@@ -49,8 +49,8 @@ android {
         resValue "string", "suggestion_authority", applicationId + ".MySuggestionProvider"
         minSdkVersion 24 // 24+: network_security_config trust anchors (ISRG Root X1) work without bundling Conscrypt
         targetSdkVersion 34
-        versionCode 95
-        versionName "7.3"
+        versionCode 96
+        versionName "7.4"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         sourceSets {
             androidTest.assets.srcDirs += files("$projectDir/schemas".toString())
