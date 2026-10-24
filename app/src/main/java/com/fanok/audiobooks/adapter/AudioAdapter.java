@@ -51,6 +51,8 @@ public class AudioAdapter extends RecyclerView.Adapter<AudioAdapter.ViewHolder> 
 
     private ArrayList<AudioPOJO> mData;
     private int mChaptersTotal;
+    /** Positions of the chapters held as exported copies in the download folder (their download may be gone). */
+    private final java.util.Set<Integer> exported = new HashSet<>();
 
     private AudioAdapter.OnListItemSelectedInterface mListener;
 
@@ -161,10 +163,10 @@ public class AudioAdapter extends RecyclerView.Adapter<AudioAdapter.ViewHolder> 
         Map<String, DownloadStatus.Part> parts = new HashMap<>();
         int done = 0;
         int selected = 0;
-        for (AudioPOJO audio : mData) {
-            String url = audio.getUrl();
+        for (int i = 0; i < mData.size(); i++) {
+            String url = mData.get(i).getUrl();
             if (url == null) continue;
-            if (!DeletionPlanner.isRemote(url)) {
+            if (!DeletionPlanner.isRemote(url) || exported.contains(i)) {
                 done++;
                 selected++;
                 continue;
@@ -201,7 +203,16 @@ public class AudioAdapter extends RecyclerView.Adapter<AudioAdapter.ViewHolder> 
             } catch (Exception e) {
                 Log.w(TAG, "Failed to query downloads", e);
             }
+            java.util.Set<Integer> copies = new HashSet<>();
+            try {
+                copies = DownloadUtil.exportedChapters(App.getInstance(), book, urls);
+            } catch (Exception e) {
+                Log.w(TAG, "Failed to read exported chapters", e);
+            }
+            final java.util.Set<Integer> exportedNow = copies;
             new android.os.Handler(android.os.Looper.getMainLooper()).post(() -> {
+                exported.clear();
+                exported.addAll(exportedNow);
                 allDownloads.clear();
                 allDownloads.putAll(byUrl);
                 notifyDataSetChanged();
@@ -321,7 +332,7 @@ public class AudioAdapter extends RecyclerView.Adapter<AudioAdapter.ViewHolder> 
 
 
         String url = mData.get(i).getUrl();
-        bindDownloadState(viewHolder, url);
+        bindDownloadState(viewHolder, i);
 
 
         viewHolder.mView.setOnLongClickListener(view -> {
@@ -396,7 +407,7 @@ public class AudioAdapter extends RecyclerView.Adapter<AudioAdapter.ViewHolder> 
     @Override
     public void onBindViewHolder(@NonNull ViewHolder viewHolder, int i, @NonNull List<Object> payloads) {
         if (payloads.contains(LIVE)) {
-            bindDownloadState(viewHolder, mData.get(i).getUrl());
+            bindDownloadState(viewHolder, i);
         } else {
             super.onBindViewHolder(viewHolder, i, payloads);
         }
@@ -406,12 +417,19 @@ public class AudioAdapter extends RecyclerView.Adapter<AudioAdapter.ViewHolder> 
      * The chapter's download as an icon: held, a ring of how much is here (the manager's live bytes), queued, failed
      * or paused. The spinner stays only while the download does not know its size yet.
      */
-    private void bindDownloadState(@NonNull ViewHolder viewHolder, String url) {
+    private void bindDownloadState(@NonNull ViewHolder viewHolder, int position) {
+        String url = mData.get(position).getUrl();
         Download download = url != null ? allDownloads.get(url) : null;
         if (download != null) download = DownloadMonitor.get().refresh(download);
         viewHolder.mImageView.setVisibility(View.INVISIBLE);
         viewHolder.mProgressBar.setVisibility(View.GONE);
         if (viewHolder.mDonut != null) viewHolder.mDonut.setVisibility(View.GONE);
+        if (exported.contains(position)) {
+            viewHolder.mImageView.setImageResource(R.drawable.ic_is_check);
+            viewHolder.mImageView.setContentDescription(null);
+            viewHolder.mImageView.setVisibility(View.VISIBLE);
+            return;
+        }
         if (download == null || !isStateMatch(states, download.state)) return;
         switch (download.state) {
             case Download.STATE_COMPLETED:

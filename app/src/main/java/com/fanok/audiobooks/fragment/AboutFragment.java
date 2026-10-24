@@ -96,8 +96,7 @@ public class AboutFragment extends PreferenceFragmentCompat {
                 enabled = false;
 
             } else if (pm != null) {
-                enabled = !pm.isIgnoringBatteryOptimizations(
-                        "com.fanok.audiobooks");
+                enabled = !pm.isIgnoringBatteryOptimizations(requireContext().getPackageName());
             } else {
                 enabled = false;
             }

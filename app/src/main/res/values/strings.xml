@@ -475,7 +475,8 @@
     <string name="export_started">Экспорт в папку загрузок…</string>
     <string name="export_done">Экспортировано глав: %1$d</string>
     <string name="export_failed">Экспортировано: %1$d, ошибок: %2$d. %3$s</string>
-    <string name="export_nothing">Нечего экспортировать: у скачанных глав уже есть копии или это поток HLS</string>
+    <string name="export_nothing">Нечего экспортировать: у всех скачанных глав уже есть копии</string>
+    <string name="auto_export_failed">Не удалось сохранить главы в папку загрузок: %1$s</string>
     <string name="ok">ОК</string>
     <string name="continue_">Продолжить</string>
     <string name="undo">Отменить</string>

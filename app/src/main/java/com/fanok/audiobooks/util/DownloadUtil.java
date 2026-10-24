@@ -236,17 +236,67 @@ public class DownloadUtil {
     @NonNull
     public static List<DownloadIds.Entry> entriesFor(@NonNull Context context, @NonNull String bookUrl,
                                                      @NonNull List<String> urls) {
-        List<BooksAudioEntity> rows = new AudioListDBModel(context).getRows(bookUrl);
-        List<String> rowUrls = new ArrayList<>(rows.size());
-        for (BooksAudioEntity row : rows) rowUrls.add(row.urlAudio == null ? "" : row.urlAudio);
+        return entriesFor(bookUrl, new AudioListDBModel(context).getRows(bookUrl), urls);
+    }
+
+    /** {@link #entriesFor(Context, String, List)} with the book's {@code rows} at hand. */
+    @NonNull
+    static List<DownloadIds.Entry> entriesFor(@NonNull String bookUrl, @NonNull List<BooksAudioEntity> rows,
+                                              @NonNull List<String> urls) {
+        int[] at = alignRows(rows, urls);
         List<DownloadIds.Entry> byRow = entriesOf(bookUrl, rows);
         List<DownloadIds.Entry> byPosition = DownloadIds.forBook(bookUrl, urls, null);
-        int[] at = DownloadIds.align(rowUrls, urls);
         List<DownloadIds.Entry> result = new ArrayList<>(urls.size());
         for (int i = 0; i < urls.size(); i++) {
             result.add(at[i] >= 0 ? byRow.get(at[i]) : byPosition.get(i));
         }
         return result;
+    }
+
+    /**
+     * For each of {@code urls}, the book's chapter list, the index of its recorded row in {@code rows}, or -1: the row
+     * with its position as ordinal and its URL, exact where chapters share one URL (a stream) and rows kept for their
+     * copy precede them; else by URL ({@link DownloadIds#align}).
+     */
+    @NonNull
+    static int[] alignRows(@NonNull List<BooksAudioEntity> rows, @NonNull List<String> urls) {
+        List<String> rowUrls = new ArrayList<>(rows.size());
+        Map<Integer, Integer> byOrdinal = new HashMap<>();
+        for (int j = 0; j < rows.size(); j++) {
+            BooksAudioEntity row = rows.get(j);
+            rowUrls.add(row.urlAudio == null ? "" : row.urlAudio);
+            if (row.ordinal >= 0) byOrdinal.put(row.ordinal, j);
+        }
+        int[] at = DownloadIds.align(rowUrls, urls);
+        for (int i = 0; i < urls.size(); i++) {
+            Integer j = byOrdinal.get(i);
+            if (j != null && urls.get(i) != null && urls.get(i).equals(rows.get(j).urlAudio)) at[i] = j;
+        }
+        return at;
+    }
+
+    /**
+     * Chapters of {@code urls} (of {@code bookUrl}) whose row records an exported copy that exists: they are held in
+     * the download folder whether or not their Media3 download is still there.
+     */
+    @NonNull
+    public static Set<Integer> exportedChapters(@NonNull Context context, @Nullable String bookUrl,
+                                                @NonNull List<String> urls) {
+        Set<Integer> exported = new HashSet<>();
+        if (bookUrl == null || bookUrl.isEmpty()) return exported;
+        List<BooksAudioEntity> rows = new AudioListDBModel(context).getRows(bookUrl);
+        int[] at = alignRows(rows, urls);
+        for (int i = 0; i < urls.size(); i++) {
+            if (at[i] >= 0 && ownCopyOf(context, rows.get(at[i])) != null) exported.add(i);
+        }
+        return exported;
+    }
+
+    /** The exported copy the row records, when it still exists; else null. */
+    @Nullable
+    static String ownCopyOf(@NonNull Context context, @NonNull BooksAudioEntity row) {
+        String local = row.localUri;
+        return local != null && !local.isEmpty() && DownloadStorageHelper.exists(context, local) ? local : null;
     }
 
     /** The ids a chapter may be downloaded under: its current id, then its legacy id. */
@@ -365,13 +415,19 @@ public class DownloadUtil {
         for (AudioPOJO chapter : chapters) urls.add(chapter.getUrl());
         List<DownloadIds.Entry> entries = entriesFor(context, book.getUrl(), urls);
         Set<String> chosen = new HashSet<>(chosenUrls);
+        Set<Integer> exported = exportedChapters(context, book.getUrl(), urls);
+        // a download is fetched (again) only while one of its chosen chapters has no exported copy
+        Set<String> needed = new HashSet<>();
+        for (int i = 0; i < urls.size(); i++) {
+            if (chosen.contains(urls.get(i)) && !exported.contains(i)) needed.add(entries.get(i).id);
+        }
         byte[] data = new Gson().toJson(book).getBytes(StandardCharsets.UTF_8);
         Set<String> queued = new HashSet<>();
         DownloadIndex index = getDownloadManager().getDownloadIndex();
         for (int i = 0; i < urls.size(); i++) {
             String url = urls.get(i);
             DownloadIds.Entry entry = entries.get(i);
-            if (!chosen.contains(url) || !DeletionPlanner.isRemote(url) || !queued.add(entry.id)) continue;
+            if (!needed.contains(entry.id) || !DeletionPlanner.isRemote(url) || !queued.add(entry.id)) continue;
             Download existing = find(index, entry, url);
             if (existing != null && existing.state == Download.STATE_COMPLETED) continue;
             DownloadRequest request = new DownloadRequest.Builder(entry.id, Uri.parse(url))
@@ -385,21 +441,26 @@ public class DownloadUtil {
 
     // ---------------------------------------------------------------- playback
 
-    /** What the player plays for one chapter: the media item (clipping is the caller's) and its data source. */
+    /**
+     * What the player plays for one chapter: the media item and its data source. The caller clips the item to the
+     * chapter unless it is the chapter's own exported copy ({@link #ownCopy}), which holds exactly the chapter.
+     */
     public static final class Playback {
         public final MediaItem.Builder mediaItem;
         public final DataSource.Factory dataSourceFactory;
+        public final boolean ownCopy;
 
-        Playback(MediaItem.Builder mediaItem, DataSource.Factory dataSourceFactory) {
+        Playback(MediaItem.Builder mediaItem, DataSource.Factory dataSourceFactory, boolean ownCopy) {
             this.mediaItem = mediaItem;
             this.dataSourceFactory = dataSourceFactory;
+            this.ownCopy = ownCopy;
         }
     }
 
     /**
-     * Playback of {@code playlist[index]} of {@code bookUrl}: a local file directly; otherwise the chapter's completed
-     * download (by its own id and cache key, legacy downloads by theirs), else the network, both through the read-only
-     * download cache and the book's request context.
+     * Playback of {@code playlist[index]} of {@code bookUrl}: a local file directly; a remote chapter from its own
+     * exported copy, else its completed download (by its own id and cache key, legacy downloads by theirs), else the
+     * network, both through the read-only download cache and the book's request context.
      */
     @NonNull
     public static Playback playbackFor(@NonNull Context context, @Nullable String bookUrl,
@@ -407,17 +468,20 @@ public class DownloadUtil {
         String url = playlist.get(index).getUrl();
         MediaItem.Builder item = new MediaItem.Builder();
         if (url == null || !DeletionPlanner.isRemote(url)) {
-            Uri local = url == null ? Uri.EMPTY
-                    : url.startsWith("content://") || url.startsWith("file://") ? Uri.parse(url)
-                    : Uri.fromFile(new java.io.File(url));
-            return new Playback(item.setUri(local), new DefaultDataSource.Factory(context));
+            return new Playback(item.setUri(localUri(url)), new DefaultDataSource.Factory(context), false);
         }
         DownloadIds.Entry entry = null;
         Download download = null;
         if (bookUrl != null && !bookUrl.isEmpty()) {
             List<String> urls = new ArrayList<>(playlist.size());
             for (AudioPOJO audio : playlist) urls.add(audio.getUrl());
-            entry = entriesFor(context, bookUrl, urls).get(index);
+            List<BooksAudioEntity> rows = new AudioListDBModel(context).getRows(bookUrl);
+            int row = alignRows(rows, urls)[index];
+            String own = row >= 0 ? ownCopyOf(context, rows.get(row)) : null;
+            if (own != null) {
+                return new Playback(item.setUri(localUri(own)), new DefaultDataSource.Factory(context), true);
+            }
+            entry = entriesFor(bookUrl, rows, urls).get(index);
             download = find(getDownloadManager().getDownloadIndex(), entry, url);
         }
         if (download != null && download.state == Download.STATE_COMPLETED) {
@@ -436,7 +500,15 @@ public class DownloadUtil {
                 .setUpstreamDataSourceFactory(upstreamFor(context, bookUrl))
                 .setCacheWriteDataSinkFactory(null) // read-only: the download cache holds explicit downloads only
                 .setFlags(CacheDataSource.FLAG_IGNORE_CACHE_ON_ERROR);
-        return new Playback(item, factory);
+        return new Playback(item, factory, false);
+    }
+
+    /** A local file as a URI: content:// and file:// as they are, a path as a file URI. */
+    @NonNull
+    private static Uri localUri(@Nullable String url) {
+        return url == null ? Uri.EMPTY
+                : url.startsWith("content://") || url.startsWith("file://") ? Uri.parse(url)
+                : Uri.fromFile(new java.io.File(url));
     }
 
     // ---------------------------------------------------------------- exact-key cache reads

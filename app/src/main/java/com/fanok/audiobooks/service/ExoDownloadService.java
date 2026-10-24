@@ -17,6 +17,7 @@ import androidx.media3.exoplayer.offline.DownloadService;
 import androidx.media3.exoplayer.scheduler.PlatformScheduler;
 import androidx.media3.exoplayer.scheduler.Scheduler;
 import com.fanok.audiobooks.NotificationDownload;
+import com.fanok.audiobooks.R;
 import com.fanok.audiobooks.download.DownloadMonitor;
 import com.fanok.audiobooks.model.AudioListDBModel;
 import com.fanok.audiobooks.model.BooksDBModel;
@@ -31,8 +32,9 @@ import java.util.Set;
 import org.jetbrains.annotations.NotNull;
 
 /**
- * Runs the downloads of the one process-wide {@link DownloadManager}. Completed media stays in the Media3 cache, the
- * authoritative copy; exporting to the download folder is a separate step the user asks for on the Downloads screen.
+ * Runs the downloads of the one process-wide {@link DownloadManager}. The Media3 cache only stages a download: once it
+ * is complete its chapters are exported to the download folder as playable files and the staged copy is removed
+ * ({@link DownloadStorageHelper#exportBooks}).
  */
 @OptIn(markerClass = UnstableApi.class)
 public class ExoDownloadService extends DownloadService {
@@ -138,10 +140,22 @@ public class ExoDownloadService extends DownloadService {
                         new BooksDBModel(context).addSaved(book);
                     }
                     notifyChanged(context);
+                    String bookUrl = DownloadUtil.bookUrlOf(download.request);
+                    if (bookUrl != null && !bookUrl.isEmpty()) export(context, bookUrl);
                 });
             } else {
                 notifyChanged(context);
             }
+        }
+
+        /** The completed chapters of the book go to the download folder; a failure is told, the download stays. */
+        private static void export(@NonNull Context context, @NonNull String bookUrl) {
+            DownloadStorageHelper.exportBooks(context, java.util.Collections.singleton(bookUrl),
+                    (exported, failed, error) -> {
+                        if (failed == 0) return;
+                        android.widget.Toast.makeText(context, context.getString(R.string.auto_export_failed,
+                                error != null ? error : ""), android.widget.Toast.LENGTH_LONG).show();
+                    });
         }
 
         @Override

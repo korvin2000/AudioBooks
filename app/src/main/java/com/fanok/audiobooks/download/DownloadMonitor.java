@@ -31,6 +31,7 @@ import com.fanok.audiobooks.App;
 import com.fanok.audiobooks.NotificationDownload;
 import com.fanok.audiobooks.R;
 import com.fanok.audiobooks.pojo.BookPOJO;
+import com.fanok.audiobooks.util.DownloadStorageHelper;
 import com.fanok.audiobooks.util.DownloadUtil;
 
 import java.io.IOException;
@@ -568,10 +569,13 @@ public final class DownloadMonitor implements DownloadManager.Listener {
         // for any running transfer, which the service shows, unless it tells another book's failure; the next
         // reconcile puts up what is true then
         boolean own = key.equals(restingKey);
-        if (own ? download.state != Download.STATE_FAILED : running && restingState != DownloadStatus.FAILED) {
+        // a download removed once its chapters are exported: the book did not move on, its notice stays
+        boolean released = download.state == Download.STATE_REMOVING && DownloadStorageHelper.isReleased(id);
+        if (!released && (own ? download.state != Download.STATE_FAILED
+                : running && restingState != DownloadStatus.FAILED)) {
             cancelResting();
         }
-        if (download.state != Download.STATE_REMOVING || own) touch(key);
+        if (!released && (download.state != Download.STATE_REMOVING || own)) touch(key);
         refreshBooks();
         notifyListeners();
         ensureTicking();
@@ -579,6 +583,7 @@ public final class DownloadMonitor implements DownloadManager.Listener {
 
     @Override
     public void onDownloadRemoved(@NonNull DownloadManager downloadManager, @NonNull Download download) {
+        DownloadStorageHelper.forgetReleased(download.request.id);
         meter.forget(download.request.id);
         failures.remove(download.request.id);
         keyOfId.remove(download.request.id);

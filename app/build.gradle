@@ -44,7 +44,9 @@ android {
             }
         }
 
-        applicationId "com.fanok.audiobooks"
+        applicationId "com.fanok.books"
+        // the search suggestion authority follows the application id, so another install of the app never clashes with it
+        resValue "string", "suggestion_authority", applicationId + ".MySuggestionProvider"
         minSdkVersion 24 // 24+: network_security_config trust anchors (ISRG Root X1) work without bundling Conscrypt
         targetSdkVersion 34
         versionCode 95

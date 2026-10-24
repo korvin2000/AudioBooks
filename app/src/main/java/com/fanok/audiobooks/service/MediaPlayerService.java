@@ -979,7 +979,9 @@ public class MediaPlayerService extends MediaBrowserServiceCompat {
             dataSourceFactory = upstreamForTest;
         }
         androidx.media3.common.MediaItem.Builder item = playback.mediaItem.setMediaId(Integer.toString(chapterIndex));
-        if (audio.getTimeStart() >= 0 && audio.getTimeFinish() >= 0) {
+        if (playback.ownCopy) {
+            //the exported copy is the chapter itself: nothing to clip
+        } else if (audio.getTimeStart() >= 0 && audio.getTimeFinish() >= 0) {
             item.setClippingConfiguration(new ClippingConfiguration.Builder()
                     .setStartPositionMs(audio.getTimeStart() * 1000L)
                     .setEndPositionMs(audio.getTimeFinish() * 1000L)
@@ -1024,13 +1026,15 @@ public class MediaPlayerService extends MediaBrowserServiceCompat {
             try {
                 for (BooksAudioEntity row : new AudioListDBModel(app).getRows(url)) {
                     String local = DownloadStorageHelper.localCopyOf(app, row);
+                    //an exported copy is exactly its chapter: the stream's clipping no longer applies
+                    boolean ownCopy = local != null && local.equals(row.localUri);
                     AudioPOJO audio = new AudioPOJO();
                     audio.setName(row.nameAudio);
                     audio.setBookName(row.booksName);
                     audio.setUrl(local != null ? local : row.urlAudio);
                     audio.setTime(row.time);
-                    audio.setTimeStart(row.timeStart);
-                    audio.setTimeFinish(row.timeEnd);
+                    audio.setTimeStart(ownCopy ? -1 : row.timeStart);
+                    audio.setTimeFinish(ownCopy ? -1 : row.timeEnd);
                     list.add(audio);
                 }
                 found = new BooksDBModel(app).getSomewhere(url);

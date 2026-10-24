@@ -374,7 +374,7 @@ public class SettingsFragment extends PreferenceFragmentCompat implements
                     == Configuration.UI_MODE_TYPE_TELEVISION) {
                 ignor = true;
             } else {
-                ignor = pm.isIgnoringBatteryOptimizations("com.fanok.audiobooks");
+                ignor = pm.isIgnoringBatteryOptimizations(requireContext().getPackageName());
             }
         } else {
             ignor = true;

@@ -163,7 +163,7 @@ public class MainActivity extends MvpAppCompatActivity
 
     private boolean shouldAskBatteryOptimization() {
         PowerManager pm = (PowerManager) getSystemService(Context.POWER_SERVICE);
-        if (pm == null || pm.isIgnoringBatteryOptimizations("com.fanok.audiobooks")) {
+        if (pm == null || pm.isIgnoringBatteryOptimizations(getPackageName())) {
             return false;
         }
         UiModeManager uiModeManager = (UiModeManager) getApplicationContext().getSystemService(UI_MODE_SERVICE);

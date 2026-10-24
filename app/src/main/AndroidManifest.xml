@@ -198,7 +198,7 @@
 
         <provider
             android:name=".MySuggestionProvider"
-            android:authorities="com.fanok.audiobooks.MySuggestionProvider"
+            android:authorities="${applicationId}.MySuggestionProvider"
             android:exported="false" />
 
         <receiver
