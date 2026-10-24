@@ -667,13 +667,15 @@ public class BookPresenter extends MvpPresenter<Activity> implements ActivityPre
                         }
 
                         if (resolvedUrl != null) {
+                            // an exported copy is exactly its chapter: the stream's clipping no longer applies
+                            boolean ownCopy = resolvedUrl.equals(row.localUri);
                             AudioPOJO audioPOJO = new AudioPOJO();
                             audioPOJO.setName(row.nameAudio);
                             audioPOJO.setBookName(row.booksName);
                             audioPOJO.setUrl(resolvedUrl);
                             audioPOJO.setTime(row.time);
-                            audioPOJO.setTimeStart(row.timeStart);
-                            audioPOJO.setTimeFinish(row.timeEnd);
+                            audioPOJO.setTimeStart(ownCopy ? -1 : row.timeStart);
+                            audioPOJO.setTimeFinish(ownCopy ? -1 : row.timeEnd);
                             localAudio.add(audioPOJO);
                             //rows come in book order: j is the chapter's index in the full list
                             localOrdinals.add(j);

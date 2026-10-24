@@ -274,6 +274,8 @@ public class App extends Application {
         // before the download service can resume the manager: the monitor sees every run from its first event and
         // takes over the resting notification an earlier process left
         DownloadMonitor.get();
+        // what finished while the app was not running, or an export left half done, goes to the download folder now
+        DownloadStorageHelper.exportPending(this);
     }
 
 

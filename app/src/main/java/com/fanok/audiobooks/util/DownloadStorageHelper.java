@@ -233,11 +233,14 @@ public class DownloadStorageHelper {
     }
 
     /**
-     * Exports, on the storage worker and one chapter at a time, every completed single-file download of the given books
-     * whose chapter has no copy yet, into "source/book/reader/NNN - title.ext" below the download folder. A chapter's
+     * Exports, on the storage worker, every completed download of the given books whose chapter has no copy yet, into
+     * "source/book/reader/NNN - title.ext" below the download folder, as a file any player opens: a single-file
+     * chapter as it was downloaded, a chapter clipped out of a stream (HLS, or one file shared by several chapters) cut
+     * out of it without re-encoding ({@link ChapterExtractor}), so every copy is exactly its chapter. A chapter's
      * local_uri is recorded only once its file is complete under its final name; asking again resumes after an
-     * interruption, and a recorded copy that no longer exists is forgotten and written again. HLS streams stay Media3
-     * assets and are not exported.
+     * interruption, and a recorded copy that no longer exists is forgotten and written again. Then the Media3
+     * downloads all of whose chapters have their copy are removed ({@link #releaseExported}): the book stays in the
+     * download folder only.
      */
     @androidx.annotation.OptIn(markerClass = androidx.media3.common.util.UnstableApi.class)
     public static void exportBooks(@NonNull Context context, @NonNull Collection<String> bookUrls,
@@ -245,61 +248,270 @@ public class DownloadStorageHelper {
         final Context app = context.getApplicationContext();
         final List<String> urls = new ArrayList<>(bookUrls);
         STORAGE.execute(() -> {
-            int exported = 0;
-            int failed = 0;
-            String error = null;
+            Tally tally = new Tally();
             try {
                 Cache cache = DownloadUtil.getDownloadCache();
                 DownloadIndex index = DownloadUtil.getDownloadManager().getDownloadIndex();
                 AudioListDBModel model = new AudioListDBModel(app);
                 BooksDBModel books = new BooksDBModel(app);
                 for (String bookUrl : urls) {
-                    BookPOJO book = books.getSomewhere(bookUrl);
-                    List<BooksAudioEntity> rows = model.getRows(bookUrl);
-                    List<DownloadIds.Entry> entries = DownloadUtil.entriesOf(bookUrl, rows);
-                    int bookExported = 0;
-                    for (int i = 0; i < rows.size(); i++) {
-                        BooksAudioEntity row = rows.get(i);
-                        if (!DeletionPlanner.isRemote(row.urlAudio)) continue;
-                        if (row.localUri != null) {
-                            if (exists(app, row.localUri)) continue;
-                            // Deleted outside the app: the stale record must not hide the chapter from export.
-                            model.getDatabase().booksAudioDao().updateLocalUriById(row.id, null);
-                        }
-                        Download download = DownloadUtil.find(index, entries.get(i), row.urlAudio);
-                        if (download == null || download.state != Download.STATE_COMPLETED
-                                || !DownloadUtil.isProgressive(download.request)) {
-                            continue;
-                        }
-                        if (book == null) book = DownloadUtil.bookOf(download.request);
-                        int number = row.ordinal >= 0 ? row.ordinal + 1 : i + 1;
-                        try {
-                            String uri = exportChapter(app, cache, download, book, bookUrl, row, number);
-                            model.getDatabase().booksAudioDao().updateLocalUri(bookUrl, row.urlAudio, uri);
-                            bookExported++;
-                        } catch (Exception e) {
-                            failed++;
-                            if (error == null) error = e.getMessage() != null ? e.getMessage() : e.toString();
-                            android.util.Log.e("DownloadStorageHelper", "Export failed: " + download.request.id, e);
-                        }
-                    }
-                    if (bookExported > 0) exportCover(app, book, bookUrl);
-                    exported += bookExported;
+                    exportBook(app, cache, index, model, books, bookUrl, tally);
                 }
             } catch (Exception e) {
-                failed++;
-                if (error == null) error = e.toString();
+                tally.fail(e);
                 android.util.Log.e("DownloadStorageHelper", "Export failed", e);
             }
             app.sendBroadcast(new Intent(BookActivity.Broadcast_UPDATE_ADAPTER).setPackage(app.getPackageName()));
             if (callback != null) {
-                final int exportedCount = exported;
-                final int failedCount = failed;
-                final String firstError = error;
                 new android.os.Handler(android.os.Looper.getMainLooper())
-                        .post(() -> callback.onExported(exportedCount, failedCount, firstError));
+                        .post(() -> callback.onExported(tally.exported, tally.failed, tally.error));
             }
         });
+    }
+
+    /**
+     * Exports, on the storage worker, the books of every completed download: what a download finished while the app
+     * was not running, or an interrupted export left, is written at the next start.
+     */
+    @androidx.annotation.OptIn(markerClass = androidx.media3.common.util.UnstableApi.class)
+    public static void exportPending(@NonNull Context context) {
+        final Context app = context.getApplicationContext();
+        STORAGE.execute(() -> {
+            Set<String> bookUrls = new java.util.LinkedHashSet<>();
+            try (androidx.media3.exoplayer.offline.DownloadCursor cursor = DownloadUtil.getDownloadManager()
+                    .getDownloadIndex().getDownloads(Download.STATE_COMPLETED)) {
+                while (cursor.moveToNext()) {
+                    String bookUrl = DownloadUtil.bookUrlOf(cursor.getDownload().request);
+                    if (bookUrl != null && !bookUrl.isEmpty()) bookUrls.add(bookUrl);
+                }
+            } catch (Exception e) {
+                android.util.Log.w("DownloadStorageHelper", "Download index unreadable", e);
+            }
+            if (!bookUrls.isEmpty()) exportBooks(app, bookUrls, null);
+        });
+    }
+
+    /** Counts of one export run and its first error. */
+    private static final class Tally {
+        int exported;
+        int failed;
+        String error;
+
+        void fail(@NonNull Exception e) {
+            failed++;
+            if (error == null) error = e.getMessage() != null ? e.getMessage() : e.toString();
+        }
+    }
+
+    /** True when playback clips the chapter out of its stream (the rule of the player's clipping). */
+    static boolean isClipped(@NonNull BooksAudioEntity row) {
+        return (row.timeStart >= 0 && row.timeEnd >= 0) || row.timeStart > 0;
+    }
+
+    @androidx.annotation.OptIn(markerClass = androidx.media3.common.util.UnstableApi.class)
+    private static void exportBook(@NonNull Context app, @NonNull Cache cache, @NonNull DownloadIndex index,
+                                   @NonNull AudioListDBModel model, @NonNull BooksDBModel books,
+                                   @NonNull String bookUrl, @NonNull Tally tally) {
+        BookPOJO book = books.getSomewhere(bookUrl);
+        List<BooksAudioEntity> rows = model.getRows(bookUrl);
+        List<DownloadIds.Entry> entries = DownloadUtil.entriesOf(bookUrl, rows);
+        // chapters cut out of one download, in one pass over it
+        java.util.Map<String, Download> streams = new java.util.LinkedHashMap<>();
+        java.util.Map<String, List<Integer>> clipped = new java.util.HashMap<>();
+        int bookExported = 0;
+        for (int i = 0; i < rows.size(); i++) {
+            BooksAudioEntity row = rows.get(i);
+            if (!DeletionPlanner.isRemote(row.urlAudio)) continue;
+            if (row.localUri != null) {
+                if (exists(app, row.localUri)) continue;
+                // Deleted outside the app: the stale record must not hide the chapter from export.
+                model.getDatabase().booksAudioDao().updateLocalUriById(row.id, null);
+                row.localUri = null;
+            }
+            Download download = DownloadUtil.find(index, entries.get(i), row.urlAudio);
+            if (download == null || download.state != Download.STATE_COMPLETED) continue;
+            if (book == null) book = DownloadUtil.bookOf(download.request);
+            if (DownloadUtil.isProgressive(download.request) && !isClipped(row)) {
+                try {
+                    String uri = exportChapter(app, cache, download, book, bookUrl, row, numberOf(row, i));
+                    model.getDatabase().booksAudioDao().updateLocalUriById(row.id, uri);
+                    row.localUri = uri;
+                    bookExported++;
+                } catch (Exception e) {
+                    tally.fail(e);
+                    android.util.Log.e("DownloadStorageHelper", "Export failed: " + download.request.id, e);
+                }
+            } else {
+                String id = download.request.id;
+                streams.put(id, download);
+                if (!clipped.containsKey(id)) clipped.put(id, new ArrayList<>());
+                clipped.get(id).add(i);
+            }
+        }
+        for (java.util.Map.Entry<String, Download> stream : streams.entrySet()) {
+            bookExported += exportClips(app, cache, stream.getValue(), book, bookUrl, rows,
+                    clipped.get(stream.getKey()), model, tally);
+        }
+        if (bookExported > 0) exportCover(app, book, bookUrl);
+        tally.exported += bookExported;
+        releaseExported(app, index, model, bookUrl, rows, entries);
+    }
+
+    /** Temporary files of an export the process died in; no other export runs meanwhile (one storage worker). */
+    private static void removeStaleTemps(@NonNull File dir) {
+        File[] stale = dir.listFiles((d, name) -> name.startsWith(".export-") && name.endsWith(".part"));
+        if (stale == null) return;
+        //noinspection ResultOfMethodCallIgnored
+        for (File file : stale) file.delete();
+    }
+
+    /** "NNN" of a chapter file: its recorded position, else its place in the list. */
+    private static int numberOf(@NonNull BooksAudioEntity row, int i) {
+        return row.ordinal >= 0 ? row.ordinal + 1 : i + 1;
+    }
+
+    /**
+     * Cuts the chapters {@code at} (indexes into {@code rows}) out of {@code download} in one pass, each into its own
+     * file below the download folder (file path first, else the selected SAF tree through a temporary file of the
+     * app), recording each copy as soon as it is complete; returns how many were exported.
+     */
+    @androidx.annotation.OptIn(markerClass = androidx.media3.common.util.UnstableApi.class)
+    private static int exportClips(@NonNull Context context, @NonNull Cache cache, @NonNull Download download,
+                                   @Nullable BookPOJO book, @NonNull String bookUrl,
+                                   @NonNull List<BooksAudioEntity> rows, @NonNull List<Integer> at,
+                                   @NonNull AudioListDBModel model, @NonNull Tally tally) {
+        BooksAudioEntity first = rows.get(at.get(0));
+        String bookName = book != null ? book.getName() : first.booksName;
+        String artist = book != null ? book.getArtist() : null;
+        String autor = book != null ? book.getAutor() : null;
+        final File dir = getBookDownloadDir(context, bookUrl, bookName, artist, autor);
+        final boolean toDir = (dir.isDirectory() || dir.mkdirs()) && canCreateFileInDir(dir);
+        final DocumentFile voiceDoc;
+        if (toDir) {
+            voiceDoc = null;
+        } else {
+            DocumentFile root = getRootDocumentFile(context);
+            DocumentFile source = root != null ? findOrCreateSubdir(root, getSourceName(bookUrl)) : null;
+            DocumentFile bookDoc = source != null ? findOrCreateSubdir(source, sanitizeFileName(bookName)) : null;
+            voiceDoc = bookDoc != null ? findOrCreateSubdir(bookDoc, voiceFolder(artist, autor)) : null;
+            if (voiceDoc == null) {
+                tally.failed += at.size();
+                if (tally.error == null) tally.error = "Download folder does not accept files: " + dir;
+                return 0;
+            }
+        }
+        final File work = toDir ? dir : context.getCacheDir();
+        removeStaleTemps(work);
+        List<ChapterExtractor.Clip> clips = new ArrayList<>(at.size());
+        for (int i : at) {
+            BooksAudioEntity row = rows.get(i);
+            long startUs = Math.max(0, row.timeStart) * 1_000_000L;
+            long endUs = row.timeEnd >= 0 ? row.timeEnd * 1_000_000L : Long.MAX_VALUE;
+            clips.add(new ChapterExtractor.Clip(startUs, endUs));
+        }
+        final int[] done = {0};
+        final int[] failed = {0};
+        try {
+            ChapterExtractor.extract(cache, download, clips, new ChapterExtractor.Output() {
+                @NonNull
+                @Override
+                public File open(int clip) throws IOException {
+                    if (work.getUsableSpace() < SPACE_MARGIN) throw new IOException("Not enough free space in " + work);
+                    return File.createTempFile(".export-", ".part", work);
+                }
+
+                @Override
+                public void done(int clip, @NonNull File file, @NonNull String extension) throws IOException {
+                    BooksAudioEntity row = rows.get(at.get(clip));
+                    int number = numberOf(row, at.get(clip));
+                    String uri;
+                    if (toDir) {
+                        uri = placeInDir(file, dir, StorageNames.exportFileName(number, row.nameAudio, extension))
+                                .getAbsolutePath();
+                    } else {
+                        try {
+                            uri = exportToTree(context, voiceDoc, out -> copyFile(file, out), number, row.nameAudio,
+                                    extension);
+                        } finally {
+                            //noinspection ResultOfMethodCallIgnored
+                            file.delete();
+                        }
+                    }
+                    model.getDatabase().booksAudioDao().updateLocalUriById(row.id, uri);
+                    row.localUri = uri;
+                    done[0]++;
+                }
+
+                @Override
+                public void failed(int clip, @NonNull Exception error) {
+                    failed[0]++;
+                    tally.fail(error);
+                    android.util.Log.e("DownloadStorageHelper", "Export failed: " + rows.get(at.get(clip)).nameAudio,
+                            error);
+                }
+            });
+        } catch (Exception e) {
+            // the stream itself: the chapters it did not report fail with it
+            int left = at.size() - done[0] - failed[0];
+            if (left > 0) {
+                tally.fail(e);
+                tally.failed += left - 1;
+            }
+            android.util.Log.e("DownloadStorageHelper", "Export failed: " + download.request.id, e);
+        }
+        return done[0];
+    }
+
+    /** Downloads removed because their chapters are exported, not deleted by the user, until the manager is done. */
+    private static final Set<String> RELEASED =
+            Collections.newSetFromMap(new java.util.concurrent.ConcurrentHashMap<String, Boolean>());
+
+    /** True while the download {@code id} is being removed after its chapters were exported. */
+    public static boolean isReleased(@NonNull String id) {
+        return RELEASED.contains(id);
+    }
+
+    /** The manager removed the download {@code id}. */
+    public static void forgetReleased(@NonNull String id) {
+        RELEASED.remove(id);
+    }
+
+    /**
+     * Removes the completed Media3 downloads of the book that only chapters with their exported copy use (the book's
+     * own rows and those of another saved entry of it), so it is kept once, in the download folder. Not while the
+     * player holds the book: it may be reading the cache; a later export (at the latest the next start) removes them.
+     */
+    @androidx.annotation.OptIn(markerClass = androidx.media3.common.util.UnstableApi.class)
+    private static void releaseExported(@NonNull Context context, @NonNull DownloadIndex index,
+                                        @NonNull AudioListDBModel model, @NonNull String bookUrl,
+                                        @NonNull List<BooksAudioEntity> rows, @NonNull List<DownloadIds.Entry> entries) {
+        if (DownloadUtil.sameBook(bookUrl, com.fanok.audiobooks.service.MediaPlayerService.currentBookUrl())) return;
+        java.util.Map<String, Boolean> copied = new java.util.HashMap<>();
+        for (int i = 0; i < rows.size(); i++) {
+            BooksAudioEntity row = rows.get(i);
+            if (!DeletionPlanner.isRemote(row.urlAudio)) continue;
+            Download download = DownloadUtil.find(index, entries.get(i), row.urlAudio);
+            if (download == null || download.state != Download.STATE_COMPLETED) continue;
+            String id = download.request.id;
+            boolean has = row.localUri != null && exists(context, row.localUri);
+            copied.put(id, has && (!copied.containsKey(id) || copied.get(id)));
+        }
+        for (java.util.Map.Entry<String, List<BooksAudioEntity>> alias : model.getAliasRows(bookUrl).entrySet()) {
+            for (BooksAudioEntity row : alias.getValue()) {
+                if (row.localUri != null && exists(context, row.localUri)) continue;
+                for (DownloadIds.Entry entry : DownloadUtil.entriesOf(alias.getKey(), Collections.singletonList(row))) {
+                    for (String id : DownloadUtil.idsOf(entry)) copied.remove(id);
+                }
+            }
+        }
+        for (java.util.Map.Entry<String, Boolean> download : copied.entrySet()) {
+            if (!download.getValue()) continue;
+            final String id = download.getKey();
+            RELEASED.add(id);
+            // the manager itself, on its looper: no service start, which Android may refuse in the background
+            new android.os.Handler(android.os.Looper.getMainLooper())
+                    .post(() -> DownloadUtil.getDownloadManager().removeDownload(id));
+        }
     }
 
     /** Writes one chapter below the download folder (file path first, else the selected SAF tree); returns its URI. */
@@ -315,6 +527,7 @@ public class DownloadStorageHelper {
         String artist = book != null ? book.getArtist() : null;
         String autor = book != null ? book.getAutor() : null;
         File dir = getBookDownloadDir(context, bookUrl, bookName, artist, autor);
+        removeStaleTemps(dir);
         IOException fileError;
         try {
             return exportToDir(cache, key, download.request.uri, length, dir, number, row.nameAudio, fallbackExt)
@@ -330,7 +543,9 @@ public class DownloadStorageHelper {
         if (voiceDoc == null) throw new IOException("Download folder does not accept " + row.nameAudio, fileError);
         long free = new File(getDownloadPath(context)).getUsableSpace();
         if (free > 0 && free < length + SPACE_MARGIN) throw new IOException("Not enough free space");
-        return exportToTree(context, voiceDoc, cache, key, download.request.uri, length, number, row.nameAudio, fallbackExt);
+        Uri uri = download.request.uri;
+        return exportToTree(context, voiceDoc, out -> DownloadUtil.copyExact(cache, key, uri, length, out), number,
+                row.nameAudio, fallbackExt);
     }
 
     /**
@@ -347,7 +562,6 @@ public class DownloadStorageHelper {
         if (!dir.isDirectory() && !dir.mkdirs()) throw new IOException("Cannot create " + dir);
         if (dir.getUsableSpace() < length + SPACE_MARGIN) throw new IOException("Not enough free space in " + dir);
         File temp = File.createTempFile(".export-", ".part", dir);
-        File target = null;
         boolean done = false;
         try {
             HeadOutputStream head;
@@ -356,7 +570,25 @@ public class DownloadStorageHelper {
                 DownloadUtil.copyExact(cache, key, uri, length, head);
                 os.getFD().sync();
             }
-            String base = StorageNames.exportFileName(number, title, sniffExtension(head.head(), fallbackExt));
+            File target = placeInDir(temp, dir,
+                    StorageNames.exportFileName(number, title, sniffExtension(head.head(), fallbackExt)));
+            done = true;
+            return target;
+        } finally {
+            //noinspection ResultOfMethodCallIgnored
+            if (!done) temp.delete();
+        }
+    }
+
+    /**
+     * Renames the complete {@code temp} (in {@code dir}) onto {@code base}, or "base (n).ext" when taken, a name
+     * reserved with {@link File#createNewFile} so an existing file is never replaced; deletes {@code temp} on failure.
+     */
+    @NonNull
+    private static File placeInDir(@NonNull File temp, @NonNull File dir, @NonNull String base) throws IOException {
+        File target = null;
+        boolean done = false;
+        try {
             for (int n = 1; target == null; n++) {
                 if (n > 999) throw new IOException("No free name for " + base);
                 File candidate = new File(dir, uniqueName(base, n));
@@ -375,12 +607,24 @@ public class DownloadStorageHelper {
         }
     }
 
+    /** The bytes of one exported file, written to {@code out}. */
+    private interface Body {
+        void writeTo(@NonNull OutputStream out) throws IOException;
+    }
+
+    private static void copyFile(@NonNull File file, @NonNull OutputStream out) throws IOException {
+        try (java.io.InputStream in = new java.io.FileInputStream(file)) {
+            byte[] buffer = new byte[64 * 1024];
+            int read;
+            while ((read = in.read(buffer)) != -1) out.write(buffer, 0, read);
+        }
+    }
+
     /** SAF variant of {@link #exportToDir}: a temp document renamed with renameDocument; returns the renamed URI. */
-    @androidx.annotation.OptIn(markerClass = androidx.media3.common.util.UnstableApi.class)
     @NonNull
-    private static String exportToTree(@NonNull Context context, @NonNull DocumentFile dir, @NonNull Cache cache,
-                                       @NonNull String key, @NonNull Uri uri, long length, int number,
-                                       @Nullable String title, @NonNull String fallbackExt) throws IOException {
+    private static String exportToTree(@NonNull Context context, @NonNull DocumentFile dir, @NonNull Body body,
+                                       int number, @Nullable String title, @NonNull String fallbackExt)
+            throws IOException {
         DocumentFile temp = dir.createFile("application/octet-stream", ".export-" + System.nanoTime() + ".part");
         if (temp == null) throw new IOException("Download folder does not accept a new file");
         boolean done = false;
@@ -389,7 +633,7 @@ public class DownloadStorageHelper {
             try (OutputStream os = context.getContentResolver().openOutputStream(temp.getUri(), "w")) {
                 if (os == null) throw new IOException("Cannot write " + temp.getUri());
                 head = new HeadOutputStream(os);
-                DownloadUtil.copyExact(cache, key, uri, length, head);
+                body.writeTo(head);
             }
             String base = StorageNames.exportFileName(number, title, sniffExtension(head.head(), fallbackExt));
             String name = base;
@@ -414,10 +658,11 @@ public class DownloadStorageHelper {
         return dot > 0 ? name.substring(0, dot) + " (" + n + ")" + name.substring(dot) : name + " (" + n + ")";
     }
 
-    /** Audio container of the first bytes: "mp3", "m4a", "ogg", "aac", "flac", "wav"; else {@code fallback}. */
+    /** Audio container of the first bytes: "mp3", "m4a", "ogg", "aac", "flac", "wav", "wma"; else {@code fallback}. */
     @NonNull
     static String sniffExtension(@NonNull byte[] head, @NonNull String fallback) {
         if (startsWith(head, 0, "ID3")) return "mp3";
+        if (startsWith(head, 0, "0&²ufÏ")) return "wma";
         if (startsWith(head, 4, "ftyp")) return "m4a";
         if (startsWith(head, 0, "OggS")) return "ogg";
         if (startsWith(head, 0, "fLaC")) return "flac";
@@ -1133,6 +1378,8 @@ public class DownloadStorageHelper {
         Set<Integer> chosenIds = new HashSet<>();
         for (BooksAudioEntity row : chosen) chosenIds.add(row.id);
         List<DeletionPlanner.Row> planRows = new ArrayList<>();
+        // the chosen rows themselves: chapters of one stream share their URL, so a row is updated by its id
+        List<BooksAudioEntity> planEntities = new ArrayList<>();
         List<List<String>> owned = new ArrayList<>();
         Set<String> keptIds = new HashSet<>();
         for (int i = 0; i < bookRows.size(); i++) {
@@ -1143,6 +1390,7 @@ public class DownloadStorageHelper {
                     : stored != null ? DownloadIds.ownedIds(entries.get(i), row.urlAudio, stored) : ids;
             if (chosenIds.contains(row.id)) {
                 planRows.add(new DeletionPlanner.Row(row.urlBook, row.urlAudio, row.localUri, ids));
+                planEntities.add(row);
                 owned.add(own);
             } else {
                 keptIds.addAll(own);
@@ -1186,10 +1434,10 @@ public class DownloadStorageHelper {
                         idFailed |= failed.contains(id);
                     }
                     if (toRemove.contains(row) && !copyFailed && !idFailed) {
-                        model.removeTrack(row.urlBook, row.urlAudio);
+                        model.getDatabase().booksAudioDao().deleteById(planEntities.get(k).id);
                     } else if (copyPlanned && !copyFailed && (toRemove.contains(row) || toClear.contains(row))) {
                         // The copy is gone even when the row stays for a download that could not be removed.
-                        model.getDatabase().booksAudioDao().updateLocalUri(row.urlBook, row.urlAudio, null);
+                        model.getDatabase().booksAudioDao().updateLocalUriById(planEntities.get(k).id, null);
                     }
                     boolean shared = false;
                     for (String id : owned.get(k)) shared |= keptIds.contains(id);
