@@ -6,6 +6,7 @@ import com.fanok.audiobooks.net.SiteHttp;
 import com.fanok.audiobooks.pojo.GenrePOJO;
 import com.fanok.audiobooks.search.Provider;
 import com.fanok.audiobooks.search.ProviderPage;
+import com.fanok.audiobooks.source.SourceParser;
 import io.reactivex.Single;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -47,6 +48,9 @@ public class GenreModel implements com.fanok.audiobooks.interface_pacatge.books.
         if (provider == null) {
             return ProviderPage.empty();
         }
+        if (provider.parser != null) {
+            return loadParser(provider.parser, url, page);
+        }
         switch (provider) {
             case KNIGAVUHE: return loadBooksList(url, page);
             case IZIBUK: return loadBooksListIzibuk(url, page);
@@ -59,6 +63,11 @@ public class GenreModel implements com.fanok.audiobooks.interface_pacatge.books.
             case POLEKNIG: return loadBooksListPoleknig(url);
         }
         return ProviderPage.empty();
+    }
+
+    /** The list of a site with a parser: genres here, authors or performers in {@link AutorsModel}. */
+    protected ProviderPage<GenrePOJO> loadParser(SourceParser parser, String url, int page) throws IOException {
+        return parser.genres(parser.fetch(url), url, page);
     }
 
     protected ProviderPage<GenrePOJO> loadBooksList(String url, int page) throws IOException {

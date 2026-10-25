@@ -31,6 +31,7 @@ import androidx.annotation.NonNull;
 import androidx.appcompat.app.AlertDialog;
 import androidx.core.content.ContextCompat;
 import androidx.media3.common.util.UnstableApi;
+import androidx.preference.CheckBoxPreference;
 import androidx.preference.EditTextPreference;
 import androidx.preference.ListPreference;
 import androidx.preference.MultiSelectListPreference;
@@ -54,6 +55,7 @@ import com.fanok.audiobooks.model.BooksDBModel;
 import com.fanok.audiobooks.pojo.BackupPOJO;
 import com.fanok.audiobooks.pojo.BookPOJO;
 import com.fanok.audiobooks.pojo.StorageUtil;
+import com.fanok.audiobooks.search.Provider;
 import com.fanok.audiobooks.util.DownloadStorageHelper;
 import com.google.android.material.navigation.NavigationView;
 import com.google.gson.Gson;
@@ -173,6 +175,39 @@ public class SettingsFragment extends PreferenceFragmentCompat implements
         }
     };
 
+    /**
+     * The source list and the search-source checkboxes come from {@link Provider}, not the xml. The nested
+     * "source_search" screen is filled both as a child of the main screen (an empty screen is not clickable) and
+     * when it is the screen shown.
+     */
+    private void fillSources() {
+        ListPreference source = findPreference("sorce_books");
+        if (source != null) {
+            Provider[] providers = Provider.values();
+            CharSequence[] titles = new CharSequence[providers.length];
+            CharSequence[] values = new CharSequence[providers.length];
+            for (int i = 0; i < providers.length; i++) {
+                titles[i] = providers[i].title;
+                values[i] = providers[i].prefValue;
+            }
+            source.setEntries(titles);
+            source.setEntryValues(values);
+        }
+        PreferenceScreen search = findPreference("source_search");
+        if (search == null && "source_search".equals(getPreferenceScreen().getKey())) {
+            search = getPreferenceScreen();
+        }
+        if (search != null && search.getPreferenceCount() == 0) {
+            for (Provider provider : Provider.values()) {
+                CheckBoxPreference box = new CheckBoxPreference(search.getContext());
+                box.setKey(provider.prefKey);
+                box.setTitle(provider.title);
+                box.setDefaultValue(true);
+                search.addPreference(box);
+            }
+        }
+    }
+
     @Override
     public void onNavigateToScreen(PreferenceScreen preferenceScreen) {
         SettingsFragment settingsFragment = new SettingsFragment();
@@ -246,6 +281,7 @@ public class SettingsFragment extends PreferenceFragmentCompat implements
                 requireActivity().getApplicationContext(), R.xml.preferences,
                 false);
         initSummary(getPreferenceScreen());
+        fillSources();
 
         preferenceChangeListner("pref_theme", (preference, newValue) -> {
             // the value is stored after this returns; apply night mode and restart once it is
@@ -267,7 +303,7 @@ public class SettingsFragment extends PreferenceFragmentCompat implements
         });
 
         preferenceChangeListner("sorce_books", (preference, newValue) -> {
-            Consts.setSOURCE(requireContext(), newValue.toString());
+            Consts.setSOURCE(newValue.toString());
             return true;
         });
 

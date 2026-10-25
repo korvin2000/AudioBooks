@@ -7,6 +7,7 @@ import com.fanok.audiobooks.pojo.GenrePOJO;
 import com.fanok.audiobooks.search.Provider;
 import com.fanok.audiobooks.search.ProviderPage;
 import com.fanok.audiobooks.search.SearchUrls;
+import com.fanok.audiobooks.source.SourceParser;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonParser;
 import java.io.IOException;
@@ -34,6 +35,10 @@ public class AutorsModel extends GenreModel {
         if (url == null) {
             return ProviderPage.empty();
         }
+        if (provider.parser != null) {
+            return provider.parser.searchPeople(provider.parser.fetch(url), page,
+                    category == SearchUrls.Category.PERFORMERS);
+        }
         switch (provider) {
             case KNIGAVUHE: return loadBooksList(url, page);
             case IZIBUK: return loadBooksListIzibuk(url, page);
@@ -41,6 +46,11 @@ public class AutorsModel extends GenreModel {
             case AKNIGA: return page > 1 ? ProviderPage.<GenrePOJO>empty() : searchAbook(url);
             default: return ProviderPage.empty();
         }
+    }
+
+    @Override
+    protected ProviderPage<GenrePOJO> loadParser(SourceParser parser, String url, int page) throws IOException {
+        return parser.people(parser.fetch(url), url, page, mPerformerMode);
     }
 
     @Override

@@ -13,10 +13,10 @@ import androidx.annotation.Nullable;
 
 import com.fanok.audiobooks.Url;
 import com.fanok.audiobooks.model.OtherSourceModel.Hit;
-import com.fanok.audiobooks.model.OtherSourceModel.Site;
 import com.fanok.audiobooks.net.SiteHttp;
 import com.fanok.audiobooks.pojo.BookPOJO;
 import com.fanok.audiobooks.pojo.OtherArtistPOJO;
+import com.fanok.audiobooks.search.Provider;
 import io.reactivex.Observable;
 import okhttp3.HttpUrl;
 
@@ -41,7 +41,11 @@ public class OtherArtistModel implements
 
     /** otrub and poleknig have no way to find other readings; an unknown host throws IllegalArgumentException. */
     public static Support support(@Nullable String bookUrl) {
-        switch (Site.of(Url.canonical(bookUrl))) {
+        Provider provider = Provider.require(Url.canonical(bookUrl));
+        if (provider.parser != null) {
+            return provider.parser.findsOtherReaders() ? Support.SUPPORTED : Support.UNSUPPORTED;
+        }
+        switch (provider) {
             case OTRUB:
             case POLEKNIG:
                 return Support.UNSUPPORTED;
@@ -52,27 +56,27 @@ public class OtherArtistModel implements
 
     public static ArrayList<OtherArtistPOJO> loadOtherArtistABMP3(String bookName, String bookAuthor, String bookUrl,
             String bookReader) throws IOException {
-        return otherReaders(Site.ABMP3, bookName, bookAuthor, bookUrl, bookReader);
+        return otherReaders(Provider.ABMP3, bookName, bookAuthor, bookUrl, bookReader);
     }
 
     public static ArrayList<OtherArtistPOJO> loadOtherArtistAbook(String bookName, String bookAuthor, String bookUrl,
             String bookReader) throws IOException {
-        return otherReaders(Site.AKNIGA, bookName, bookAuthor, bookUrl, bookReader);
+        return otherReaders(Provider.AKNIGA, bookName, bookAuthor, bookUrl, bookReader);
     }
 
     public static ArrayList<OtherArtistPOJO> loadOtherArtistBazaKnig(final String baseName, final String baseAutor,
             final String baseUrl, final String baseArtist) throws IOException {
-        return otherReaders(Site.BAZA_KNIG, baseName, baseAutor, baseUrl, baseArtist);
+        return otherReaders(Provider.BAZA_KNIG, baseName, baseAutor, baseUrl, baseArtist);
     }
 
     public static ArrayList<OtherArtistPOJO> loadOtherArtistKnigoblud(String bookName, String bookAuthor,
             String bookUrl, String bookReader) throws IOException {
-        return otherReaders(Site.KNIGOBLUD, bookName, bookAuthor, bookUrl, bookReader);
+        return otherReaders(Provider.KNIGOBLUD, bookName, bookAuthor, bookUrl, bookReader);
     }
 
     public static ArrayList<OtherArtistPOJO> loadOtherArtistAudioboo(String bookName, String bookAuthor,
             String bookUrl, String bookReader) throws IOException {
-        return otherReaders(Site.AUDIOBOO, bookName, bookAuthor, bookUrl, bookReader);
+        return otherReaders(Provider.AUDIOBOO, bookName, bookAuthor, bookUrl, bookReader);
     }
 
     @Override
@@ -92,26 +96,29 @@ public class OtherArtistModel implements
 
     static ArrayList<OtherArtistPOJO> load(BookPOJO book) throws IOException {
         String url = Url.canonical(book.getUrl());
-        Site site = Site.of(url);
+        Provider site = Provider.require(url);
         if (support(url) == Support.UNSUPPORTED) {
             return new ArrayList<>();
         }
-        if (site == Site.KNIGAVUHE) {
+        if (site.parser != null) {
+            return site.parser.otherReaders(url, book.getName(), book.getAutor(), book.getArtist());
+        }
+        if (site == Provider.KNIGAVUHE) {
             return parseKnigavuheOtherReaders(SiteHttp.get(url));
         }
         return otherReaders(site, book.getName(), book.getAutor(), url, book.getArtist());
     }
 
     /** Searches {@code site} by title (and author where the site's search copes with it) and keeps other readings. */
-    private static ArrayList<OtherArtistPOJO> otherReaders(Site site, String name, String author, String url,
+    private static ArrayList<OtherArtistPOJO> otherReaders(Provider site, String name, String author, String url,
             String reader) throws IOException {
         if (isBlank(name)) {
             return new ArrayList<>();
         }
-        String terms = site == Site.ABMP3 || site == Site.AUDIOBOO ? query(name) : query(name, author);
+        String terms = site == Provider.ABMP3 || site == Provider.AUDIOBOO ? query(name) : query(name, author);
         List<Hit> hits = OtherSourceModel.parseSearch(site, SiteHttp.get(OtherSourceModel.searchUrl(site, terms, 1)));
         ArrayList<OtherArtistPOJO> result = otherReaders(hits, name, author, url, reader);
-        if (site == Site.BAZA_KNIG) {
+        if (site == Provider.BAZA_KNIG) {
             for (Hit hit : hits) {
                 if (hit.altVoices && sameBook(hit, name, author)) {
                     result.addAll(parseBazaKnigAltReaders(SiteHttp.get(hit.url), hit.url, reader));

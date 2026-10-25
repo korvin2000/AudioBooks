@@ -352,15 +352,7 @@
     <string name="books_adapter_layout_big_list_value" translatable="false">big_list</string>
     <string name="abook_value" translatable="false">abook</string>
     <string name="abook" translatable="false">Akniga</string>
-    <string name="kniga_v_uhe_value" translatable="false">kniga_v_uhe</string>
-    <string name="izibuc_value" translatable="false">izibuc</string>
-    <string name="izibuc">ИзиБук</string>
-    <string name="audionook_mp3" translatable="false">AudioBook-mp3</string>
-    <string name="audiobook_mp3_value" translatable="false">audiobook_mp3</string>
     <string name="baza_knig">База Книг</string>
-    <string name="baza_knig_value" translatable="false">baza_knig</string>
-    <string name="knigoblud_value" translatable="false">knigoblud</string>
-    <string name="audioboo_value" translatable="false">audioboo</string>
     <string name="menu_saved">Загруженные</string>
     <string name="clear_audio_list">Очистить список аудио файлов</string>
     <string name="confirm_clear_audio_list">Вы уверены что хотите очистить список аудио файлов</string>
@@ -462,11 +454,6 @@
     <string name="toggle_details">Показать детали</string>
     <string name="download_control_button">Возобновить/Пауза</string>
     <string name="more_options">Дополнительно</string>
-    <string name="audioboo">Audioboo</string>
-    <string name="otrub">Отрубин</string>
-    <string name="otrub_value" translatable="false">otrub</string>
-    <string name="poleknig">Полекниг</string>
-    <string name="poleknig_value" translatable="false">poleknig</string>
     <string name="download_chapters_label">Главы:</string>
     <string name="download_chapters_value">скачано %1$d из %2$d, выбрано %3$d</string>
     <string name="download_exported_label">Копии в папке:</string>

@@ -330,6 +330,9 @@ public final class ListingFilters {
      * akniga's collections ("Подборки") list collections, not books, and carry none.
      */
     public static boolean listsDuration(Provider provider, String url) {
+        if (provider != null && provider.parser != null) {
+            return provider.parser.listsDuration(url);
+        }
         return provider != null && provider != Provider.OTRUB
                 && !(provider == Provider.AKNIGA && url != null && url.contains("/collections/"));
     }
@@ -554,6 +557,9 @@ public final class ListingFilters {
         if (provider == null || url == null) {
             return null;
         }
+        if (provider.parser != null) {
+            return provider.parser.genreOf(url);
+        }
         Matcher m;
         switch (provider) {
             case AKNIGA:
@@ -592,6 +598,9 @@ public final class ListingFilters {
     public static String inGenre(Provider provider, String siteWide, String genre) {
         if (genre == null) {
             return siteWide;
+        }
+        if (provider.parser != null) {
+            return provider.parser.inGenre(siteWide, genre);
         }
         switch (provider) {
             case AKNIGA:

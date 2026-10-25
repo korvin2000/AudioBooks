@@ -9,6 +9,8 @@ import com.fanok.audiobooks.net.SiteHttp;
 import com.fanok.audiobooks.pojo.ComentsPOJO;
 import com.fanok.audiobooks.pojo.ContentParentPOJO;
 import com.fanok.audiobooks.pojo.SubComentsPOJO;
+import com.fanok.audiobooks.search.Provider;
+import com.fanok.audiobooks.source.SourceParser;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonParser;
 import io.reactivex.Observable;
@@ -90,7 +92,10 @@ public class ComentsModel implements
     static ArrayList<ComentsPOJO> load(String url, BooleanSupplier cancelled) throws Exception {
         url = Url.canonical(url);
         Parsed parsed;
-        if (Url.isHost(url, Url.SERVER)) {
+        SourceParser parser = Provider.parserOf(url);
+        if (parser != null) {
+            return parser.comments(url, cancelled);
+        } else if (Url.isHost(url, Url.SERVER)) {
             parsed = parseCommentsKnigavuhe(SiteHttp.get(url), url);
         } else if (Url.isHost(url, Url.SERVER_ABMP3)) {
             parsed = parseCommentsAbmp3(SiteHttp.get(url), url);

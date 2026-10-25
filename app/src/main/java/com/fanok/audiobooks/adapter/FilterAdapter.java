@@ -7,8 +7,8 @@ import android.view.ViewGroup;
 import android.widget.TextView;
 import androidx.annotation.NonNull;
 import androidx.recyclerview.widget.RecyclerView;
-import com.fanok.audiobooks.Consts;
 import com.fanok.audiobooks.R;
+import com.fanok.audiobooks.search.Provider;
 import java.util.ArrayList;
 
 /** @noinspection ClassEscapesDefinedScope*/
@@ -47,43 +47,12 @@ public class FilterAdapter extends RecyclerView.Adapter<FilterAdapter.MyHolder> 
                 mView.setBackgroundResource(R.drawable.filter_item_selector);
             }
 
-            switch (mData.get(pos)) {
-                case -1:
-                    mText.setText(R.string.all);
-                    break;
-                case Consts.SOURCE_KNIGA_V_UHE:
-                    mText.setText(R.string.kniga_v_uhe);
-                    break;
-                case Consts.SOURCE_IZI_BUK:
-                    mText.setText(R.string.izibuc);
-                    break;
-                case Consts.SOURCE_AUDIO_BOOK_MP3:
-                    mText.setText(R.string.audionook_mp3);
-                    break;
-                case Consts.SOURCE_ABOOK:
-                    mText.setText(R.string.abook);
-                    break;
-                case Consts.SOURCE_BAZA_KNIG:
-                    mText.setText(R.string.baza_knig);
-                    break;
-
-                case Consts.SOURCE_KNIGOBLUD:
-                    mText.setText(R.string.knigoblud);
-                    break;
-
-                case Consts.SOURCE_AUDIOBOO:
-                    mText.setText(R.string.audioboo);
-                    break;
-
-                case Consts.SOURCE_OTRUB:
-                    mText.setText(R.string.otrub);
-                    break;
-
-                case Consts.SOURCE_POLEKNIG:
-                    mText.setText(R.string.poleknig);
-                    break;
+            Provider provider = Provider.ofSource(mData.get(pos));
+            if (provider == null) {
+                mText.setText(R.string.all);
+            } else {
+                mText.setText(provider.title);
             }
-
         }
     }
 
@@ -102,43 +71,11 @@ public class FilterAdapter extends RecyclerView.Adapter<FilterAdapter.MyHolder> 
     public FilterAdapter(SharedPreferences preferences) {
         mData = new ArrayList<>();
         mData.add(-1);
-
-        if (preferences.getBoolean("search_abook", true)) {
-            mData.add(Consts.SOURCE_ABOOK);
+        for (Provider provider : Provider.values()) {
+            if (preferences.getBoolean(provider.prefKey, true)) {
+                mData.add(provider.sourceId);
+            }
         }
-
-        if (preferences.getBoolean("search_kniga_v_uhe", true)) {
-            mData.add(Consts.SOURCE_KNIGA_V_UHE);
-        }
-
-        if (preferences.getBoolean("search_izibuc", true)) {
-            mData.add(Consts.SOURCE_IZI_BUK);
-        }
-
-        if (preferences.getBoolean("search_abmp3", true)) {
-            mData.add(Consts.SOURCE_AUDIO_BOOK_MP3);
-        }
-
-        if (preferences.getBoolean("search_baza_knig", true)) {
-            mData.add(Consts.SOURCE_BAZA_KNIG);
-        }
-
-        if (preferences.getBoolean("search_knigoblud", true)) {
-            mData.add(Consts.SOURCE_KNIGOBLUD);
-        }
-
-        if (preferences.getBoolean("search_audioboo", true)) {
-            mData.add(Consts.SOURCE_AUDIOBOO);
-        }
-
-        if (preferences.getBoolean("search_otrub", true)) {
-            mData.add(Consts.SOURCE_OTRUB);
-        }
-
-        if (preferences.getBoolean("search_poleknig", true)) {
-            mData.add(Consts.SOURCE_POLEKNIG);
-        }
-
     }
 
     public int getItem(int postion) {

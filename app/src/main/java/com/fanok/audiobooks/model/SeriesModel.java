@@ -8,9 +8,9 @@ import static com.fanok.audiobooks.model.OtherSourceModel.text;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import com.fanok.audiobooks.Url;
-import com.fanok.audiobooks.model.OtherSourceModel.Site;
 import com.fanok.audiobooks.net.SiteHttp;
 import com.fanok.audiobooks.pojo.SeriesPOJO;
+import com.fanok.audiobooks.search.Provider;
 import io.reactivex.Observable;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -45,7 +45,11 @@ public class SeriesModel implements
     /** Fetches and parses the series of the book at {@code bookUrl}; an unknown host throws IllegalArgumentException. */
     static ArrayList<SeriesPOJO> loadSeries(String bookUrl) throws IOException {
         String url = Url.canonical(bookUrl);
-        switch (Site.of(url)) {
+        Provider provider = Provider.require(url);
+        if (provider.parser != null) {
+            return provider.parser.series(provider.parser.fetch(url), url);
+        }
+        switch (provider) {
             case KNIGAVUHE:
                 return parseKnigavuheSeries(SiteHttp.get(url));
             case IZIBUK:

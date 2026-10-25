@@ -8,6 +8,7 @@ import com.fanok.audiobooks.Url;
 import com.fanok.audiobooks.net.SiteHttp;
 import com.fanok.audiobooks.pojo.BookPOJO;
 import com.fanok.audiobooks.pojo.OtherArtistPOJO;
+import com.fanok.audiobooks.search.Provider;
 import io.reactivex.Observable;
 import io.reactivex.Scheduler;
 import io.reactivex.Single;
@@ -40,61 +41,41 @@ public class OtherSourceModel implements
 
     private static final Logger LOG = Logger.getLogger("parsers");
 
-    /** The providers, in the order other-source results are shown; {@code label} is what the user sees. */
-    enum Site {
-        AKNIGA(Url.SERVER_AKNIGA, "akniga.org"),
-        KNIGAVUHE(Url.SERVER, "knigavuhe.org"),
-        IZIBUK(Url.SERVER_IZIBUK, "izib.uk"),
-        ABMP3(Url.SERVER_ABMP3, "audiobook-mp3.com"),
-        BAZA_KNIG(Url.SERVER_BAZA_KNIG, "baza-knig.top"),
-        KNIGOBLUD(Url.SERVER_KNIGOBLUD, "Книгоблуд"),
-        AUDIOBOO(Url.SERVER_AUDIOBOO, "Audioboo"),
-        OTRUB(Url.SERVER_OTRUB, "Отрубин"),
-        POLEKNIG(Url.SERVER_POLEKNIG, "Полекниг");
-
-        final String server;
-
-        final String label;
-
-        Site(String server, String label) {
-            this.server = server;
-            this.label = label;
-        }
-
-        /** The provider serving {@code url} (parsed host); an unknown host is an error, not "no data". */
-        static Site of(@Nullable String url) {
-            for (Site site : values()) {
-                if (Url.isHost(url, site.server)) {
-                    return site;
-                }
-            }
-            throw new IllegalArgumentException("unsupported host: " + Url.hostOf(url));
+    /** What the user sees as the name of a hit's site: the first sites keep their long-standing labels. */
+    static String label(Provider site) {
+        switch (site) {
+            case AKNIGA: return "akniga.org";
+            case KNIGAVUHE: return "knigavuhe.org";
+            case IZIBUK: return "izib.uk";
+            case ABMP3: return "audiobook-mp3.com";
+            case BAZA_KNIG: return "baza-knig.top";
+            default: return site.title;
         }
     }
 
     /** One search result as the provider lists it; a missing field is "". */
-    static final class Hit {
+    public static final class Hit {
 
-        final String url;
+        public final String url;
 
-        final String title;
+        public final String title;
 
-        final String author;
+        public final String author;
 
-        final String reader;
+        public final String reader;
 
         /** baza-knig: the result advertises alternative voice-overs on its own page. */
-        final boolean altVoices;
+        public final boolean altVoices;
 
-        Hit(String url, String title, String author, String reader) {
+        public Hit(String url, String title, String author, String reader) {
             this(url, title, author, reader, false);
         }
 
-        Hit(String url, String title, String author, String reader, boolean altVoices) {
-            this.url = url;
-            this.title = title;
-            this.author = author;
-            this.reader = reader;
+        public Hit(String url, String title, String author, String reader, boolean altVoices) {
+            this.url = url == null ? "" : url;
+            this.title = title == null ? "" : title;
+            this.author = author == null ? "" : author;
+            this.reader = reader == null ? "" : reader;
             this.altVoices = altVoices;
         }
     }
@@ -113,7 +94,7 @@ public class OtherSourceModel implements
         }
         String url = Url.canonical(bookPOJO.getUrl());
         List<Single<ArrayList<OtherArtistPOJO>>> lookups = new ArrayList<>();
-        for (Site site : Site.values()) {
+        for (Provider site : Provider.values()) {
             if (!Url.isHost(url, site.server)) {
                 lookups.add(Single.<ArrayList<OtherArtistPOJO>>create(emitter -> {
                     try {
@@ -153,12 +134,13 @@ public class OtherSourceModel implements
     }
 
     /** Searches {@code site} for {@code book}: an empty list or the one matching page. */
-    private static ArrayList<OtherArtistPOJO> lookup(Site site, BookPOJO book) throws IOException {
+    private static ArrayList<OtherArtistPOJO> lookup(Provider site, BookPOJO book) throws IOException {
         ArrayList<OtherArtistPOJO> found = new ArrayList<>();
         String terms = terms(site, book);
-        int pages = site == Site.BAZA_KNIG ? MAX_SEARCH_PAGES : 1;
+        int pages = site == Provider.BAZA_KNIG ? MAX_SEARCH_PAGES : 1;
         for (int page = 1; page <= pages; page++) {
-            Document doc = SiteHttp.get(searchUrl(site, terms, page));
+            String pageUrl = searchUrl(site, terms, page);
+            Document doc = site.parser != null ? site.parser.fetch(pageUrl) : SiteHttp.get(pageUrl);
             OtherArtistPOJO pojo = pickSameBook(site, parseSearch(site, doc), book);
             if (pojo != null) {
                 found.add(pojo);
@@ -172,7 +154,10 @@ public class OtherSourceModel implements
     }
 
     /** The words searched on {@code site} for {@code book}; a missing field is left out, never sent as "null". */
-    static String terms(Site site, BookPOJO book) {
+    static String terms(Provider site, BookPOJO book) {
+        if (site.parser != null) {
+            return site.parser.otherSourceTerms(book);
+        }
         switch (site) {
             case ABMP3:
             case BAZA_KNIG:
@@ -187,7 +172,7 @@ public class OtherSourceModel implements
     }
 
     /** The non-blank parts joined by spaces. */
-    static String query(String... parts) {
+    public static String query(String... parts) {
         StringBuilder q = new StringBuilder();
         for (String part : parts) {
             if (!isBlank(part)) {
@@ -201,7 +186,10 @@ public class OtherSourceModel implements
     }
 
     /** The search page URL of {@code site}; {@code terms} is encoded as one query parameter. */
-    static String searchUrl(Site site, String terms, int page) {
+    static String searchUrl(Provider site, String terms, int page) {
+        if (site.parser != null) {
+            return site.parser.otherSourceSearchUrl(terms, page);
+        }
         HttpUrl.Builder url = HttpUrl.get(site.server).newBuilder();
         switch (site) {
             case AKNIGA:
@@ -231,7 +219,10 @@ public class OtherSourceModel implements
         return url.build().toString();
     }
 
-    static ArrayList<Hit> parseSearch(Site site, Document doc) {
+    static ArrayList<Hit> parseSearch(Provider site, Document doc) {
+        if (site.parser != null) {
+            return site.parser.otherSourceHits(doc);
+        }
         switch (site) {
             case AKNIGA:
                 return parseAknigaSearch(doc);
@@ -464,12 +455,12 @@ public class OtherSourceModel implements
 
     /** The first hit that is this book (title, and author/reader where we know them), labelled by its site. */
     @Nullable
-    static OtherArtistPOJO pickSameBook(Site site, List<Hit> hits, BookPOJO book) {
+    static OtherArtistPOJO pickSameBook(Provider site, List<Hit> hits, BookPOJO book) {
         for (Hit hit : hits) {
             if (!hit.url.isEmpty() && sameBook(hit, book.getName(), book.getAutor())
                     && (isBlank(book.getArtist()) || samePerson(hit.reader, book.getArtist()))) {
                 OtherArtistPOJO pojo = new OtherArtistPOJO();
-                pojo.setName(site.label);
+                pojo.setName(label(site));
                 pojo.setUrl(hit.url);
                 return pojo;
             }

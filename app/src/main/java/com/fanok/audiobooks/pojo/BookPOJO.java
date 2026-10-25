@@ -5,6 +5,8 @@ import androidx.annotation.NonNull;
 import com.fanok.audiobooks.Consts;
 import com.fanok.audiobooks.Url;
 import com.fanok.audiobooks.net.SiteHttp;
+import com.fanok.audiobooks.search.Provider;
+import com.fanok.audiobooks.source.SourceParser;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import io.reactivex.Observable;
@@ -42,15 +44,11 @@ public class BookPOJO {
         return name;
     }
 
-    /** The hosts a book page can be loaded from; anything else is rejected before any download. */
-    private static final String[] SOURCES = {Url.SERVER, Url.SERVER_IZIBUK, Url.SERVER_ABMP3, Url.SERVER_AKNIGA,
-            Url.SERVER_BAZA_KNIG, Url.SERVER_KNIGOBLUD, Url.SERVER_AUDIOBOO, Url.SERVER_OTRUB, Url.SERVER_POLEKNIG};
-
     /** {@link Url#canonical} of {@code url}; throws {@link IllegalArgumentException} for a host no parser handles. */
     public static String requireSupported(String url) {
         String canonical = Url.canonical(url);
-        for (String source : SOURCES) {
-            if (Url.isHost(canonical, source)) {
+        for (Provider source : Provider.values()) {
+            if (Url.isHost(canonical, source.server)) {
                 return canonical;
             }
         }
@@ -510,7 +508,8 @@ public class BookPOJO {
     public static Observable<BookPOJO> getDescription(String url) {
         return Observable.fromCallable(() -> {
             String pageUrl = requireSupported(url);
-            return parseBook(SiteHttp.get(pageUrl), pageUrl);
+            SourceParser parser = Provider.parserOf(pageUrl);
+            return parseBook(parser != null ? parser.fetch(pageUrl) : SiteHttp.get(pageUrl), pageUrl);
         });
     }
 
@@ -518,7 +517,10 @@ public class BookPOJO {
     static BookPOJO parseBook(Document document, String bookUrl) throws IOException {
         String url = requireSupported(bookUrl);
         BookPOJO book;
-        if (Url.isHost(url, Url.SERVER)) {
+        SourceParser parser = Provider.parserOf(url);
+        if (parser != null) {
+            book = parser.book(document, url);
+        } else if (Url.isHost(url, Url.SERVER)) {
             book = parseBookKnigavuhe(document, url);
         } else if (Url.isHost(url, Url.SERVER_IZIBUK)) {
             book = parseBookIzibuk(document, url);

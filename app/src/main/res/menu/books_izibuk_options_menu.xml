@@ -35,37 +35,7 @@
         android:icon="@drawable/ic_web"
         android:title="@string/source"
         app:showAsAction="ifRoom">
-        <menu>
-            <group android:checkableBehavior="single">
-                <item
-                    android:id="@+id/source_abook"
-                    android:title="@string/abook" />
-                <item
-                    android:id="@+id/source_kniga_v_uhe"
-                    android:title="@string/kniga_v_uhe" />
-                <item
-                    android:id="@+id/source_izi_book"
-                    android:title="@string/izibuc" />
-                <item
-                    android:id="@+id/source_audio_book_mp3"
-                    android:title="@string/audionook_mp3" />
-                <item
-                    android:id="@+id/source_baza_knig"
-                    android:title="@string/baza_knig" />
-                <item
-                    android:id="@+id/source_knigoblud"
-                    android:title="@string/knigoblud" />
-                <item
-                    android:id="@+id/source_audioboo"
-                    android:title="@string/audioboo" />
-                <item
-                    android:id="@+id/source_otrub"
-                    android:title="@string/otrub" />
-                <item
-                    android:id="@+id/source_poleknig"
-                    android:title="@string/poleknig" />
-            </group>
-        </menu>
+        <menu />
     </item>
 
 </menu>

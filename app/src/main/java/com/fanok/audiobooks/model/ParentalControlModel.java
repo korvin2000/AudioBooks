@@ -6,6 +6,7 @@ import com.fanok.audiobooks.Url;
 import com.fanok.audiobooks.net.SiteHttp;
 import com.fanok.audiobooks.pojo.GenrePOJO;
 import com.fanok.audiobooks.pojo.ParentControlPOJO;
+import com.fanok.audiobooks.search.Provider;
 import io.reactivex.Observable;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -42,6 +43,11 @@ public class ParentalControlModel {
             load(loaded, "Audioboo", () -> loadGenres("Audioboo", Url.INDEX_AUDIOBOO));
             load(loaded, "Отрубин", () -> loadGenres("Отрубин", Url.SECTIONS_OTRUB));
             load(loaded, "Полекниг", () -> loadGenres("Полекниг", Url.SECTIONS_POLEKNIG));
+            for (Provider provider : Provider.values()) {
+                if (provider.parser != null && provider.sections != null) {
+                    load(loaded, provider.title, () -> loadGenres(provider.title, provider.sections));
+                }
+            }
             return loaded;
         });
     }

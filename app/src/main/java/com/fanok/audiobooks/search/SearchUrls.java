@@ -16,6 +16,9 @@ public final class SearchUrls {
 
     /** The URL for page {@code page} (1-based) of {@code category} on {@code provider}, or null when unsupported. */
     public static String url(Provider provider, Category category, String query, int page) {
+        if (provider.parser != null) {
+            return provider.parser.searchUrl(category, query, page);
+        }
         String q = enc(query);
         switch (provider) {
             case KNIGAVUHE:
@@ -68,7 +71,7 @@ public final class SearchUrls {
     }
 
     /** Query-string encoding (space → {@code +}). */
-    static String enc(String query) {
+    public static String enc(String query) {
         try {
             return URLEncoder.encode(query, "UTF-8");
         } catch (UnsupportedEncodingException e) {
@@ -77,7 +80,7 @@ public final class SearchUrls {
     }
 
     /** Path-segment encoding (space → {@code %20}); a literal {@code +} stays {@code %2B}. */
-    static String segment(String query) {
+    public static String segment(String query) {
         return enc(query).replace("+", "%20");
     }
 }

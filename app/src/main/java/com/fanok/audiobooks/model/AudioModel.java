@@ -8,6 +8,8 @@ import com.fanok.audiobooks.interface_pacatge.book_content.AudioModelInterfece;
 import com.fanok.audiobooks.net.JsonSlice;
 import com.fanok.audiobooks.net.SiteHttp;
 import com.fanok.audiobooks.pojo.AudioPOJO;
+import com.fanok.audiobooks.search.Provider;
+import com.fanok.audiobooks.source.SourceParser;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
@@ -69,7 +71,8 @@ public class AudioModel implements AudioModelInterfece {
 
     @Override
     public Observable<ArrayList<AudioPOJO>> getAudio(@NonNull String url) {
-        return audio(url, AudioModel::fetchPage);
+        SourceParser parser = Provider.parserOf(url);
+        return audio(url, parser != null ? parser::fetch : AudioModel::fetchPage);
     }
 
     static Observable<ArrayList<AudioPOJO>> audio(String url, PageSource pages) {
@@ -112,7 +115,10 @@ public class AudioModel implements AudioModelInterfece {
     }
 
     private static PageParser parser(String url) {
-        if (Url.isHost(url, Url.SERVER)) {
+        SourceParser parser = Provider.parserOf(url);
+        if (parser != null) {
+            return parser::tracks;
+        } else if (Url.isHost(url, Url.SERVER)) {
             return AudioModel::parseKnigavuhe;
         } else if (Url.isHost(url, Url.SERVER_IZIBUK)) {
             return AudioModel::parseIzibuk;
