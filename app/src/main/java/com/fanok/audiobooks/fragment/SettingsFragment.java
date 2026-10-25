@@ -280,8 +280,8 @@ public class SettingsFragment extends PreferenceFragmentCompat implements
         PreferenceManager.setDefaultValues(
                 requireActivity().getApplicationContext(), R.xml.preferences,
                 false);
+        fillSources(); // before the summaries: the source list's summary is its chosen entry
         initSummary(getPreferenceScreen());
-        fillSources();
 
         preferenceChangeListner("pref_theme", (preference, newValue) -> {
             // the value is stored after this returns; apply night mode and restart once it is

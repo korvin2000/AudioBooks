@@ -95,7 +95,8 @@ public final class AudioknigiFun implements SourceParser {
 
     @Override
     public String pageUrl(String url, int page) {
-        return Dle.pageUrl(url, page);
+        // the /c/*.html indexes of authors and readers are single pages
+        return url.endsWith(".html") ? url : Dle.pageUrl(url, page);
     }
 
     @Override

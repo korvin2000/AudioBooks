@@ -55,6 +55,8 @@ public final class Uknig implements SourceParser {
     public static final String POPULAR_MONTH = SERVER + "/popular-books/month";
     public static final String POPULAR_ALL_TIME = SERVER + "/popular-books/all";
 
+    /** Bound of the pages read for a book's series tab. */
+    static final int MAX_SERIES_PAGES = 10;
     private static final Pattern GENRE = Pattern.compile("^https?://[^/]+/genres/[^/?#]+");
     /** Listings of one author, reader, series or year: nothing to re-sort. */
     private static final Pattern UNSORTED = Pattern.compile("^https?://[^/]+/(authors|readers|series|years)/");
@@ -179,8 +181,17 @@ public final class Uknig implements SourceParser {
 
     @Override
     public ArrayList<SeriesPOJO> series(Document page, String bookUrl) throws IOException {
+        ArrayList<SeriesPOJO> result = new ArrayList<>();
         String series = seriesUrl(page);
-        return series.isEmpty() ? new ArrayList<>() : parseSeries(fetch(series));
+        // a series pages on (24 a page) like any listing
+        for (int no = 1; !series.isEmpty() && no <= MAX_SERIES_PAGES; no++) {
+            Document doc = fetch(pageUrl(series, no));
+            result.addAll(parseSeries(doc));
+            if (!hasNext(doc)) {
+                break;
+            }
+        }
+        return result;
     }
 
     // ---------------------------------------------------------------- pure parsers
