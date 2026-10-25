@@ -438,6 +438,26 @@ public class BookPresenter extends MvpPresenter<Activity> implements ActivityPre
         getViewState().broadcastSend(broadcastIntent);
     }
 
+    /** Whether the player holds another book than this loaded one, so holding play may switch to this one. */
+    @Override
+    public boolean canSwitchToThisBook() {
+        String playing = MediaPlayerService.currentBookUrl();
+        return playing != null && !playing.equals(mBookPOJO.getUrl()) && mAudioPOJO != null && !mAudioPOJO.isEmpty();
+    }
+
+    /** Replaces the other book in the player with this one, started where it was left, as a normal start does. */
+    @Override
+    public void switchToThisBook() {
+        if (!canSwitchToThisBook()) {
+            return;
+        }
+        Checkpoint checkpoint = resumePoint();
+        AudioPOJO pojo = mAudioPOJO.get(checkpoint.chapterIndex);
+        getViewState().showTitle(pojo.getName());
+        getViewState().setSelected(checkpoint.chapterIndex, pojo.getName());
+        playAudio(checkpoint.chapterIndex, checkpoint.positionMs, true);
+    }
+
     @Override
     public void buttomRewindClick(View view) {
         Intent broadcastIntent = new Intent(Broadcast_SEEK_PREVIOUS_10);
