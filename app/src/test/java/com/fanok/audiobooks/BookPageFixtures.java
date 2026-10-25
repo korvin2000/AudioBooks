@@ -27,6 +27,7 @@ public final class BookPageFixtures {
             {"uknig/book-series.html", "https://uknig.com/books/708261"},
             {"audiokniga-life/book.html", "https://audiokniga.life/fantastika/6508-noldsapfir-2-s-t-i-k-s.html"},
             {"audioknigi-fun/book.html", "https://audioknigi.fun/81692-na-vyruchku-yunomu-gassi.html"},
+            {"aknig-xyz/book.html", "https://s2.aknig.xyz/14731-chetvertoe-krylo.html"},
     };
 
     private BookPageFixtures() {

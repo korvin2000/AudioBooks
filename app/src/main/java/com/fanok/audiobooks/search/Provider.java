@@ -2,6 +2,7 @@ package com.fanok.audiobooks.search;
 
 import com.fanok.audiobooks.Consts;
 import com.fanok.audiobooks.Url;
+import com.fanok.audiobooks.source.AknigXyz;
 import com.fanok.audiobooks.source.AudioknigaLife;
 import com.fanok.audiobooks.source.AudioknigiFun;
 import com.fanok.audiobooks.source.SourceParser;
@@ -36,6 +37,8 @@ public enum Provider {
     AUDIOKNIGI_FUN(AudioknigiFun.SERVER, "Аудиокниги.fun", "audioknigi_fun", "search_audioknigi_fun", 10,
             AudioknigiFun.INDEX, AudioknigiFun.GENRES, AudioknigiFun.AUTHORS, AudioknigiFun.READERS,
             new AudioknigiFun()),
+    AKNIG_XYZ(AknigXyz.SERVER, "Aknig.xyz", "aknig_xyz", "search_aknig_xyz", 11,
+            AknigXyz.INDEX, AknigXyz.GENRES, null, null, new AknigXyz()),
     AUDIOKNIGA_LIFE(AudioknigaLife.SERVER, "Аудиокнига Life", "audiokniga_life", "search_audiokniga_life", 12,
             AudioknigaLife.INDEX, AudioknigaLife.GENRES, null, null, new AudioknigaLife());
 

@@ -250,7 +250,7 @@ public class AudioModel implements AudioModelInterfece {
     }
 
     /** Playerjs page whose {@code file} is an inline list or the URL of a JSON playlist. */
-    private static ArrayList<AudioPOJO> loadPlayerjs(Document doc, String bookUrl, String bookName)
+    public static ArrayList<AudioPOJO> loadPlayerjs(Document doc, String bookUrl, String bookName)
             throws IOException {
         String file = playerjsFile(doc);
         if (file.trim().startsWith("[")) {
