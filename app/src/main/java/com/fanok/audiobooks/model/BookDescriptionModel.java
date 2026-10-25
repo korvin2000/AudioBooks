@@ -11,6 +11,8 @@ import com.fanok.audiobooks.interface_pacatge.book_content.DescriptionModel;
 import com.fanok.audiobooks.net.SiteHttp;
 import com.fanok.audiobooks.pojo.BookPOJO;
 import com.fanok.audiobooks.pojo.DescriptionPOJO;
+import com.fanok.audiobooks.search.Provider;
+import com.fanok.audiobooks.source.SourceParser;
 import io.reactivex.Maybe;
 import io.reactivex.Observable;
 import io.reactivex.Single;
@@ -45,7 +47,13 @@ public class BookDescriptionModel implements DescriptionModel {
     private Single<Document> mPage;
 
     public BookDescriptionModel(String url) {
-        this(url, SiteHttp::get);
+        this(url, fetchFor(url));
+    }
+
+    /** The site's own fetch when it has a parser, else {@link SiteHttp#get}. */
+    private static Function<String, Document> fetchFor(String url) {
+        SourceParser parser = Provider.parserOf(url);
+        return parser != null ? parser::fetch : SiteHttp::get;
     }
 
     BookDescriptionModel(String url, Function<String, Document> fetch) {
@@ -104,7 +112,10 @@ public class BookDescriptionModel implements DescriptionModel {
     static DescriptionPOJO parseDescription(Document document, String bookUrl) throws IOException {
         String url = BookPOJO.requireSupported(bookUrl);
         DescriptionPOJO description;
-        if (Url.isHost(url, Url.SERVER)) {
+        SourceParser parser = Provider.parserOf(url);
+        if (parser != null) {
+            description = parser.description(document, url);
+        } else if (Url.isHost(url, Url.SERVER)) {
             description = parseDescriptionKnigavuhe(document, url);
         } else if (Url.isHost(url, Url.SERVER_IZIBUK)) {
             description = parseDescriptionIzibuk(document, url);
@@ -132,7 +143,10 @@ public class BookDescriptionModel implements DescriptionModel {
     /** Pure: the "other books" block of the page; sources without one give an empty list. */
     static ArrayList<BookPOJO> parseBooks(Document document, String bookUrl) {
         String url = BookPOJO.requireSupported(bookUrl);
-        if (Url.isHost(url, Url.SERVER)) {
+        SourceParser parser = Provider.parserOf(url);
+        if (parser != null) {
+            return parser.recommendations(document, url);
+        } else if (Url.isHost(url, Url.SERVER)) {
             return parseBooksKnigavuhe(document);
         } else if (Url.isHost(url, Url.SERVER_ABMP3)) {
             return parseBooksABMP3(document);
@@ -152,8 +166,12 @@ public class BookDescriptionModel implements DescriptionModel {
         String title = description.getTitle();
         String autor = description.getAutor();
         String artist = description.getArtist();
+        SourceParser parser = Provider.parserOf(mPageUrl);
         try {
-            if (Url.isHost(mPageUrl, Url.SERVER_IZIBUK)) {
+            if (parser != null) {
+                description.setOtherReader(parser.findsOtherReaders()
+                        && !parser.otherReaders(mPageUrl, title, autor, artist).isEmpty());
+            } else if (Url.isHost(mPageUrl, Url.SERVER_IZIBUK)) {
                 HttpUrl search = Objects.requireNonNull(HttpUrl.parse(Url.SERVER_IZIBUK + "/search")).newBuilder()
                         .addQueryParameter("q", title + " " + autor)
                         .build();

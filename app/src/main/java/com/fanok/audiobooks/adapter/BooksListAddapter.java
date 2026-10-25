@@ -34,6 +34,7 @@ import com.fanok.audiobooks.model.AudioListDBModel;
 import com.fanok.audiobooks.model.BooksDBModel;
 import com.fanok.audiobooks.pojo.AudioListPOJO;
 import com.fanok.audiobooks.pojo.BookPOJO;
+import com.fanok.audiobooks.search.Provider;
 import com.fanok.audiobooks.util.DownloadUtil;
 import com.github.lzyzsd.circleprogress.DonutProgress;
 import java.util.ArrayList;
@@ -157,34 +158,11 @@ public class BooksListAddapter extends RecyclerView.Adapter<BooksListAddapter.My
                 }
             }
 
-            if (book.getUrl().contains(Url.SERVER)) {
-                mSource.setText(R.string.kniga_v_uhe);
+            Provider provider = Provider.ofUrl(book.getUrl());
+            if (provider != null) {
+                mSource.setText(provider.title);
                 mSource.setVisibility(View.VISIBLE);
-            } else if (book.getUrl().contains(Url.SERVER_IZIBUK)) {
-                mSource.setText(R.string.izibuc);
-                mSource.setVisibility(View.VISIBLE);
-            } else if (book.getUrl().contains(Url.SERVER_ABMP3)) {
-                mSource.setText(R.string.audionook_mp3);
-                mSource.setVisibility(View.VISIBLE);
-            } else if (book.getUrl().contains(Url.SERVER_AKNIGA)) {
-                mSource.setText(R.string.abook);
-                mSource.setVisibility(View.VISIBLE);
-            } else if (book.getUrl().contains(Url.SERVER_BAZA_KNIG)) {
-                mSource.setText(R.string.baza_knig);
-                mSource.setVisibility(View.VISIBLE);
-            } else if (book.getUrl().contains(Url.SERVER_KNIGOBLUD)) {
-                mSource.setText(R.string.knigoblud);
-                mSource.setVisibility(View.VISIBLE);
-            } else if (book.getUrl().contains(Url.SERVER_AUDIOBOO)) {
-                mSource.setText(R.string.audioboo);
-                mSource.setVisibility(View.VISIBLE);
-            } else if (book.getUrl().contains(Url.SERVER_OTRUB)) {
-                mSource.setText(R.string.otrub);
-                mSource.setVisibility(View.VISIBLE);
-            } else if (book.getUrl().contains(Url.SERVER_POLEKNIG)) {
-                mSource.setText(R.string.poleknig);
-                mSource.setVisibility(View.VISIBLE);
-            }else {
+            } else {
                 mSource.setVisibility(View.GONE);
             }
 

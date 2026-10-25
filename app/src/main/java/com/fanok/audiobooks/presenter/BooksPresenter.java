@@ -297,6 +297,9 @@ public class BooksPresenter extends MvpPresenter<BooksView> implements
         if (mModelId == Consts.MODEL_GENRE) {
             return mUrl;
         }
+        if (mProvider != null && mProvider.parser != null) {
+            return mProvider.parser.pageUrl(mUrl, page);
+        }
         if (Url.isHost(mUrl, Url.SERVER_AUDIOBOO)) {
             //the index, genres and the author, reader and series links of cards share one scheme
             return Url.audiobooListingPage(mUrl, page);
@@ -453,40 +456,21 @@ public class BooksPresenter extends MvpPresenter<BooksView> implements
         subTitle = subTitle.replace(" " + getStringById(R.string.knigoblud_finished), "");
         String url = "";
 
-        if (itemId == R.id.source_izi_book || itemId == R.id.source_kniga_v_uhe
-                || itemId == R.id.source_audio_book_mp3 || itemId == R.id.source_abook
-                || itemId == R.id.source_baza_knig||itemId == R.id.source_knigoblud || itemId == R.id.source_audioboo
-                || itemId == R.id.source_otrub || itemId == R.id.source_poleknig) {
+        Provider source = BooksFragment.sourceOf(itemId);
+        if (source != null) {
             SharedPreferences pref = getDefaultSharedPreferences(Objects.requireNonNull(mContext));
             SharedPreferences.Editor editor = pref.edit();
-            String sourceValue = "";
-            if (itemId == R.id.source_kniga_v_uhe) {
-                sourceValue = getStringById(R.string.kniga_v_uhe_value);
-            } else if (itemId == R.id.source_izi_book) {
-                sourceValue = getStringById(R.string.izibuc_value);
-            } else if (itemId == R.id.source_audio_book_mp3) {
-                sourceValue = getStringById(R.string.audiobook_mp3_value);
-            } else if (itemId == R.id.source_abook) {
-                sourceValue = getStringById(R.string.abook_value);
-            } else if (itemId == R.id.source_baza_knig) {
-                sourceValue = getStringById(R.string.baza_knig_value);
-            } else if (itemId == R.id.source_knigoblud){
-                sourceValue = getStringById(R.string.knigoblud_value);
-            } else if (itemId == R.id.source_audioboo){
-                sourceValue = getStringById(R.string.audioboo_value);
-            } else if (itemId == R.id.source_otrub){
-                sourceValue = getStringById(R.string.otrub_value);
-            } else if (itemId == R.id.source_poleknig){
-                sourceValue = getStringById(R.string.poleknig_value);
-            }
-            editor.putString("sorce_books", sourceValue);
+            editor.putString("sorce_books", source.prefValue);
             editor.apply();
             // Обновляем статическое поле сразу — процесс не перезапускается
-            Consts.setSOURCE(mContext, sourceValue);
+            Consts.setSOURCE(source.prefValue);
             getViewState().recreate();
         }
 
-        if (mUrl.contains(Url.SERVER)) {
+        if (mProvider != null && mProvider.parser != null) {
+            String sort = mProvider.parser.sortUrl(itemId, mUrl);
+            url = sort == null ? "" : sort;
+        } else if (mUrl.contains(Url.SERVER)) {
             if (!mUrl.contains("genre")) {
                 if (itemId == R.id.new_data) {
                     url = Url.NEW_BOOK;

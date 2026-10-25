@@ -49,6 +49,9 @@ public class BooksModel implements com.fanok.audiobooks.interface_pacatge.books.
         if (url == null) {
             return ProviderPage.empty();
         }
+        if (provider.parser != null) {
+            return provider.parser.searchResults(provider.parser.fetch(url), page);
+        }
         switch (provider) {
             case KNIGAVUHE: return parseKnigavuhe(SiteHttp.get(url), url, page);
             case IZIBUK: return parseIzibuk(SiteHttp.get(url), url, page);
@@ -67,6 +70,9 @@ public class BooksModel implements com.fanok.audiobooks.interface_pacatge.books.
         Provider provider = Provider.ofUrl(url);
         if (provider == null) {
             return ProviderPage.empty();
+        }
+        if (provider.parser != null) {
+            return provider.parser.listing(provider.parser.fetch(url), url, page);
         }
         switch (provider) {
             case KNIGAVUHE: return parseKnigavuhe(SiteHttp.get(url), url, page);
@@ -134,7 +140,7 @@ public class BooksModel implements com.fanok.audiobooks.interface_pacatge.books.
     }
 
     /** DLE search endpoints take their parameters as a form: POST the query string of {@code url}. */
-    static Document postForm(String url) throws IOException {
+    public static Document postForm(String url) throws IOException {
         HttpUrl parsed = HttpUrl.parse(url);
         if (parsed == null) {
             throw new IOException("bad url " + url);

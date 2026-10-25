@@ -3,4 +3,5 @@
     <!-- the filter item's submenu on a book listing, filled in BooksFragment -->
     <item name="filter_duration" type="id" />
     <item name="filter_period_group" type="id" />
+    <item name="source_group" type="id" />
 </resources>

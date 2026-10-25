@@ -38,7 +38,9 @@ import com.fanok.audiobooks.model.AudioListDBModel;
 import com.fanok.audiobooks.pojo.AudioPOJO;
 import com.fanok.audiobooks.pojo.BookPOJO;
 import com.fanok.audiobooks.room.BooksAudioEntity;
+import com.fanok.audiobooks.search.Provider;
 import com.fanok.audiobooks.service.ExoDownloadService;
+import com.fanok.audiobooks.source.SourceParser;
 import com.google.gson.Gson;
 
 import java.io.IOException;
@@ -101,7 +103,11 @@ public class DownloadUtil {
         Map<String, String> headers = new HashMap<>();
         if (bookUrl == null || bookUrl.isEmpty()) return headers;
         String book = Url.canonical(bookUrl);
-        if (Url.isHost(book, Url.SERVER_ABMP3)) {
+        SourceParser parser = Provider.parserOf(book);
+        Map<String, String> own = parser == null ? null : parser.mediaHeaders(book);
+        if (own != null) {
+            headers.putAll(own);
+        } else if (Url.isHost(book, Url.SERVER_ABMP3)) {
             headers.put("User-Agent", DESKTOP_UA);
             headers.put("Referer", Url.SERVER_ABMP3 + "/");
         } else if (Url.isHost(book, Url.SERVER_BAZA_KNIG)) {

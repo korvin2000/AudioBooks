@@ -24,6 +24,10 @@ public final class BookPageFixtures {
             {"audioboo/book-description.html", "https://audioboo.org/fantastika/123139-mahanenko-vasilij-solo-06.html"},
             {"otrub/book-description.html", "https://otrub.in/volnyjj-lekar-student-tom-7.html"},
             {"poleknig/book-description.html", "https://poleknig.com/books/269329"},
+            {"uknig/book-series.html", "https://uknig.com/books/708261"},
+            {"audiokniga-life/book.html", "https://audiokniga.life/fantastika/6508-noldsapfir-2-s-t-i-k-s.html"},
+            {"audioknigi-fun/book.html", "https://audioknigi.fun/81692-na-vyruchku-yunomu-gassi.html"},
+            {"aknig-xyz/book.html", "https://s2.aknig.xyz/14731-chetvertoe-krylo.html"},
     };
 
     private BookPageFixtures() {

@@ -35,6 +35,10 @@ public class SearchUrlsTest {
         PAGE_FORMAT.put(Provider.AUDIOBOO, "search_start=%d&");
         PAGE_FORMAT.put(Provider.OTRUB, "&p=%d");
         PAGE_FORMAT.put(Provider.POLEKNIG, "&p=%d");
+        PAGE_FORMAT.put(Provider.UKNIG, "&p=%d");
+        PAGE_FORMAT.put(Provider.AUDIOKNIGA_LIFE, "/page/%d/");
+        PAGE_FORMAT.put(Provider.AUDIOKNIGI_FUN, "search_start=%d&");
+        PAGE_FORMAT.put(Provider.AKNIG_XYZ, "&search_start=%d&");
     }
 
     private static String pageToken(Provider provider, Category category, int page) {
@@ -69,7 +73,7 @@ public class SearchUrlsTest {
                         assertNotNull(where, HttpUrl.parse(url));
                         assertEquals(where, provider.host(), HttpUrl.parse(url).host().replaceFirst("^www\\.", ""));
                         URI.create(url); // throws on anything left unencoded
-                        String encoded = provider == Provider.BAZA_KNIG
+                        String encoded = provider == Provider.BAZA_KNIG || provider == Provider.AUDIOKNIGA_LIFE
                                 ? SearchUrls.segment(query) : SearchUrls.enc(query);
                         assertEquals(where, 1, count(url, encoded));
                         assertFalse(where + " double-encoded", url.contains("%25") && !query.contains("%"));
@@ -138,12 +142,16 @@ public class SearchUrlsTest {
                         continue;
                     }
                     String decoded;
-                    if (provider == Provider.BAZA_KNIG) {
+                    if (provider == Provider.AUDIOKNIGA_LIFE) {
+                        String path = URI.create(url).getPath();
+                        decoded = path.substring("/search/".length(), path.indexOf("/page/"));
+                    } else if (provider == Provider.BAZA_KNIG) {
                         String path = URI.create(url).getPath();
                         int from = path.indexOf("p.title=") + "p.title=".length();
                         decoded = path.substring(from, path.indexOf("/v.litres_buy", from));
                     } else {
-                        String name = provider == Provider.ABMP3 ? "text" : provider == Provider.AUDIOBOO ? "story" : "q";
+                        String name = provider == Provider.ABMP3 ? "text" : provider == Provider.AUDIOBOO
+                                || provider == Provider.AUDIOKNIGI_FUN || provider == Provider.AKNIG_XYZ ? "story" : "q";
                         decoded = HttpUrl.parse(url).queryParameter(name);
                     }
                     assertEquals(provider + "/" + category + " -> " + url, query, decoded);

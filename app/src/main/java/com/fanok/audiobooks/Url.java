@@ -110,6 +110,7 @@ public class Url {
         HOST_ALIASES.put("audioboo.ru", "audioboo.org");
         HOST_ALIASES.put("m.knigavuhe.org", "knigavuhe.org");
         HOST_ALIASES.put("pda.izibuk.ru", "izib.uk");
+        HOST_ALIASES.put("aknig.xyz", "s2.aknig.xyz");
     }
 
     /** Lower-case host of {@code url} without a leading {@code www.}; empty when unparsable. */

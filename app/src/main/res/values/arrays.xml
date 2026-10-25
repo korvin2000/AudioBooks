@@ -66,30 +66,6 @@
         <item>@string/books_adapter_layout_big_list_value</item>
     </string-array>
 
-    <string-array name="sorce_books_titles">
-        <item>@string/abook</item>
-        <item>@string/kniga_v_uhe</item>
-        <item>@string/izibuc</item>
-        <item>@string/audionook_mp3</item>
-        <item>@string/baza_knig</item>
-        <item>@string/knigoblud</item>
-        <item>@string/audioboo</item>
-        <item>@string/otrub</item>
-        <item>@string/poleknig</item>
-    </string-array>
-
-    <string-array name="sorce_books_values">
-        <item>@string/abook_value</item>
-        <item>@string/kniga_v_uhe_value</item>
-        <item>@string/izibuc_value</item>
-        <item>@string/audiobook_mp3_value</item>
-        <item>@string/baza_knig_value</item>
-        <item>@string/knigoblud_value</item>
-        <item>@string/audioboo_value</item>
-        <item>@string/otrub_value</item>
-        <item>@string/poleknig_value</item>
-    </string-array>
-
     <string-array name="vpn_titles">
         <item>@string/no</item>
         <item>@string/antizapret</item>
@@ -120,5 +96,4 @@
         <item>@string/excellent</item>
     </string-array>
 
-    <string name="knigoblud">Книгоблуд</string>
 </resources>

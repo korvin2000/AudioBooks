@@ -219,7 +219,10 @@ public class BooksFragment extends MvpAppCompatFragment implements BooksView {
                 menu.clear();
 
                 int menuResId;
-                if (mUrl.contains(Url.SERVER_IZIBUK)) {
+                Provider provider = Provider.ofUrl(mUrl);
+                if (provider != null && provider.parser != null) {
+                    menuResId = provider.parser.optionsMenu();
+                } else if (mUrl.contains(Url.SERVER_IZIBUK)) {
                     menuResId = R.menu.books_izibuk_options_menu;
                 } else if (mUrl.contains(Url.SERVER_BAZA_KNIG)) {
                     menuResId = R.menu.books_baza_knig_options_menu;
@@ -235,6 +238,7 @@ public class BooksFragment extends MvpAppCompatFragment implements BooksView {
                     menuResId = R.menu.books_options_menu;
                 }
                 inflater.inflate(menuResId, menu);
+                fillSourceMenu(menu);
 
                 if (modelID != Consts.MODEL_BOOKS || mUrl.contains("reader") || mUrl.contains("author")
                         || mUrl.contains("genre") || mUrl.contains("serie") || mUrl.contains("performer")) {
@@ -244,14 +248,17 @@ public class BooksFragment extends MvpAppCompatFragment implements BooksView {
                     setColorPrimeriTextInIconItemMenu(menu.findItem(R.id.source), requireContext());
                 }
 
-                if (modelID != Consts.MODEL_BOOKS || mUrl.contains("reader") || mUrl.contains("author") ||
+                boolean noSort = provider != null && provider.parser != null
+                        ? !provider.parser.hasSort(mUrl)
+                        : mUrl.contains("reader") || mUrl.contains("author") ||
                         mUrl.contains("serie") || mUrl.contains("cikl") ||
                         (mUrl.contains(Url.SERVER_ABMP3) && mUrl.contains("genre")) ||
                         (mUrl.contains(Url.SERVER_BAZA_KNIG) && mUrl.contains("ispolnitel")) ||
                         // knigoblud's author, reader and series listings: /<id> like its genres, but no sort
                         (mUrl.matches(Pattern.quote(Url.SERVER_KNIGOBLUD) + "/[0-9a-f-]{36}.*")
                                 && ListingFilters.genreOf(Provider.KNIGOBLUD, mUrl,
-                                GenreModel.KNIGOBLUD_GENRE_URLS) == null))  {
+                                GenreModel.KNIGOBLUD_GENRE_URLS) == null);
+                if (modelID != Consts.MODEL_BOOKS || noSort) {
                     MenuItem orderItem = menu.findItem(R.id.order);
                     if (orderItem != null) orderItem.setVisible(false);
                 } else {
@@ -266,36 +273,7 @@ public class BooksFragment extends MvpAppCompatFragment implements BooksView {
 
                             @Override
                             public void onPrepareMenu(@NonNull Menu menu) {
-                MenuItem item = null;
-                switch (Consts.getSOURCE()) {
-                    case Consts.SOURCE_ABOOK:
-                        item = menu.findItem(R.id.source_abook);
-                        break;
-                    case Consts.SOURCE_KNIGA_V_UHE:
-                        item = menu.findItem(R.id.source_kniga_v_uhe);
-                        break;
-                    case Consts.SOURCE_IZI_BUK:
-                        item = menu.findItem(R.id.source_izi_book);
-                        break;
-                    case Consts.SOURCE_AUDIO_BOOK_MP3:
-                        item = menu.findItem(R.id.source_audio_book_mp3);
-                        break;
-                    case Consts.SOURCE_BAZA_KNIG:
-                        item = menu.findItem(R.id.source_baza_knig);
-                        break;
-                    case Consts.SOURCE_KNIGOBLUD:
-                        item = menu.findItem(R.id.source_knigoblud);
-                        break;
-                    case Consts.SOURCE_AUDIOBOO:
-                        item = menu.findItem(R.id.source_audioboo);
-                        break;
-                    case Consts.SOURCE_OTRUB:
-                        item = menu.findItem(R.id.source_otrub);
-                        break;
-                    case Consts.SOURCE_POLEKNIG:
-                        item = menu.findItem(R.id.source_poleknig);
-                        break;
-                }
+                MenuItem item = menu.findItem(SOURCE_ITEM_BASE + Consts.getSOURCE());
                 if (item != null) {
                     item.setChecked(true);
                 }
@@ -663,6 +641,27 @@ public class BooksFragment extends MvpAppCompatFragment implements BooksView {
                 }
             }
         }
+    }
+
+    /** Item ids of the generated source submenu: {@code SOURCE_ITEM_BASE + sourceId} (the period items use Menu.FIRST + n). */
+    private static final int SOURCE_ITEM_BASE = Menu.FIRST + 100;
+
+    /** The provider a source menu item selects, or null for any other item. */
+    public static Provider sourceOf(int itemId) {
+        return itemId < SOURCE_ITEM_BASE ? null : Provider.ofSource(itemId - SOURCE_ITEM_BASE);
+    }
+
+    /** The "source" submenu: one checkable item per {@link Provider}, in its order; the xml leaves it empty. */
+    private static void fillSourceMenu(@NonNull Menu menu) {
+        MenuItem source = menu.findItem(R.id.source);
+        SubMenu sub = source == null ? null : source.getSubMenu();
+        if (sub == null) {
+            return;
+        }
+        for (Provider provider : Provider.values()) {
+            sub.add(R.id.source_group, SOURCE_ITEM_BASE + provider.sourceId, Menu.NONE, provider.title);
+        }
+        sub.setGroupCheckable(R.id.source_group, true, true);
     }
 
     /** The filter item and its submenu items; false for any other item. */

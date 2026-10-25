@@ -18,6 +18,7 @@ import com.fanok.audiobooks.net.AppProxy;
 import com.fanok.audiobooks.net.MemoryCookieJar;
 import com.fanok.audiobooks.pojo.StorageUtil;
 import com.fanok.audiobooks.presenter.BookPresenter;
+import com.fanok.audiobooks.search.Provider;
 import com.fanok.audiobooks.util.DownloadStorageHelper;
 import com.fanok.audiobooks.util.DownloadUtil;
 
@@ -237,6 +238,15 @@ public class App extends Application {
                         requestBuilder.header("Referer", Url.SERVER_IZIBUK + "/");
                     } else if (url.contains("akniga.org")) {
                         requestBuilder.header("Referer", "https://akniga.org/");
+                    } else {
+                        String host = Url.hostOf(url);
+                        for (Provider provider : Provider.values()) {
+                            if (provider.parser != null && provider.parser.referer() != null
+                                    && (host.equals(provider.host()) || host.endsWith("." + provider.host()))) {
+                                requestBuilder.header("Referer", provider.parser.referer());
+                                break;
+                            }
+                        }
                     }
                 }
                 return chain.proceed(requestBuilder.build());
@@ -268,7 +278,7 @@ public class App extends Application {
 
         String source = pref.getString("sorce_books", getString(R.string.abook_value));
 
-        Consts.setSOURCE(this, source);
+        Consts.setSOURCE(source);
 
         getDownloadManager();
         // before the download service can resume the manager: the monitor sees every run from its first event and

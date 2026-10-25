@@ -12,8 +12,6 @@
     <ListPreference
         android:defaultValue="@string/abook_value"
         android:dialogTitle="@string/sorce_books"
-        android:entries="@array/sorce_books_titles"
-        android:entryValues="@array/sorce_books_values"
         android:icon="@drawable/ic_web"
         android:key="sorce_books"
         android:title="@string/sorce_books" />
@@ -40,51 +38,7 @@
         android:summary="@string/source_search_desc"
         android:title="@string/source_search">
 
-        <CheckBoxPreference
-            android:defaultValue="true"
-            android:key="search_abook"
-            android:title="@string/abook" />
-
-        <CheckBoxPreference
-            android:defaultValue="true"
-            android:key="search_kniga_v_uhe"
-            android:title="@string/kniga_v_uhe" />
-
-        <CheckBoxPreference
-            android:defaultValue="true"
-            android:key="search_izibuc"
-            android:title="@string/izibuc" />
-
-        <CheckBoxPreference
-            android:defaultValue="true"
-            android:key="search_abmp3"
-            android:title="@string/audionook_mp3" />
-
-        <CheckBoxPreference
-            android:defaultValue="true"
-            android:key="search_baza_knig"
-            android:title="@string/baza_knig" />
-
-        <CheckBoxPreference
-            android:defaultValue="true"
-            android:key="search_knigoblud"
-            android:title="@string/knigoblud" />
-
-        <CheckBoxPreference
-            android:defaultValue="true"
-            android:key="search_audioboo"
-            android:title="@string/audioboo" />
-
-        <CheckBoxPreference
-            android:defaultValue="true"
-            android:key="search_otrub"
-            android:title="@string/otrub" />
-
-        <CheckBoxPreference
-            android:defaultValue="true"
-            android:key="search_poleknig"
-            android:title="@string/poleknig" />
-
+        <!-- one checkbox per Provider, added by SettingsFragment -->
     </PreferenceScreen>
 
 

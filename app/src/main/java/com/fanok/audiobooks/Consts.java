@@ -20,6 +20,7 @@ import android.view.MenuItem;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.core.graphics.drawable.DrawableCompat;
+import com.fanok.audiobooks.search.Provider;
 import java.util.Objects;
 import java.util.regex.Pattern;
 import javax.net.ssl.SSLSocketFactory;
@@ -131,25 +132,12 @@ public class Consts {
         Consts.bazaKnigCookies = bazaKnigCookies;
     }
 
-    public static void setSOURCE(@NonNull Context context, @NonNull String value) {
-        if (value.equals(context.getString(R.string.kniga_v_uhe_value))) {
-            Consts.SOURCE = Consts.SOURCE_KNIGA_V_UHE;
-        } else if (value.equals(context.getString(R.string.izibuc_value))) {
-            Consts.SOURCE = Consts.SOURCE_IZI_BUK;
-        } else if (value.equals(context.getString(R.string.audiobook_mp3_value))) {
-            Consts.SOURCE = Consts.SOURCE_AUDIO_BOOK_MP3;
-        } else if (value.equals(context.getString(R.string.abook_value))) {
-            Consts.SOURCE = Consts.SOURCE_ABOOK;
-        } else if (value.equals(context.getString(R.string.baza_knig_value))) {
-            Consts.SOURCE = Consts.SOURCE_BAZA_KNIG;
-        } else if (value.equals(context.getString(R.string.knigoblud_value))){
-            Consts.SOURCE = Consts.SOURCE_KNIGOBLUD;
-        }else if (value.equals(context.getString(R.string.audioboo_value))){
-            Consts.SOURCE = Consts.SOURCE_AUDIOBOO;
-        }else if (value.equals(context.getString(R.string.otrub_value))){
-            Consts.SOURCE = Consts.SOURCE_OTRUB;
-        }else if (value.equals(context.getString(R.string.poleknig_value))){
-            Consts.SOURCE = Consts.SOURCE_POLEKNIG;
+    /** Selects the source whose {@link Provider#prefValue} is {@code value} (the {@code sorce_books} preference). */
+    public static void setSOURCE(@NonNull String value) {
+        for (Provider provider : Provider.values()) {
+            if (value.equals(provider.prefValue)) {
+                Consts.SOURCE = provider.sourceId;
+            }
         }
     }
 
@@ -238,19 +226,6 @@ public class Consts {
      */
     public static SSLSocketFactory socketFactory() {
         return (SSLSocketFactory) SSLSocketFactory.getDefault();
-    }
-
-    public static String getSorceName(@NonNull Context context, @NonNull String url){
-        if (url.contains(Url.SERVER)) return context.getString(R.string.kniga_v_uhe);
-        if (url.contains(Url.SERVER_ABMP3)) return context.getString(R.string.audionook_mp3);
-        if (url.contains(Url.SERVER_AKNIGA)) return context.getString(R.string.abook);
-        if (url.contains(Url.SERVER_IZIBUK)) return context.getString(R.string.izibuc);
-        if (url.contains(Url.SERVER_BAZA_KNIG)) return context.getString(R.string.baza_knig);
-        if (url.contains(Url.SERVER_KNIGOBLUD)) return context.getString(R.string.knigoblud);
-        if (url.contains(Url.SERVER_OTRUB)) return context.getString(R.string.otrub);
-        if (url.contains(Url.SERVER_POLEKNIG)) return context.getString(R.string.poleknig);
-        return "Unknown";
-
     }
 
     public static String formatTimeDisplay(String timeStr) {
