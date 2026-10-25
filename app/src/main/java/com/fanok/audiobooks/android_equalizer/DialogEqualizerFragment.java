@@ -37,6 +37,7 @@ import com.db.chart.view.ChartView;
 import com.db.chart.view.LineChartView;
 import com.fanok.audiobooks.R;
 import com.fanok.audiobooks.pojo.StorageUtil;
+import com.fanok.audiobooks.service.BalanceAudioProcessor;
 import java.util.ArrayList;
 import java.util.Locale;
 import org.jetbrains.annotations.NotNull;
@@ -49,6 +50,8 @@ import org.jetbrains.annotations.NotNull;
 public class DialogEqualizerFragment extends DialogFragment {
     public static final String ARG_AUDIO_SESSIOIN_ID = "audio_session_id";
     private static final String TAG = DialogEqualizerFragment.class.getSimpleName();
+    /** A balance this close to the centre, dragged to, is the centre. */
+    private static final int BALANCE_DETENT = 4;
     private static int textColor = Color.WHITE;
     private static int themeColor = Color.parseColor("#B24242");
     private static int backgroundColor = Color.WHITE;
@@ -242,6 +245,7 @@ public class DialogEqualizerFragment extends DialogFragment {
 
         presetSpinner = view.findViewById(R.id.equalizer_preset_spinner);
         presetSpinner.getBackground().setColorFilter(textColor, PorterDuff.Mode.SRC_ATOP);
+        bindBalance(view);
 
         chart = view.findViewById(R.id.lineChart);
         Paint paint = new Paint();
@@ -404,6 +408,43 @@ public class DialogEqualizerFragment extends DialogFragment {
 
         chart.addData(dataset);
         chart.show();
+    }
+
+    /**
+     * The left/right balance bar: heard at once, saved with the other settings when the dialog closes. It is not an
+     * effect of the session, so it plays whether the equalizer switch is on or off.
+     */
+    private void bindBalance(@NonNull View view) {
+        ((TextView) view.findViewById(R.id.equalizer_balance_left)).setTextColor(textColor);
+        ((TextView) view.findViewById(R.id.equalizer_balance_right)).setTextColor(textColor);
+        SeekBar balanceBar = view.findViewById(R.id.equalizer_balance);
+        balanceBar.getProgressDrawable().setColorFilter(
+                new PorterDuffColorFilter(Color.DKGRAY, PorterDuff.Mode.SRC_IN));
+        balanceBar.getThumb().setColorFilter(new PorterDuffColorFilter(themeColor, PorterDuff.Mode.SRC_IN));
+        balanceBar.setMax(2 * BalanceAudioProcessor.MAX);
+        balanceBar.setProgress(Settings.balance + BalanceAudioProcessor.MAX);
+        balanceBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+            @Override
+            public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
+                int balance = progress - BalanceAudioProcessor.MAX;
+                if (fromUser && balance != 0 && Math.abs(balance) <= BALANCE_DETENT) {
+                    seekBar.setProgress(BalanceAudioProcessor.MAX); //the centre holds the thumb
+                    return;
+                }
+                Settings.balance = balance;
+                BalanceAudioProcessor.setBalance(balance);
+            }
+
+            @Override
+            public void onStartTrackingTouch(SeekBar seekBar) {
+
+            }
+
+            @Override
+            public void onStopTrackingTouch(SeekBar seekBar) {
+
+            }
+        });
     }
 
     /** "60 Hz", "3.6 kHz": the band's centre frequency given in millihertz. */

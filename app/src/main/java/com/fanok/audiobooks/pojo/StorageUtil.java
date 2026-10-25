@@ -113,6 +113,7 @@ public class StorageUtil {
             settings.reverbPreset = Settings.equalizerModel.getReverbPreset();
             settings.seekbarpos = Settings.equalizerModel.getSeekbarpos();
             settings.equalizerEnabled = Settings.isEqualizerEnabled;
+            settings.balance = Settings.balance;
 
             Gson gson = new Gson();
             preferences.edit()
@@ -142,6 +143,7 @@ public class StorageUtil {
         Settings.presetPos = settings.presetPos;
         Settings.reverbPreset = settings.reverbPreset;
         Settings.seekbarpos = settings.seekbarpos;
+        Settings.balance = settings.balance;
         Settings.equalizerModel = model;
     }
 }

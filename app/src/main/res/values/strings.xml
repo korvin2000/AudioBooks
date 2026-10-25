@@ -494,6 +494,9 @@
     <string name="equalizer_3d" translatable="false">3D</string>
     <string name="equalizer_error">Ошибка эквалайзера</string>
     <string name="equalizer_band_description">Полоса %1$s</string>
+    <string name="equalizer_balance">Баланс</string>
+    <string name="equalizer_balance_left">Л</string>
+    <string name="equalizer_balance_right">П</string>
     <string name="download_state_partial">Скачано частично</string>
     <string name="download_state_full">Скачано полностью</string>
     <string name="cookies_site">Cookies сайта</string>
