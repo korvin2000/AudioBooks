@@ -37,6 +37,7 @@ public class SearchUrlsTest {
         PAGE_FORMAT.put(Provider.POLEKNIG, "&p=%d");
         PAGE_FORMAT.put(Provider.UKNIG, "&p=%d");
         PAGE_FORMAT.put(Provider.AUDIOKNIGA_LIFE, "/page/%d/");
+        PAGE_FORMAT.put(Provider.AUDIOKNIGI_FUN, "search_start=%d&");
     }
 
     private static String pageToken(Provider provider, Category category, int page) {
@@ -148,7 +149,8 @@ public class SearchUrlsTest {
                         int from = path.indexOf("p.title=") + "p.title=".length();
                         decoded = path.substring(from, path.indexOf("/v.litres_buy", from));
                     } else {
-                        String name = provider == Provider.ABMP3 ? "text" : provider == Provider.AUDIOBOO ? "story" : "q";
+                        String name = provider == Provider.ABMP3 ? "text" : provider == Provider.AUDIOBOO
+                                || provider == Provider.AUDIOKNIGI_FUN ? "story" : "q";
                         decoded = HttpUrl.parse(url).queryParameter(name);
                     }
                     assertEquals(provider + "/" + category + " -> " + url, query, decoded);

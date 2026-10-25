@@ -195,6 +195,7 @@
                 <data android:host="poleknig.com" />
                 <data android:host="uknig.com" />
                 <data android:host="audiokniga.life" />
+                <data android:host="audioknigi.fun" />
             </intent-filter>
         </activity>
 
