@@ -9,6 +9,8 @@ import android.graphics.Color;
 import android.graphics.Paint;
 import android.graphics.PorterDuff;
 import android.graphics.PorterDuffColorFilter;
+import android.graphics.drawable.Drawable;
+import android.graphics.drawable.LayerDrawable;
 import android.media.audiofx.BassBoost;
 import android.media.audiofx.Equalizer;
 import android.media.audiofx.PresetReverb;
@@ -417,9 +419,18 @@ public class DialogEqualizerFragment extends DialogFragment {
     private void bindBalance(@NonNull View view) {
         ((TextView) view.findViewById(R.id.equalizer_balance_left)).setTextColor(textColor);
         ((TextView) view.findViewById(R.id.equalizer_balance_right)).setTextColor(textColor);
+        view.findViewById(R.id.equalizer_balance_centre).setBackgroundColor(textColor);
         SeekBar balanceBar = view.findViewById(R.id.equalizer_balance);
         balanceBar.getProgressDrawable().setColorFilter(
                 new PorterDuffColorFilter(Color.DKGRAY, PorterDuff.Mode.SRC_IN));
+        if (balanceBar.getProgressDrawable() instanceof LayerDrawable) {
+            // a balance is no amount: one even track, without a fill from the left edge
+            LayerDrawable track = (LayerDrawable) balanceBar.getProgressDrawable();
+            Drawable fill = track.findDrawableByLayerId(android.R.id.progress);
+            Drawable rail = track.findDrawableByLayerId(android.R.id.background);
+            if (fill != null) fill.setAlpha(0);
+            if (rail != null) rail.setAlpha(255);
+        }
         balanceBar.getThumb().setColorFilter(new PorterDuffColorFilter(themeColor, PorterDuff.Mode.SRC_IN));
         balanceBar.setMax(2 * BalanceAudioProcessor.MAX);
         balanceBar.setProgress(Settings.balance + BalanceAudioProcessor.MAX);

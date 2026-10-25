@@ -60,61 +60,67 @@
             android:id="@+id/lineChart"
             android:layout_width="match_parent"
             android:layout_height="0dp"
-            android:layout_weight="3"
+            android:layout_weight="2"
             android:paddingLeft="15dp"
             android:paddingRight="15dp"
             android:paddingBottom="5dp" />
 
+        <!-- left/right balance across the whole width; the sides are physical, so never mirrored -->
         <LinearLayout
             android:layout_width="match_parent"
-            android:layout_height="0dp"
-            android:layout_marginLeft="9dp"
-            android:layout_marginRight="9dp"
-            android:layout_weight="1"
-            android:orientation="horizontal">
+            android:layout_height="48dp"
+            android:layout_marginTop="4dp"
+            android:gravity="center_vertical"
+            android:layoutDirection="ltr"
+            android:orientation="horizontal"
+            android:paddingLeft="16dp"
+            android:paddingRight="16dp">
 
-            <Spinner
-                android:id="@+id/equalizer_preset_spinner"
+            <TextView
+                android:id="@+id/equalizer_balance_left"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:importantForAccessibility="no"
+                android:text="@string/equalizer_balance_left"
+                android:textSize="16sp" />
+
+            <!-- the centre mark sits under the thumb's middle position -->
+            <FrameLayout
                 android:layout_width="0dp"
                 android:layout_height="match_parent"
-                android:layout_marginStart="5dp"
-                android:layout_weight="1" />
+                android:layout_weight="1">
 
-            <!-- left/right balance: the sides are physical, so never mirrored -->
-            <LinearLayout
-                android:layout_width="0dp"
-                android:layout_height="match_parent"
-                android:layout_weight="1"
-                android:gravity="center_vertical"
-                android:layoutDirection="ltr"
-                android:orientation="horizontal">
-
-                <TextView
-                    android:id="@+id/equalizer_balance_left"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginStart="10dp"
-                    android:importantForAccessibility="no"
-                    android:text="@string/equalizer_balance_left" />
+                <View
+                    android:id="@+id/equalizer_balance_centre"
+                    android:layout_width="2dp"
+                    android:layout_height="14dp"
+                    android:layout_gravity="center"
+                    android:alpha="0.5" />
 
                 <SeekBar
                     android:id="@+id/equalizer_balance"
-                    android:layout_width="0dp"
+                    android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_weight="1"
+                    android:layout_gravity="center_vertical"
                     android:contentDescription="@string/equalizer_balance"
                     android:thumb="@drawable/custom_equalizer_thumb" />
+            </FrameLayout>
 
-                <TextView
-                    android:id="@+id/equalizer_balance_right"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginEnd="5dp"
-                    android:importantForAccessibility="no"
-                    android:text="@string/equalizer_balance_right" />
-            </LinearLayout>
-
+            <TextView
+                android:id="@+id/equalizer_balance_right"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:importantForAccessibility="no"
+                android:text="@string/equalizer_balance_right"
+                android:textSize="16sp" />
         </LinearLayout>
+
+        <Spinner
+            android:id="@+id/equalizer_preset_spinner"
+            android:layout_width="match_parent"
+            android:layout_height="48dp"
+            android:layout_marginLeft="8dp"
+            android:layout_marginRight="8dp" />
 
 
         <!-- one @layout/equalizer_band per band is added here at runtime -->
