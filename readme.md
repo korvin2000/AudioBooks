@@ -42,7 +42,7 @@ The idea is simple: bring book discovery, a personal library, and comfortable li
 
 ### Book sources
 
-Choose from **Akniga, Книга в ухе, ИзиБук, AudioBook-mp3, База Книг, Книгоблуд, Audioboo, Отрубин, and Полекниг**. Select the browsing source in **Settings → Source** (`Настройки → Источник`) and choose which catalogs to search under **Search sources** (`Источники поиска`).
+Choose from **Akniga, Книга в ухе, ИзиБук, AudioBook-mp3, База Книг, Книгоблуд, Audioboo, Отрубин, Полекниг, уКниг, Аудиокниги.fun, Aknig.xyz, and Аудиокнига Life**. Select the browsing source in **Settings → Source** (`Настройки → Источник`) and choose which catalogs to search under **Search sources** (`Источники поиска`).
 
 Books and catalog details come from the selected websites. Availability, recommendations, and other features can vary by source and network access.
 
@@ -74,7 +74,7 @@ The app interface shown below is in Russian. Select an image to view it at full 
   </tr>
   <tr>
     <td valign="top"><a href="docs/assets/screenshots/main_menu.png"><img src="docs/assets/screenshots/main_menu.png" width="220" alt="Navigation to books, genres, authors, narrators, favorites, history, and downloads"></a></td>
-    <td valign="top"><a href="docs/assets/screenshots/available_sources.png"><img src="docs/assets/screenshots/available_sources.png" width="220" alt="Selection of nine audiobook sources"></a></td>
+    <td valign="top"><a href="docs/assets/screenshots/available_sources.png"><img src="docs/assets/screenshots/available_sources.png" width="220" alt="Selection of audiobook sources"></a></td>
     <td valign="top"><a href="docs/assets/screenshots/settings.png"><img src="docs/assets/screenshots/settings.png" width="220" alt="Settings for appearance, sources, offline listening, parental controls, and backups"></a></td>
   </tr>
 </table>

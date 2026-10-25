@@ -42,7 +42,7 @@
 
 ### Источники книг
 
-В приложении доступны **Akniga, Книга в ухе, ИзиБук, AudioBook-mp3, База Книг, Книгоблуд, Audioboo, Отрубин и Полекниг**. Каталог для просмотра выбирается в разделе **Настройки → Источник**, а сайты для поиска — в разделе **Источники поиска**.
+В приложении доступны **Akniga, Книга в ухе, ИзиБук, AudioBook-mp3, База Книг, Книгоблуд, Audioboo, Отрубин, Полекниг, уКниг, Аудиокниги.fun, Aknig.xyz и Аудиокнига Life**. Каталог для просмотра выбирается в разделе **Настройки → Источник**, а сайты для поиска — в разделе **Источники поиска**.
 
 Книги и сведения о них загружаются с выбранных сайтов. Наличие произведений, рекомендаций и отдельных возможностей зависит от источника и доступности сайта в вашей сети.
 
@@ -74,7 +74,7 @@
   </tr>
   <tr>
     <td valign="top"><a href="docs/assets/screenshots/main_menu.png"><img src="docs/assets/screenshots/main_menu.png" width="220" alt="Переход к книгам, жанрам, авторам, исполнителям, избранному, истории и загрузкам"></a></td>
-    <td valign="top"><a href="docs/assets/screenshots/available_sources.png"><img src="docs/assets/screenshots/available_sources.png" width="220" alt="Выбор из девяти источников аудиокниг"></a></td>
+    <td valign="top"><a href="docs/assets/screenshots/available_sources.png"><img src="docs/assets/screenshots/available_sources.png" width="220" alt="Выбор источника аудиокниг"></a></td>
     <td valign="top"><a href="docs/assets/screenshots/settings.png"><img src="docs/assets/screenshots/settings.png" width="220" alt="Настройки оформления, источников, офлайн-режима, родительского контроля и резервных копий"></a></td>
   </tr>
 </table>
