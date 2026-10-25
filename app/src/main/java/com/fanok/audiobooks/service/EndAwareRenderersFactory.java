@@ -6,6 +6,7 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.annotation.OptIn;
 import androidx.media3.common.C;
+import androidx.media3.common.audio.AudioProcessor;
 import androidx.media3.common.util.UnstableApi;
 import androidx.media3.exoplayer.DefaultRenderersFactory;
 import androidx.media3.exoplayer.ExoPlaybackException;
@@ -13,6 +14,7 @@ import androidx.media3.exoplayer.ExoPlayer;
 import androidx.media3.exoplayer.Renderer;
 import androidx.media3.exoplayer.audio.AudioRendererEventListener;
 import androidx.media3.exoplayer.audio.AudioSink;
+import androidx.media3.exoplayer.audio.DefaultAudioSink;
 import androidx.media3.exoplayer.audio.MediaCodecAudioRenderer;
 import androidx.media3.exoplayer.mediacodec.MediaCodecSelector;
 import java.util.ArrayList;
@@ -22,6 +24,7 @@ import java.util.ArrayList;
  * when the clock reaches its declared duration: audio that ends sooner (a duration the file overstates, data cut short)
  * leaves the player playing silence with a moving clock, and a seek into that stretch has nothing to play either.
  * The service loads such a chapter again, or finishes it ({@link #endedEarly}, {@link #shouldRecover}).
+ * Its audio sink plays the left/right balance ({@link BalanceAudioProcessor}).
  */
 @OptIn(markerClass = UnstableApi.class)
 final class EndAwareRenderersFactory extends DefaultRenderersFactory {
@@ -79,6 +82,17 @@ final class EndAwareRenderersFactory extends DefaultRenderersFactory {
      */
     static boolean shouldRecover(long recoveredAtMs, long positionMs) {
         return recoveredAtMs == C.TIME_UNSET || Math.abs(positionMs - recoveredAtMs) > SAME_SPOT_MS;
+    }
+
+    @Override
+    protected AudioSink buildAudioSink(@NonNull Context context, boolean enableFloatOutput,
+            boolean enableAudioOutputPlaybackParameters) {
+        //the default sink, with the balance ahead of Media3's own processors (speed)
+        return new DefaultAudioSink.Builder(context)
+                .setEnableFloatOutput(enableFloatOutput)
+                .setEnableAudioOutputPlaybackParameters(enableAudioOutputPlaybackParameters)
+                .setAudioProcessors(new AudioProcessor[]{new BalanceAudioProcessor()})
+                .build();
     }
 
     @Override
