@@ -90,6 +90,8 @@ public final class BalanceAudioProcessor extends BaseAudioProcessor {
     }
 
     private static short scale(short sample, float gain) {
-        return gain == 1f ? sample : (short) Math.round(sample * gain);
+        //saturated: a ramp's float steps may end a hair above 1, and 32768 would wrap to -32768 (a click)
+        return gain == 1f ? sample
+                : (short) Math.max(Short.MIN_VALUE, Math.min(Short.MAX_VALUE, Math.round(sample * gain)));
     }
 }

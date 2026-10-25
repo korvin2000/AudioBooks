@@ -607,6 +607,8 @@ public class BooksModel implements com.fanok.audiobooks.interface_pacatge.books.
             listParent = document.body(); // the mobile series page has no list container
         }
         final String pageTitle = izibukTitle(document);
+        // the listing itself as a link of its cards: without the page (and sort) of this request
+        final String listing = url.replaceFirst("[?#].*", "") + "?p=";
         Elements raw = listParent.getElementsByClass("_ccb9b7");
         ArrayList<BookPOJO> result = cards(raw, book -> {
             BookPOJO bookPOJO = new BookPOJO();
@@ -615,7 +617,7 @@ public class BooksModel implements com.fanok.audiobooks.interface_pacatge.books.
                 bookPOJO.setGenre(genre.text());
                 bookPOJO.setUrlGenre(Url.SERVER_IZIBUK + genre.attr("href") + "?p=");
             } else if (url.contains("genre")) {
-                bookPOJO.setUrlGenre(url);
+                bookPOJO.setUrlGenre(listing);
                 if (pageTitle != null) {
                     bookPOJO.setGenre(pageTitle);
                 }
@@ -663,19 +665,19 @@ public class BooksModel implements com.fanok.audiobooks.interface_pacatge.books.
                 bookPOJO.setTime(time.text());
             }
             if (bookPOJO.getAutor() == null && url.contains("author")) {
-                bookPOJO.setUrlAutor(url + "?p=");
+                bookPOJO.setUrlAutor(listing);
                 if (pageTitle != null) {
                     bookPOJO.setAutor(pageTitle);
                 }
             }
             if (bookPOJO.getArtist() == null && url.contains("reader")) {
-                bookPOJO.setUrlArtist(url + "?p=");
+                bookPOJO.setUrlArtist(listing);
                 if (pageTitle != null) {
                     bookPOJO.setArtist(pageTitle);
                 }
             }
             if (bookPOJO.getSeries() == null && url.contains("serie")) {
-                bookPOJO.setUrlSeries(url + "?p=");
+                bookPOJO.setUrlSeries(listing);
                 if (pageTitle != null) {
                     bookPOJO.setSeries(pageTitle);
                 }

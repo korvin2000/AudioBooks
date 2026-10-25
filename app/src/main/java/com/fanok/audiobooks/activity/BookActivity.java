@@ -1337,7 +1337,8 @@ public class BookActivity extends MvpAppCompatActivity implements Activity {
         public void run() {
             boolean armed = mArmed;
             mArmed = false;
-            if (!armed || !mPresenter.canSwitchToThisBook()) {
+            // still held: a press whose release was missed (focus moved, screen left) ends unpressed
+            if (!armed || !mButton.isPressed() || !mButton.hasWindowFocus() || !mPresenter.canSwitchToThisBook()) {
                 return;
             }
             mFired = true;
