@@ -9,6 +9,7 @@ import java.util.Calendar;
 import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
+import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -28,6 +29,9 @@ import java.util.regex.Pattern;
  * <li>abmp3, poleknig, audioboo: no period at all (audioboo sorts by duration but cannot bound it); cards carry
  * the duration. izibuk: nothing, and its cards carry no duration either.</li>
  * </ul>
+ * A sort chosen in a genre listing stays within the genre ({@link #inGenre}): akniga ({@code /section/<g>/top/}),
+ * baza-knig ({@code /f/cat=<id>/}) and poleknig ({@code /genres/<id>/best}) rank a genre on the server; otrub and
+ * knigoblud cannot, so their site-wide ranking is narrowed on the device to the cards of the genre.
  */
 public final class ListingFilters {
 
@@ -204,11 +208,13 @@ public final class ListingFilters {
         public final boolean end;
         /** A page is being fetched right now. */
         public final boolean loading;
+        /** A site-wide ranking narrowed to one genre on the device ({@link #cardGenre}). */
+        public final boolean genre;
         /** Filtering, more pages and no load running: "search further" can be pressed. */
         public final boolean canSearchMore;
 
         Bar(boolean visible, Duration duration, boolean durationAvailable, Period period, List<Period> periods,
-                int shown, int scanned, boolean end, boolean loading) {
+                int shown, int scanned, boolean end, boolean loading, boolean genre) {
             this.visible = visible;
             this.duration = duration;
             this.durationAvailable = durationAvailable;
@@ -218,14 +224,15 @@ public final class ListingFilters {
             this.scanned = scanned;
             this.end = end;
             this.loading = loading;
+            this.genre = genre;
             this.canSearchMore = isFiltering() && !end && !loading;
         }
 
         public static final Bar HIDDEN = new Bar(false, Duration.ANY, false, null, Collections.<Period>emptyList(),
-                0, 0, false, false);
+                0, 0, false, false, false);
 
         public boolean isFiltering() {
-            return durationAvailable && !duration.isAny();
+            return durationAvailable && !duration.isAny() || genre;
         }
     }
 
@@ -300,12 +307,17 @@ public final class ListingFilters {
 
     /** The books of {@code all} that pass {@code duration}; the same list when it is ANY. */
     public static ArrayList<BookPOJO> filter(ArrayList<BookPOJO> all, Duration duration) {
-        if (duration.isAny()) {
+        return filter(all, duration, null);
+    }
+
+    /** The books of {@code all} that pass {@code duration} and are of {@code genre} ({@link #cardGenre}) unless null. */
+    public static ArrayList<BookPOJO> filter(ArrayList<BookPOJO> all, Duration duration, String genre) {
+        if (duration.isAny() && genre == null) {
             return all;
         }
         ArrayList<BookPOJO> out = new ArrayList<>();
         for (BookPOJO book : all) {
-            if (matches(book, duration)) {
+            if (matches(book, duration) && (genre == null || genre.equals(lastSegment(book.getUrlGenre())))) {
                 out.add(book);
             }
         }
@@ -517,7 +529,101 @@ public final class ListingFilters {
         if (!durationAvailable && period == null) {
             return Bar.HIDDEN;
         }
-        return new Bar(true, duration, durationAvailable, period, periods(provider, url), shown, scanned, end, loading);
+        return new Bar(true, duration, durationAvailable, period, periods(provider, url), shown, scanned, end, loading,
+                cardGenre(provider, url) != null);
+    }
+
+    // ---------------------------------------------------------------- genre
+
+    private static final Pattern AKNIGA_SECTION =
+            Pattern.compile("^" + Pattern.quote(Url.SERVER_AKNIGA) + "/section/[^/?#]+/");
+    /** A category root followed by its pages or filter; not the index ({@code /page/2/}) nor {@code /f/} itself. */
+    private static final Pattern BAZA_KNIG_CATEGORY =
+            Pattern.compile("^(" + Pattern.quote(Url.SERVER_BAZA_KNIG) + "/[\\w-]+/)(?:page/|f/)");
+    private static final Pattern POLEKNIG_GENRE =
+            Pattern.compile("^" + Pattern.quote(Url.SERVER_POLEKNIG) + "/genres/\\d+(?=[/?#]|$)");
+    private static final Pattern OTRUB_GENRE =
+            Pattern.compile("^" + Pattern.quote(Url.SERVER_OTRUB) + "/genres/([\\w-]+)\\.html");
+
+    /**
+     * The genre of a genre listing or of a ranking opened from one, as {@link #inGenre} takes it: the genre's root
+     * URL (akniga, baza-knig, poleknig) or its key (otrub slug, knigoblud id); null for any other listing.
+     */
+    public static String genreOf(Provider provider, String url, Set<String> knigobludGenres) {
+        if (provider == null || url == null) {
+            return null;
+        }
+        Matcher m;
+        switch (provider) {
+            case AKNIGA:
+                m = AKNIGA_SECTION.matcher(url);
+                return m.find() ? m.group() : null;
+            case BAZA_KNIG:
+                m = BAZA_KNIG_CATEGORY.matcher(url);
+                return m.find() ? m.group(1) : null;
+            case POLEKNIG:
+                m = POLEKNIG_GENRE.matcher(url);
+                return m.find() ? m.group() : null;
+            case OTRUB:
+            case KNIGOBLUD: {
+                String narrowed = cardGenre(provider, url);
+                if (narrowed != null) {
+                    return narrowed;
+                }
+                if (provider == Provider.KNIGOBLUD) {
+                    // its genre, author and series links all look alike: /<id>
+                    return knigobludGenres.contains(url) ? lastSegment(url) : null;
+                }
+                m = OTRUB_GENRE.matcher(url);
+                return m.find() ? m.group(1) : null;
+            }
+            default:
+                return null;
+        }
+    }
+
+    /**
+     * {@code siteWide}, a listing of the sort menu, within {@code genre} ({@link #genreOf}; null keeps it site-wide).
+     * baza-knig's {@code /<category>/f/} gets the category id when loaded (the filter ignores the path). otrub and
+     * knigoblud have no genre rankings: "new" is the genre listing itself, a ranking carries the genre in a
+     * {@code genre=} parameter their servers ignore, and its cards are filtered by it ({@link #cardGenre}).
+     */
+    public static String inGenre(Provider provider, String siteWide, String genre) {
+        if (genre == null) {
+            return siteWide;
+        }
+        switch (provider) {
+            case AKNIGA:
+                return siteWide.replace(Url.SERVER_AKNIGA + "/index/", genre);
+            case BAZA_KNIG:
+                return siteWide.replace(Url.SERVER_BAZA_KNIG + "/", genre);
+            case POLEKNIG:
+                return siteWide.replace(Url.SERVER_POLEKNIG + "/books/novelties", genre + "/new")
+                        .replace(Url.SERVER_POLEKNIG + "/books/popular", genre + "/best");
+            case OTRUB:
+                return siteWide.equals(Url.NEW_BOOK_OTRUB) ? Url.SERVER_OTRUB + "/genres/" + genre + ".html?p="
+                        : siteWide.replace("?", "?genre=" + genre + "&");
+            case KNIGOBLUD:
+                return siteWide.equals(Url.INDEX_KNIGOBLUD) ? Url.SERVER_KNIGOBLUD + "/" + genre
+                        : siteWide.replace("?", "?genre=" + genre + "&");
+            default:
+                return siteWide;
+        }
+    }
+
+    /** The genre a site-wide ranking of otrub or knigoblud is narrowed to on the device, else null. */
+    public static String cardGenre(Provider provider, String url) {
+        return provider == Provider.OTRUB || provider == Provider.KNIGOBLUD ? param(url, "genre") : null;
+    }
+
+    /** The last path segment of {@code url} without {@code .html}: a card's genre link as a genre key. */
+    static String lastSegment(String url) {
+        if (url == null) {
+            return null;
+        }
+        String path = url.replaceFirst("[?#].*", "").replaceFirst("/+$", "");
+        String last = path.substring(path.lastIndexOf('/') + 1);
+        return last.endsWith(".html") ? last.substring(0, last.length() - 5) : last;
     }
 
     // ---------------------------------------------------------------- url helpers

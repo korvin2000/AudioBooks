@@ -9,6 +9,8 @@ import com.fanok.audiobooks.search.ProviderPage;
 import io.reactivex.Single;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.Set;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
 import org.jsoup.select.Elements;
@@ -162,7 +164,20 @@ public class GenreModel implements com.fanok.audiobooks.interface_pacatge.books.
         }), false);
     }
 
+    /** The URLs of knigoblud's genres: its genre, author and series links look alike, so a sort knows them by this. */
+    public static final Set<String> KNIGOBLUD_GENRE_URLS = new HashSet<>();
+
+    static {
+        for (GenrePOJO genre : knigobludGenres()) {
+            KNIGOBLUD_GENRE_URLS.add(genre.getUrl());
+        }
+    }
+
     private ProviderPage<GenrePOJO> loadBooksListKnigoblud() {
+        return ProviderPage.of(knigobludGenres(), false);
+    }
+
+    private static ArrayList<GenrePOJO> knigobludGenres() {
         ArrayList<GenrePOJO> result = new ArrayList<>();
         result.add(new GenrePOJO("Фантастика, фэнтези", Url.SERVER_KNIGOBLUD+"/9d47c7aa-9e2e-4fe0-bcd5-14f7d4874198"));
         result.add(new GenrePOJO("Детективы, триллеры, боевики", Url.SERVER_KNIGOBLUD+"/4daab267-3592-4604-9e34-8f3b6a1db9fe"));
@@ -186,7 +201,7 @@ public class GenreModel implements com.fanok.audiobooks.interface_pacatge.books.
         result.add(new GenrePOJO("Ужасы, мистика, хоррор", Url.SERVER_KNIGOBLUD+"/120a1664-12e5-4ac6-853f-792f6a8007e9"));
         result.add(new GenrePOJO("Эзотерика, Нетрадиционные религиозно-философские учения", Url.SERVER_KNIGOBLUD+"/e4117eca-c027-4f80-8004-3851d9b562c7"));
         result.add(new GenrePOJO("Юмор, сатира", Url.SERVER_KNIGOBLUD+"/70bb89e8-65f7-414d-b98d-107878734c89"));
-        return ProviderPage.of(result, false);
+        return result;
     }
 
     protected ProviderPage<GenrePOJO> loadBooksListAudioboo(String url, int page) throws IOException {

@@ -195,7 +195,7 @@ public class BooksPresenter extends MvpPresenter<BooksView> implements
         }
         // the cards are already here: re-filter them, then hunt for more when the filter hid most of them;
         // a new filter counts every card it shows, not only the ones fetched from now on
-        books = ListingFilters.filter(mBookCursor.items(), effectiveDuration());
+        books = filtered(mBookCursor.items());
         getViewState().showDataBooks(books);
         startHunt(0);
         huntOn();
@@ -259,6 +259,11 @@ public class BooksPresenter extends MvpPresenter<BooksView> implements
         return ListingFilters.listsDuration(mProvider, mUrl) ? mDuration : ListingFilters.Duration.ANY;
     }
 
+    /** The cards that pass the duration filter and, on a ranking narrowed to a genre, are of that genre. */
+    private ArrayList<BookPOJO> filtered(ArrayList<BookPOJO> items) {
+        return ListingFilters.filter(items, effectiveDuration(), ListingFilters.cardGenre(mProvider, mUrl));
+    }
+
     /** Starts a hunt that counts the matches beyond {@code baseShown} cards. */
     private void startHunt(int baseShown) {
         mHuntBaseShown = baseShown;
@@ -267,7 +272,8 @@ public class BooksPresenter extends MvpPresenter<BooksView> implements
 
     /** After a page of a filtered book listing: fetches the next one while the hunt budget allows. */
     private void huntOn() {
-        if (mModelId != Consts.MODEL_BOOKS || effectiveDuration().isAny() || isLoading
+        if (mModelId != Consts.MODEL_BOOKS || isLoading
+                || effectiveDuration().isAny() && ListingFilters.cardGenre(mProvider, mUrl) == null
                 || mBookCursor.isEnd()
                 || !ListingFilters.keepHunting(books.size() - mHuntBaseShown, books.size(), mHuntPages)) {
             return;
@@ -634,6 +640,11 @@ public class BooksPresenter extends MvpPresenter<BooksView> implements
             // a source switch, a submenu parent or an item this site has no listing for
             return;
         }
+        if (!url.equals(mUrl)) {
+            // the sorts above are the site-wide listings; a genre listing's sort stays within its genre
+            url = ListingFilters.inGenre(mProvider, url,
+                    ListingFilters.genreOf(mProvider, mUrl, GenreModel.KNIGOBLUD_GENRE_URLS));
+        }
         if (itemId == R.id.app_bar_search) {
             if (mUrl.contains(Url.SERVER_ABMP3)) {
                 if (mModelId == Consts.MODEL_AUTOR) {
@@ -864,7 +875,7 @@ public class BooksPresenter extends MvpPresenter<BooksView> implements
                                     if (page <= 1) {
                                         mHuntBaseShown = 0; // page 1 replaced the list the hunt counted from
                                     }
-                                    books = ListingFilters.filter(cursor.items(), effectiveDuration());
+                                    books = filtered(cursor.items());
                                     getViewState().showDataBooks(books);
                                 });
                                 if (!result.isFailure()) {

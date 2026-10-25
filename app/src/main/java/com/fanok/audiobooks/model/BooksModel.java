@@ -16,7 +16,12 @@ import okhttp3.HttpUrl;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import org.jsoup.Connection;
+import org.jsoup.HttpStatusException;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
 import org.jsoup.select.Elements;
@@ -68,7 +73,7 @@ public class BooksModel implements com.fanok.audiobooks.interface_pacatge.books.
             case IZIBUK: return izibukListing(url, page);
             case ABMP3: return parseAbmp3(SiteHttp.get(url), page);
             case AKNIGA: return parseAkniga(SiteHttp.get(url), page);
-            case BAZA_KNIG: return parseBazaKnig(SiteHttp.get(url), page);
+            case BAZA_KNIG: return parseBazaKnig(bazaKnigListing(url), page);
             case KNIGOBLUD: return parseKnigoblud(SiteHttp.get(url), page);
             case AUDIOBOO: return parseAudioboo(audiobooListing(url, nameModel, context), page);
             case OTRUB: return parseOtrub(SiteHttp.get(url), page);
@@ -78,6 +83,55 @@ public class BooksModel implements com.fanok.audiobooks.interface_pacatge.books.
     }
 
     // ---------------------------------------------------------------- fetch helpers
+
+    /** baza-knig category roots as linked → {the root they lead to (a renamed one redirects), the DLE category id}. */
+    private static final Map<String, String[]> BAZA_KNIG_CATEGORIES = new ConcurrentHashMap<>();
+    private static final Pattern BAZA_KNIG_CATEGORY_PAGE =
+            Pattern.compile("^(" + Pattern.quote(Url.SERVER_BAZA_KNIG) + "/[\\w-]+/)(page/.*|f/.*)$");
+    private static final Pattern BAZA_KNIG_CATEGORY_ID = Pattern.compile("dle_sort_cat_(\\d+)");
+
+    /**
+     * A page of a baza-knig listing. A category's own rankings ({@code /<category>/f/...}, see
+     * ListingFilters#inGenre) go to the DLE filter, which takes a category only as {@code cat=<id>}; a category the
+     * site renamed ("uzhasy-mistika" → "uzhasy-mistika_") is still linked by its menu under the old name, whose root
+     * redirects but whose pages are 404. Both are read off the category's own page, once.
+     */
+    static Document bazaKnigListing(String url) throws IOException {
+        Matcher m = BAZA_KNIG_CATEGORY_PAGE.matcher(url);
+        if (!m.matches()) {
+            return SiteHttp.get(url);
+        }
+        String root = m.group(1);
+        String rest = m.group(2);
+        if (rest.startsWith("f/")) {
+            String id = bazaKnigCategory(root)[1];
+            return SiteHttp.get(id == null ? url : Url.SERVER_BAZA_KNIG + "/f/cat=" + id + "/" + rest.substring(2));
+        }
+        String[] known = BAZA_KNIG_CATEGORIES.get(root);
+        try {
+            return SiteHttp.get(known != null ? known[0] + rest : url);
+        } catch (HttpStatusException e) {
+            if (known != null || e.getStatusCode() != 404) {
+                throw e;
+            }
+            String moved = bazaKnigCategory(root)[0];
+            if (moved.equals(root)) {
+                throw e;
+            }
+            return SiteHttp.get(moved + rest);
+        }
+    }
+
+    private static String[] bazaKnigCategory(String root) throws IOException {
+        String[] known = BAZA_KNIG_CATEGORIES.get(root);
+        if (known == null) {
+            Document doc = SiteHttp.get(root);
+            Matcher id = BAZA_KNIG_CATEGORY_ID.matcher(doc.html());
+            known = new String[]{doc.location(), id.find() ? id.group(1) : null};
+            BAZA_KNIG_CATEGORIES.put(root, known);
+        }
+        return known;
+    }
 
     /** DLE search endpoints take their parameters as a form: POST the query string of {@code url}. */
     static Document postForm(String url) throws IOException {
