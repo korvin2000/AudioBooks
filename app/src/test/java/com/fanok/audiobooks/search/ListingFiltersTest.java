@@ -128,11 +128,10 @@ public class ListingFiltersTest {
 
     @Test
     public void onlySitesWhoseCardsCarryADurationCanFilterByIt() {
-        assertFalse(ListingFilters.listsDuration(Provider.IZIBUK, Url.INDEX_IZIBUK));
         assertFalse(ListingFilters.listsDuration(Provider.OTRUB, Url.BEST_WEEK_OTRUB));
         assertFalse(ListingFilters.listsDuration(null, Url.INDEX));
         for (Provider p : Provider.values()) {
-            if (p != Provider.IZIBUK && p != Provider.OTRUB) {
+            if (p != Provider.OTRUB) {
                 assertTrue(p.name(), ListingFilters.listsDuration(p, Url.INDEX));
             }
         }
@@ -305,8 +304,10 @@ public class ListingFiltersTest {
         assertFalse(otrub.durationAvailable);
         assertFalse("a stored duration filter must not hide an otrub list", otrub.isFiltering());
         assertEquals(Period.WEEK, otrub.period);
-        // izibuk offers nothing; genre and author lists never show the bar
-        assertFalse(ListingFilters.bar(true, Provider.IZIBUK, Url.INDEX_IZIBUK, Duration.UNDER_30M, null, 0, 0, false, false).visible);
+        // izibuk: the duration chip without any period; genre and author lists never show the bar
+        ListingFilters.Bar izibuk = ListingFilters.bar(true, Provider.IZIBUK, Url.INDEX_IZIBUK, Duration.UNDER_30M, null, 0, 0, false, false);
+        assertTrue(izibuk.isFiltering());
+        assertTrue(izibuk.periods.isEmpty());
         assertFalse(ListingFilters.bar(false, Provider.KNIGAVUHE, Url.SECTIONS, Duration.UNDER_30M, null, 0, 0, false, false).visible);
     }
 

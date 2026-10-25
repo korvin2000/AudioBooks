@@ -8,6 +8,7 @@ import static org.junit.Assert.assertTrue;
 
 import com.fanok.audiobooks.Url;
 import com.fanok.audiobooks.pojo.BookPOJO;
+import com.fanok.audiobooks.search.ListingFilters;
 import com.fanok.audiobooks.search.Provider;
 import com.fanok.audiobooks.search.ProviderPage;
 
@@ -143,6 +144,42 @@ public class BooksModelParsersTest {
         assertEquals(4, page.items.size());
         assertEquals("Назад в СССР 1984", page.items.get(0).getName());
         assertEquals("Необыкновенный Икс. 1964 – 1984", page.items.get(3).getName());
+        assertFalse(page.hasMore);
+    }
+
+    @Test
+    public void izibukMobileGenrePageCarriesDurations() throws IOException {
+        String url = "https://izib.uk/genre1?p=1/";
+        ProviderPage<BookPOJO> page = BooksModel.parseIzibuk(fixture("izibuk/listing-mobile-genre1-p1.html", url), url, 1);
+        assertEquals(20, page.items.size());
+        assertTrue("2239 pages", page.hasMore);
+        assertAllHaveNameAndUrl(page, Url.SERVER_IZIBUK);
+        BookPOJO first = page.items.get(0);
+        assertEquals("Романов. Том 12", first.getName());
+        assertEquals("Владимир Кощеев", first.getAutor());
+        assertEquals("8 ч. 12 мин.", first.getTime());
+        // mobile genre cards carry no genre: the breadcrumb names it
+        assertEquals("Фантастика, фэнтези", first.getGenre());
+        assertTrue(first.getDesc(), first.getDesc().startsWith("Балы, красавицы"));
+        for (BookPOJO book : page.items) {
+            assertTrue(book.getTime(), ListingFilters.durationMinutes(book.getTime()) > 0);
+        }
+    }
+
+    @Test
+    public void izibukMobileSeriesPageWithoutListContainerSkipsFragments() {
+        String url = "https://izib.uk/serie703?p=1/";
+        String card = "<div class=_ccb9b7><div class=_680f12> #%d </div><div class=_802db0><span></span>"
+                + "<div class=_3dc935><a href=/art%d>Book %d</a>%s</div>"
+                + "<div class=_eeab32><span class=_1d4de8></span><a href=/serie703>Мегрэ</a></div>"
+                + "<div class=_eeab32><span class=_1f6354></span><span class=_08dd3a>4 ч. 2 мин.</span></div></div></div>";
+        Document doc = Jsoup.parse("<div class=_6eb726> Серия «<b>Комиссар Мегрэ</b>» </div>"
+                + String.format(card, 1, 1, 1, "") + String.format(card, 2, 2, 2, "<span class=_09ddb7>Ф</span>"), url);
+        ProviderPage<BookPOJO> page = BooksModel.parseIzibuk(doc, url, 1);
+        assertEquals(1, page.items.size());
+        assertEquals("Book 1", page.items.get(0).getName());
+        assertEquals("4 ч. 2 мин.", page.items.get(0).getTime());
+        assertEquals("Мегрэ", page.items.get(0).getSeries());
         assertFalse(page.hasMore);
     }
 

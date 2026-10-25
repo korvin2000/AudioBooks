@@ -247,7 +247,6 @@ public class BooksFragment extends MvpAppCompatFragment implements BooksView {
                 if (modelID != Consts.MODEL_BOOKS || mUrl.contains("reader") || mUrl.contains("author") ||
                         mUrl.contains("serie") || mUrl.contains("cikl") ||
                         (mUrl.contains(Url.SERVER_ABMP3) && mUrl.contains("genre")) ||
-                        (mUrl.contains(Url.SERVER_IZIBUK) && mUrl.contains("genre")) ||
                         (mUrl.contains(Url.SERVER_BAZA_KNIG) && mUrl.contains("ispolnitel")) ||
                         // knigoblud's author, reader and series listings: /<id> like its genres, but no sort
                         (mUrl.matches(Pattern.quote(Url.SERVER_KNIGOBLUD) + "/[0-9a-f-]{36}.*")
@@ -311,9 +310,6 @@ public class BooksFragment extends MvpAppCompatFragment implements BooksView {
                 if (finishedItem != null) finishedItem.setVisible(isKnigoblud);
                 MenuItem retingParent = menu.findItem(R.id.reting);
                 if (retingParent != null) retingParent.setVisible(!isKnigoblud);
-                // only ever hidden here: onCreateMenu already hid Order where the listing takes no sort
-                MenuItem orderItem = menu.findItem(R.id.order);
-                if (orderItem != null && mUrl.contains(Url.SERVER_IZIBUK)) orderItem.setVisible(false);
                 boolean isAbmp3 = mUrl.contains(Url.SERVER_ABMP3);
                 MenuItem popularParent = menu.findItem(R.id.popular_parent);
                 if (popularParent != null) popularParent.setVisible(!isAbmp3);

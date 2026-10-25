@@ -111,8 +111,6 @@ public class Consts {
 
     public static final int SOURCE_POLEKNIG = 8;
 
-    public static boolean izibuk_reiting = false;
-
     private static int SOURCE;
 
     private static String bazaKnigCookies = "";
