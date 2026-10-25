@@ -524,17 +524,12 @@ public class BooksPresenter extends MvpPresenter<BooksView> implements
                 }
             }
         } else if (mUrl.contains(Url.SERVER_IZIBUK)) {
+            // the index and a genre rank by popularity (all time, no period) with sort_pop=1, the genre kept
+            String newest = mUrl.replace("sort_pop=1&", "");
             if (itemId == R.id.new_data) {
-                Consts.izibuk_reiting = false;
-                url = Url.INDEX_IZIBUK;
-            } else if (itemId == R.id.popular || itemId == R.id.popular_all_time
-                    || itemId == R.id.popular_day || itemId == R.id.popular_week
-                    || itemId == R.id.popular_month
-                    || itemId == R.id.reting || itemId == R.id.reting_all_time
-                    || itemId == R.id.reting_day || itemId == R.id.reting_week
-                    || itemId == R.id.reting_month) {
-                Consts.izibuk_reiting = true;
-                url = Url.INDEX_IZIBUK;
+                url = newest;
+            } else if (itemId == R.id.popular) {
+                url = newest.replaceFirst("\\?", "?sort_pop=1&");
             }
         } else if (mUrl.contains(Url.SERVER_ABMP3)) {
             if (itemId == R.id.new_data) {

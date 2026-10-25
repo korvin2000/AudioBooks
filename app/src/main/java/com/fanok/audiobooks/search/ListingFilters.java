@@ -26,7 +26,8 @@ import java.util.regex.Pattern;
  * {@code f.prodolzhitelnost}/{@code t.prodolzhitelnost} as HH:MM:SS compared by whole hours; it ignores the
  * genre of the page it was opened from, so genre pages filter client-side. Cards carry the duration.</li>
  * <li>abmp3, poleknig, audioboo: no period at all (audioboo sorts by duration but cannot bound it); cards carry
- * the duration. izibuk: nothing, and its cards carry no duration either.</li>
+ * the duration. izibuk: no period (its popularity sort is all-time); the cards of its mobile site, which
+ * {@code BooksModel} lists from, carry the duration.</li>
  * </ul>
  */
 public final class ListingFilters {
@@ -317,7 +318,7 @@ public final class ListingFilters {
      * akniga's collections ("Подборки") list collections, not books, and carry none.
      */
     public static boolean listsDuration(Provider provider, String url) {
-        return provider != null && provider != Provider.IZIBUK && provider != Provider.OTRUB
+        return provider != null && provider != Provider.OTRUB
                 && !(provider == Provider.AKNIGA && url != null && url.contains("/collections/"));
     }
 
