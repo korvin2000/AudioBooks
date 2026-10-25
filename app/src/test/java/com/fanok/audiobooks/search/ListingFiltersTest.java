@@ -128,11 +128,10 @@ public class ListingFiltersTest {
 
     @Test
     public void onlySitesWhoseCardsCarryADurationCanFilterByIt() {
-        assertFalse(ListingFilters.listsDuration(Provider.IZIBUK, Url.INDEX_IZIBUK));
         assertFalse(ListingFilters.listsDuration(Provider.OTRUB, Url.BEST_WEEK_OTRUB));
         assertFalse(ListingFilters.listsDuration(null, Url.INDEX));
         for (Provider p : Provider.values()) {
-            if (p != Provider.IZIBUK && p != Provider.OTRUB) {
+            if (p != Provider.OTRUB) {
                 assertTrue(p.name(), ListingFilters.listsDuration(p, Url.INDEX));
             }
         }
@@ -305,8 +304,10 @@ public class ListingFiltersTest {
         assertFalse(otrub.durationAvailable);
         assertFalse("a stored duration filter must not hide an otrub list", otrub.isFiltering());
         assertEquals(Period.WEEK, otrub.period);
-        // izibuk offers nothing; genre and author lists never show the bar
-        assertFalse(ListingFilters.bar(true, Provider.IZIBUK, Url.INDEX_IZIBUK, Duration.UNDER_30M, null, 0, 0, false, false).visible);
+        // izibuk: the duration chip without any period; genre and author lists never show the bar
+        ListingFilters.Bar izibuk = ListingFilters.bar(true, Provider.IZIBUK, Url.INDEX_IZIBUK, Duration.UNDER_30M, null, 0, 0, false, false);
+        assertTrue(izibuk.isFiltering());
+        assertTrue(izibuk.periods.isEmpty());
         assertFalse(ListingFilters.bar(false, Provider.KNIGAVUHE, Url.SECTIONS, Duration.UNDER_30M, null, 0, 0, false, false).visible);
     }
 
@@ -317,5 +318,62 @@ public class ListingFiltersTest {
         }
         assertNull(Period.of(null));
         assertNull(Period.of("FORTNIGHT"));
+    }
+
+    @Test
+    public void aSortInAGenreListingStaysInTheGenre() {
+        java.util.Set<String> kbGenres = Collections.singleton(Url.SERVER_KNIGOBLUD + "/0c6d4928-555a-4671-99e9-9bcf9a37d382");
+        // akniga: the section's own top/discussed, also when re-sorting a section ranking
+        String section = ListingFilters.genreOf(Provider.AKNIGA, Url.SERVER_AKNIGA + "/section/classic/page<page>/", null);
+        assertEquals(Url.SERVER_AKNIGA + "/section/classic/top/page<page>/?period=7",
+                ListingFilters.inGenre(Provider.AKNIGA, Url.BEST_WEEK_AKNIGA, section));
+        assertEquals(section, ListingFilters.genreOf(Provider.AKNIGA, Url.SERVER_AKNIGA + "/section/classic/top/page<page>/?period=7", null));
+        assertNull(ListingFilters.genreOf(Provider.AKNIGA, Url.BEST_WEEK_AKNIGA, null));
+        // baza-knig: the category root (renamed ones end in "_"); the index and the site-wide filter are no genre
+        String category = ListingFilters.genreOf(Provider.BAZA_KNIG, Url.SERVER_BAZA_KNIG + "/uzhasy-mistika_/page/", null);
+        assertEquals(Url.SERVER_BAZA_KNIG + "/uzhasy-mistika_/f/sort=rating/order=desc/page/",
+                ListingFilters.inGenre(Provider.BAZA_KNIG, Url.RATING_BAZA_KNIG, category));
+        assertEquals(Url.SERVER_BAZA_KNIG + "/uzhasy-mistika_/page/",
+                ListingFilters.inGenre(Provider.BAZA_KNIG, Url.NEW_BOOK_BAZA_KNIG, category));
+        assertNull(ListingFilters.genreOf(Provider.BAZA_KNIG, Url.INDEX_BAZA_KNIG, null));
+        assertNull(ListingFilters.genreOf(Provider.BAZA_KNIG, Url.RATING_BAZA_KNIG, null));
+        // poleknig: /genres/<id>/new and /best
+        String genre = ListingFilters.genreOf(Provider.POLEKNIG, Url.SERVER_POLEKNIG + "/genres/12?p=", null);
+        assertEquals(Url.SERVER_POLEKNIG + "/genres/12/best?p=", ListingFilters.inGenre(Provider.POLEKNIG, Url.BEST_POLEKNIG, genre));
+        assertEquals(genre, ListingFilters.genreOf(Provider.POLEKNIG, Url.SERVER_POLEKNIG + "/genres/12/best?p=", null));
+        assertNull(ListingFilters.genreOf(Provider.POLEKNIG, Url.SERVER_POLEKNIG + "/genres?p=", null));
+        // otrub, knigoblud: the genre listing for "new", the site-wide ranking narrowed on the device
+        String slug = ListingFilters.genreOf(Provider.OTRUB, Url.SERVER_OTRUB + "/genres/fantastika.html?p=", null);
+        assertEquals(Url.SERVER_OTRUB + "/genres/fantastika.html?p=", ListingFilters.inGenre(Provider.OTRUB, Url.NEW_BOOK_OTRUB, slug));
+        String ranking = ListingFilters.inGenre(Provider.OTRUB, Url.BEST_WEEK_OTRUB, slug);
+        assertEquals(Url.SERVER_OTRUB + "/popular/?genre=fantastika&period=week&p=", ranking);
+        assertEquals("fantastika", ListingFilters.cardGenre(Provider.OTRUB, ranking));
+        assertEquals(slug, ListingFilters.genreOf(Provider.OTRUB, ranking, null));
+        assertEquals(Url.SERVER_OTRUB + "/popular/?genre=fantastika&period=month&p=",
+                ListingFilters.withPeriod(Provider.OTRUB, ranking, Period.MONTH, today()));
+        String id = ListingFilters.genreOf(Provider.KNIGOBLUD, kbGenres.iterator().next(), kbGenres);
+        assertEquals(Url.SERVER_KNIGOBLUD + "/today/?genre=" + id + "&page=",
+                ListingFilters.inGenre(Provider.KNIGOBLUD, Url.TODAY_KNIGOBLUD, id));
+        assertEquals(kbGenres.iterator().next(), ListingFilters.inGenre(Provider.KNIGOBLUD, Url.INDEX_KNIGOBLUD, id));
+        // an author listing looks like a genre one: only the known genres count
+        assertNull(ListingFilters.genreOf(Provider.KNIGOBLUD, Url.SERVER_KNIGOBLUD + "/426b52d3-cd88-4dc3-9cd1-487bcbb0ff30", kbGenres));
+        assertNull(ListingFilters.cardGenre(Provider.OTRUB, Url.BEST_WEEK_OTRUB));
+    }
+
+    @Test
+    public void aNarrowedRankingShowsOnlyTheCardsOfItsGenre() {
+        BookPOJO fantasy = book("1:00:00");
+        fantasy.setUrlGenre(Url.SERVER_OTRUB + "/genres/fantastika.html?p=");
+        BookPOJO novel = book("1:00:00");
+        novel.setUrlGenre(Url.SERVER_OTRUB + "/genres/roman-proza.html?p=");
+        BookPOJO none = book("1:00:00");
+        java.util.ArrayList<BookPOJO> all = new java.util.ArrayList<>(Arrays.asList(fantasy, novel, none));
+        assertEquals(Collections.singletonList(fantasy), ListingFilters.filter(all, Duration.ANY, "fantastika"));
+        assertEquals(0, ListingFilters.filter(all, Duration.UNDER_30M, "fantastika").size());
+        assertEquals(all, ListingFilters.filter(all, Duration.ANY, null));
+        String ranking = Url.SERVER_OTRUB + "/popular/?genre=fantastika&period=week&p=";
+        ListingFilters.Bar bar = ListingFilters.bar(true, Provider.OTRUB, ranking, Duration.ANY, Period.WEEK, 1, 3, false, false);
+        assertTrue(bar.isFiltering());
+        assertTrue(bar.canSearchMore);
     }
 }

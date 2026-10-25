@@ -31,10 +31,12 @@ import android.text.TextWatcher;
 import android.util.AttributeSet;
 import android.util.Log;
 import android.util.Xml;
+import android.view.HapticFeedbackConstants;
 import android.view.KeyEvent;
 import android.view.Menu;
 import android.view.MenuInflater;
 import android.view.MenuItem;
+import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewParent;
 import android.widget.Button;
@@ -128,6 +130,8 @@ public class BookActivity extends MvpAppCompatActivity implements Activity {
     }
 
     private static final String ARG_BOOK = "arg_book";
+    /** Far beyond the system long press (~500 ms), so a slow tap never switches books by accident. */
+    private static final long SWITCH_BOOK_HOLD_MS = 2500;
     @InjectPresenter
     BookPresenter mPresenter;
     private ImageButton mSpeed;
@@ -730,6 +734,7 @@ public class BookActivity extends MvpAppCompatActivity implements Activity {
 
         if (mPlayTop != null) {
             mPlayTop.setOnClickListener(view -> mPresenter.buttomPlayClick(view));
+            new SwitchBookHold().attach(mPlayTop);
         }
         if (mPreviousTop != null) {
             mPreviousTop.setOnClickListener(view -> mPresenter.buttomPreviousClick(view));
@@ -738,6 +743,7 @@ public class BookActivity extends MvpAppCompatActivity implements Activity {
             mNextTop.setOnClickListener(view -> mPresenter.buttomNextClick(view));
         }
         mPlayBottom.setOnClickListener(view -> mPresenter.buttomPlayClick(view));
+        new SwitchBookHold().attach(mPlayBottom);
         mPreviousBottom.setOnClickListener(view -> mPresenter.buttomPreviousClick(view));
         mNextBottom.setOnClickListener(view -> mPresenter.buttomNextClick(view));
         mRewind.setOnClickListener(view -> mPresenter.buttomRewindClick(view));
@@ -1282,6 +1288,100 @@ public class BookActivity extends MvpAppCompatActivity implements Activity {
             }
         }
         return super.onKeyDown(keyCode, event);
+    }
+
+    /**
+     * Holding a play button (touch, or the D-pad centre / Enter key) for {@link #SWITCH_BOOK_HOLD_MS} while another
+     * book plays switches the player to this one; a shorter press stays an ordinary click.
+     */
+    private final class SwitchBookHold implements View.OnTouchListener, View.OnKeyListener, Runnable {
+
+        private View mButton;
+
+        private boolean mArmed;
+
+        private boolean mFired;
+
+        void attach(@NonNull View button) {
+            mButton = button;
+            button.setOnTouchListener(this);
+            button.setOnKeyListener(this);
+        }
+
+        private void arm() {
+            disarm();
+            mFired = false;
+            if (mPresenter.canSwitchToThisBook()) {
+                mArmed = true;
+                mButton.postDelayed(this, SWITCH_BOOK_HOLD_MS);
+            }
+        }
+
+        private void disarm() {
+            mArmed = false;
+            mButton.removeCallbacks(this);
+        }
+
+        /** Ends the press; true when the hold fired, so the click that would follow is swallowed. */
+        private boolean release() {
+            disarm();
+            if (!mFired) {
+                return false;
+            }
+            mFired = false;
+            mButton.setPressed(false);
+            return true;
+        }
+
+        @Override
+        public void run() {
+            boolean armed = mArmed;
+            mArmed = false;
+            // still held: a press whose release was missed (focus moved, screen left) ends unpressed
+            if (!armed || !mButton.isPressed() || !mButton.hasWindowFocus() || !mPresenter.canSwitchToThisBook()) {
+                return;
+            }
+            mFired = true;
+            mButton.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS);
+            showToast(R.string.switched_to_this_book);
+            mPresenter.switchToThisBook();
+        }
+
+        @SuppressLint("ClickableViewAccessibility")
+        @Override
+        public boolean onTouch(View v, MotionEvent event) {
+            switch (event.getActionMasked()) {
+                case MotionEvent.ACTION_DOWN:
+                    arm();
+                    break;
+                case MotionEvent.ACTION_MOVE:
+                    if (event.getX() < 0 || event.getY() < 0 || event.getX() > v.getWidth()
+                            || event.getY() > v.getHeight()) {
+                        disarm();
+                    }
+                    break;
+                case MotionEvent.ACTION_UP:
+                case MotionEvent.ACTION_CANCEL:
+                    return release();
+                default:
+                    break;
+            }
+            return false;
+        }
+
+        @Override
+        public boolean onKey(View v, int keyCode, KeyEvent event) {
+            if (keyCode != KeyEvent.KEYCODE_DPAD_CENTER && keyCode != KeyEvent.KEYCODE_ENTER) {
+                return false;
+            }
+            if (event.getAction() == KeyEvent.ACTION_DOWN) {
+                if (event.getRepeatCount() == 0) {
+                    arm();
+                }
+                return mFired;
+            }
+            return event.getAction() == KeyEvent.ACTION_UP && release();
+        }
     }
 
     private boolean isTabView(View view) {

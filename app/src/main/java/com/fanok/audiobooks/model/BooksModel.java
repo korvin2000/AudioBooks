@@ -16,7 +16,12 @@ import okhttp3.HttpUrl;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import org.jsoup.Connection;
+import org.jsoup.HttpStatusException;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
 import org.jsoup.select.Elements;
@@ -68,7 +73,7 @@ public class BooksModel implements com.fanok.audiobooks.interface_pacatge.books.
             case IZIBUK: return izibukListing(url, page);
             case ABMP3: return parseAbmp3(SiteHttp.get(url), page);
             case AKNIGA: return parseAkniga(SiteHttp.get(url), page);
-            case BAZA_KNIG: return parseBazaKnig(SiteHttp.get(url), page);
+            case BAZA_KNIG: return parseBazaKnig(bazaKnigListing(url), page);
             case KNIGOBLUD: return parseKnigoblud(SiteHttp.get(url), page);
             case AUDIOBOO: return parseAudioboo(audiobooListing(url, nameModel, context), page);
             case OTRUB: return parseOtrub(SiteHttp.get(url), page);
@@ -78,6 +83,55 @@ public class BooksModel implements com.fanok.audiobooks.interface_pacatge.books.
     }
 
     // ---------------------------------------------------------------- fetch helpers
+
+    /** baza-knig category roots as linked → {the root they lead to (a renamed one redirects), the DLE category id}. */
+    private static final Map<String, String[]> BAZA_KNIG_CATEGORIES = new ConcurrentHashMap<>();
+    private static final Pattern BAZA_KNIG_CATEGORY_PAGE =
+            Pattern.compile("^(" + Pattern.quote(Url.SERVER_BAZA_KNIG) + "/[\\w-]+/)(page/.*|f/.*)$");
+    private static final Pattern BAZA_KNIG_CATEGORY_ID = Pattern.compile("dle_sort_cat_(\\d+)");
+
+    /**
+     * A page of a baza-knig listing. A category's own rankings ({@code /<category>/f/...}, see
+     * ListingFilters#inGenre) go to the DLE filter, which takes a category only as {@code cat=<id>}; a category the
+     * site renamed ("uzhasy-mistika" → "uzhasy-mistika_") is still linked by its menu under the old name, whose root
+     * redirects but whose pages are 404. Both are read off the category's own page, once.
+     */
+    static Document bazaKnigListing(String url) throws IOException {
+        Matcher m = BAZA_KNIG_CATEGORY_PAGE.matcher(url);
+        if (!m.matches()) {
+            return SiteHttp.get(url);
+        }
+        String root = m.group(1);
+        String rest = m.group(2);
+        if (rest.startsWith("f/")) {
+            String id = bazaKnigCategory(root)[1];
+            return SiteHttp.get(id == null ? url : Url.SERVER_BAZA_KNIG + "/f/cat=" + id + "/" + rest.substring(2));
+        }
+        String[] known = BAZA_KNIG_CATEGORIES.get(root);
+        try {
+            return SiteHttp.get(known != null ? known[0] + rest : url);
+        } catch (HttpStatusException e) {
+            if (known != null || e.getStatusCode() != 404) {
+                throw e;
+            }
+            String moved = bazaKnigCategory(root)[0];
+            if (moved.equals(root)) {
+                throw e;
+            }
+            return SiteHttp.get(moved + rest);
+        }
+    }
+
+    private static String[] bazaKnigCategory(String root) throws IOException {
+        String[] known = BAZA_KNIG_CATEGORIES.get(root);
+        if (known == null) {
+            Document doc = SiteHttp.get(root);
+            Matcher id = BAZA_KNIG_CATEGORY_ID.matcher(doc.html());
+            known = new String[]{doc.location(), id.find() ? id.group(1) : null};
+            BAZA_KNIG_CATEGORIES.put(root, known);
+        }
+        return known;
+    }
 
     /** DLE search endpoints take their parameters as a form: POST the query string of {@code url}. */
     static Document postForm(String url) throws IOException {
@@ -114,11 +168,24 @@ public class BooksModel implements com.fanok.audiobooks.interface_pacatge.books.
         return SiteHttp.parse(SiteHttp.execute(connection));
     }
 
+    /** izibuk's mobile site: the same listings, sorts and pages, but its cards carry the duration. */
+    private static final String IZIBUK_MOBILE = "https://pda.izib.uk";
+
     private static ProviderPage<BookPOJO> izibukListing(String url, int page) throws IOException {
-        Connection connection = SiteHttp.connect(url)
-                .referrer(Url.INDEX_IZIBUK + "1")
-                .cookie("sort_pop", com.fanok.audiobooks.Consts.izibuk_reiting ? "1" : "0");
-        ProviderPage<BookPOJO> result = parseIzibuk(SiteHttp.parse(SiteHttp.execute(connection)), url, page);
+        String mobile = url.replace(Url.SERVER_IZIBUK, IZIBUK_MOBILE);
+        ProviderPage<BookPOJO> result;
+        if (mobile.startsWith(IZIBUK_MOBILE + "/?")) {
+            // its index has 7 cards on page 1 and 20 from page 2 on: page n is its page n + 1, page 1 with its
+            // page 1 in front, so a short first page never leaves a tablet grid without anything to scroll
+            result = parseIzibuk(SiteHttp.get(mobile.replaceFirst("([?&]p=)\\d+", "$1" + (page + 1))), url, page + 1);
+            if (page <= 1) {
+                ArrayList<BookPOJO> items = new ArrayList<>(parseIzibuk(SiteHttp.get(mobile), url, 1).items);
+                items.addAll(result.items);
+                result = ProviderPage.of(items, result.hasMore);
+            }
+        } else {
+            result = parseIzibuk(SiteHttp.get(mobile), url, page);
+        }
         if (url.contains("serie") && !result.items.isEmpty()) {
             // series cards carry no genre or author: read them once from the first book's page
             Document book = SiteHttp.get(result.items.get(0).getUrl());
@@ -537,10 +604,11 @@ public class BooksModel implements com.fanok.audiobooks.interface_pacatge.books.
             listParent = document.getElementById("books_updates_list");
         }
         if (listParent == null) {
-            return ProviderPage.empty();
+            listParent = document.body(); // the mobile series page has no list container
         }
-        Element h1 = document.selectFirst("h1");
-        final String pageTitle = h1 == null ? null : nonEmpty(h1.text());
+        final String pageTitle = izibukTitle(document);
+        // the listing itself as a link of its cards: without the page (and sort) of this request
+        final String listing = url.replaceFirst("[?#].*", "") + "?p=";
         Elements raw = listParent.getElementsByClass("_ccb9b7");
         ArrayList<BookPOJO> result = cards(raw, book -> {
             BookPOJO bookPOJO = new BookPOJO();
@@ -549,7 +617,7 @@ public class BooksModel implements com.fanok.audiobooks.interface_pacatge.books.
                 bookPOJO.setGenre(genre.text());
                 bookPOJO.setUrlGenre(Url.SERVER_IZIBUK + genre.attr("href") + "?p=");
             } else if (url.contains("genre")) {
-                bookPOJO.setUrlGenre(url);
+                bookPOJO.setUrlGenre(listing);
                 if (pageTitle != null) {
                     bookPOJO.setGenre(pageTitle);
                 }
@@ -573,52 +641,69 @@ public class BooksModel implements com.fanok.audiobooks.interface_pacatge.books.
                     bookPOJO.setName(title.text());
                 }
             }
-            Element meta = child(content, 2);
-            if (meta != null) {
-                for (Element element : meta.children()) {
-                    Element link = child(element, 1);
-                    if (link == null) {
-                        continue;
-                    }
-                    String href = link.attr("href");
-                    String name = link.text();
-                    if (href.contains("author")) {
-                        bookPOJO.setUrlAutor(Url.SERVER_IZIBUK + href + "?p=");
-                        bookPOJO.setAutor(name);
-                    } else if (href.contains("reader")) {
-                        bookPOJO.setUrlArtist(Url.SERVER_IZIBUK + href + "?p=");
-                        bookPOJO.setArtist(name);
-                    } else if (href.contains("serie")) {
-                        bookPOJO.setUrlSeries(Url.SERVER_IZIBUK + href + "?p=");
-                        bookPOJO.setSeries(name);
-                    }
+            // desktop cards group these rows in a block, mobile ones list them directly and add the duration
+            for (Element element : content.getElementsByClass("_eeab32")) {
+                Element link = child(element, 1);
+                if (link == null) {
+                    continue;
+                }
+                String href = link.attr("href");
+                String name = link.text();
+                if (href.contains("author")) {
+                    bookPOJO.setUrlAutor(Url.SERVER_IZIBUK + href + "?p=");
+                    bookPOJO.setAutor(name);
+                } else if (href.contains("reader")) {
+                    bookPOJO.setUrlArtist(Url.SERVER_IZIBUK + href + "?p=");
+                    bookPOJO.setArtist(name);
+                } else if (href.contains("serie")) {
+                    bookPOJO.setUrlSeries(Url.SERVER_IZIBUK + href + "?p=");
+                    bookPOJO.setSeries(name);
                 }
             }
+            Element time = content.selectFirst("._eeab32 ._08dd3a");
+            if (time != null && nonEmpty(time.text()) != null) {
+                bookPOJO.setTime(time.text());
+            }
             if (bookPOJO.getAutor() == null && url.contains("author")) {
-                bookPOJO.setUrlAutor(url + "?p=");
+                bookPOJO.setUrlAutor(listing);
                 if (pageTitle != null) {
                     bookPOJO.setAutor(pageTitle);
                 }
             }
             if (bookPOJO.getArtist() == null && url.contains("reader")) {
-                bookPOJO.setUrlArtist(url + "?p=");
+                bookPOJO.setUrlArtist(listing);
                 if (pageTitle != null) {
                     bookPOJO.setArtist(pageTitle);
                 }
             }
             if (bookPOJO.getSeries() == null && url.contains("serie")) {
-                bookPOJO.setUrlSeries(url + "?p=");
+                bookPOJO.setUrlSeries(listing);
                 if (pageTitle != null) {
                     bookPOJO.setSeries(pageTitle);
                 }
             }
-            Element description = child(content, 3);
+            Element description = content.selectFirst("._b1f6b9, [id$=_desc]");
             if (description != null) {
                 bookPOJO.setDesc(description.text());
             }
             return bookPOJO;
         });
         return ProviderPage.of(result, hasMore, raw.size());
+    }
+
+    /** The listing's name: the desktop h1; on the mobile page the bold series name, else the breadcrumb after its link. */
+    private static String izibukTitle(Document document) {
+        Element title = document.selectFirst("h1, ._6eb726 b");
+        if (title != null) {
+            return nonEmpty(title.text());
+        }
+        Element crumbs = document.selectFirst("._6eb726");
+        if (crumbs == null) {
+            return null;
+        }
+        String text = crumbs.text();
+        Element first = crumbs.selectFirst("a");
+        return nonEmpty(first != null && text.startsWith(first.text()) ? text.substring(first.text().length()) : text);
     }
 
     /** ABMP3's search returns every hit at once: one request per page, sliced locally, no book-page fetches (SRCH-13). */

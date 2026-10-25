@@ -2266,6 +2266,8 @@ public class MediaPlayerService extends MediaBrowserServiceCompat {
             return;
         }
         storage.loadEqualizerSettings();
+        //the balance is the sink's, not an effect of the session: it plays with the equalizer off too
+        BalanceAudioProcessor.setBalance(Settings.balance);
         if (Settings.isEqualizerEnabled) {
             startEqualizer();
         } else {

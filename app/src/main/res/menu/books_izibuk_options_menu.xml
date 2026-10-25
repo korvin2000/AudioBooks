@@ -6,11 +6,29 @@
         android:icon="@drawable/ic_search_black_24dp"
         android:title="@string/search"
         app:showAsAction="ifRoom" />
+    <!-- duration range; its submenu is filled and shown by BooksFragment -->
+    <item
+        android:id="@+id/filter"
+        android:icon="@drawable/ic_filter"
+        android:title="@string/filter"
+        android:visible="false"
+        app:showAsAction="ifRoom">
+        <menu />
+    </item>
     <item
         android:id="@+id/order"
         android:icon="@drawable/ic_sort"
         android:title="@string/order"
-        app:showAsAction="ifRoom" />
+        app:showAsAction="ifRoom">
+        <menu>
+            <item
+                android:id="@+id/new_data"
+                android:title="@string/new_data" />
+            <item
+                android:id="@+id/popular"
+                android:title="@string/popular" />
+        </menu>
+    </item>
 
     <item
         android:id="@+id/source"

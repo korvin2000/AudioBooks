@@ -56,17 +56,20 @@ import com.fanok.audiobooks.adapter.GenreListAddapter;
 import com.fanok.audiobooks.databinding.DialogDurationFilterBinding;
 import com.fanok.audiobooks.databinding.FragmentBooksBinding;
 import com.fanok.audiobooks.interface_pacatge.books.BooksView;
+import com.fanok.audiobooks.model.GenreModel;
 import com.fanok.audiobooks.pojo.BookPOJO;
 import com.fanok.audiobooks.pojo.GenrePOJO;
 import com.fanok.audiobooks.policy.ParentalControl;
 import com.fanok.audiobooks.presenter.BooksPresenter;
 import com.fanok.audiobooks.search.ListingFilters;
 import com.fanok.audiobooks.search.ListingFilters.Duration;
+import com.fanok.audiobooks.search.Provider;
 import com.google.android.material.navigation.NavigationView;
 import com.google.android.material.slider.RangeSlider;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+import java.util.regex.Pattern;
 import org.jetbrains.annotations.NotNull;
 
 
@@ -244,9 +247,11 @@ public class BooksFragment extends MvpAppCompatFragment implements BooksView {
                 if (modelID != Consts.MODEL_BOOKS || mUrl.contains("reader") || mUrl.contains("author") ||
                         mUrl.contains("serie") || mUrl.contains("cikl") ||
                         (mUrl.contains(Url.SERVER_ABMP3) && mUrl.contains("genre")) ||
-                        (mUrl.contains(Url.SERVER_IZIBUK) && mUrl.contains("genre")) ||
                         (mUrl.contains(Url.SERVER_BAZA_KNIG) && mUrl.contains("ispolnitel")) ||
-                        false)  {
+                        // knigoblud's author, reader and series listings: /<id> like its genres, but no sort
+                        (mUrl.matches(Pattern.quote(Url.SERVER_KNIGOBLUD) + "/[0-9a-f-]{36}.*")
+                                && ListingFilters.genreOf(Provider.KNIGOBLUD, mUrl,
+                                GenreModel.KNIGOBLUD_GENRE_URLS) == null))  {
                     MenuItem orderItem = menu.findItem(R.id.order);
                     if (orderItem != null) orderItem.setVisible(false);
                 } else {
@@ -305,9 +310,6 @@ public class BooksFragment extends MvpAppCompatFragment implements BooksView {
                 if (finishedItem != null) finishedItem.setVisible(isKnigoblud);
                 MenuItem retingParent = menu.findItem(R.id.reting);
                 if (retingParent != null) retingParent.setVisible(!isKnigoblud);
-                // only ever hidden here: onCreateMenu already hid Order where the listing takes no sort
-                MenuItem orderItem = menu.findItem(R.id.order);
-                if (orderItem != null && mUrl.contains(Url.SERVER_IZIBUK)) orderItem.setVisible(false);
                 boolean isAbmp3 = mUrl.contains(Url.SERVER_ABMP3);
                 MenuItem popularParent = menu.findItem(R.id.popular_parent);
                 if (popularParent != null) popularParent.setVisible(!isAbmp3);
@@ -317,6 +319,11 @@ public class BooksFragment extends MvpAppCompatFragment implements BooksView {
                 if (abmp3Top100 != null) abmp3Top100.setVisible(isAbmp3);
                 MenuItem abmp3Random = menu.findItem(R.id.abmp3_random);
                 if (abmp3Random != null) abmp3Random.setVisible(isAbmp3);
+                // akniga's collections are site-wide: not offered within a genre
+                MenuItem collections = menu.findItem(R.id.collections);
+                if (collections != null) {
+                    collections.setVisible(ListingFilters.genreOf(Provider.AKNIGA, mUrl, null) == null);
+                }
                 prepareFilterMenu(menu);
                             }
 

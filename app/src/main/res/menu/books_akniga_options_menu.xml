@@ -62,7 +62,9 @@
                         android:title="@string/all_time" />
                 </menu>
             </item>
-            <item android:title="@string/order_collections">
+            <item
+                android:id="@+id/collections"
+                android:title="@string/order_collections">
                 <menu>
                     <item
                         android:id="@+id/collections_new"
