@@ -23,6 +23,10 @@ public interface ActivityPresenter {
 
     void buttomPlayClick(View view);
 
+    boolean canSwitchToThisBook();
+
+    void switchToThisBook();
+
     void buttomPreviousClick(View view);
 
     void buttomNextClick(View view);

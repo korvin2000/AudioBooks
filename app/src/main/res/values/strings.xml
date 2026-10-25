@@ -307,6 +307,7 @@
     <string name="no_sdcard">SD карта не установлена</string>
     <string name="reproduction">Воспроизведение</string>
     <string name="reproduction_desc">При открытии новой книги продолжать воспроизводить старую</string>
+    <string name="switched_to_this_book">Воспроизведение переключено на эту книгу</string>
     <string name="autoplay">Автовоспроизведение</string>
     <string name="autoplay_desc">Запускать книги сразу после открытия</string>
     <string name="open_4pda">Открыть тему на 4pda</string>

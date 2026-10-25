@@ -45,11 +45,19 @@ public class AutorsModel extends GenreModel {
 
     @Override
     protected ProviderPage<GenrePOJO> loadBooksList(String url, int page) throws IOException {
-        Document doc = SiteHttp.get(url);
+        return parseKnigavuhePeople(SiteHttp.get(url), page);
+    }
+
+    /** knigavuhe's author/reader rows: legacy_people_row on the listings, author_item in the search. */
+    static ProviderPage<GenrePOJO> parseKnigavuhePeople(Document doc, int page) {
         boolean hasMore = BooksModel.lastPage(doc.select(".pn_page_buttons a")) > page;
-        return ProviderPage.of(rows(doc.getElementsByClass("author_item"), item -> {
+        return ProviderPage.of(rows(doc.select(".author_item, .legacy_people_row"), item -> {
             GenrePOJO genrePOJO = new GenrePOJO();
-            Element a = item.selectFirst("a");
+            // a listing row opens with the avatar link, whose text is the initials
+            Element a = item.selectFirst(".legacy_people_name a");
+            if (a == null) {
+                a = item.selectFirst("a");
+            }
             if (a != null) {
                 if (!a.attr("href").isEmpty()) {
                     genrePOJO.setUrl(Url.SERVER + a.attr("href"));
@@ -58,7 +66,7 @@ public class AutorsModel extends GenreModel {
                     genrePOJO.setName(a.text());
                 }
             }
-            Element booksCount = item.selectFirst(".author_item_books_count");
+            Element booksCount = item.selectFirst(".author_item_books_count, .legacy_people_books");
             if (booksCount != null) {
                 genrePOJO.setDescription(booksCount.text());
             }
