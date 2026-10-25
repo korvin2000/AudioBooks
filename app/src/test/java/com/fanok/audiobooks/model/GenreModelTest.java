@@ -52,4 +52,29 @@ public class GenreModelTest {
             assertTrue(reader.getUrl(), reader.getUrl().startsWith(Url.SERVER_AUDIOBOO + "/tags/"));
         }
     }
+
+    @Test
+    public void knigavuhePeopleComeFromListingRowsAndSearchItems() {
+        // the shapes of /authors/2/ (legacy_people_row) and /search/authors/ (author_item), cut down
+        org.jsoup.nodes.Document doc = org.jsoup.Jsoup.parse("<div id=\"authors_list\">"
+                + "<div class=\"legacy_people_row\"><div class=\"legacy_people_identity\">"
+                + "<a href=\"/author/donna-tartt/\" class=\"legacy_people_avatar -pseudo\">ДТ</a>"
+                + "<div class=\"legacy_people_identity_body\"><div class=\"legacy_people_name\">"
+                + "<a href=\"/author/donna-tartt/\">Донна <span>Тартт</span></a></div>"
+                + "<div class=\"legacy_people_books\">6 книг</div></div></div>"
+                + "<div class=\"legacy_people_metric -plays\">43K</div></div>"
+                + "<div class=\"common_list_item author_item\"><span class=\"author_item_books_count\">586 книг</span>"
+                + "<a href=\"/author/stiven-king/\" class=\"author_item_name\"><span>Стивен Кинг</span></a></div>"
+                + "</div><div class=\"pn_page_buttons\"><a href=\"/authors/\" data-page=\"1\">1</a>"
+                + "<a href=\"/authors/2/\" data-page=\"2\">2</a><a href=\"/authors/330/\" data-page=\"330\">330</a></div>");
+        ProviderPage<GenrePOJO> page = AutorsModel.parseKnigavuhePeople(doc, 2);
+        assertEquals(2, page.items.size());
+        assertTrue(page.hasMore);
+        assertEquals("Донна Тартт", page.items.get(0).getName());
+        assertEquals(Url.SERVER + "/author/donna-tartt/", page.items.get(0).getUrl());
+        assertEquals("6 книг", page.items.get(0).getDescription());
+        assertEquals("Стивен Кинг", page.items.get(1).getName());
+        assertEquals("586 книг", page.items.get(1).getDescription());
+        assertFalse(AutorsModel.parseKnigavuhePeople(doc, 330).hasMore);
+    }
 }
