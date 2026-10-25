@@ -194,6 +194,7 @@
                 <data android:host="otrub.in" />
                 <data android:host="poleknig.com" />
                 <data android:host="uknig.com" />
+                <data android:host="audiokniga.life" />
             </intent-filter>
         </activity>
 

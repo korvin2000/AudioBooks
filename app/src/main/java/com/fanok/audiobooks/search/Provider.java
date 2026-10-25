@@ -2,6 +2,7 @@ package com.fanok.audiobooks.search;
 
 import com.fanok.audiobooks.Consts;
 import com.fanok.audiobooks.Url;
+import com.fanok.audiobooks.source.AudioknigaLife;
 import com.fanok.audiobooks.source.SourceParser;
 import com.fanok.audiobooks.source.Uknig;
 
@@ -30,7 +31,9 @@ public enum Provider {
     POLEKNIG(Url.SERVER_POLEKNIG, "Полекниг", "poleknig", "search_poleknig", Consts.SOURCE_POLEKNIG,
             Url.INDEX_POLEKNIG, Url.SECTIONS_POLEKNIG, null, null, null),
     UKNIG(Uknig.SERVER, "уКниг", "uknig", "search_uknig", 9,
-            Uknig.INDEX, Uknig.GENRES, Uknig.AUTHORS, Uknig.READERS, new Uknig());
+            Uknig.INDEX, Uknig.GENRES, Uknig.AUTHORS, Uknig.READERS, new Uknig()),
+    AUDIOKNIGA_LIFE(AudioknigaLife.SERVER, "Аудиокнига Life", "audiokniga_life", "search_audiokniga_life", 12,
+            AudioknigaLife.INDEX, AudioknigaLife.GENRES, null, null, new AudioknigaLife());
 
     /** {@code https://host} without a trailing slash. */
     public final String server;
