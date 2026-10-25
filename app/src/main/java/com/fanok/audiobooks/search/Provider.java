@@ -3,6 +3,7 @@ package com.fanok.audiobooks.search;
 import com.fanok.audiobooks.Consts;
 import com.fanok.audiobooks.Url;
 import com.fanok.audiobooks.source.SourceParser;
+import com.fanok.audiobooks.source.Uknig;
 
 /**
  * The sites the app scrapes: one row of data per site, in the order the source menu, the settings and the search
@@ -27,7 +28,9 @@ public enum Provider {
     OTRUB(Url.SERVER_OTRUB, "Отрубин", "otrub", "search_otrub", Consts.SOURCE_OTRUB,
             Url.INDEX_OTRUB, Url.SECTIONS_OTRUB, null, null, null),
     POLEKNIG(Url.SERVER_POLEKNIG, "Полекниг", "poleknig", "search_poleknig", Consts.SOURCE_POLEKNIG,
-            Url.INDEX_POLEKNIG, Url.SECTIONS_POLEKNIG, null, null, null);
+            Url.INDEX_POLEKNIG, Url.SECTIONS_POLEKNIG, null, null, null),
+    UKNIG(Uknig.SERVER, "уКниг", "uknig", "search_uknig", 9,
+            Uknig.INDEX, Uknig.GENRES, Uknig.AUTHORS, Uknig.READERS, new Uknig());
 
     /** {@code https://host} without a trailing slash. */
     public final String server;

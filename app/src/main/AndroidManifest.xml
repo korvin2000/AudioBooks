@@ -193,6 +193,7 @@
                 <data android:host="audioboo.ru" />
                 <data android:host="otrub.in" />
                 <data android:host="poleknig.com" />
+                <data android:host="uknig.com" />
             </intent-filter>
         </activity>
 

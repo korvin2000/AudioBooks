@@ -35,6 +35,7 @@ public class SearchUrlsTest {
         PAGE_FORMAT.put(Provider.AUDIOBOO, "search_start=%d&");
         PAGE_FORMAT.put(Provider.OTRUB, "&p=%d");
         PAGE_FORMAT.put(Provider.POLEKNIG, "&p=%d");
+        PAGE_FORMAT.put(Provider.UKNIG, "&p=%d");
     }
 
     private static String pageToken(Provider provider, Category category, int page) {
