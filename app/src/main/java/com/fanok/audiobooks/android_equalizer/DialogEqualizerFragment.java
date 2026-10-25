@@ -5,6 +5,7 @@ import static com.fanok.audiobooks.android_equalizer.EqualizerFragment.Broadcast
 
 import android.content.Context;
 import android.content.Intent;
+import android.content.res.Configuration;
 import android.graphics.Color;
 import android.graphics.Paint;
 import android.graphics.PorterDuff;
@@ -20,6 +21,7 @@ import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.Window;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
 import android.widget.ImageView;
@@ -204,6 +206,17 @@ public class DialogEqualizerFragment extends DialogFragment {
     public View onCreateView(@NonNull LayoutInflater inflater, ViewGroup container,
             Bundle savedInstanceState) {
         return inflater.inflate(R.layout.dialog_fragment_equalizer, container, false);
+    }
+
+    @Override
+    public void onStart() {
+        super.onStart();
+        // a dialog keeps its portrait width on its side: in landscape its two columns take most of the screen
+        Window window = getDialog() == null ? null : getDialog().getWindow();
+        if (window != null && getResources().getConfiguration().orientation == Configuration.ORIENTATION_LANDSCAPE) {
+            window.setLayout((int) (getResources().getDisplayMetrics().widthPixels * 0.85),
+                    ViewGroup.LayoutParams.MATCH_PARENT);
+        }
     }
 
     @Override
