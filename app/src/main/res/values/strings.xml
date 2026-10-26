@@ -103,6 +103,9 @@
     <string name="sort_title_artist">По исполнителю</string>
     <string name="sort_title_series">По серии</string>
     <string name="sort_title_saved">По загруженному</string>
+    <string name="genre_sort_none">Без сортировки</string>
+    <string name="genre_sort_name">По алфавиту</string>
+    <string name="genre_sort_count">По количеству книг</string>
 
     <string name="sort_value_date" translatable="false">date</string>
     <string name="sort_value_name" translatable="false">name</string>
@@ -190,7 +193,8 @@
     <string name="privacy">Условия использования</string>
     <string name="donate" translatable="false">Donate</string>
     <string name="donate_summary">Поддержать проект</string>
-    <string name="write_autor">Написать автору</string>
+    <string name="write_autor">Написать автору форка</string>
+    <string name="feedback_email" translatable="false">delafer2019@gmail.com</string>
     <string name="getPlus">Получить Plus версию</string>
     <string name="how_is">Что это?</string>
     <string name="version">Версия</string>
@@ -312,6 +316,7 @@
     <string name="autoplay">Автовоспроизведение</string>
     <string name="autoplay_desc">Запускать книги сразу после открытия</string>
     <string name="open_4pda">Открыть тему на 4pda</string>
+    <string name="open_github">Открыть на GitHub</string>
     <string name="dowland_delete">Скачать/Удалить</string>
     <string name="delete_complite">Удаление завершено</string>
     <string name="delete_result">Удалено %1$d из %2$d</string>

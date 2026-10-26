@@ -31,6 +31,7 @@ import com.fanok.audiobooks.pojo.BookPOJO;
 import com.fanok.audiobooks.pojo.GenrePOJO;
 import com.fanok.audiobooks.policy.DefaultCover;
 import com.fanok.audiobooks.policy.ParentalControl;
+import com.fanok.audiobooks.search.GenreSort;
 import com.fanok.audiobooks.search.ListingCursor;
 import com.fanok.audiobooks.search.ListingFilters;
 import com.fanok.audiobooks.search.Provider;
@@ -53,6 +54,7 @@ public class BooksPresenter extends MvpPresenter<BooksView> implements
      * (older versions stored a preset's enum name; {@link ListingFilters.Duration#of(String)} reads both).
      */
     private static final String PREF_DURATION = "listing_duration_filter";
+    private static final String PREF_GENRE_SORT = "genre_sort";
 
     private boolean isLoading = false;
     private boolean isRefreshing = false;
@@ -70,6 +72,8 @@ public class BooksPresenter extends MvpPresenter<BooksView> implements
     private final Context mContext;
     private final Provider mProvider;
     private ListingFilters.Duration mDuration = ListingFilters.Duration.ANY;
+    /** The local order of a genre list ({@link #genre} is the cursor's genres in this order). */
+    private GenreSort mGenreSort = GenreSort.NONE;
     /** Cards shown and pages fetched since the user's last action, bounding the automatic hunt for matches. */
     private int mHuntBaseShown;
     private int mHuntPages;
@@ -106,6 +110,7 @@ public class BooksPresenter extends MvpPresenter<BooksView> implements
             case Consts.MODEL_GENRE:
                 genre = new ArrayList<>();
                 mModelGenre = new GenreModel();
+                mGenreSort = GenreSort.of(getDefaultSharedPreferences(context).getString(PREF_GENRE_SORT, ""));
                 break;
             case Consts.MODEL_AUTOR:
             case Consts.MODEL_ARTIST:
@@ -172,6 +177,20 @@ public class BooksPresenter extends MvpPresenter<BooksView> implements
     }
 
     // ---------------------------------------------------------------- duration and period filters
+
+    @NonNull
+    public GenreSort getGenreSort() {
+        return mGenreSort;
+    }
+
+    /** Re-sorts the loaded genres in place of a reload: the order is local, the pages stay as fetched. */
+    public void onGenreSortSelected(@NonNull GenreSort sort) {
+        mGenreSort = sort;
+        getDefaultSharedPreferences(mContext).edit().putString(PREF_GENRE_SORT, sort.name()).apply();
+        genre = sort.sorted(mGenreCursor.items());
+        getViewState().showDataGenres(genre);
+        getViewState().setPosition(0);
+    }
 
     @Override
     public void onDurationChipClick() {
@@ -635,6 +654,9 @@ public class BooksPresenter extends MvpPresenter<BooksView> implements
                 } else {
                     getViewState().showSearchActivity(Consts.MODEL_BOOKS);
                 }
+            } else if (mModelId == Consts.MODEL_GENRE) {
+                // no site searches its genres: from a genre list the search is the book search
+                getViewState().showSearchActivity(Consts.MODEL_BOOKS);
             } else {
                 getViewState().showSearchActivity(mModelId);
             }
@@ -876,7 +898,7 @@ public class BooksPresenter extends MvpPresenter<BooksView> implements
                     .subscribeOn(Schedulers.io())
                     .observeOn(AndroidSchedulers.mainThread())
                     .subscribe(result -> onPage(page, result, mGenreCursor, () -> {
-                                genre = mGenreCursor.items();
+                                genre = mGenreSort.sorted(mGenreCursor.items());
                                 getViewState().showDataGenres(genre);
                             }),
                             e -> onPage(page, ProviderPage.<GenrePOJO>failed(e), mGenreCursor, null)));

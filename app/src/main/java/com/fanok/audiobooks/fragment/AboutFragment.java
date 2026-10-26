@@ -131,7 +131,12 @@ public class AboutFragment extends PreferenceFragmentCompat {
         });
 
         preferenceClickListner("open_4pda", preference -> {
-            openInBrowser("https://4pda.to/forum/index.php?showtopic=978445");
+            openInBrowser("https://4pda.to/forum/index.php?showtopic=1128418");
+            return true;
+        });
+
+        preferenceClickListner("open_github", preference -> {
+            openInBrowser("https://github.com/korvin2000/AudioBooks");
             return true;
         });
 

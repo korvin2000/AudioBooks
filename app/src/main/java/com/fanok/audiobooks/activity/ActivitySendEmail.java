@@ -22,8 +22,6 @@ import java.util.regex.Matcher;
 
 public class ActivitySendEmail extends MvpAppCompatActivity {
 
-    private static final String FEEDBACK_EMAIL = "fanok.inc@gmail.com";
-
     private ActivitySendEmailBinding binding;
 
     @Override
@@ -132,7 +130,7 @@ public class ActivitySendEmail extends MvpAppCompatActivity {
                     + Build.MANUFACTURER + " " + Build.MODEL + ", Android " + Build.VERSION.RELEASE;
 
             // The user's own mail app sends the message, so they see the recipient and the text.
-            Intent intent = new Intent(Intent.ACTION_SENDTO, Uri.parse("mailto:" + FEEDBACK_EMAIL
+            Intent intent = new Intent(Intent.ACTION_SENDTO, Uri.parse("mailto:" + getString(R.string.feedback_email)
                     + "?subject=" + Uri.encode(subject) + "&body=" + Uri.encode(body)));
             intent.putExtra(Intent.EXTRA_SUBJECT, subject);
             intent.putExtra(Intent.EXTRA_TEXT, body);
