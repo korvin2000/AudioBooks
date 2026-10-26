@@ -132,6 +132,24 @@ public class BookActivity extends MvpAppCompatActivity implements Activity {
     private static final String ARG_BOOK = "arg_book";
     /** Far beyond the system long press (~500 ms), so a slow tap never switches books by accident. */
     private static final long SWITCH_BOOK_HOLD_MS = 2500;
+    private static final String PREF_SEEK_BUTTONS = "seekButtonsPref";
+    private static final String PREF_SAFE_NAVIGATION = "safeNavigationPref";
+    /** Holding rewind/forward seeks every interval, by steps that grow every few ticks, as video players do. */
+    private static final long SEEK_HOLD_INTERVAL_MS = 400;
+    private static final int SEEK_HOLD_TICKS_PER_STEP = 6;
+    private static final long[] SEEK_HOLD_STEPS_MS = {30_000, 60_000, 120_000, 300_000};
+    /** Menu items that can be toolbar icons, in toolbar order, and the setting of each; the favourite pair shares one. */
+    private static final int[] TOOLBAR_ITEMS = {R.id.addFavorite, R.id.share, R.id.download_delete, R.id.sleep_timer,
+            R.id.equalizer, R.id.settings, R.id.openSite, R.id.addMainScreen, R.id.refresh};
+    private static final String[] TOOLBAR_KEYS = {"toolbar_favorite", "toolbar_share", "toolbar_download",
+            "toolbar_sleep_timer", "toolbar_equalizer", "toolbar_settings", "toolbar_open_site", "toolbar_main_screen",
+            "toolbar_refresh"};
+    /** Widths in the book toolbar: the back arrow, an icon (styles.xml BookToolbarActionButton), the overflow button. */
+    private static final int TOOLBAR_NAV_DP = 56;
+    private static final int TOOLBAR_ICON_DP = 40;
+    private static final int TOOLBAR_OVERFLOW_DP = 48;
+    /** Below this width left by the icons the title and author are not shown at all. */
+    private static final int TOOLBAR_TITLE_MIN_DP = 120;
     @InjectPresenter
     BookPresenter mPresenter;
     private ImageButton mSpeed;
@@ -146,6 +164,8 @@ public class BookActivity extends MvpAppCompatActivity implements Activity {
     private ImageButton mPreviousTop;
     private ImageButton mPlayTop;
     private ImageButton mNextTop;
+    /** The collapsed player's buttons beside play rewind/forward instead of changing chapters ("Кнопки плеера"). */
+    private boolean mTopSeek;
     private TextView mTimeStart;
     private AppCompatSeekBar mSeekBar;
     private TextView mTimeEnd;
@@ -542,6 +562,10 @@ public class BookActivity extends MvpAppCompatActivity implements Activity {
                                     mDownland.setVisibility(View.VISIBLE);
                                     mDelete.setVisibility(View.VISIBLE);
                                 }
+                                if (mButtonCollapse != null) {
+                                    mButtonCollapse.setRotation(0);
+                                    mButtonCollapse.setContentDescription(getString(R.string.collapse));
+                                }
 
 
                                 double alphaCollapse = (slideOffset - Consts.COLLAPS_BUTTON_VISIBLE)
@@ -583,10 +607,7 @@ public class BookActivity extends MvpAppCompatActivity implements Activity {
 
                                 mNameCurent.animate().alpha((float) alphaCollapse).setDuration(0);
                             } else {
-                                if (mButtonCollapse != null
-                                        && mButtonCollapse.getVisibility() != View.INVISIBLE) {
-                                    mButtonCollapse.setVisibility(View.INVISIBLE);
-                                }
+                                showExpandHint(Math.max(0, alpha));
 
                                 if (mRadioAll != null && mRadioAll.getVisibility() != View.GONE) {
                                     mRadioAll.setVisibility(View.GONE);
@@ -617,8 +638,11 @@ public class BookActivity extends MvpAppCompatActivity implements Activity {
             mButtonCollapse.setOnClickListener(view -> {
                 if (BottomSheetBehavior.STATE_EXPANDED == bottomSheetBehavior.getState()) {
                     bottomSheetBehavior.setState(BottomSheetBehavior.STATE_COLLAPSED);
+                } else if (BottomSheetBehavior.STATE_COLLAPSED == bottomSheetBehavior.getState()) {
+                    bottomSheetBehavior.setState(BottomSheetBehavior.STATE_EXPANDED);
                 }
             });
+            showExpandHint(1);
         }
 
 
@@ -746,18 +770,35 @@ public class BookActivity extends MvpAppCompatActivity implements Activity {
             mPlayTop.setOnClickListener(view -> mPresenter.buttomPlayClick(view));
             new SwitchBookHold().attach(mPlayTop);
         }
+        //icons and descriptions of these two follow the setting in onResume
         if (mPreviousTop != null) {
-            mPreviousTop.setOnClickListener(view -> mPresenter.buttomPreviousClick(view));
+            mPreviousTop.setOnClickListener(view -> {
+                if (mTopSeek) {
+                    mPresenter.buttomRewindClick(view);
+                } else {
+                    jumpChapter(view, false);
+                }
+            });
+            new SeekHold(mPreviousTop, false, true);
         }
         if (mNextTop != null) {
-            mNextTop.setOnClickListener(view -> mPresenter.buttomNextClick(view));
+            mNextTop.setOnClickListener(view -> {
+                if (mTopSeek) {
+                    mPresenter.buttomForwardClick(view);
+                } else {
+                    jumpChapter(view, true);
+                }
+            });
+            new SeekHold(mNextTop, true, true);
         }
         mPlayBottom.setOnClickListener(view -> mPresenter.buttomPlayClick(view));
         new SwitchBookHold().attach(mPlayBottom);
-        mPreviousBottom.setOnClickListener(view -> mPresenter.buttomPreviousClick(view));
-        mNextBottom.setOnClickListener(view -> mPresenter.buttomNextClick(view));
+        mPreviousBottom.setOnClickListener(view -> jumpChapter(view, false));
+        mNextBottom.setOnClickListener(view -> jumpChapter(view, true));
         mRewind.setOnClickListener(view -> mPresenter.buttomRewindClick(view));
         mForward.setOnClickListener(view -> mPresenter.buttomForwardClick(view));
+        new SeekHold(mRewind, false, false);
+        new SeekHold(mForward, true, false);
         mSpeed.setOnClickListener(v -> mPresenter.buttonSpeedClick(v));
         getSystemService(AUDIO_SERVICE);
 
@@ -808,7 +849,9 @@ public class BookActivity extends MvpAppCompatActivity implements Activity {
             mProgressBar.setVisibility(
                     View.VISIBLE);
         }
-        if (mButtonCollapse != null && mButtonCollapse.getVisibility() != View.INVISIBLE) {
+        if (bottomSheetBehavior != null) {
+            showExpandHint(1);
+        } else if (mButtonCollapse != null && mButtonCollapse.getVisibility() != View.INVISIBLE) {
             mButtonCollapse.setVisibility(View.INVISIBLE);
         }
 
@@ -982,8 +1025,109 @@ public class BookActivity extends MvpAppCompatActivity implements Activity {
         }
 
         mPresenter.onCreateOptionsMenu(menu);
+        layoutToolbar(menu);
 
         return true;
+    }
+
+    /**
+     * Makes the actions chosen in the settings toolbar icons, as many as fit beside the back arrow; the others stay
+     * in the overflow menu, which disappears when it is empty. Title and author take the width left, and are not
+     * shown at all when that is too little to read (or when they are not wanted).
+     */
+    private void layoutToolbar(@NonNull Menu menu) {
+        int wanted = 0;
+        boolean others = false;
+        for (int i = 0; i < TOOLBAR_ITEMS.length; i++) {
+            MenuItem item = menu.findItem(TOOLBAR_ITEMS[i]);
+            //one of the favourite pair is visible, whichever it is
+            if (item == null || !item.isVisible() && TOOLBAR_ITEMS[i] != R.id.addFavorite) {
+                continue;
+            }
+            if (onToolbar(TOOLBAR_KEYS[i])) {
+                wanted++;
+            } else {
+                others = true;
+            }
+        }
+        int room = getResources().getConfiguration().screenWidthDp - TOOLBAR_NAV_DP;
+        int shown = Math.min(wanted, room / TOOLBAR_ICON_DP);
+        if (shown < wanted || others) {
+            room -= TOOLBAR_OVERFLOW_DP;
+            shown = Math.min(wanted, room / TOOLBAR_ICON_DP);
+        }
+        room -= shown * TOOLBAR_ICON_DP;
+        for (int i = 0; i < TOOLBAR_ITEMS.length; i++) {
+            MenuItem item = menu.findItem(TOOLBAR_ITEMS[i]);
+            if (item == null || !item.isVisible() && TOOLBAR_ITEMS[i] != R.id.addFavorite) {
+                continue;
+            }
+            boolean icon = shown > 0 && onToolbar(TOOLBAR_KEYS[i]);
+            if (icon) {
+                shown--;
+            }
+            int action = icon ? MenuItem.SHOW_AS_ACTION_ALWAYS : MenuItem.SHOW_AS_ACTION_NEVER;
+            item.setShowAsAction(action);
+            if (TOOLBAR_ITEMS[i] == R.id.addFavorite) {
+                menu.findItem(R.id.removeFavorite).setShowAsAction(action);
+            }
+        }
+        ActionBar actionBar = getSupportActionBar();
+        if (actionBar != null) {
+            actionBar.setDisplayShowTitleEnabled(
+                    pref.getBoolean("toolbar_title", true) && room >= TOOLBAR_TITLE_MIN_DP);
+        }
+    }
+
+    private boolean onToolbar(@NonNull String key) {
+        return pref.getBoolean(key, "toolbar_favorite".equals(key) || "toolbar_share".equals(key));
+    }
+
+    /** In the collapsed player the collapse button, turned upwards, shows that the chapter list opens. */
+    private void showExpandHint(float alpha) {
+        if (mButtonCollapse == null) {
+            return;
+        }
+        mButtonCollapse.setRotation(180);
+        mButtonCollapse.setContentDescription(getString(R.string.expand));
+        mButtonCollapse.animate().alpha(alpha).setDuration(0);
+        mButtonCollapse.setVisibility(View.VISIBLE);
+    }
+
+    /**
+     * The previous or next chapter. With "Безопасная навигация" on (the default) only after a confirmation: a
+     * stray tap would lose the place in what may be a chapter of hours.
+     */
+    private void jumpChapter(@NonNull View view, boolean next) {
+        Runnable jump = () -> {
+            if (next) {
+                mPresenter.buttomNextClick(view);
+            } else {
+                mPresenter.buttomPreviousClick(view);
+            }
+        };
+        if (!pref.getBoolean(PREF_SAFE_NAVIGATION, true)) {
+            jump.run();
+            return;
+        }
+        new AlertDialog.Builder(this)
+                .setMessage(next ? R.string.confirm_next_chapter : R.string.confirm_previous_chapter)
+                .setPositiveButton(R.string.go_to, (dialog, which) -> jump.run())
+                .setNegativeButton(R.string.cancel, null)
+                .show();
+    }
+
+    /** The collapsed player's buttons beside play: chapters, or rewind/forward as "Кнопки плеера" asks. */
+    private void bindTopSideButtons() {
+        mTopSeek = pref.getBoolean(PREF_SEEK_BUTTONS, false);
+        if (mPreviousTop != null) {
+            mPreviousTop.setImageResource(mTopSeek ? R.drawable.ic_rewind_30 : R.drawable.ic_skip_previous);
+            mPreviousTop.setContentDescription(getString(mTopSeek ? R.string.rewind_10 : R.string.previous));
+        }
+        if (mNextTop != null) {
+            mNextTop.setImageResource(mTopSeek ? R.drawable.ic_fast_forward_30 : R.drawable.ic_skip_next);
+            mNextTop.setContentDescription(getString(mTopSeek ? R.string.forward_30 : R.string.next));
+        }
     }
 
     @Override
@@ -1368,6 +1512,51 @@ public class BookActivity extends MvpAppCompatActivity implements Activity {
         }
     }
 
+    /**
+     * Holding a rewind/forward button (touch, or the D-pad centre) seeks again and again, by steps that grow the
+     * longer it is held; a tap stays the ordinary click. The collapsed player's buttons do it only in seek mode.
+     */
+    private final class SeekHold implements View.OnLongClickListener, Runnable {
+
+        private final View mButton;
+
+        private final boolean mForward;
+
+        private final boolean mTop;
+
+        private int mTicks;
+
+        SeekHold(@NonNull View button, boolean forward, boolean top) {
+            mButton = button;
+            mForward = forward;
+            mTop = top;
+            button.setOnLongClickListener(this);
+        }
+
+        @Override
+        public boolean onLongClick(View v) {
+            if (mTop && !mTopSeek) {
+                return false;
+            }
+            mButton.removeCallbacks(this);
+            mTicks = 0;
+            run();
+            return true;
+        }
+
+        @Override
+        public void run() {
+            //released, or the screen left while held: the press is over
+            if (!mButton.isPressed() || !mButton.hasWindowFocus()) {
+                return;
+            }
+            long step = SEEK_HOLD_STEPS_MS[Math.min(mTicks++ / SEEK_HOLD_TICKS_PER_STEP,
+                    SEEK_HOLD_STEPS_MS.length - 1)];
+            mPresenter.seekBy(mForward ? step : -step);
+            mButton.postDelayed(this, SEEK_HOLD_INTERVAL_MS);
+        }
+    }
+
     private boolean isTabView(View view) {
         if (view == null || tabs == null) return false;
         // Каждая вкладка (TabView) является дочерним элементом контейнера внутри TabLayout.
@@ -1400,6 +1589,7 @@ public class BookActivity extends MvpAppCompatActivity implements Activity {
             showEqualizer(sessionId);
         }
         showingView = mBookPOJO.getUrl();
+        bindTopSideButtons();
         View decorView = getWindow().getDecorView();
         int uiOptions = View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN;
         decorView.setSystemUiVisibility(uiOptions);
