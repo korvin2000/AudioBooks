@@ -171,7 +171,7 @@ public class DialogEqualizerFragment extends DialogFragment {
         try {
             presetReverb = new PresetReverb(0, audioSesionId);
             presetReverb.setPreset(Settings.equalizerModel.getReverbPreset());
-            presetReverb.setEnabled(Settings.isEqualizerEnabled);
+            presetReverb.setEnabled(Settings.isReverbOn(Settings.equalizerModel.getReverbPreset()));
         } catch (RuntimeException e) {
             Log.w(TAG, "No reverb", e);
             presetReverb = null;
@@ -180,25 +180,11 @@ public class DialogEqualizerFragment extends DialogFragment {
         mEqualizer.setEnabled(Settings.isEqualizerEnabled);
         short bands = mEqualizer.getNumberOfBands();
         levels = Settings.bandLevels(bands);
-
-        if (Settings.presetPos == 0) {
-            applyLevels(bands);
-        } else {
-            try {
-                mEqualizer.usePreset((short) (Settings.presetPos - 1));
-            } catch (IllegalArgumentException e) {
-                Settings.presetPos = 0;
-                applyLevels(bands);
-            }
-        }
-    }
-
-    private void applyLevels(short bands) {
-        short min = mEqualizer.getBandLevelRange()[0];
-        short max = mEqualizer.getBandLevelRange()[1];
-        for (short bandIdx = 0; bandIdx < bands; bandIdx++) {
-            short level = (short) Math.max(min, Math.min(max, levels[bandIdx]));
-            mEqualizer.setBandLevel(bandIdx, level);
+        try {
+            Settings.applyTo(mEqualizer);
+        } catch (IllegalArgumentException e) {
+            Settings.presetPos = 0;
+            Settings.applyTo(mEqualizer);
         }
     }
 
@@ -252,10 +238,10 @@ public class DialogEqualizerFragment extends DialogFragment {
             if (bassBoost != null) {
                 bassBoost.setEnabled(isChecked);
             }
-            if (presetReverb != null) {
-                presetReverb.setEnabled(isChecked);
-            }
             Settings.isEqualizerEnabled = isChecked;
+            if (presetReverb != null) {
+                presetReverb.setEnabled(Settings.isReverbOn(Settings.equalizerModel.getReverbPreset()));
+            }
         });
 
         presetSpinner = view.findViewById(R.id.equalizer_preset_spinner);
@@ -325,6 +311,7 @@ public class DialogEqualizerFragment extends DialogFragment {
                     try {
                         if (presetReverb != null) {
                             presetReverb.setPreset(Settings.reverbPreset);
+                            presetReverb.setEnabled(Settings.isReverbOn(Settings.reverbPreset));
                         }
                         Settings.equalizerModel.setReverbPreset(Settings.reverbPreset);
                     } catch (Exception e) {

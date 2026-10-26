@@ -180,8 +180,13 @@ public class BookPresenter extends MvpPresenter<Activity> implements ActivityPre
         value = PlaybackSettings.clampSpeed(value);
         speed = value;
         new StorageUtil(mContext).storeSpeed(value);
+        playAtSpeed(value);
+    }
+
+    /** Plays at this speed without keeping it: the speed dialog lets it be heard before OK. */
+    private void playAtSpeed(float value) {
         Intent intent = new Intent(Broadcast_SET_SPEED);
-        intent.putExtra("speed", value);
+        intent.putExtra("speed", PlaybackSettings.clampSpeed(value));
         getViewState().broadcastSend(intent);
     }
 
@@ -358,10 +363,16 @@ public class BookPresenter extends MvpPresenter<Activity> implements ActivityPre
         return new Checkpoint(url, 0, 0);
     }
 
+    /**
+     * The speed is heard while the slider moves; only OK keeps it. Cancel, back or a tap outside return to the
+     * speed the dialog opened with.
+     */
     @Override
     public void buttonSpeedClick(View view) {
 
         final int step = 10;
+        final float initial = speed;
+        final boolean[] confirmed = {false};
 
         final AlertDialog.Builder popDialog = new AlertDialog.Builder(view.getContext());
         final LinearLayout linearLayout = new LinearLayout(view.getContext());
@@ -382,6 +393,9 @@ public class BookPresenter extends MvpPresenter<Activity> implements ActivityPre
                 progress = progress * step;
                 String s = progress / 100 + "." + progress % 100;
                 textView.setText(s);
+                if (fromUser) {
+                    playAtSpeed(Float.parseFloat(s));
+                }
             }
 
             @Override
@@ -401,15 +415,21 @@ public class BookPresenter extends MvpPresenter<Activity> implements ActivityPre
         popDialog.setTitle(view.getContext().getString(R.string.title_set_speed_popup));
         popDialog.setView(linearLayout);
 
-        // Button OK
-        popDialog.setPositiveButton("OK",
+        popDialog.setPositiveButton(R.string.ok,
                 (dialog, which) -> {
+                    confirmed[0] = true;
                     float s = PlaybackSettings.clampSpeed(Float.parseFloat(textView.getText().toString()));
                     if (s != speed) {
                         setSpeed(s);
                     }
                     dialog.dismiss();
                 });
+        popDialog.setNegativeButton(R.string.cancel, null);
+        popDialog.setOnDismissListener(dialog -> {
+            if (!confirmed[0]) {
+                playAtSpeed(initial);
+            }
+        });
 
         popDialog.create();
         popDialog.show();
@@ -467,6 +487,13 @@ public class BookPresenter extends MvpPresenter<Activity> implements ActivityPre
     @Override
     public void buttomForwardClick(View view) {
         Intent broadcastIntent = new Intent(Broadcast_SEEK_NEXT_30);
+        getViewState().broadcastSend(broadcastIntent);
+    }
+
+    /** A rewind or forward of any length, as holding the button makes it. */
+    public void seekBy(long deltaMs) {
+        Intent broadcastIntent = new Intent(deltaMs < 0 ? Broadcast_SEEK_PREVIOUS_10 : Broadcast_SEEK_NEXT_30);
+        broadcastIntent.putExtra("ms", Math.abs(deltaMs));
         getViewState().broadcastSend(broadcastIntent);
     }
 

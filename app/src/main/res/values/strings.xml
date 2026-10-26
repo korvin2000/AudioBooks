@@ -58,7 +58,7 @@
     <string name="other_recomended_books">Рекомендуемые книги</string>
     <string name="try_again">Попробовать еще</string>
     <string name="show_less">Скрыть</string>
-    <string name="share">Поделится</string>
+    <string name="share">Поделиться</string>
     <string name="add_to_main_screen">Добавить на главный экран</string>
     <string name="refresh">Обновить</string>
     <string name="answers">Ответы</string>
@@ -117,6 +117,7 @@
     <string name="select_folder_description">Выберите папку для загрузки</string>
     <string name="default_text">По умолчанию</string>
     <string name="select_folder">Выберите папку</string>
+    <string name="pref_download_path">Папка для скачивания</string>
     <string name="confirm">Подтвердить</string>
     <string name="clear_history_search">Очистить историю поиска</string>
     <string name="confirm_clear_history_search">Вы уверены что хотите очистить историю поиска?</string>
@@ -317,6 +318,17 @@
     <string name="remove_partial">Удалено книг: %1$d из %2$d. Не удалось удалить глав: %3$d, они остались в списке</string>
     <string name="seekTo">Перемотка</string>
     <string name="seekToPauseDesc">Снимать плеер с паузы во время перемотки</string>
+    <string name="seek_buttons">Кнопки плеера</string>
+    <string name="seek_buttons_desc">Перемотка вместо навигации по главам</string>
+    <string name="safe_navigation">Безопасная навигация</string>
+    <string name="safe_navigation_desc">Подтверждение перехода по главам/трекам</string>
+    <string name="confirm_previous_chapter">Перейти к предыдущей главе?</string>
+    <string name="confirm_next_chapter">Перейти к следующей главе?</string>
+    <string name="go_to">Перейти</string>
+    <string name="expand">Развернуть</string>
+    <string name="book_toolbar">Панель книги</string>
+    <string name="book_toolbar_desc">Значки в верхней панели экрана книги</string>
+    <string name="toolbar_title">Название и автор</string>
     <string name="scrollToSelected">Переход к активному файлу</string>
     <string name="scrollToSelectedDesc">Первым в списке будет стоять активный аудиофайл</string>
     <string name="offline">Офлайн</string>

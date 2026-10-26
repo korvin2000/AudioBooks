@@ -1,5 +1,8 @@
 package com.fanok.audiobooks.android_equalizer;
 
+import android.media.audiofx.Equalizer;
+import android.media.audiofx.PresetReverb;
+import androidx.annotation.NonNull;
 import java.util.Arrays;
 
 public class Settings {
@@ -24,5 +27,29 @@ public class Settings {
             equalizerModel.setSeekbarpos(seekbarpos);
         }
         return seekbarpos;
+    }
+
+    /**
+     * Restores the saved sound on an equalizer exactly as the dialog shows it: {@link #presetPos} is the spinner
+     * position, 0 being "custom" (the band levels, clamped to the device's range), n the device preset n - 1.
+     */
+    public static void applyTo(@NonNull Equalizer equalizer) {
+        short bands = equalizer.getNumberOfBands();
+        if (presetPos > 0 && presetPos <= equalizer.getNumberOfPresets()) {
+            equalizer.usePreset((short) (presetPos - 1));
+            return;
+        }
+        presetPos = 0;
+        int[] levels = bandLevels(bands);
+        short min = equalizer.getBandLevelRange()[0];
+        short max = equalizer.getBandLevelRange()[1];
+        for (short bandIdx = 0; bandIdx < bands; bandIdx++) {
+            equalizer.setBandLevel(bandIdx, (short) Math.max(min, Math.min(max, levels[bandIdx])));
+        }
+    }
+
+    /** An insert reverb runs only with a room chosen: even at PRESET_NONE it takes over the session's volume. */
+    public static boolean isReverbOn(short preset) {
+        return isEqualizerEnabled && preset != PresetReverb.PRESET_NONE;
     }
 }
