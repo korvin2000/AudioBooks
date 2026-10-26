@@ -256,6 +256,7 @@ public final class AudioknigaLife implements SourceParser {
                 genre.setName(name);
                 genre.setUrl(listing(a));
                 genre.setDescription(text(a, ".genre_kol"));
+                genre.setReting(number(text(a, ".genre_kol"), 0)); // the genre list sorts by it
                 result.add(genre);
             }
         }
