@@ -26,6 +26,7 @@ import com.fanok.audiobooks.pojo.BookPOJO;
 import com.fanok.audiobooks.pojo.GenrePOJO;
 import com.fanok.audiobooks.pojo.SearcheblPOJO;
 import com.fanok.audiobooks.pojo.SearchebleArrayPOJO;
+import com.fanok.audiobooks.policy.DefaultCover;
 import com.fanok.audiobooks.search.Provider;
 import com.fanok.audiobooks.search.ProviderPage;
 import com.fanok.audiobooks.search.SearchSession;
@@ -400,11 +401,15 @@ public class SearchbalePresenter extends MvpPresenter<SearchableView> implements
         BookPOJO bookPOJO = bookAt(position);
 
         ImageView imageView = layout.findViewById(R.id.imageView);
-        Picasso.get()
-                .load(bookPOJO.getPhoto())
-                .error(android.R.drawable.ic_menu_gallery)
-                .placeholder(android.R.drawable.ic_menu_gallery)
-                .into(imageView);
+        if (DefaultCover.replaces(bookPOJO.getPhoto())) {
+            imageView.setImageDrawable(DefaultCover.drawable(imageView.getContext(), bookPOJO.getUrl()));
+        } else {
+            Picasso.get()
+                    .load(bookPOJO.getPhoto())
+                    .error(android.R.drawable.ic_menu_gallery)
+                    .placeholder(android.R.drawable.ic_menu_gallery)
+                    .into(imageView);
+        }
 
         TextView title = layout.findViewById(R.id.title);
         title.setText(bookPOJO.getName());

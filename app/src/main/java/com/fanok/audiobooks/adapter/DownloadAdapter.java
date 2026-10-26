@@ -28,6 +28,7 @@ import com.fanok.audiobooks.download.DownloadMonitor;
 import com.fanok.audiobooks.download.DownloadStatus;
 import com.fanok.audiobooks.download.DownloadStatusText;
 import com.fanok.audiobooks.pojo.DownloadItem;
+import com.fanok.audiobooks.policy.DefaultCover;
 import com.squareup.picasso.Picasso;
 
 import java.util.ArrayList;
@@ -193,7 +194,11 @@ public class DownloadAdapter extends RecyclerView.Adapter<DownloadAdapter.ViewHo
             String fileIcon = item.getFileIcon();
             if (fileIcon != null && !fileIcon.trim().isEmpty()) {
                 try {
-                    if (fileIcon.startsWith("content://")) {
+                    if (DefaultCover.replaces(fileIcon)) {
+                        Picasso.get().cancelRequest(binding.imageFileType);
+                        binding.imageFileType.setImageDrawable(
+                                DefaultCover.drawable(binding.imageFileType.getContext(), item.getBookUrl()));
+                    } else if (fileIcon.startsWith("content://")) {
                         Picasso.get()
                                 .load(android.net.Uri.parse(fileIcon))
                                 .error(android.R.drawable.ic_menu_gallery)

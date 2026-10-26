@@ -53,6 +53,7 @@ import com.fanok.audiobooks.adapter.BooksListAddapter;
 import com.fanok.audiobooks.databinding.FragmentFavoriteBinding;
 import com.fanok.audiobooks.interface_pacatge.favorite.FavoriteView;
 import com.fanok.audiobooks.pojo.BookPOJO;
+import com.fanok.audiobooks.policy.DefaultCover;
 import com.fanok.audiobooks.policy.ParentalControl;
 import com.fanok.audiobooks.presenter.FavoritePresenter;
 import com.google.android.material.bottomsheet.BottomSheetDialog;
@@ -457,6 +458,8 @@ public class FavoriteFragment extends MvpAppCompatFragment implements FavoriteVi
         Drawable mask = ParentalControl.coverMask(imageView.getContext(), book);
         if (mask != null) {
             imageView.setImageDrawable(mask);
+        } else if (DefaultCover.replaces(book.getPhoto())) {
+            imageView.setImageDrawable(DefaultCover.drawable(imageView.getContext(), book.getUrl()));
         } else {
             Picasso.get()
                     .load(book.getPhoto())

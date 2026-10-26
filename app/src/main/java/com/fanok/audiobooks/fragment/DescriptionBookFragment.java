@@ -34,6 +34,7 @@ import com.fanok.audiobooks.adapter.ExpandableText;
 import com.fanok.audiobooks.interface_pacatge.book_content.Description;
 import com.fanok.audiobooks.pojo.BookPOJO;
 import com.fanok.audiobooks.pojo.DescriptionPOJO;
+import com.fanok.audiobooks.policy.DefaultCover;
 import com.fanok.audiobooks.presenter.BookDescriptionPresenter;
 import com.google.gson.Gson;
 import com.squareup.picasso.Picasso;
@@ -95,6 +96,21 @@ public class DescriptionBookFragment extends MvpAppCompatFragment implements Des
         } catch (Exception ignored) {
         }
         return null;
+    }
+
+    /** The book's page URL, which its list item's default cover is keyed by; {@code poster} when unknown. */
+    private String coverKey(String poster) {
+        try {
+            Bundle args = getArguments();
+            if (args != null && args.containsKey(ARG_BOOK_POJO)) {
+                BookPOJO pojo = new Gson().fromJson(args.getString(ARG_BOOK_POJO), BookPOJO.class);
+                if (pojo != null && pojo.getUrl() != null) {
+                    return pojo.getUrl();
+                }
+            }
+        } catch (Exception ignored) {
+        }
+        return poster;
     }
 
     @Nullable
@@ -237,7 +253,10 @@ public class DescriptionBookFragment extends MvpAppCompatFragment implements Des
                 poster = localCover;
             }
             if (poster != null && !poster.trim().isEmpty()) {
-                if (poster.startsWith("content://")) {
+                if (DefaultCover.replaces(poster)) {
+                    Picasso.get().cancelRequest(mImageView);
+                    mImageView.setImageDrawable(DefaultCover.drawable(mImageView.getContext(), coverKey(poster)));
+                } else if (poster.startsWith("content://")) {
                     Picasso.get()
                             .load(android.net.Uri.parse(poster))
                             .placeholder(android.R.drawable.ic_menu_gallery)
@@ -268,7 +287,7 @@ public class DescriptionBookFragment extends MvpAppCompatFragment implements Des
                 mImageView.setOnClickListener(view ->
                         ImageFullScreenActivity.start(activity,
                                 remotePoster, description.getTitle(),
-                                mImageView));
+                                mImageView, coverKey(remotePoster)));
             }
 
             if (description.getGenre() != null && !description.getGenre().isEmpty()) {
