@@ -42,23 +42,24 @@
     <string name="remove_favorite">Удалить из избранного</string>
     <string name="remove">Удалить</string>
     <string name="title_activity_book" translatable="false">BookActivity</string>
-    <string name="tab_text_1">Описание</string>
-    <string name="tab_text_2">Комментарии</string>
+    <string name="tab_text_1">Обзор</string>
+    <string name="tab_text_2">Отзывы</string>
+    <string name="tab_text_2_count">Отзывы (%d)</string>
     <string name="tab_text_3">Серия</string>
-    <string name="tab_text_5">Другие источники</string>
+    <string name="tab_text_5">Альтернативы</string>
     <string name="time_zero" translatable="false">00:00</string>
     <string name="previous">Предыдущий</string>
     <string name="play">Воспроизвести</string>
     <string name="next">Следуйщий</string>
     <string name="collapse">Свернуть</string>
     <string name="autor">Автор:</string>
-    <string name="artist">Читает:</string>
+    <string name="artist">Чтец:</string>
     <string name="series">Серия:</string>
     <string name="show_more">Читать дальше</string>
     <string name="other_recomended_books">Рекомендуемые книги</string>
     <string name="try_again">Попробовать еще</string>
-    <string name="show_less">Скрыть</string>
-    <string name="share">Поделится</string>
+    <string name="show_less">Свернуть</string>
+    <string name="share">Поделиться</string>
     <string name="add_to_main_screen">Добавить на главный экран</string>
     <string name="refresh">Обновить</string>
     <string name="answers">Ответы</string>
@@ -103,6 +104,9 @@
     <string name="sort_title_artist">По исполнителю</string>
     <string name="sort_title_series">По серии</string>
     <string name="sort_title_saved">По загруженному</string>
+    <string name="genre_sort_none">Без сортировки</string>
+    <string name="genre_sort_name">По алфавиту</string>
+    <string name="genre_sort_count">По количеству книг</string>
 
     <string name="sort_value_date" translatable="false">date</string>
     <string name="sort_value_name" translatable="false">name</string>
@@ -117,6 +121,7 @@
     <string name="select_folder_description">Выберите папку для загрузки</string>
     <string name="default_text">По умолчанию</string>
     <string name="select_folder">Выберите папку</string>
+    <string name="pref_download_path">Папка для скачивания</string>
     <string name="confirm">Подтвердить</string>
     <string name="clear_history_search">Очистить историю поиска</string>
     <string name="confirm_clear_history_search">Вы уверены что хотите очистить историю поиска?</string>
@@ -189,7 +194,8 @@
     <string name="privacy">Условия использования</string>
     <string name="donate" translatable="false">Donate</string>
     <string name="donate_summary">Поддержать проект</string>
-    <string name="write_autor">Написать автору</string>
+    <string name="write_autor">Написать автору форка</string>
+    <string name="feedback_email" translatable="false">delafer2019@gmail.com</string>
     <string name="getPlus">Получить Plus версию</string>
     <string name="how_is">Что это?</string>
     <string name="version">Версия</string>
@@ -311,12 +317,24 @@
     <string name="autoplay">Автовоспроизведение</string>
     <string name="autoplay_desc">Запускать книги сразу после открытия</string>
     <string name="open_4pda">Открыть тему на 4pda</string>
+    <string name="open_github">Открыть на GitHub</string>
     <string name="dowland_delete">Скачать/Удалить</string>
     <string name="delete_complite">Удаление завершено</string>
     <string name="delete_result">Удалено %1$d из %2$d</string>
     <string name="remove_partial">Удалено книг: %1$d из %2$d. Не удалось удалить глав: %3$d, они остались в списке</string>
     <string name="seekTo">Перемотка</string>
     <string name="seekToPauseDesc">Снимать плеер с паузы во время перемотки</string>
+    <string name="seek_buttons">Кнопки плеера</string>
+    <string name="seek_buttons_desc">Перемотка вместо навигации по главам</string>
+    <string name="safe_navigation">Безопасная навигация</string>
+    <string name="safe_navigation_desc">Подтверждение перехода по главам/трекам</string>
+    <string name="confirm_previous_chapter">Перейти к предыдущей главе?</string>
+    <string name="confirm_next_chapter">Перейти к следующей главе?</string>
+    <string name="go_to">Перейти</string>
+    <string name="expand">Развернуть</string>
+    <string name="book_toolbar">Панель книги</string>
+    <string name="book_toolbar_desc">Значки в верхней панели экрана книги</string>
+    <string name="toolbar_title">Название и автор</string>
     <string name="scrollToSelected">Переход к активному файлу</string>
     <string name="scrollToSelectedDesc">Первым в списке будет стоять активный аудиофайл</string>
     <string name="offline">Офлайн</string>
@@ -363,6 +381,7 @@
     <string name="source">Источник</string>
     <string name="buffer_size">Размер буфера в секундах (макс 999с)</string>
     <string name="rewind_back">Перемотка назад</string>
+    <string name="fast_forward">Перемотка вперёд</string>
     <string name="source_search">Источники поиска</string>
     <string name="source_search_desc">Выбрать источники по которым будет осуществляться поиск</string>
     <string name="speed_up_search_abmp3">Ускорить поиск по источнику Audiobook-mp3</string>

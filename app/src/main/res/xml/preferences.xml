@@ -22,7 +22,7 @@
         android:icon="@drawable/ic_download"
         android:key="pref_download_path"
         android:summary="@string/select_folder"
-        android:title="Папка для скачивания" />
+        android:title="@string/pref_download_path" />
 
     <CheckBoxPreference
         android:defaultValue="true"
@@ -39,6 +39,55 @@
         android:title="@string/source_search">
 
         <!-- one checkbox per Provider, added by SettingsFragment -->
+    </PreferenceScreen>
+
+    <!-- which book-screen actions are icons in its toolbar; the rest stay in the overflow menu -->
+    <PreferenceScreen
+        android:icon="@drawable/ic_menu_settings"
+        android:key="book_toolbar"
+        android:persistent="true"
+        android:summary="@string/book_toolbar_desc"
+        android:title="@string/book_toolbar">
+        <CheckBoxPreference
+            android:defaultValue="true"
+            android:key="toolbar_title"
+            android:title="@string/toolbar_title" />
+        <CheckBoxPreference
+            android:defaultValue="true"
+            android:key="toolbar_favorite"
+            android:title="@string/add_to_favorite" />
+        <CheckBoxPreference
+            android:defaultValue="true"
+            android:key="toolbar_share"
+            android:title="@string/share" />
+        <CheckBoxPreference
+            android:defaultValue="false"
+            android:key="toolbar_download"
+            android:title="@string/dowland" />
+        <CheckBoxPreference
+            android:defaultValue="false"
+            android:key="toolbar_sleep_timer"
+            android:title="@string/sleep_timer" />
+        <CheckBoxPreference
+            android:defaultValue="false"
+            android:key="toolbar_equalizer"
+            android:title="@string/equalizer" />
+        <CheckBoxPreference
+            android:defaultValue="false"
+            android:key="toolbar_settings"
+            android:title="@string/menu_settings" />
+        <CheckBoxPreference
+            android:defaultValue="false"
+            android:key="toolbar_open_site"
+            android:title="@string/open_site" />
+        <CheckBoxPreference
+            android:defaultValue="false"
+            android:key="toolbar_main_screen"
+            android:title="@string/add_to_main_screen" />
+        <CheckBoxPreference
+            android:defaultValue="false"
+            android:key="toolbar_refresh"
+            android:title="@string/refresh" />
     </PreferenceScreen>
 
 
@@ -109,6 +158,20 @@
         android:key="seekToPausePref"
         android:summary="@string/seekToPauseDesc"
         android:title="@string/seekTo" />
+
+    <CheckBoxPreference
+        android:defaultValue="false"
+        android:icon="@drawable/ic_skip_pref"
+        android:key="seekButtonsPref"
+        android:summary="@string/seek_buttons_desc"
+        android:title="@string/seek_buttons" />
+
+    <CheckBoxPreference
+        android:defaultValue="true"
+        android:icon="@drawable/ic_privacy"
+        android:key="safeNavigationPref"
+        android:summary="@string/safe_navigation_desc"
+        android:title="@string/safe_navigation" />
 
     <CheckBoxPreference
         android:defaultValue="false"

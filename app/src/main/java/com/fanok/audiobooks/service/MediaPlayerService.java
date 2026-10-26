@@ -2113,12 +2113,12 @@ public class MediaPlayerService extends MediaBrowserServiceCompat {
                 break;
             case Broadcast_SEEK_NEXT_30:
                 if (player != null && hasBook()) {
-                    seekFromApp(currentPositionMs() + FAST_FORWARD);
+                    seekFromApp(currentPositionMs() + intent.getLongExtra("ms", FAST_FORWARD));
                 }
                 break;
             case Broadcast_SEEK_PREVIOUS_10:
                 if (player != null && hasBook()) {
-                    seekFromApp(currentPositionMs() - REWIND);
+                    seekFromApp(currentPositionMs() - intent.getLongExtra("ms", REWIND));
                 }
                 break;
             case Broadcast_SET_SPEED:
@@ -2299,17 +2299,11 @@ public class MediaPlayerService extends MediaBrowserServiceCompat {
 
                 presetReverb = new PresetReverb(0, audioSesionId);
                 presetReverb.setPreset(Settings.equalizerModel.getReverbPreset());
-                presetReverb.setEnabled(Settings.isEqualizerEnabled);
+                presetReverb.setEnabled(Settings.isReverbOn(Settings.equalizerModel.getReverbPreset()));
 
                 mEqualizer.setEnabled(Settings.isEqualizerEnabled);
-
-                if (Settings.presetPos == 0) {
-                    for (short bandIdx = 0; bandIdx < mEqualizer.getNumberOfBands(); bandIdx++) {
-                        mEqualizer.setBandLevel(bandIdx, (short) Settings.seekbarpos[bandIdx]);
-                    }
-                } else {
-                    mEqualizer.usePreset((short) Settings.presetPos);
-                }
+                //the same mapping as the dialog: the sound heard while editing is the one kept after closing it
+                Settings.applyTo(mEqualizer);
             } catch (RuntimeException e) {
                 stopEqualizer();
             }
