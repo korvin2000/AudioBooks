@@ -71,6 +71,9 @@ public class DescriptionBookFragment extends MvpAppCompatFragment implements Des
     private BooksOtherAdapter mAdapterBooksRecomended;
     /** Whether the description is unfolded; survives re-binds of the same view. */
     private boolean descExpanded;
+    /** The bound description, for unfolding it once there are no recommendations below. */
+    @Nullable
+    private String descText;
 
     public static DescriptionBookFragment newInstance(@NonNull BookPOJO pojo) {
         Bundle args = new Bundle();
@@ -337,12 +340,19 @@ public class DescriptionBookFragment extends MvpAppCompatFragment implements Des
             }
 
 
-            final String text = description.getDescription();
+            descText = description.getDescription();
+            final String text = descText;
             ExpandableText.bind(mDesc, mShowMore, text, MAX_LINES, descExpanded);
             mShowMore.setOnClickListener(view1 -> {
                 descExpanded = !descExpanded;
                 if (mDesc != null) {
                     ExpandableText.bind(mDesc, mShowMore, text, MAX_LINES, descExpanded);
+                }
+            });
+            // a tap anywhere on the text toggles it too, whenever there is something to toggle
+            mDesc.setOnClickListener(view1 -> {
+                if (mShowMore != null && mShowMore.getVisibility() == View.VISIBLE) {
+                    mShowMore.performClick();
                 }
             });
             if (text == null || text.isEmpty()) {
@@ -414,6 +424,17 @@ public class DescriptionBookFragment extends MvpAppCompatFragment implements Des
 
     }
 
+    /** Nothing is recommended below: the description unfolds instead of leaving the space below empty. */
+    private void expandDescription() {
+        if (descExpanded) {
+            return;
+        }
+        descExpanded = true;
+        if (mDesc != null && descText != null) {
+            ExpandableText.bind(mDesc, mShowMore, descText, MAX_LINES, true);
+        }
+    }
+
     @Override
     public void showProgress(boolean b) {
         if (mProgressBar == null) {
@@ -438,6 +459,9 @@ public class DescriptionBookFragment extends MvpAppCompatFragment implements Des
     public void showOtherBooksLine(boolean b) {
         if (mOtherBookLine != null) {
             mOtherBookLine.setVisibility(b ? View.VISIBLE : View.GONE);
+        }
+        if (!b) {
+            expandDescription(); // the recommendations came empty or failed
         }
     }
 
