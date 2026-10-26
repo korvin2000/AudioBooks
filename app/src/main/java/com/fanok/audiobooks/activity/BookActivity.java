@@ -144,10 +144,10 @@ public class BookActivity extends MvpAppCompatActivity implements Activity {
     private static final String[] TOOLBAR_KEYS = {"toolbar_favorite", "toolbar_share", "toolbar_download",
             "toolbar_sleep_timer", "toolbar_equalizer", "toolbar_settings", "toolbar_open_site", "toolbar_main_screen",
             "toolbar_refresh"};
-    /** Widths in the book toolbar: the back arrow, an icon (styles.xml BookToolbarActionButton), the overflow button. */
+    /** Widths in the book toolbar: the back arrow, an action icon (styles.xml Widget.App.ActionButton), the overflow. */
     private static final int TOOLBAR_NAV_DP = 56;
-    private static final int TOOLBAR_ICON_DP = 40;
-    private static final int TOOLBAR_OVERFLOW_DP = 48;
+    private static final int TOOLBAR_ICON_DP = 32;
+    private static final int TOOLBAR_OVERFLOW_DP = 40;
     /** Below this width left by the icons the title and author are not shown at all. */
     private static final int TOOLBAR_TITLE_MIN_DP = 120;
     @InjectPresenter
@@ -1121,12 +1121,12 @@ public class BookActivity extends MvpAppCompatActivity implements Activity {
     private void bindTopSideButtons() {
         mTopSeek = pref.getBoolean(PREF_SEEK_BUTTONS, false);
         if (mPreviousTop != null) {
-            mPreviousTop.setImageResource(mTopSeek ? R.drawable.ic_rewind_30 : R.drawable.ic_skip_previous);
-            mPreviousTop.setContentDescription(getString(mTopSeek ? R.string.rewind_10 : R.string.previous));
+            mPreviousTop.setImageResource(mTopSeek ? R.drawable.ic_fast_rewind : R.drawable.ic_skip_previous);
+            mPreviousTop.setContentDescription(getString(mTopSeek ? R.string.rewind_back : R.string.previous));
         }
         if (mNextTop != null) {
-            mNextTop.setImageResource(mTopSeek ? R.drawable.ic_fast_forward_30 : R.drawable.ic_skip_next);
-            mNextTop.setContentDescription(getString(mTopSeek ? R.string.forward_30 : R.string.next));
+            mNextTop.setImageResource(mTopSeek ? R.drawable.ic_fast_forward : R.drawable.ic_skip_next);
+            mNextTop.setContentDescription(getString(mTopSeek ? R.string.fast_forward : R.string.next));
         }
     }
 

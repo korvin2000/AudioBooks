@@ -29,17 +29,6 @@
 
     <style name="AppTheme.AppBarOverlay" parent="ThemeOverlay.MaterialComponents.Dark.ActionBar" />
 
-    <!-- the book toolbar holds up to ten icons (BookActivity.layoutToolbar counts 40dp each) -->
-    <style name="BookToolbarOverlay" parent="">
-        <item name="actionButtonStyle">@style/BookToolbarActionButton</item>
-    </style>
-
-    <style name="BookToolbarActionButton" parent="Widget.AppCompat.ActionButton">
-        <item name="android:minWidth">40dp</item>
-        <item name="android:paddingLeft">8dp</item>
-        <item name="android:paddingRight">8dp</item>
-    </style>
-
 
     <style name="AppTheme.PopupOverlay" parent="ThemeOverlay.MaterialComponents.Dark" />
 

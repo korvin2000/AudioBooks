@@ -381,6 +381,7 @@
     <string name="source">Источник</string>
     <string name="buffer_size">Размер буфера в секундах (макс 999с)</string>
     <string name="rewind_back">Перемотка назад</string>
+    <string name="fast_forward">Перемотка вперёд</string>
     <string name="source_search">Источники поиска</string>
     <string name="source_search_desc">Выбрать источники по которым будет осуществляться поиск</string>
     <string name="speed_up_search_abmp3">Ускорить поиск по источнику Audiobook-mp3</string>
