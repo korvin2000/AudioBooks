@@ -23,6 +23,8 @@ import org.jsoup.select.Elements;
 public class AutorsModel extends GenreModel {
 
     private boolean mPerformerMode = false;
+    /** audioboo's empty letters passed so far: page N is the letter N plus these (pages load one by one). */
+    private int mAudiobooSkipped;
 
     public void setPerformerMode(boolean mode) {
         mPerformerMode = mode;
@@ -206,15 +208,25 @@ public class AutorsModel extends GenreModel {
     protected ProviderPage<GenrePOJO> loadBooksListAudioboo(String url, int page) throws IOException {
         if (mPerformerMode) {
             // 17k tags: ~4 MB unpacked (0.3 MB sent), the bound SiteHttp sets for a page
+            int limit = 4 * SiteHttp.MAX_BODY_BYTES;
             return parseAudiobooReaders(SiteHttp.parse(SiteHttp.execute(SiteHttp.connect(
-                    Url.SERVER_AUDIOBOO + "/tags/").maxBodySize(4 * SiteHttp.MAX_BODY_BYTES))));
+                    Url.SERVER_AUDIOBOO + "/tags/").maxBodySize(limit)), limit));
         }
         Elements letters = SiteHttp.get(url).select("a.alfavit[href]");
-        if (page > letters.size()) {
-            return ProviderPage.empty();
+        if (page <= 1) {
+            mAudiobooSkipped = 0;
         }
-        Document letter = SiteHttp.get(letters.get(page - 1).absUrl("href"));
-        return ProviderPage.of(parseAudiobooAuthors(letter), page < letters.size());
+        int index = page - 1 + mAudiobooSkipped;
+        ArrayList<GenrePOJO> authors = new ArrayList<>();
+        // an empty letter would end the list: the next one is read in its place
+        for (; index < letters.size(); index++) {
+            authors = parseAudiobooAuthors(SiteHttp.get(letters.get(index).absUrl("href")));
+            if (!authors.isEmpty() || index == letters.size() - 1) {
+                break;
+            }
+            mAudiobooSkipped++;
+        }
+        return ProviderPage.of(authors, index < letters.size() - 1);
     }
 
     /** A letter of audioboo's authors' index: a table row per author, with the number of their books. */

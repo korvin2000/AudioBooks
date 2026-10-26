@@ -729,10 +729,13 @@ public class BooksFragment extends MvpAppCompatFragment implements BooksView {
         });
         String query = getPresenter().getGenreQuery();
         if (!query.isEmpty()) {
-            searchView.post(() -> {
-                item.expandActionView();
-                searchView.setQuery(query, false);
-                searchView.clearFocus();
+            // on the fragment's view: a collapsed action view is not attached, so it would never run its own posts
+            requireView().post(() -> {
+                if (isResumed()) {
+                    item.expandActionView();
+                    searchView.setQuery(query, false);
+                    searchView.clearFocus();
+                }
             });
         }
     }

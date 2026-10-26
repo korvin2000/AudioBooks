@@ -1319,6 +1319,10 @@ public class BookActivity extends MvpAppCompatActivity implements Activity {
 
     @Override
     public void updateTime(int timeCurent, int timeEnd, int buffered) {
+        // the chapter played to its end under a hold: the position held belongs to the one before
+        if (mActiveSeekHold != null && timeEnd != mSeekBar.getMax()) {
+            mActiveSeekHold.finish(false);
+        }
         // a hold shows its own position; a tick sent before its seek arrived would jump back for a moment
         if (mActiveSeekHold != null || (SystemClock.uptimeMillis() - mSeekCommitAt < SEEK_COMMIT_SETTLE_MS
                 && Math.abs(timeCurent - mSeekCommitTarget) > SEEK_COMMIT_TOLERANCE_MS)) {

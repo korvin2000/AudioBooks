@@ -140,10 +140,15 @@ public final class SiteHttp {
 
     /** Parses a response or throws: a challenge page → {@link CookesExeption}, HTTP ≥ 400 → {@link HttpStatusException}. */
     public static Document parse(Connection.Response response) throws IOException {
+        return parse(response, MAX_BODY_BYTES);
+    }
+
+    /** As {@link #parse(Connection.Response)}, for a response fetched with {@code maxBodySize(maxBytes)}. */
+    public static Document parse(Connection.Response response, int maxBytes) throws IOException {
         String url = response.url().toString();
-        if (response.bodyAsBytes().length >= MAX_BODY_BYTES) {
+        if (response.bodyAsBytes().length >= maxBytes) {
             // Jsoup silently truncates at maxBodySize; a cut page would parse as "no more items", so refuse it.
-            throw new IOException("Response larger than " + MAX_BODY_BYTES + " bytes: " + url);
+            throw new IOException("Response larger than " + maxBytes + " bytes: " + url);
         }
         Document document = response.parse();
         if (isChallenge(response.header("cf-mitigated"), document.title())) {
