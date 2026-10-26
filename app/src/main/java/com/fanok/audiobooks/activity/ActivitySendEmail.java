@@ -36,6 +36,9 @@ public class ActivitySendEmail extends MvpAppCompatActivity {
             actionBar.setDisplayHomeAsUpEnabled(true);
         }
 
+        // the address the message goes to: the fork's author, filled in and still editable
+        binding.emailInput.setText(R.string.feedback_email);
+
         Intent intent = getIntent();
         String message = intent.getStringExtra("message");
         if (message != null) {
@@ -123,14 +126,13 @@ public class ActivitySendEmail extends MvpAppCompatActivity {
         }
 
         if (!binding.messageLayout.isErrorEnabled() && !binding.emailLayout.isErrorEnabled()) {
-            String email = binding.emailInput.getText().toString();
+            String email = binding.emailInput.getText().toString().trim();
             String subject = binding.spinner.getSelectedItem().toString();
             String body = binding.messageInput.getText().toString() + "\n\n"
-                    + email + "\n"
                     + Build.MANUFACTURER + " " + Build.MODEL + ", Android " + Build.VERSION.RELEASE;
 
             // The user's own mail app sends the message, so they see the recipient and the text.
-            Intent intent = new Intent(Intent.ACTION_SENDTO, Uri.parse("mailto:" + getString(R.string.feedback_email)
+            Intent intent = new Intent(Intent.ACTION_SENDTO, Uri.parse("mailto:" + email
                     + "?subject=" + Uri.encode(subject) + "&body=" + Uri.encode(body)));
             intent.putExtra(Intent.EXTRA_SUBJECT, subject);
             intent.putExtra(Intent.EXTRA_TEXT, body);
