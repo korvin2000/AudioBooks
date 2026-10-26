@@ -26,15 +26,13 @@ public final class ExpandableText {
         text.setMaxLines(expanded ? Integer.MAX_VALUE : maxLines);
         text.setText(content == null ? "" : content);
         toggle.setText(expanded ? R.string.show_less : R.string.show_more);
-        if (expanded) {
-            toggle.setVisibility(View.VISIBLE);
-            return;
-        }
-        toggle.setVisibility(View.GONE);
+        toggle.setVisibility(expanded ? View.VISIBLE : View.GONE);
+        int boundMaxLines = text.getMaxLines();
         text.post(() -> {
-            if (text.getMaxLines() != maxLines) {
+            if (text.getMaxLines() != boundMaxLines) {
                 return; // re-bound meanwhile
             }
+            // expanded without the toggle ever shown (unfolded by the caller): no "show less" for a short text
             Layout layout = text.getLayout();
             boolean overflows = layout != null && (layout.getLineCount() > maxLines
                     || (layout.getLineCount() == maxLines && layout.getEllipsisCount(maxLines - 1) > 0));

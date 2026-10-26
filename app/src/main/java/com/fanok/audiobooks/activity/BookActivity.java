@@ -156,6 +156,8 @@ public class BookActivity extends MvpAppCompatActivity implements Activity {
     private ImageButton mForward;
     private TabLayout tabs;
     private SectionsPagerAdapter sectionsPagerAdapter;
+    /** The comments fetch that decides whether their tab shows. */
+    private io.reactivex.disposables.Disposable comentsCount;
     private BookPOJO mBookPOJO;
     private BottomSheetBehavior<LinearLayout> bottomSheetBehavior;
     private LinearLayoutManager mLinearLayoutManager;
@@ -443,6 +445,14 @@ public class BookActivity extends MvpAppCompatActivity implements Activity {
         new TabLayoutMediator(tabs, viewPager,
                 (tab, position) -> tab.setText(sectionsPagerAdapter.getPageTitle(position))
         ).attach();
+        // the comments tab shows only when there are comments; its list reuses this fetch
+        comentsCount = com.fanok.audiobooks.model.ComentsModel.shared(mBookPOJO.getUrl(), savedInstanceState == null)
+                .observeOn(io.reactivex.android.schedulers.AndroidSchedulers.mainThread())
+                .subscribe(comments -> {
+                    if (!comments.isEmpty()) {
+                        sectionsPagerAdapter.showComents(comments.size());
+                    }
+                }, e -> Log.d(TAG, "no comments tab: " + e));
 
 
         ActionBar actionBar = getSupportActionBar();
@@ -882,42 +892,17 @@ public class BookActivity extends MvpAppCompatActivity implements Activity {
 
 
     public void showSiries() {
-        showPage(getResources().getString(R.string.tab_text_3));
+        sectionsPagerAdapter.showTab(SectionsPagerAdapter.SERIES);
     }
 
     @Override
     public void showOtherSource() {
         sectionsPagerAdapter.setArtistPOJO(mPresenter.getOtherArtistPOJOS());
-        showPage(getResources().getString(R.string.tab_text_5));
+        sectionsPagerAdapter.showTab(SectionsPagerAdapter.OTHER_SOURCE);
     }
 
     public void showOtherArtist() {
-        showPage(getResources().getString(R.string.tab_text_4));
-    }
-
-    private void showPage(String name) {
-        boolean temp = false;
-        boolean sours = false;
-        String otherSours = getString(R.string.tab_text_5);
-        for (int i = 0; i < tabs.getTabCount(); i++) {
-            String title = Objects.requireNonNull(
-                    Objects.requireNonNull(tabs.getTabAt(i)).getText()).toString();
-            if (title.equals(name)) {
-                temp = true;
-            }
-            if (title.equals(otherSours) && !otherSours.equals(name)) {
-                sours = true;
-            }
-        }
-        if (!temp) {
-            if (!sours) {
-                tabs.addTab(tabs.newTab().setText(name));
-                sectionsPagerAdapter.addTabPage(name);
-            } else {
-                tabs.addTab(tabs.newTab().setText(name), sectionsPagerAdapter.getItemCount() - 1);
-                sectionsPagerAdapter.addTabPage(name, sectionsPagerAdapter.getItemCount() - 1);
-            }
-        }
+        sectionsPagerAdapter.showTab(SectionsPagerAdapter.OTHER_ARTIST);
     }
 
     @UnstableApi
@@ -981,6 +966,7 @@ public class BookActivity extends MvpAppCompatActivity implements Activity {
     @Override
     protected void onDestroy() {
         showingView = "";
+        comentsCount.dispose();
         //Moxy destroys the presenter (and its player binding) when this screen is finished for good
         super.onDestroy();
     }
@@ -1002,11 +988,9 @@ public class BookActivity extends MvpAppCompatActivity implements Activity {
 
     @Override
     public void setTabPostion(String title) {
-        for (int i = 0; i < tabs.getTabCount(); i++) {
-            TabLayout.Tab tab = tabs.getTabAt(i);
-            if (tab != null && Objects.requireNonNull(tab.getText()).toString().equals(title)) {
-                tab.select();
-            }
+        TabLayout.Tab tab = tabs.getTabAt(sectionsPagerAdapter.positionOf(title));
+        if (tab != null) {
+            tab.select();
         }
     }
 

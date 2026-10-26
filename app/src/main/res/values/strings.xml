@@ -42,22 +42,23 @@
     <string name="remove_favorite">Удалить из избранного</string>
     <string name="remove">Удалить</string>
     <string name="title_activity_book" translatable="false">BookActivity</string>
-    <string name="tab_text_1">Описание</string>
-    <string name="tab_text_2">Комментарии</string>
+    <string name="tab_text_1">Обзор</string>
+    <string name="tab_text_2">Отзывы</string>
+    <string name="tab_text_2_count">Отзывы (%d)</string>
     <string name="tab_text_3">Серия</string>
-    <string name="tab_text_5">Другие источники</string>
+    <string name="tab_text_5">Альтернативы</string>
     <string name="time_zero" translatable="false">00:00</string>
     <string name="previous">Предыдущий</string>
     <string name="play">Воспроизвести</string>
     <string name="next">Следуйщий</string>
     <string name="collapse">Свернуть</string>
     <string name="autor">Автор:</string>
-    <string name="artist">Читает:</string>
+    <string name="artist">Чтец:</string>
     <string name="series">Серия:</string>
     <string name="show_more">Читать дальше</string>
     <string name="other_recomended_books">Рекомендуемые книги</string>
     <string name="try_again">Попробовать еще</string>
-    <string name="show_less">Скрыть</string>
+    <string name="show_less">Свернуть</string>
     <string name="share">Поделится</string>
     <string name="add_to_main_screen">Добавить на главный экран</string>
     <string name="refresh">Обновить</string>

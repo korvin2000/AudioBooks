@@ -15,6 +15,7 @@ import com.google.gson.JsonElement;
 import com.google.gson.JsonParser;
 import io.reactivex.Observable;
 import io.reactivex.functions.BooleanSupplier;
+import io.reactivex.schedulers.Schedulers;
 import java.io.IOException;
 import java.net.URI;
 import java.util.ArrayList;
@@ -70,6 +71,22 @@ public class ComentsModel implements
     interface PageSource {
 
         String get(String url) throws IOException;
+    }
+
+    private static String sSharedUrl;
+
+    private static Observable<ArrayList<ComentsPOJO>> sShared;
+
+    /**
+     * The comments of the book screen opened last, fetched once and shared by its tab title (the count) and its
+     * list. {@code fresh} starts a new fetch (the book opened anew); otherwise one of the same book is reused.
+     */
+    public static synchronized Observable<ArrayList<ComentsPOJO>> shared(@NonNull String url, boolean fresh) {
+        if (fresh || sShared == null || !url.equals(sSharedUrl)) {
+            sSharedUrl = url;
+            sShared = new ComentsModel().getComents(url).subscribeOn(Schedulers.io()).cache();
+        }
+        return sShared;
     }
 
     @Override

@@ -1,6 +1,5 @@
 package com.fanok.audiobooks.activity;
 
-import android.animation.Animator;
 import android.app.Activity;
 import android.app.ActivityOptions;
 import android.content.Intent;
@@ -27,8 +26,6 @@ import com.squareup.picasso.Target;
 import org.jetbrains.annotations.NotNull;
 
 public class ImageFullScreenActivity extends AppCompatActivity {
-
-    private boolean isHide = true;
 
     private ActivityImageFullScrinBinding binding;
 
@@ -78,35 +75,6 @@ public class ImageFullScreenActivity extends AppCompatActivity {
         String title = intent.getStringExtra("title");
         if (title != null) setTitle(title);
 
-        binding.appBar.animate().setListener(new Animator.AnimatorListener() {
-            @Override
-            public void onAnimationStart(@NonNull Animator animator) {
-
-            }
-
-            @Override
-            public void onAnimationEnd(@NonNull Animator animator) {
-                if (!isHide) {
-                    if (actionBar != null) {
-                        actionBar.hide();
-                    }
-                    isHide = true;
-                } else {
-                    isHide = false;
-                }
-            }
-
-            @Override
-            public void onAnimationCancel(@NonNull Animator animator) {
-
-            }
-
-            @Override
-            public void onAnimationRepeat(@NonNull Animator animator) {
-
-            }
-        });
-
         coverTarget = new Target() {
             @Override
             public void onBitmapFailed(Exception e, Drawable errorDrawable) {
@@ -152,18 +120,8 @@ public class ImageFullScreenActivity extends AppCompatActivity {
                     .into(coverTarget);
         }
 
-        binding.image.setOnClickListener(view -> {
-            if (actionBar != null) {
-                if (actionBar.isShowing()) {
-                    binding.appBar.animate().alpha(0f).setDuration(340).start();
-                    setStatusBarHidden(true);
-                } else {
-                    actionBar.show();
-                    binding.appBar.animate().alpha(1f).setDuration(300).start();
-                    setStatusBarHidden(false);
-                }
-            }
-        });
+        // a single tap (PhotoView's confirmed one, never part of a double tap or a pinch) closes the cover
+        binding.image.setOnClickListener(view -> supportFinishAfterTransition());
 
 
     }
