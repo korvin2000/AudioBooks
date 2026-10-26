@@ -56,7 +56,8 @@ public class BooksOtherAdapter extends RecyclerView.Adapter<BooksOtherAdapter.Vi
         if (mask != null) {
             viewHolder.mImageView.setImageDrawable(mask);
         } else if (DefaultCover.replaces(book.getPhoto())) {
-            viewHolder.mImageView.setImageResource(R.drawable.default_cover);
+            viewHolder.mImageView.setImageDrawable(
+                    DefaultCover.drawable(viewHolder.mImageView.getContext(), book.getUrl()));
         } else if (book.getPhoto() != null && !book.getPhoto().isEmpty()) {
             Picasso.get().load(book.getPhoto())
                     .placeholder(android.R.drawable.ic_menu_gallery)

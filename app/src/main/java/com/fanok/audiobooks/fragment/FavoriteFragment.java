@@ -459,7 +459,7 @@ public class FavoriteFragment extends MvpAppCompatFragment implements FavoriteVi
         if (mask != null) {
             imageView.setImageDrawable(mask);
         } else if (DefaultCover.replaces(book.getPhoto())) {
-            imageView.setImageResource(R.drawable.default_cover);
+            imageView.setImageDrawable(DefaultCover.drawable(imageView.getContext(), book.getUrl()));
         } else {
             Picasso.get()
                     .load(book.getPhoto())

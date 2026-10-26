@@ -402,7 +402,7 @@ public class SearchbalePresenter extends MvpPresenter<SearchableView> implements
 
         ImageView imageView = layout.findViewById(R.id.imageView);
         if (DefaultCover.replaces(bookPOJO.getPhoto())) {
-            imageView.setImageResource(R.drawable.default_cover);
+            imageView.setImageDrawable(DefaultCover.drawable(imageView.getContext(), bookPOJO.getUrl()));
         } else {
             Picasso.get()
                     .load(bookPOJO.getPhoto())

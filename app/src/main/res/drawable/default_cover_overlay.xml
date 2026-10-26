@@ -1,27 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Neutral book cover for books whose own cover cannot be loaded. 2:3 like the big list's 100x150dp slot
-     (the list's 80x115dp is close to it); a vector, so the full-screen view stays sharp. -->
+<!-- Spine, frame and emblem of the default cover for books whose own cover cannot be loaded; DefaultCover lays
+     them over one of its muted gradients. 2:3 like the big list's 100x150dp slot (the list's 80x115dp is close
+     to it); a vector, so the full-screen view stays sharp. -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:aapt="http://schemas.android.com/aapt"
     android:width="100dp"
     android:height="150dp"
     android:viewportWidth="200"
     android:viewportHeight="300">
-
-    <!-- cover -->
-    <path android:pathData="M0,0h200v300h-200z">
-        <aapt:attr name="android:fillColor">
-            <gradient
-                android:type="linear"
-                android:startX="0"
-                android:startY="0"
-                android:endX="200"
-                android:endY="300"
-                android:startColor="#FF5E6E83"
-                android:centerColor="#FF414E61"
-                android:endColor="#FF283140" />
-        </aapt:attr>
-    </path>
 
     <!-- spine -->
     <path

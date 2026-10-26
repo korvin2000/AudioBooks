@@ -1,5 +1,6 @@
 package com.fanok.audiobooks.policy;
 
+import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
@@ -22,5 +23,22 @@ public class DefaultCoverTest {
         assertFalse(DefaultCover.replaces("/storage/emulated/0/AudioBooks/cover.jpg"));
         assertFalse(DefaultCover.replaces(""));
         assertFalse(DefaultCover.replaces(null));
+    }
+
+    @Test
+    public void newBooksTakeTheNextPaletteInTurn() {
+        int first = DefaultCover.paletteOf("https://audioboo.org/turn/1.html");
+        for (int i = 1; i < 10; i++) {
+            assertEquals((first + i) % 8, DefaultCover.paletteOf("https://audioboo.org/turn/" + (i + 1) + ".html"));
+        }
+    }
+
+    @Test
+    public void aBookKeepsItsPalette() {
+        int palette = DefaultCover.paletteOf("https://audioboo.org/keep/1.html");
+        DefaultCover.paletteOf("https://audioboo.org/keep/2.html");
+        assertEquals(palette, DefaultCover.paletteOf("https://audioboo.org/keep/1.html"));
+        // the same book under the host it had before
+        assertEquals(palette, DefaultCover.paletteOf("https://audioboo.ru/keep/1.html"));
     }
 }

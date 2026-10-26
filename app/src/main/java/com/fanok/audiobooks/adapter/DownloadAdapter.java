@@ -196,7 +196,8 @@ public class DownloadAdapter extends RecyclerView.Adapter<DownloadAdapter.ViewHo
                 try {
                     if (DefaultCover.replaces(fileIcon)) {
                         Picasso.get().cancelRequest(binding.imageFileType);
-                        binding.imageFileType.setImageResource(R.drawable.default_cover);
+                        binding.imageFileType.setImageDrawable(
+                                DefaultCover.drawable(binding.imageFileType.getContext(), item.getBookUrl()));
                     } else if (fileIcon.startsWith("content://")) {
                         Picasso.get()
                                 .load(android.net.Uri.parse(fileIcon))

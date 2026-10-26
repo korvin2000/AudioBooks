@@ -35,11 +35,13 @@ public class ImageFullScreenActivity extends AppCompatActivity {
     /** Picasso keeps targets weakly: held here so the load cannot be collected before delivery (UI-19). */
     private Target coverTarget;
 
+    /** {@code coverKey}: the book whose default cover shows when {@code image} cannot be loaded. */
     public static void start(@NotNull Activity activity, @NotNull String image, String title,
-            View anim) {
+            View anim, String coverKey) {
         Intent intent = new Intent(activity, ImageFullScreenActivity.class);
         intent.putExtra("image", image);
         intent.putExtra("title", title);
+        intent.putExtra("coverKey", coverKey);
         if (anim != null) {
             ActivityOptions options = ActivityOptions
                     .makeSceneTransitionAnimation(activity, anim, "robot");
@@ -140,7 +142,8 @@ public class ImageFullScreenActivity extends AppCompatActivity {
             }
         };
         if (DefaultCover.replaces(imageUrl)) {
-            binding.image.setImageResource(R.drawable.default_cover);
+            String coverKey = intent.getStringExtra("coverKey");
+            binding.image.setImageDrawable(DefaultCover.drawable(this, coverKey != null ? coverKey : imageUrl));
         } else {
             Picasso.get()
                     .load(imageUrl)

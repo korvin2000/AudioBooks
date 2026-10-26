@@ -340,7 +340,7 @@ public class BooksPresenter extends MvpPresenter<BooksView> implements
             imageView.setImageDrawable(mask);
         } else if (DefaultCover.replaces(books.get(position).getPhoto())) {
             ImageView imageView = layout.findViewById(R.id.imageView);
-            imageView.setImageResource(R.drawable.default_cover);
+            imageView.setImageDrawable(DefaultCover.drawable(imageView.getContext(), books.get(position).getUrl()));
         } else if (books.get(position).getPhoto() != null) {
             ImageView imageView = layout.findViewById(R.id.imageView);
             Picasso.get()
