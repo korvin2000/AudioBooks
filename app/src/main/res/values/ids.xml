@@ -4,4 +4,6 @@
     <item name="filter_duration" type="id" />
     <item name="filter_period_group" type="id" />
     <item name="source_group" type="id" />
+    <!-- the order item's submenu on a genre list, filled in BooksFragment -->
+    <item name="genre_sort_group" type="id" />
 </resources>

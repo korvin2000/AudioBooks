@@ -61,6 +61,7 @@ import com.fanok.audiobooks.pojo.BookPOJO;
 import com.fanok.audiobooks.pojo.GenrePOJO;
 import com.fanok.audiobooks.policy.ParentalControl;
 import com.fanok.audiobooks.presenter.BooksPresenter;
+import com.fanok.audiobooks.search.GenreSort;
 import com.fanok.audiobooks.search.ListingFilters;
 import com.fanok.audiobooks.search.ListingFilters.Duration;
 import com.fanok.audiobooks.search.Provider;
@@ -258,7 +259,9 @@ public class BooksFragment extends MvpAppCompatFragment implements BooksView {
                         (mUrl.matches(Pattern.quote(Url.SERVER_KNIGOBLUD) + "/[0-9a-f-]{36}.*")
                                 && ListingFilters.genreOf(Provider.KNIGOBLUD, mUrl,
                                 GenreModel.KNIGOBLUD_GENRE_URLS) == null);
-                if (modelID != Consts.MODEL_BOOKS || noSort) {
+                if (modelID == Consts.MODEL_GENRE) {
+                    fillGenreSortMenu(menu);
+                } else if (modelID != Consts.MODEL_BOOKS || noSort) {
                     MenuItem orderItem = menu.findItem(R.id.order);
                     if (orderItem != null) orderItem.setVisible(false);
                 } else {
@@ -303,11 +306,18 @@ public class BooksFragment extends MvpAppCompatFragment implements BooksView {
                     collections.setVisible(ListingFilters.genreOf(Provider.AKNIGA, mUrl, null) == null);
                 }
                 prepareFilterMenu(menu);
+                MenuItem genreSort = menu.findItem(GENRE_SORT_ITEM_BASE + getPresenter().getGenreSort().ordinal());
+                if (genreSort != null) {
+                    genreSort.setChecked(true);
+                }
                             }
 
                             @Override
                             public boolean onMenuItemSelected(@NonNull MenuItem item) {
-                if (!onFilterItemSelected(item)) {
+                if (item.getGroupId() == R.id.genre_sort_group) {
+                    item.setChecked(true);
+                    getPresenter().onGenreSortSelected(GenreSort.values()[item.getItemId() - GENRE_SORT_ITEM_BASE]);
+                } else if (!onFilterItemSelected(item)) {
                     getPresenter().onOptionItemSelected(item.getItemId());
                 }
                 return true;
@@ -662,6 +672,25 @@ public class BooksFragment extends MvpAppCompatFragment implements BooksView {
             sub.add(R.id.source_group, SOURCE_ITEM_BASE + provider.sourceId, Menu.NONE, provider.title);
         }
         sub.setGroupCheckable(R.id.source_group, true, true);
+    }
+
+    /** Item ids of the genre list's sort submenu: {@code GENRE_SORT_ITEM_BASE + GenreSort.ordinal()}. */
+    private static final int GENRE_SORT_ITEM_BASE = Menu.FIRST + 200;
+
+    /** On a genre list the "order" item sorts the loaded genres locally: its site sorts give way to {@link GenreSort}. */
+    private void fillGenreSortMenu(@NonNull Menu menu) {
+        MenuItem order = menu.findItem(R.id.order);
+        SubMenu sub = order == null ? null : order.getSubMenu();
+        if (sub == null) {
+            return;
+        }
+        sub.clear();
+        for (GenreSort sort : GenreSort.values()) {
+            sub.add(R.id.genre_sort_group, GENRE_SORT_ITEM_BASE + sort.ordinal(), Menu.NONE, sort.title);
+        }
+        sub.setGroupCheckable(R.id.genre_sort_group, true, true);
+        order.setVisible(true);
+        setColorPrimeriTextInIconItemMenu(order, requireContext());
     }
 
     /** The filter item and its submenu items; false for any other item. */
