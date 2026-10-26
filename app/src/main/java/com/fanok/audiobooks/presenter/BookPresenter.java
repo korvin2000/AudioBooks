@@ -111,6 +111,9 @@ public class BookPresenter extends MvpPresenter<Activity> implements ActivityPre
 
     private static float speed = 1;
 
+    /** The open speed dialog, or null; it belongs to the current screen and goes with it. */
+    private AlertDialog mSpeedDialog;
+
     private boolean mIsOfflineFallback = false;
 
     private Throwable mLastError = null;
@@ -373,6 +376,7 @@ public class BookPresenter extends MvpPresenter<Activity> implements ActivityPre
         final int step = 10;
         final float initial = speed;
         final boolean[] confirmed = {false};
+        dismissSpeedDialog();
 
         final AlertDialog.Builder popDialog = new AlertDialog.Builder(view.getContext());
         final LinearLayout linearLayout = new LinearLayout(view.getContext());
@@ -426,13 +430,20 @@ public class BookPresenter extends MvpPresenter<Activity> implements ActivityPre
                 });
         popDialog.setNegativeButton(R.string.cancel, null);
         popDialog.setOnDismissListener(dialog -> {
+            mSpeedDialog = null;
             if (!confirmed[0]) {
                 playAtSpeed(initial);
             }
         });
 
-        popDialog.create();
-        popDialog.show();
+        mSpeedDialog = popDialog.show();
+    }
+
+    /** Closes the speed dialog as a cancel would (the screen is going): an unconfirmed speed is not kept playing. */
+    public void dismissSpeedDialog() {
+        if (mSpeedDialog != null) {
+            mSpeedDialog.dismiss();
+        }
     }
 
 

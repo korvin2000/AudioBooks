@@ -871,6 +871,10 @@ public class BookActivity extends MvpAppCompatActivity implements Activity {
     @UnstableApi
     @Override
     public void stateExpanded() {
+        if (mButtonCollapse != null) {
+            mButtonCollapse.setRotation(0);
+            mButtonCollapse.setContentDescription(getString(R.string.collapse));
+        }
         if (mTopButtonsControls != null && mTopButtonsControls.getVisibility() != View.GONE) {
             mTopButtonsControls.setVisibility(View.GONE);
         }
@@ -996,6 +1000,7 @@ public class BookActivity extends MvpAppCompatActivity implements Activity {
         unregisterReceiver(showRating);
         unregisterReceiver(updateAdapter);
         unregisterReceiver(showEqualizer);
+        mPresenter.dismissSpeedDialog();
         mPresenter.onStop();
         super.onStop();
     }
@@ -1010,6 +1015,9 @@ public class BookActivity extends MvpAppCompatActivity implements Activity {
     protected void onDestroy() {
         showingView = "";
         comentsCount.dispose();
+        if (isFinishing()) {
+            com.fanok.audiobooks.model.ComentsModel.cancel(mBookPOJO.getUrl());
+        }
         //Moxy destroys the presenter (and its player binding) when this screen is finished for good
         super.onDestroy();
     }
@@ -1516,7 +1524,8 @@ public class BookActivity extends MvpAppCompatActivity implements Activity {
      * Holding a rewind/forward button (touch, or the D-pad centre) seeks again and again, by steps that grow the
      * longer it is held; a tap stays the ordinary click. The collapsed player's buttons do it only in seek mode.
      */
-    private final class SeekHold implements View.OnLongClickListener, Runnable {
+    private final class SeekHold implements View.OnLongClickListener, View.OnTouchListener, View.OnKeyListener,
+            Runnable {
 
         private final View mButton;
 
@@ -1531,6 +1540,27 @@ public class BookActivity extends MvpAppCompatActivity implements Activity {
             mForward = forward;
             mTop = top;
             button.setOnLongClickListener(this);
+            button.setOnTouchListener(this);
+            button.setOnKeyListener(this);
+        }
+
+        /** A release ends the hold at once: a quick next press must not inherit its long steps. */
+        @SuppressLint("ClickableViewAccessibility")
+        @Override
+        public boolean onTouch(View v, MotionEvent event) {
+            int action = event.getActionMasked();
+            if (action == MotionEvent.ACTION_UP || action == MotionEvent.ACTION_CANCEL) {
+                mButton.removeCallbacks(this);
+            }
+            return false;
+        }
+
+        @Override
+        public boolean onKey(View v, int keyCode, KeyEvent event) {
+            if (event.getAction() == KeyEvent.ACTION_UP) {
+                mButton.removeCallbacks(this);
+            }
+            return false;
         }
 
         @Override
@@ -1590,6 +1620,7 @@ public class BookActivity extends MvpAppCompatActivity implements Activity {
         }
         showingView = mBookPOJO.getUrl();
         bindTopSideButtons();
+        invalidateOptionsMenu(); //the toolbar settings may have changed meanwhile
         View decorView = getWindow().getDecorView();
         int uiOptions = View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN;
         decorView.setSystemUiVisibility(uiOptions);

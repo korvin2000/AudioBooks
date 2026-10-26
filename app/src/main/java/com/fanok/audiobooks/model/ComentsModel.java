@@ -14,7 +14,9 @@ import com.fanok.audiobooks.source.SourceParser;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonParser;
 import io.reactivex.Observable;
+import io.reactivex.disposables.Disposable;
 import io.reactivex.functions.BooleanSupplier;
+import io.reactivex.observables.ConnectableObservable;
 import io.reactivex.schedulers.Schedulers;
 import java.io.IOException;
 import java.net.URI;
@@ -77,6 +79,9 @@ public class ComentsModel implements
 
     private static Observable<ArrayList<ComentsPOJO>> sShared;
 
+    /** The running fetch of {@link #sShared}, so leaving the book can stop its paging. */
+    private static Disposable sConnection;
+
     /**
      * The comments of the book screen opened last, fetched once and shared by its tab title (the count) and its
      * list. {@code fresh} starts a new fetch (the book opened anew); otherwise one of the same book is reused.
@@ -84,9 +89,22 @@ public class ComentsModel implements
     public static synchronized Observable<ArrayList<ComentsPOJO>> shared(@NonNull String url, boolean fresh) {
         if (fresh || sShared == null || !url.equals(sSharedUrl)) {
             sSharedUrl = url;
-            sShared = new ComentsModel().getComents(url).subscribeOn(Schedulers.io()).cache();
+            ConnectableObservable<ArrayList<ComentsPOJO>> shared =
+                    new ComentsModel().getComents(url).subscribeOn(Schedulers.io()).replay();
+            sConnection = shared.connect();
+            sShared = shared;
         }
         return sShared;
+    }
+
+    /** The book screen of {@code url} is closed for good: its comments fetch, if still the shared one, stops. */
+    public static synchronized void cancel(@NonNull String url) {
+        if (url.equals(sSharedUrl) && sConnection != null) {
+            sConnection.dispose();
+            sConnection = null;
+            sShared = null;
+            sSharedUrl = null;
+        }
     }
 
     @Override
