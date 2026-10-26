@@ -35,7 +35,8 @@ import java.util.regex.Pattern;
  * <li>best (rating, no period): {@code /best-books?p=N}, {@code /genres/<slug>/best?p=N}.</li>
  * <li>search {@code /?q=Q&p=N} (books only); {@code /authors/<slug>}, {@code /readers/<slug>}, {@code /series/<id>},
  * {@code /years/YYYY}, all paged with {@code ?p=N}; all authors {@code /authors?p=N}, all readers
- * {@code /readers?p=N} (10 {@code .author-item} rows a page).</li>
+ * {@code /readers?p=N} (10 {@code .author-item} rows a page, too few to scroll: {@link #PEOPLE_PAGES} of them make
+ * one page of the app's list).</li>
  * <li>book {@code /books/<id>}: tracks are the JSON of its {@code createPlayer("…/playlist.txt?t=…")}, whose
  * {@code file} is "{@code /files/<fid>?h=… or /files/<fid>?d=1&h=…}"; the {@code d=1} one redirects to an mp3
  * that serves ranges ({@code h} is the file's hash and does not expire). A book the site sells through litres
@@ -57,6 +58,9 @@ public final class Uknig implements SourceParser {
 
     /** Bound of the pages read for a book's series tab. */
     static final int MAX_SERIES_PAGES = 10;
+    /** Site pages of {@code /authors} or {@code /readers} per page of the list: one short of a screen never scrolls on. */
+    static final int PEOPLE_PAGES = 5;
+    private static final Pattern PEOPLE = Pattern.compile("^(https?://[^/]+/(?:authors|readers))(?:\\?p=\\d+)?$");
     private static final Pattern GENRE = Pattern.compile("^https?://[^/]+/genres/[^/?#]+");
     /** Listings of one author, reader, series or year: nothing to re-sort. */
     private static final Pattern UNSORTED = Pattern.compile("^https?://[^/]+/(authors|readers|series|years)/");
@@ -69,12 +73,23 @@ public final class Uknig implements SourceParser {
         return parseListing(page);
     }
 
-    /** Page 1 is the listing itself, or {@code ?p=1} for a URL that ends in {@code p=}. */
+    /**
+     * Page 1 is the listing itself, or {@code ?p=1} for a URL that ends in {@code p=}. Page N of the authors or readers
+     * is the first of its {@link #PEOPLE_PAGES} site pages ({@link #people} reads the others).
+     */
     @Override
     public String pageUrl(String url, int page) {
         if (url.endsWith("p=")) {
             return url + page;
         }
+        Matcher people = PEOPLE.matcher(url);
+        if (people.matches()) {
+            return sitePage(people.group(1), (page - 1) * PEOPLE_PAGES + 1);
+        }
+        return sitePage(url, page);
+    }
+
+    private static String sitePage(String url, int page) {
         if (page <= 1) {
             return url;
         }
@@ -141,9 +156,22 @@ public final class Uknig implements SourceParser {
         return ProviderPage.of(parseGenres(page), false);
     }
 
+    /** {@code page} is the first site page of the list's page {@code pageNo}; the rest of its site pages are read here. */
     @Override
-    public ProviderPage<GenrePOJO> people(Document page, String url, int pageNo, boolean performers) {
-        return parsePeople(page);
+    public ProviderPage<GenrePOJO> people(Document page, String url, int pageNo, boolean performers)
+            throws IOException {
+        ProviderPage<GenrePOJO> result = parsePeople(page);
+        Matcher index = PEOPLE.matcher(url);
+        if (!index.matches()) {
+            return result;
+        }
+        ArrayList<GenrePOJO> people = new ArrayList<>(result.items);
+        int first = (pageNo - 1) * PEOPLE_PAGES + 1;
+        for (int no = first + 1; no < first + PEOPLE_PAGES && result.hasMore; no++) {
+            result = parsePeople(fetch(sitePage(index.group(1), no)));
+            people.addAll(result.items);
+        }
+        return ProviderPage.of(people, result.hasMore);
     }
 
     @Override
@@ -255,7 +283,7 @@ public final class Uknig implements SourceParser {
         return book;
     }
 
-    /** The {@code /genres} page: name, listing URL ending in {@code ?p=}, and the book count as description. */
+    /** The {@code /genres} page: name, listing URL ending in {@code ?p=}, and the book count (also as description). */
     public static ArrayList<GenrePOJO> parseGenres(Document doc) {
         ArrayList<GenrePOJO> genres = new ArrayList<>();
         for (Element row : doc.select("div.genre")) {
@@ -264,7 +292,12 @@ public final class Uknig implements SourceParser {
                 continue;
             }
             GenrePOJO genre = new GenrePOJO(a.text().trim(), a.absUrl("href") + "?p=");
-            genre.setDescription(text(row, ".books-count"));
+            String count = text(row, ".books-count");
+            genre.setDescription(count);
+            String books = count.replaceAll("\\D", ""); // "4738 аудиокниг"
+            if (!books.isEmpty() && books.length() < 10) {
+                genre.setReting(Integer.parseInt(books));
+            }
             genres.add(genre);
         }
         return genres;

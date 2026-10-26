@@ -23,6 +23,7 @@ public class GenreModelTest {
         assertEquals("Альтернативная история", first.getName());
         assertEquals("https://audioboo.org/altist/", first.getUrl());
         assertEquals("953", first.getDescription());
+        assertEquals("the genre list sorts by it", 953, first.getReting());
         boolean mystic = false;
         for (GenrePOJO genre : page.items) {
             assertTrue(genre.getUrl(), Url.isHost(genre.getUrl(), Url.SERVER_AUDIOBOO));
@@ -36,21 +37,36 @@ public class GenreModelTest {
     }
 
     @Test
-    public void audiobooAuthorsAndReadersAreThoseOfTheListingCards() throws IOException {
-        org.jsoup.nodes.Document index = fixture("audioboo/listing-index-p1.html", Url.SERVER_AUDIOBOO + "/");
-        ProviderPage<GenrePOJO> authors = AutorsModel.parseAudiobooPeople(index, false, 1);
-        ProviderPage<GenrePOJO> readers = AutorsModel.parseAudiobooPeople(index, true, 1);
-        assertTrue(authors.items.size() > 10);
-        assertTrue(readers.items.size() > 10);
-        assertTrue(authors.hasMore);
-        java.util.Set<String> names = new java.util.HashSet<>();
-        for (GenrePOJO author : authors.items) {
-            assertTrue(author.getName(), names.add(author.getName()));
-            assertTrue(author.getUrl(), author.getUrl().startsWith(Url.SERVER_AUDIOBOO + "/xfsearch/avtora/"));
-        }
-        for (GenrePOJO reader : readers.items) {
-            assertTrue(reader.getUrl(), reader.getUrl().startsWith(Url.SERVER_AUDIOBOO + "/tags/"));
-        }
+    public void audiobooAuthorsComeFromTheLetterIndexAndReadersFromTheTagCloud() throws IOException {
+        // every listing page links the letters of the authors' index
+        assertEquals(29, fixture("audioboo/listing-index-p1.html", Url.SERVER_AUDIOBOO + "/")
+                .select("a.alfavit[href]").size());
+        // the shapes of /a30-aa.html and /tags/, cut down
+        java.util.List<GenrePOJO> authors = AutorsModel.parseAudiobooAuthors(org.jsoup.Jsoup.parse(
+                "<div id=\"dle-content\"><h1>Все авторы на букву А</h1><table>"
+                + "<tr><td><span class=\"fas fa-user\"></span>&ensp;Автор:&ensp;<a href='/xfsearch/avtora/А Фонд'>А Фонд</a>"
+                + "</td><td><span class=\"fas fa-book\"></span>&ensp;Кол-во книг в базе:&ensp;"
+                + "<a href='/xfsearch/А Фонд'>5</a></td></tr>"
+                + "<tr><td>&ensp;Автор:&ensp;<a href='/xfsearch/avtora/Абдуллаев Чингиз'>Абдуллаев Чингиз</a></td>"
+                + "<td>&ensp;Кол-во книг в базе:&ensp;<a href='/xfsearch/Абдуллаев Чингиз'>117</a></td></tr>"
+                + "</table></div>", Url.SERVER_AUDIOBOO + "/a30-aa.html"));
+        assertEquals(2, authors.size());
+        assertEquals("А Фонд", authors.get(0).getName());
+        assertEquals("as a card links it", Url.SERVER_AUDIOBOO + "/xfsearch/avtora/%D0%90%20%D0%A4%D0%BE%D0%BD%D0%B4/",
+                authors.get(0).getUrl());
+        assertEquals(5, authors.get(0).getReting());
+        assertEquals(117, authors.get(1).getReting());
+        ProviderPage<GenrePOJO> readers = AutorsModel.parseAudiobooReaders(org.jsoup.Jsoup.parse(
+                "<div class=\"clearfix cloud-tags\"><h3>A</h3><span class=\"clouds_xsmall\">"
+                + "<a href=\"https://audioboo.org/tags/A.Tim/\" title=\"Найдено публикаций: 12\">A.Tim</a></span>, "
+                + "<span class=\"clouds_medium\"><a href=\"https://audioboo.org/tags/%D0%9A%D0%B8%D0%BC%20%D0%98%D0%B3%D0%BE%D1%80%D1%8C/\""
+                + " title=\"Найдено публикаций: 1530\">Ким Игорь</a></span></div>", Url.SERVER_AUDIOBOO + "/tags/"));
+        assertEquals(2, readers.items.size());
+        assertFalse("one page", readers.hasMore);
+        assertEquals("A.Tim", readers.items.get(0).getName());
+        assertEquals(Url.SERVER_AUDIOBOO + "/tags/A.Tim/", readers.items.get(0).getUrl());
+        assertEquals(12, readers.items.get(0).getReting());
+        assertEquals(1530, readers.items.get(1).getReting());
     }
 
     @Test

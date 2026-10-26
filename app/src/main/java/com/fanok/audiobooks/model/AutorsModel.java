@@ -198,39 +198,52 @@ public class AutorsModel extends GenreModel {
         }), hasMore);
     }
 
+    /**
+     * audioboo's authors: an index page per letter ("Все авторы на букву А"), linked from every listing page, so
+     * page N is the N-th letter. Its readers are its tags (a card's reader links to one), all on the tag cloud.
+     */
     @Override
     protected ProviderPage<GenrePOJO> loadBooksListAudioboo(String url, int page) throws IOException {
-        return parseAudiobooPeople(SiteHttp.get(url), mPerformerMode, page);
+        if (mPerformerMode) {
+            // 17k tags: ~4 MB unpacked (0.3 MB sent), the bound SiteHttp sets for a page
+            return parseAudiobooReaders(SiteHttp.parse(SiteHttp.execute(SiteHttp.connect(
+                    Url.SERVER_AUDIOBOO + "/tags/").maxBodySize(4 * SiteHttp.MAX_BODY_BYTES))));
+        }
+        Elements letters = SiteHttp.get(url).select("a.alfavit[href]");
+        if (page > letters.size()) {
+            return ProviderPage.empty();
+        }
+        Document letter = SiteHttp.get(letters.get(page - 1).absUrl("href"));
+        return ProviderPage.of(parseAudiobooAuthors(letter), page < letters.size());
     }
 
-    /**
-     * audioboo has no index of authors or readers: those of the listing page's cards, once each, linking to their
-     * book listings. The listing's pages are this list's pages.
-     */
-    static ProviderPage<GenrePOJO> parseAudiobooPeople(Document doc, boolean performers, int page) {
-        String marker = performers ? "Исполнитель:" : "Автор:";
-        ArrayList<GenrePOJO> result = new ArrayList<>();
-        ArrayList<String> names = new ArrayList<>();
-        Elements cards = doc.select("article.card");
-        for (Element card : cards) {
-            for (Element li : card.select(".card__list li")) {
-                Element link = li.selectFirst("a[href]");
-                if (link == null || !li.text().contains(marker)) {
-                    continue;
-                }
-                String name = link.text().trim();
-                String href = link.absUrl("href");
-                if (name.isEmpty() || !Url.isHost(href, Url.SERVER_AUDIOBOO) || names.contains(name)) {
-                    continue;
-                }
-                GenrePOJO person = new GenrePOJO();
-                person.setUrl(href);
-                person.setName(name);
-                names.add(name);
-                result.add(person);
+    /** A letter of audioboo's authors' index: a table row per author, with the number of their books. */
+    static ArrayList<GenrePOJO> parseAudiobooAuthors(Document doc) {
+        return rows(doc.select("#dle-content tr"), row -> {
+            Element a = row.selectFirst("a[href*=/xfsearch/avtora/]");
+            // the index links "/xfsearch/avtora/А Фонд": encoded and closed by "/" as the cards link it
+            HttpUrl href = a == null ? null : HttpUrl.parse(a.absUrl("href"));
+            if (href == null) {
+                return null;
             }
-        }
-        int last = BooksModel.lastPage(doc.select(".navigation a, .pagination a"));
-        return ProviderPage.of(result, last > 0 ? last > page : !cards.isEmpty(), cards.size());
+            GenrePOJO author = new GenrePOJO();
+            String link = href.toString();
+            author.setUrl(link.endsWith("/") ? link : link + "/");
+            author.setName(a.text().trim());
+            Elements cells = row.select("td");
+            author.setReting(countOf(cells.last().text()));
+            return author;
+        });
+    }
+
+    /** audioboo's tag cloud: every reader with the number of their books. */
+    static ProviderPage<GenrePOJO> parseAudiobooReaders(Document doc) {
+        return ProviderPage.of(rows(doc.select(".cloud-tags a[href*=/tags/]"), a -> {
+            GenrePOJO reader = new GenrePOJO();
+            reader.setUrl(a.absUrl("href"));
+            reader.setName(a.text().trim());
+            reader.setReting(countOf(a.attr("title"))); // "Найдено публикаций: 12"
+            return reader;
+        }), false);
     }
 }
