@@ -145,7 +145,9 @@ public class BooksListAddapter extends RecyclerView.Adapter<BooksListAddapter.My
             } else {
                 if (book.getPhoto() != null && !book.getPhoto().isEmpty()) {
                     String photoPath = book.getPhoto();
-                    if (photoPath.startsWith("content://")) {
+                    if (com.fanok.audiobooks.policy.DefaultCover.replaces(photoPath)) {
+                        Glide.with(mImageView).load(R.drawable.default_cover).into(mImageView);
+                    } else if (photoPath.startsWith("content://")) {
                         Glide.with(mImageView).load(android.net.Uri.parse(photoPath)).into(mImageView);
                     } else if (photoPath.startsWith("/") || photoPath.contains(":\\")) {
                         Glide.with(mImageView).load(new java.io.File(photoPath)).into(mImageView);

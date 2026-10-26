@@ -34,6 +34,7 @@ import com.fanok.audiobooks.adapter.ExpandableText;
 import com.fanok.audiobooks.interface_pacatge.book_content.Description;
 import com.fanok.audiobooks.pojo.BookPOJO;
 import com.fanok.audiobooks.pojo.DescriptionPOJO;
+import com.fanok.audiobooks.policy.DefaultCover;
 import com.fanok.audiobooks.presenter.BookDescriptionPresenter;
 import com.google.gson.Gson;
 import com.squareup.picasso.Picasso;
@@ -237,7 +238,10 @@ public class DescriptionBookFragment extends MvpAppCompatFragment implements Des
                 poster = localCover;
             }
             if (poster != null && !poster.trim().isEmpty()) {
-                if (poster.startsWith("content://")) {
+                if (DefaultCover.replaces(poster)) {
+                    Picasso.get().cancelRequest(mImageView);
+                    mImageView.setImageResource(R.drawable.default_cover);
+                } else if (poster.startsWith("content://")) {
                     Picasso.get()
                             .load(android.net.Uri.parse(poster))
                             .placeholder(android.R.drawable.ic_menu_gallery)

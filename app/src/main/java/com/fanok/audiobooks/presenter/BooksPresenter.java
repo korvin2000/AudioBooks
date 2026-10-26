@@ -29,6 +29,7 @@ import com.fanok.audiobooks.model.BooksModel;
 import com.fanok.audiobooks.model.GenreModel;
 import com.fanok.audiobooks.pojo.BookPOJO;
 import com.fanok.audiobooks.pojo.GenrePOJO;
+import com.fanok.audiobooks.policy.DefaultCover;
 import com.fanok.audiobooks.policy.ParentalControl;
 import com.fanok.audiobooks.search.ListingCursor;
 import com.fanok.audiobooks.search.ListingFilters;
@@ -337,6 +338,9 @@ public class BooksPresenter extends MvpPresenter<BooksView> implements
         if (mask != null) {
             ImageView imageView = layout.findViewById(R.id.imageView);
             imageView.setImageDrawable(mask);
+        } else if (DefaultCover.replaces(books.get(position).getPhoto())) {
+            ImageView imageView = layout.findViewById(R.id.imageView);
+            imageView.setImageResource(R.drawable.default_cover);
         } else if (books.get(position).getPhoto() != null) {
             ImageView imageView = layout.findViewById(R.id.imageView);
             Picasso.get()

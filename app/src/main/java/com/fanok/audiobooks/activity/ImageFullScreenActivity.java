@@ -21,6 +21,7 @@ import androidx.core.view.WindowInsetsControllerCompat;
 import androidx.palette.graphics.Palette;
 import com.fanok.audiobooks.R;
 import com.fanok.audiobooks.databinding.ActivityImageFullScrinBinding;
+import com.fanok.audiobooks.policy.DefaultCover;
 import com.squareup.picasso.Picasso;
 import com.squareup.picasso.Target;
 import org.jetbrains.annotations.NotNull;
@@ -138,11 +139,15 @@ public class ImageFullScreenActivity extends AppCompatActivity {
                 binding.image.setImageDrawable(placeHolderDrawable);
             }
         };
-        Picasso.get()
-                .load(imageUrl)
-                .error(android.R.drawable.ic_menu_gallery)
-                .placeholder(android.R.drawable.ic_menu_gallery)
-                .into(coverTarget);
+        if (DefaultCover.replaces(imageUrl)) {
+            binding.image.setImageResource(R.drawable.default_cover);
+        } else {
+            Picasso.get()
+                    .load(imageUrl)
+                    .error(android.R.drawable.ic_menu_gallery)
+                    .placeholder(android.R.drawable.ic_menu_gallery)
+                    .into(coverTarget);
+        }
 
         binding.image.setOnClickListener(view -> {
             if (actionBar != null) {

@@ -19,6 +19,7 @@ import androidx.recyclerview.widget.RecyclerView;
 import com.fanok.audiobooks.R;
 import com.fanok.audiobooks.activity.LoadBook;
 import com.fanok.audiobooks.pojo.BookPOJO;
+import com.fanok.audiobooks.policy.DefaultCover;
 import com.fanok.audiobooks.policy.ParentalControl;
 import com.squareup.picasso.Picasso;
 import java.util.ArrayList;
@@ -54,6 +55,8 @@ public class BooksOtherAdapter extends RecyclerView.Adapter<BooksOtherAdapter.Vi
         Drawable mask = ParentalControl.coverMask(viewHolder.mImageView.getContext(), book);
         if (mask != null) {
             viewHolder.mImageView.setImageDrawable(mask);
+        } else if (DefaultCover.replaces(book.getPhoto())) {
+            viewHolder.mImageView.setImageResource(R.drawable.default_cover);
         } else if (book.getPhoto() != null && !book.getPhoto().isEmpty()) {
             Picasso.get().load(book.getPhoto())
                     .placeholder(android.R.drawable.ic_menu_gallery)
