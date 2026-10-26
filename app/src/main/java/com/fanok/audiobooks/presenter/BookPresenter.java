@@ -501,13 +501,6 @@ public class BookPresenter extends MvpPresenter<Activity> implements ActivityPre
         getViewState().broadcastSend(broadcastIntent);
     }
 
-    /** A rewind or forward of any length, as holding the button makes it. */
-    public void seekBy(long deltaMs) {
-        Intent broadcastIntent = new Intent(deltaMs < 0 ? Broadcast_SEEK_PREVIOUS_10 : Broadcast_SEEK_NEXT_30);
-        broadcastIntent.putExtra("ms", Math.abs(deltaMs));
-        getViewState().broadcastSend(broadcastIntent);
-    }
-
     @Override
     public void seekChange(int progress) {
         Intent broadcastIntent = new Intent(Broadcast_SEEK_TO);

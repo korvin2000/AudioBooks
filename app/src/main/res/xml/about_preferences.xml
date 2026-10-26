@@ -123,7 +123,6 @@
     <Preference
         android:icon="@drawable/ic_write"
         android:key="write_autor"
-        android:summary="@string/feedback_email"
         android:title="@string/write_autor" />
 
     <Preference
@@ -140,6 +139,7 @@
         app:isPreferenceVisible="false" />
 
     <Preference
+        android:icon="@drawable/ic_web"
         android:key="open_4pda"
         android:title="@string/open_4pda" />
 

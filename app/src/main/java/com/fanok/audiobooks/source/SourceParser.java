@@ -23,8 +23,8 @@ import java.util.Map;
 /**
  * Everything the app asks a site for; one stateless instance per {@link com.fanok.audiobooks.search.Provider} row.
  * The models fetch a page through {@link #fetch} and hand the {@link Document} over, so a site's parsing stays in
- * pure static functions that fixtures can test; only {@link #tracks}, {@link #series}, {@link #comments} and
- * {@link #otherReaders} may fetch more themselves. A default means "the site has no such feature".
+ * pure static functions that fixtures can test; only {@link #tracks}, {@link #series}, {@link #comments},
+ * {@link #otherReaders} and {@link #people} may fetch more themselves. A default means "the site has no such feature".
  */
 public interface SourceParser {
 
@@ -81,8 +81,12 @@ public interface SourceParser {
     /** The genre list at {@code url} ({@code Provider.sections}). */
     ProviderPage<GenrePOJO> genres(Document page, String url, int pageNo);
 
-    /** One page of the authors or readers list ({@code Provider.authors} / {@code performers}). */
-    default ProviderPage<GenrePOJO> people(Document page, String url, int pageNo, boolean performers) {
+    /**
+     * One page of the authors or readers list ({@code Provider.authors} / {@code performers}); may read further site
+     * pages into it when one site page holds too few rows for the list to scroll on.
+     */
+    default ProviderPage<GenrePOJO> people(Document page, String url, int pageNo, boolean performers)
+            throws IOException {
         return ProviderPage.empty();
     }
 

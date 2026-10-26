@@ -218,7 +218,13 @@ public class GenreModel implements com.fanok.audiobooks.interface_pacatge.books.
         return parseAudiobooGenres(SiteHttp.get(Url.SERVER_AUDIOBOO + "/"));
     }
 
-    /** The genres of the navigation menu, with the site's own URLs and the book count as the description. */
+    /** The number in a count text ("[953]", "Найдено публикаций: 12"); 0 when there is none. */
+    static int countOf(String text) {
+        String digits = text.replaceAll("\\D", "");
+        return digits.isEmpty() || digits.length() > 9 ? 0 : Integer.parseInt(digits);
+    }
+
+    /** The genres of the navigation menu, with the site's own URLs and the book count (also as the description). */
     static ProviderPage<GenrePOJO> parseAudiobooGenres(Document doc) {
         return ProviderPage.of(rows(doc.select("ul.navmenu li > a[href]"), item -> {
             String name = item.ownText().trim();
@@ -232,6 +238,7 @@ public class GenreModel implements com.fanok.audiobooks.interface_pacatge.books.
             Element count = item.selectFirst("span");
             if (count != null) {
                 genrePOJO.setDescription(count.text().replaceAll("[\\[\\]]", "").trim());
+                genrePOJO.setReting(countOf(count.text()));
             }
             return genrePOJO;
         }), false);

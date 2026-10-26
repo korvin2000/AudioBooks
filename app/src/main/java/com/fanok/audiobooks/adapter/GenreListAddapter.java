@@ -94,13 +94,16 @@ public class GenreListAddapter extends RecyclerView.Adapter<GenreListAddapter.My
                 throw new NullPointerException();
             }
             mName.setText(book.getName());
-            if (book.getReting() != 0) {
+            // a count the description already says is not repeated beside it
+            String description = book.getDescription();
+            if (book.getReting() != 0 && (description == null
+                    || !description.replaceAll("\\D", "").equals(String.valueOf(book.getReting())))) {
                 mReting.setText(String.valueOf(book.getReting()));
                 mReting.setVisibility(View.VISIBLE);
             } else {
                 mReting.setVisibility(View.GONE);
             }
-            mDescription.setText(book.getDescription());
+            mDescription.setText(description);
 
         }
     }

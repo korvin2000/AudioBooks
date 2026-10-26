@@ -130,6 +130,7 @@ public class AudioknigaLifeTest {
         assertEquals("Фантастика", genres.get(0).getName());
         assertEquals(S + "/fantastika/", genres.get(0).getUrl());
         assertEquals("1507", genres.get(0).getDescription());
+        assertEquals("the genre list sorts by it", 1507, genres.get(0).getReting());
         boolean subgenre = false;
         for (GenrePOJO genre : genres) {
             assertTrue(genre.getName() + " has an id", PARSER.genreOf(genre.getUrl()).matches("\\d+"));

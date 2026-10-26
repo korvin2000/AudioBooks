@@ -23,10 +23,22 @@ public final class ExpandableText {
      */
     public static void bind(@NonNull TextView text, @NonNull TextView toggle, @Nullable CharSequence content,
                             int maxLines, boolean expanded) {
+        bind(text, toggle, null, content, maxLines, expanded);
+    }
+
+    /**
+     * As above, with {@code companion} in the toggle's row: shown beside "show less" only, the toggle then moves
+     * to the end of the row.
+     */
+    public static void bind(@NonNull TextView text, @NonNull TextView toggle, @Nullable View companion,
+                            @Nullable CharSequence content, int maxLines, boolean expanded) {
         text.setMaxLines(expanded ? Integer.MAX_VALUE : maxLines);
         text.setText(content == null ? "" : content);
         toggle.setText(expanded ? R.string.show_less : R.string.show_more);
-        toggle.setVisibility(expanded ? View.VISIBLE : View.GONE);
+        if (companion != null) {
+            toggle.setTextAlignment(expanded ? View.TEXT_ALIGNMENT_VIEW_END : View.TEXT_ALIGNMENT_CENTER);
+        }
+        showToggle(toggle, companion, expanded, expanded);
         int boundMaxLines = text.getMaxLines();
         text.post(() -> {
             if (text.getMaxLines() != boundMaxLines) {
@@ -36,7 +48,15 @@ public final class ExpandableText {
             Layout layout = text.getLayout();
             boolean overflows = layout != null && (layout.getLineCount() > maxLines
                     || (layout.getLineCount() == maxLines && layout.getEllipsisCount(maxLines - 1) > 0));
-            toggle.setVisibility(overflows ? View.VISIBLE : View.GONE);
+            showToggle(toggle, companion, expanded, overflows);
         });
+    }
+
+    private static void showToggle(@NonNull View toggle, @Nullable View companion, boolean expanded,
+                                   boolean visible) {
+        toggle.setVisibility(visible ? View.VISIBLE : View.GONE);
+        if (companion != null) {
+            companion.setVisibility(visible && expanded ? View.VISIBLE : View.GONE);
+        }
     }
 }

@@ -107,7 +107,11 @@ public class UknigTest {
         assertEquals("https://uknig.com/?p=1", UKNIG.pageUrl(Uknig.INDEX, 1));
         assertEquals("https://uknig.com/?p=3", UKNIG.pageUrl(Uknig.INDEX, 3));
         assertEquals("https://uknig.com/authors/pavel-chuk", UKNIG.pageUrl("https://uknig.com/authors/pavel-chuk", 1));
-        assertEquals("https://uknig.com/authors?p=2", UKNIG.pageUrl(Uknig.AUTHORS, 2));
+        // a page of the authors or readers is PEOPLE_PAGES site pages of 10 rows, the first one fetched for it
+        assertEquals(Uknig.AUTHORS, UKNIG.pageUrl(Uknig.AUTHORS, 1));
+        assertEquals("https://uknig.com/authors?p=6", UKNIG.pageUrl(Uknig.AUTHORS, 2));
+        assertEquals("https://uknig.com/readers?p=11", UKNIG.pageUrl(Uknig.READERS, 3));
+        assertEquals("https://uknig.com/authors/pavel-chuk?p=2", UKNIG.pageUrl("https://uknig.com/authors/pavel-chuk", 2));
         assertEquals("https://uknig.com/?q=%D0%9D%D0%BE%D1%87%D0%BD%D0%BE%D0%B9+%D0%B4%D0%BE%D0%B7%D0%BE%D1%80&p=2",
                 UKNIG.searchUrl(SearchUrls.Category.BOOKS, "Ночной дозор", 2));
         assertNull(UKNIG.searchUrl(SearchUrls.Category.AUTHORS, "Гофман", 1));
@@ -145,8 +149,8 @@ public class UknigTest {
 
     @Test
     public void people() throws IOException {
-        ProviderPage<GenrePOJO> page = UKNIG.people(page("people-authors-p1.html", Uknig.AUTHORS), Uknig.AUTHORS, 1,
-                false);
+        // one site page (UKNIG.people reads PEOPLE_PAGES of them from the network)
+        ProviderPage<GenrePOJO> page = Uknig.parsePeople(page("people-authors-p1.html", Uknig.AUTHORS));
         assertEquals(10, page.items.size());
         assertTrue("2891 pages", page.hasMore);
         assertEquals("Alex.S", page.items.get(0).getName());
@@ -167,6 +171,7 @@ public class UknigTest {
         assertEquals("Для детей", genres.get(0).getName());
         assertEquals("https://uknig.com/genres/dlya-detej?p=", genres.get(0).getUrl());
         assertEquals("4738 аудиокниг", genres.get(0).getDescription());
+        assertEquals("the genre list sorts by it", 4738, genres.get(0).getReting());
         assertEquals("Юмор", genres.get(119).getName());
     }
 

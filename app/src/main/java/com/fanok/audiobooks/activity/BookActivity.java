@@ -26,6 +26,7 @@ import android.graphics.drawable.Icon;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.SystemClock;
 import android.text.Editable;
 import android.text.TextWatcher;
 import android.util.AttributeSet;
@@ -49,6 +50,7 @@ import android.widget.TextView;
 import android.widget.Toast;
 import androidx.activity.OnBackPressedCallback;
 import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 import androidx.annotation.RequiresApi;
 import androidx.appcompat.app.ActionBar;
 import androidx.appcompat.app.AlertDialog;
@@ -134,10 +136,21 @@ public class BookActivity extends MvpAppCompatActivity implements Activity {
     private static final long SWITCH_BOOK_HOLD_MS = 2500;
     private static final String PREF_SEEK_BUTTONS = "seekButtonsPref";
     private static final String PREF_SAFE_NAVIGATION = "safeNavigationPref";
-    /** Holding rewind/forward seeks every interval, by steps that grow every few ticks, as video players do. */
-    private static final long SEEK_HOLD_INTERVAL_MS = 400;
-    private static final int SEEK_HOLD_TICKS_PER_STEP = 6;
-    private static final long[] SEEK_HOLD_STEPS_MS = {30_000, 60_000, 120_000, 300_000};
+    /**
+     * Holding rewind/forward scrubs at {@code START_SPEED} times real time, doubling every {@code DOUBLING_MS} up to
+     * {@code MAX_SPEED}; a chapter of many hours allows up to {@code MAX_SPEED_LONG}, crossing it in about
+     * {@code CROSSING_MS}. The scrub stops {@code END_MARGIN_MS} short of the end, so a release there does not end
+     * the chapter.
+     */
+    private static final double SEEK_HOLD_START_SPEED = 10;
+    private static final double SEEK_HOLD_DOUBLING_MS = 1500;
+    private static final double SEEK_HOLD_MAX_SPEED = 300;
+    private static final double SEEK_HOLD_MAX_SPEED_LONG = 600;
+    private static final double SEEK_HOLD_CROSSING_MS = 20_000;
+    private static final int SEEK_HOLD_END_MARGIN_MS = 1000;
+    /** After a scrub's seek, progress this far from its target and this soon is a tick sent before the seek. */
+    private static final long SEEK_COMMIT_SETTLE_MS = 1000;
+    private static final int SEEK_COMMIT_TOLERANCE_MS = 1500;
     /** Menu items that can be toolbar icons, in toolbar order, and the setting of each; the favourite pair shares one. */
     private static final int[] TOOLBAR_ITEMS = {R.id.addFavorite, R.id.share, R.id.download_delete, R.id.sleep_timer,
             R.id.equalizer, R.id.settings, R.id.openSite, R.id.addMainScreen, R.id.refresh};
@@ -166,6 +179,12 @@ public class BookActivity extends MvpAppCompatActivity implements Activity {
     private ImageButton mNextTop;
     /** The collapsed player's buttons beside play rewind/forward instead of changing chapters ("Кнопки плеера"). */
     private boolean mTopSeek;
+    /** The rewind/forward button being held: it shows its own position meanwhile. */
+    @Nullable
+    private SeekHold mActiveSeekHold;
+    /** The position the last hold sought to, and when. */
+    private int mSeekCommitTarget;
+    private long mSeekCommitAt;
     private TextView mTimeStart;
     private AppCompatSeekBar mSeekBar;
     private TextView mTimeEnd;
@@ -754,7 +773,10 @@ public class BookActivity extends MvpAppCompatActivity implements Activity {
 
                 @Override
                 public void onStartTrackingTouch(SeekBar seekBar) {
-                    // Можно оставить пустым
+                    // the drag wins over a button held meanwhile
+                    if (mActiveSeekHold != null) {
+                        mActiveSeekHold.finish(false);
+                    }
                 }
 
                 @Override
@@ -1297,6 +1319,19 @@ public class BookActivity extends MvpAppCompatActivity implements Activity {
 
     @Override
     public void updateTime(int timeCurent, int timeEnd, int buffered) {
+        // the chapter played to its end under a hold: the position held belongs to the one before
+        if (mActiveSeekHold != null && timeEnd != mSeekBar.getMax()) {
+            mActiveSeekHold.finish(false);
+        }
+        // a hold shows its own position; a tick sent before its seek arrived would jump back for a moment
+        if (mActiveSeekHold != null || (SystemClock.uptimeMillis() - mSeekCommitAt < SEEK_COMMIT_SETTLE_MS
+                && Math.abs(timeCurent - mSeekCommitTarget) > SEEK_COMMIT_TOLERANCE_MS)) {
+            return;
+        }
+        showTime(timeCurent, timeEnd, buffered);
+    }
+
+    private void showTime(int timeCurent, int timeEnd, int buffered) {
         if (mProgressBar != null) {
             mProgressBar.setMax(timeEnd);
             mProgressBar.setProgress(timeCurent);
@@ -1521,8 +1556,9 @@ public class BookActivity extends MvpAppCompatActivity implements Activity {
     }
 
     /**
-     * Holding a rewind/forward button (touch, or the D-pad centre) seeks again and again, by steps that grow the
-     * longer it is held; a tap stays the ordinary click. The collapsed player's buttons do it only in seek mode.
+     * Holding a rewind/forward button (touch, or the D-pad centre) scrubs the shown position, faster and faster
+     * the longer it is held, as hardware players do; the player seeks once, on release, so a stream does not
+     * rebuffer on the way. A tap stays the ordinary click. The collapsed player's buttons do it only in seek mode.
      */
     private final class SeekHold implements View.OnLongClickListener, View.OnTouchListener, View.OnKeyListener,
             Runnable {
@@ -1533,7 +1569,17 @@ public class BookActivity extends MvpAppCompatActivity implements Activity {
 
         private final boolean mTop;
 
-        private int mTicks;
+        /** The position shown (ms) and the top speed of this hold. */
+        private double mPosition;
+
+        private double mMaxSpeed;
+
+        /** The hold's start and its last frame, uptime ms. */
+        private long mStart;
+
+        private long mLast;
+
+        private boolean mAtEdge;
 
         SeekHold(@NonNull View button, boolean forward, boolean top) {
             mButton = button;
@@ -1544,13 +1590,13 @@ public class BookActivity extends MvpAppCompatActivity implements Activity {
             button.setOnKeyListener(this);
         }
 
-        /** A release ends the hold at once: a quick next press must not inherit its long steps. */
+        /** Any end of the press (a cancel too: the sheet took the gesture) seeks to the position the user saw. */
         @SuppressLint("ClickableViewAccessibility")
         @Override
         public boolean onTouch(View v, MotionEvent event) {
             int action = event.getActionMasked();
             if (action == MotionEvent.ACTION_UP || action == MotionEvent.ACTION_CANCEL) {
-                mButton.removeCallbacks(this);
+                finish(true);
             }
             return false;
         }
@@ -1558,32 +1604,72 @@ public class BookActivity extends MvpAppCompatActivity implements Activity {
         @Override
         public boolean onKey(View v, int keyCode, KeyEvent event) {
             if (event.getAction() == KeyEvent.ACTION_UP) {
-                mButton.removeCallbacks(this);
+                finish(true);
             }
             return false;
         }
 
         @Override
         public boolean onLongClick(View v) {
-            if (mTop && !mTopSeek) {
+            int duration = mSeekBar.getMax();
+            //no chapter length known yet: nothing to scrub, a tap still seeks
+            if ((mTop && !mTopSeek) || duration <= SEEK_HOLD_END_MARGIN_MS) {
                 return false;
             }
-            mButton.removeCallbacks(this);
-            mTicks = 0;
-            run();
+            if (mActiveSeekHold != null) {
+                mActiveSeekHold.finish(true);
+            }
+            mActiveSeekHold = this;
+            mPosition = mSeekBar.getProgress();
+            mMaxSpeed = Math.max(SEEK_HOLD_MAX_SPEED,
+                    Math.min(SEEK_HOLD_MAX_SPEED_LONG, duration / SEEK_HOLD_CROSSING_MS));
+            mStart = SystemClock.uptimeMillis();
+            mLast = mStart;
+            mAtEdge = false;
+            mButton.postOnAnimation(this);
             return true;
         }
 
+        /** One frame: the position moves by the speed reached so far, times the time since the last frame. */
         @Override
         public void run() {
-            //released, or the screen left while held: the press is over
-            if (!mButton.isPressed() || !mButton.hasWindowFocus()) {
+            if (mActiveSeekHold != this) {
                 return;
             }
-            long step = SEEK_HOLD_STEPS_MS[Math.min(mTicks++ / SEEK_HOLD_TICKS_PER_STEP,
-                    SEEK_HOLD_STEPS_MS.length - 1)];
-            mPresenter.seekBy(mForward ? step : -step);
-            mButton.postDelayed(this, SEEK_HOLD_INTERVAL_MS);
+            //released, slid off, or the screen left while held: the press is over
+            if (!mButton.isPressed() || !mButton.hasWindowFocus()) {
+                finish(true);
+                return;
+            }
+            long now = SystemClock.uptimeMillis();
+            double speed = Math.min(mMaxSpeed,
+                    SEEK_HOLD_START_SPEED * Math.pow(2, (now - mStart) / SEEK_HOLD_DOUBLING_MS));
+            double next = mPosition + (mForward ? speed : -speed) * (now - mLast);
+            mLast = now;
+            int end = Math.max(0, mSeekBar.getMax() - SEEK_HOLD_END_MARGIN_MS);
+            mPosition = Math.max(0, Math.min(end, next));
+            boolean atEdge = next <= 0 || next >= end;
+            if (atEdge && !mAtEdge) {
+                mButton.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK);
+            }
+            mAtEdge = atEdge;
+            showTime((int) mPosition, mSeekBar.getMax(), mSeekBar.getSecondaryProgress());
+            mButton.postOnAnimation(this);
+        }
+
+        /** Ends the hold: {@code commit} seeks to the position shown, else the player's own position returns. */
+        void finish(boolean commit) {
+            if (mActiveSeekHold != this) {
+                return;
+            }
+            mActiveSeekHold = null;
+            mButton.removeCallbacks(this);
+            if (commit) {
+                mSeekCommitTarget = (int) mPosition;
+                mSeekCommitAt = SystemClock.uptimeMillis();
+                mPresenter.seekChange(mSeekCommitTarget);
+                mButton.announceForAccessibility(mTimeStart.getText());
+            }
         }
     }
 

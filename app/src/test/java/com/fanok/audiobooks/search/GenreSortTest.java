@@ -49,6 +49,22 @@ public class GenreSortTest {
     }
 
     @Test
+    public void aDescriptionThatIsOnlyACountCountsWhenThereIsNoRating() {
+        GenrePOJO books = genre("a", 0);
+        books.setDescription("4 738 аудиокниг");
+        GenrePOJO bracketed = genre("b", 0);
+        bracketed.setDescription("[953]");
+        GenrePOJO text = genre("c", 0);
+        text.setDescription("Книги о войне 1812 года и не только");
+        GenrePOJO rated = genre("d", 5);
+        rated.setDescription("100 книг");
+        assertEquals(4738, GenreSort.count(books));
+        assertEquals(953, GenreSort.count(bracketed));
+        assertEquals(0, GenreSort.count(text));
+        assertEquals(5, GenreSort.count(rated));
+    }
+
+    @Test
     public void anUnknownKeptKeyIsNone() {
         assertEquals(GenreSort.NONE, GenreSort.of(null));
         assertEquals(GenreSort.NONE, GenreSort.of("bogus"));

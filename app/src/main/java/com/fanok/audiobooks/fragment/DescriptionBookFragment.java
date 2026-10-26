@@ -1,9 +1,13 @@
 package com.fanok.audiobooks.fragment;
 
+import static android.content.Context.CLIPBOARD_SERVICE;
 import static android.content.Context.UI_MODE_SERVICE;
 
 import android.app.UiModeManager;
+import android.content.ClipData;
+import android.content.ClipboardManager;
 import android.content.res.Configuration;
+import android.os.Build;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.KeyEvent;
@@ -57,6 +61,9 @@ public class DescriptionBookFragment extends MvpAppCompatFragment implements Des
     private LinearLayout mSeriesConteiner;
     private TextView mDesc;
     private TextView mShowMore;
+    /** Copies the description; beside "show less" only, absent on TV. */
+    @Nullable
+    private TextView mCopyDesc;
     private RecyclerView mRecommendedBooks;
     private TextView mRecommendedBooksTitle;
     private ScrollView mScrollView;
@@ -135,6 +142,7 @@ public class DescriptionBookFragment extends MvpAppCompatFragment implements Des
         mSeriesConteiner = view.findViewById(R.id.seriesConteiner);
         mDesc = view.findViewById(R.id.desc);
         mShowMore = view.findViewById(R.id.showMore);
+        mCopyDesc = view.findViewById(R.id.copyDesc);
         mRecommendedBooks = view.findViewById(R.id.recommendedBooks);
         mRecommendedBooksTitle = view.findViewById(R.id.recommendedBooksTitle);
         mScrollView = view.findViewById(R.id.scrollView);
@@ -215,6 +223,7 @@ public class DescriptionBookFragment extends MvpAppCompatFragment implements Des
         mSeriesConteiner = null;
         mDesc = null;
         mShowMore = null;
+        mCopyDesc = null;
         mRecommendedBooks = null;
         mRecommendedBooksTitle = null;
         mScrollView = null;
@@ -342,13 +351,16 @@ public class DescriptionBookFragment extends MvpAppCompatFragment implements Des
 
             descText = description.getDescription();
             final String text = descText;
-            ExpandableText.bind(mDesc, mShowMore, text, MAX_LINES, descExpanded);
+            ExpandableText.bind(mDesc, mShowMore, mCopyDesc, text, MAX_LINES, descExpanded);
             mShowMore.setOnClickListener(view1 -> {
                 descExpanded = !descExpanded;
                 if (mDesc != null) {
-                    ExpandableText.bind(mDesc, mShowMore, text, MAX_LINES, descExpanded);
+                    ExpandableText.bind(mDesc, mShowMore, mCopyDesc, text, MAX_LINES, descExpanded);
                 }
             });
+            if (mCopyDesc != null) {
+                mCopyDesc.setOnClickListener(view1 -> copyDescription(text));
+            }
             // a tap anywhere on the text toggles it too, whenever there is something to toggle
             mDesc.setOnClickListener(view1 -> {
                 if (mShowMore != null && mShowMore.getVisibility() == View.VISIBLE) {
@@ -424,6 +436,18 @@ public class DescriptionBookFragment extends MvpAppCompatFragment implements Des
 
     }
 
+    private void copyDescription(@Nullable String text) {
+        ClipboardManager clipboard = (ClipboardManager) requireContext().getSystemService(CLIPBOARD_SERVICE);
+        if (clipboard == null || text == null) {
+            return;
+        }
+        clipboard.setPrimaryClip(ClipData.newPlainText("description", text));
+        // Android 13+ confirms a copy itself
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
+            Toast.makeText(requireContext(), R.string.copied, Toast.LENGTH_SHORT).show();
+        }
+    }
+
     /** Nothing is recommended below: the description unfolds instead of leaving the space below empty. */
     private void expandDescription() {
         if (descExpanded) {
@@ -431,7 +455,7 @@ public class DescriptionBookFragment extends MvpAppCompatFragment implements Des
         }
         descExpanded = true;
         if (mDesc != null && descText != null) {
-            ExpandableText.bind(mDesc, mShowMore, descText, MAX_LINES, true);
+            ExpandableText.bind(mDesc, mShowMore, mCopyDesc, descText, MAX_LINES, true);
         }
     }
 

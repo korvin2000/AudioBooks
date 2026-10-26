@@ -33,6 +33,7 @@ import androidx.annotation.NonNull;
 import androidx.appcompat.app.ActionBar;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.appcompat.widget.SearchView;
 import androidx.core.view.MenuCompat;
 import androidx.core.view.MenuHost;
 import androidx.core.view.MenuProvider;
@@ -261,6 +262,7 @@ public class BooksFragment extends MvpAppCompatFragment implements BooksView {
                                 GenreModel.KNIGOBLUD_GENRE_URLS) == null);
                 if (modelID == Consts.MODEL_GENRE) {
                     fillGenreSortMenu(menu);
+                    setGenreSearch(menu.findItem(R.id.app_bar_search));
                 } else if (modelID != Consts.MODEL_BOOKS || noSort) {
                     MenuItem orderItem = menu.findItem(R.id.order);
                     if (orderItem != null) orderItem.setVisible(false);
@@ -314,6 +316,9 @@ public class BooksFragment extends MvpAppCompatFragment implements BooksView {
 
                             @Override
                             public boolean onMenuItemSelected(@NonNull MenuItem item) {
+                if (item.getActionView() instanceof SearchView) {
+                    return false; // a genre list's search opens in the toolbar
+                }
                 if (item.getGroupId() == R.id.genre_sort_group) {
                     item.setChecked(true);
                     getPresenter().onGenreSortSelected(GenreSort.values()[item.getItemId() - GENRE_SORT_ITEM_BASE]);
@@ -691,6 +696,48 @@ public class BooksFragment extends MvpAppCompatFragment implements BooksView {
         sub.setGroupCheckable(R.id.genre_sort_group, true, true);
         order.setVisible(true);
         setColorPrimeriTextInIconItemMenu(order, requireContext());
+    }
+
+    /**
+     * A genre list's search narrows the loaded genres as one types (no site searches its genres). The query lives
+     * in the presenter: it outlives the menu rebuilt on return from a genre, and is shown again there.
+     */
+    private void setGenreSearch(MenuItem item) {
+        if (item == null) {
+            return;
+        }
+        ActionBar actionBar = ((AppCompatActivity) requireActivity()).getSupportActionBar();
+        SearchView searchView = new SearchView(actionBar != null ? actionBar.getThemedContext() : requireContext());
+        searchView.setQueryHint(getString(R.string.search));
+        item.setActionView(searchView);
+        item.setShowAsAction(MenuItem.SHOW_AS_ACTION_ALWAYS | MenuItem.SHOW_AS_ACTION_COLLAPSE_ACTION_VIEW);
+        searchView.setOnQueryTextListener(new SearchView.OnQueryTextListener() {
+            @Override
+            public boolean onQueryTextChange(String s) {
+                // leaving the screen clears the menu, which collapses the view: that is not the user's clearing
+                if (isResumed()) {
+                    getPresenter().onGenreQuery(s);
+                }
+                return true;
+            }
+
+            @Override
+            public boolean onQueryTextSubmit(String s) {
+                searchView.clearFocus();
+                return true;
+            }
+        });
+        String query = getPresenter().getGenreQuery();
+        if (!query.isEmpty()) {
+            // on the fragment's view: a collapsed action view is not attached, so it would never run its own posts
+            requireView().post(() -> {
+                if (isResumed()) {
+                    item.expandActionView();
+                    searchView.setQuery(query, false);
+                    searchView.clearFocus();
+                }
+            });
+        }
     }
 
     /** The filter item and its submenu items; false for any other item. */

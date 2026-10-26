@@ -43,6 +43,7 @@ import io.reactivex.disposables.CompositeDisposable;
 import io.reactivex.schedulers.Schedulers;
 import java.util.ArrayList;
 import java.util.Calendar;
+import java.util.Locale;
 import java.util.Objects;
 
 @InjectViewState
@@ -74,6 +75,8 @@ public class BooksPresenter extends MvpPresenter<BooksView> implements
     private ListingFilters.Duration mDuration = ListingFilters.Duration.ANY;
     /** The local order of a genre list ({@link #genre} is the cursor's genres in this order). */
     private GenreSort mGenreSort = GenreSort.NONE;
+    /** The genre list's toolbar search: only the genres whose names contain it are shown. */
+    private String mGenreQuery = "";
     /** Cards shown and pages fetched since the user's last action, bounding the automatic hunt for matches. */
     private int mHuntBaseShown;
     private int mHuntPages;
@@ -187,9 +190,39 @@ public class BooksPresenter extends MvpPresenter<BooksView> implements
     public void onGenreSortSelected(@NonNull GenreSort sort) {
         mGenreSort = sort;
         getDefaultSharedPreferences(mContext).edit().putString(PREF_GENRE_SORT, sort.name()).apply();
-        genre = sort.sorted(mGenreCursor.items());
-        getViewState().showDataGenres(genre);
+        showGenres();
         getViewState().setPosition(0);
+    }
+
+    @NonNull
+    public String getGenreQuery() {
+        return mGenreQuery;
+    }
+
+    public void onGenreQuery(@NonNull String query) {
+        String normalized = query.trim().toLowerCase(Locale.ROOT).replace('ё', 'е');
+        if (normalized.equals(mGenreQuery)) {
+            return;
+        }
+        mGenreQuery = normalized;
+        showGenres();
+        getViewState().setPosition(0);
+    }
+
+    /** The loaded genres in the chosen order, narrowed to the search. */
+    private void showGenres() {
+        genre = mGenreSort.sorted(mGenreCursor.items());
+        if (!mGenreQuery.isEmpty()) {
+            ArrayList<GenrePOJO> matching = new ArrayList<>();
+            for (GenrePOJO item : genre) {
+                String name = item.getName();
+                if (name != null && name.toLowerCase(Locale.ROOT).replace('ё', 'е').contains(mGenreQuery)) {
+                    matching.add(item);
+                }
+            }
+            genre = matching;
+        }
+        getViewState().showDataGenres(genre);
     }
 
     @Override
@@ -897,10 +930,7 @@ public class BooksPresenter extends MvpPresenter<BooksView> implements
             mDisposables.add(mModelGenre.getBooks(url, page)
                     .subscribeOn(Schedulers.io())
                     .observeOn(AndroidSchedulers.mainThread())
-                    .subscribe(result -> onPage(page, result, mGenreCursor, () -> {
-                                genre = mGenreSort.sorted(mGenreCursor.items());
-                                getViewState().showDataGenres(genre);
-                            }),
+                    .subscribe(result -> onPage(page, result, mGenreCursor, this::showGenres),
                             e -> onPage(page, ProviderPage.<GenrePOJO>failed(e), mGenreCursor, null)));
         }
     }
