@@ -23,6 +23,7 @@ import com.fanok.audiobooks.pojo.BookPOJO;
 import com.fanok.audiobooks.pojo.OtherArtistPOJO;
 import com.fanok.audiobooks.presenter.OtherArtistPresenter;
 import com.google.gson.Gson;
+import com.google.gson.reflect.TypeToken;
 import java.util.ArrayList;
 import org.jetbrains.annotations.NotNull;
 
@@ -33,6 +34,8 @@ public class OtherArtistFragment extends MvpAppCompatFragment implements OtherAr
 
     private static final String ARG_URL = "arg_url";
 
+    private static final String ARG_ARTISTS = "arg_artists";
+
     private FragmentBookSeriasBinding binding;
 
     @InjectPresenter
@@ -41,9 +44,12 @@ public class OtherArtistFragment extends MvpAppCompatFragment implements OtherAr
 
     private OtherArtistListAddapter mOtherArtistListAddapter;
 
-    public static OtherArtistFragment newInstance(@NonNull BookPOJO bookPOJO) {
+    /** {@code artists}: the narrators already loaded, shown without loading again; empty makes the tab load. */
+    public static OtherArtistFragment newInstance(@NonNull BookPOJO bookPOJO,
+            @NonNull ArrayList<OtherArtistPOJO> artists) {
         Bundle args = new Bundle();
         args.putString(ARG_URL, new Gson().toJson(bookPOJO));
+        args.putString(ARG_ARTISTS, new Gson().toJson(artists));
         OtherArtistFragment fragment = new OtherArtistFragment();
         fragment.setArguments(args);
         return fragment;
@@ -106,7 +112,10 @@ public class OtherArtistFragment extends MvpAppCompatFragment implements OtherAr
         if (bookPOJO == null) {
             throw new NullPointerException();
         }
-        return new OtherArtistPresenter(bookPOJO);
+        ArrayList<OtherArtistPOJO> artists = new Gson().fromJson(
+                requireArguments().getString(ARG_ARTISTS), new TypeToken<ArrayList<OtherArtistPOJO>>() {
+                }.getType());
+        return new OtherArtistPresenter(bookPOJO, artists);
     }
 
     @Override

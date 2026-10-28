@@ -67,7 +67,7 @@
     <string name="close">Закрыть</string>
     <string name="show_all_answer">Показать все ответы</string>
     <string name="rewind_10">назад на 10 секунд</string>
-    <string name="forward_30">вперед на 30 секунд</string>
+    <string name="forward_30">Вперёд на 30 секунд</string>
     <string name="speed">скорость</string>
     <string name="error_load_coments">Не удалось загрузить комментарии</string>
     <string name="error_load_books">Не удалось загрузить книги</string>
@@ -75,7 +75,7 @@
     <string name="in_year">За год</string>
     <string name="order_discussed">Обсуждаемые</string>
     <string name="order_collections">Подборки</string>
-    <string name="tab_text_4">Другие озвучки</string>
+    <string name="tab_text_4">Озвучки</string>
     <string name="file_not_dowland">Файл еще не загрузился полностью</string>
     <string name="notification_channel_name" translatable="false">channelId</string>
     <string name="no_comments">Комментарии отсутствуют</string>

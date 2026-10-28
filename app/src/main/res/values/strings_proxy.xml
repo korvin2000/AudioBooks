@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The "Прокси" setting: its dialog (ProxyDialogFragment) and its summary in the settings. -->
+<resources>
+    <string name="proxy_mode_off">Выключен</string>
+    <string name="proxy_mode_off_caption">Используются настройки сети устройства</string>
+    <string name="proxy_mode_builtin">Встроенный прокси</string>
+    <string name="proxy_mode_builtin_caption">Сервер приложения; работает, пока он в сети</string>
+    <string name="proxy_mode_auto">Автоматический подбор</string>
+    <string name="proxy_mode_auto_caption">Приложение само найдёт рабочий публичный прокси и сменит его при сбое</string>
+
+    <string name="proxy_status_lists">Поиск прокси… загрузка списков</string>
+    <string name="proxy_status_scanning">Поиск прокси… проверено %1$d из %2$d, найдено %3$d</string>
+    <string name="proxy_status_working">Работает: %1$s · %2$d мс</string>
+    <string name="proxy_status_working_spares">Работает: %1$s · %2$d мс · запасных: %3$d</string>
+    <string name="proxy_status_not_found">Рабочий прокси не найден — попробуйте позже</string>
+    <string name="proxy_status_no_network">Нет сети</string>
+    <string name="proxy_rescan">Найти заново</string>
+    <string name="proxy_note">Публичные прокси бывают медленными и нестабильными; при сбое приложение подберёт другой.</string>
+    <string name="proxy_close">Закрыть</string>
+
+    <string name="proxy_summary_off">Выключен · настройки устройства</string>
+    <string name="proxy_summary_builtin">Встроенный прокси</string>
+    <string name="proxy_summary_auto">Автоматический</string>
+    <string name="proxy_summary_auto_working">Автоматический · работает %1$s, %2$d мс</string>
+    <string name="proxy_summary_auto_scanning">Автоматический · поиск…</string>
+    <string name="proxy_summary_auto_not_found">Автоматический · рабочий прокси не найден</string>
+    <string name="proxy_summary_auto_no_network">Автоматический · нет сети</string>
+</resources>

@@ -11,6 +11,7 @@ import com.arellomobile.mvp.viewstate.strategy.SkipStrategy;
 import com.arellomobile.mvp.viewstate.strategy.StateStrategyType;
 import com.fanok.audiobooks.pojo.AudioPOJO;
 import com.fanok.audiobooks.pojo.BookPOJO;
+import com.fanok.audiobooks.pojo.OtherArtistPOJO;
 import java.util.ArrayList;
 
 public interface Activity extends MvpView {
@@ -61,6 +62,10 @@ public interface Activity extends MvpView {
 
     @StateStrategyType(AddToEndSingleStrategy.class)
     void showOtherSource();
+
+    /** Shows the other-narrators tab with {@code artists}, never empty. */
+    @StateStrategyType(AddToEndSingleStrategy.class)
+    void showOtherArtist(@NonNull ArrayList<OtherArtistPOJO> artists);
 
     @StateStrategyType(AddToEndSingleStrategy.class)
     void stateElse();

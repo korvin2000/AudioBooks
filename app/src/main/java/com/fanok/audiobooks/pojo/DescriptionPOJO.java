@@ -1,6 +1,8 @@
 package com.fanok.audiobooks.pojo;
 
+import androidx.annotation.Nullable;
 import com.fanok.audiobooks.Consts;
+import java.util.ArrayList;
 
 public class DescriptionPOJO {
 
@@ -44,6 +46,24 @@ public class DescriptionPOJO {
 
     public void setOtherReader(boolean otherReader) {
         this.otherReader = otherReader;
+    }
+
+    /**
+     * The other narrations the description search already found, so the tab needs no second search;
+     * null when {@link #isOtherReader} was decided without a list. Never persisted.
+     */
+    @Nullable
+    private transient ArrayList<OtherArtistPOJO> otherReaders;
+
+    @Nullable
+    public ArrayList<OtherArtistPOJO> getOtherReaders() {
+        return otherReaders;
+    }
+
+    /** Also sets {@link #isOtherReader}: true when {@code otherReaders} is not empty. */
+    public void setOtherReaders(@Nullable ArrayList<OtherArtistPOJO> otherReaders) {
+        this.otherReaders = otherReaders;
+        this.otherReader = otherReaders != null && !otherReaders.isEmpty();
     }
 
     public String getDisLike() {

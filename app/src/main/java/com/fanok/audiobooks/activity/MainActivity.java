@@ -47,6 +47,7 @@ import com.fanok.audiobooks.interface_pacatge.main.MainView;
 import com.fanok.audiobooks.pojo.BookPOJO;
 import com.fanok.audiobooks.pojo.StorageUtil;
 import com.fanok.audiobooks.presenter.MainPresenter;
+import com.fanok.audiobooks.service.MediaPlayerService;
 import com.google.android.material.navigation.NavigationView;
 
 import java.util.ArrayList;
@@ -158,6 +159,27 @@ public class MainActivity extends MvpAppCompatActivity
         }
         if (shouldAskBatteryOptimization()) {
             dialogs.add(this::showBatteryDialog);
+        }
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        updateNowPlayingEntry();
+    }
+
+    /** "Now playing" is offered only while the player service holds a book. */
+    private void updateNowPlayingEntry() {
+        boolean visible = MediaPlayerService.isRunning() && MediaPlayerService.currentBook() != null;
+        if (navigationView != null) {
+            MenuItem item = navigationView.getMenu().findItem(R.id.nav_now_playing);
+            if (item != null) {
+                item.setVisible(visible);
+            }
+        }
+        View textView = findViewById(R.id.layout_nav_now_playing);
+        if (textView != null) {
+            textView.setVisibility(visible ? View.VISIBLE : View.GONE);
         }
     }
 
@@ -281,6 +303,15 @@ public class MainActivity extends MvpAppCompatActivity
                     this, drawer, toolbar, R.string.navigation_drawer_open,
                     R.string.navigation_drawer_close);
             drawer.addDrawerListener(toggle);
+            drawer.addDrawerListener(new DrawerLayout.SimpleDrawerListener() {
+                @Override
+                public void onDrawerStateChanged(int newState) {
+                    // the entry shows the player as it is when the drawer starts to open
+                    if (newState != DrawerLayout.STATE_IDLE && !drawer.isDrawerOpen(GravityCompat.START)) {
+                        updateNowPlayingEntry();
+                    }
+                }
+            });
             toggle.syncState();
             navigationView.setNavigationItemSelectedListener(this);
         } else {
@@ -297,6 +328,12 @@ public class MainActivity extends MvpAppCompatActivity
                     if (view instanceof TextView) {
                         mTextViewArrayList.add((TextView) view);
                         view.setOnClickListener(view1 -> {
+                            if (view1.getId() == R.id.layout_nav_now_playing) {
+                                // opens the book screen, so the current section stays highlighted
+                                mPresenter.onItemSelected(view1.getId());
+                                updateNowPlayingEntry(); //a dead entry (the player stopped meanwhile) hides itself
+                                return;
+                            }
                             for (TextView textView : mTextViewArrayList) {
                                 textView.setBackgroundResource(outValue.resourceId);
                             }
