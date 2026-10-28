@@ -131,6 +131,9 @@ public final class SiteHttp {
     private static Connection.Response executeOnce(Connection connection) throws IOException {
         String requestedHost = Url.hostOf(connection.request().url().toString());
         Connection.Response response = connection.execute();
+        if (response.statusCode() == 403 || response.statusCode() == 429) {
+            AppProxy.reportSuspect(); // the automatic proxy may be the one refused
+        }
         Map<String, String> cookies = response.cookies();
         if (!cookies.isEmpty() && requestedHost.equals(Url.hostOf(response.url().toString()))) {
             JAR.computeIfAbsent(requestedHost, k -> new ConcurrentHashMap<>()).putAll(cookies);

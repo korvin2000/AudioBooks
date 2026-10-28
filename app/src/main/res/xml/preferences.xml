@@ -203,11 +203,10 @@
         android:summary="@string/cookies_site_summary"
         android:title="@string/cookies_site" />
 
-    <SwitchPreferenceCompat
-        android:defaultValue="false"
+    <Preference
         android:icon="@drawable/ic_web"
         android:key="pref_proxy"
-        android:summary="@string/proxy_summary"
+        android:persistent="false"
         android:title="@string/proxy_title" />
 
     <ListPreference

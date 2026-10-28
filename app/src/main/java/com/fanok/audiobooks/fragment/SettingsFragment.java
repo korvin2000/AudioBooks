@@ -52,6 +52,8 @@ import com.fanok.audiobooks.activity.ParentalControlActivity;
 import com.fanok.audiobooks.model.AudioDBModel;
 import com.fanok.audiobooks.model.AudioListDBModel;
 import com.fanok.audiobooks.model.BooksDBModel;
+import com.fanok.audiobooks.net.AppProxy;
+import com.fanok.audiobooks.net.ProxyFinder;
 import com.fanok.audiobooks.pojo.BackupPOJO;
 import com.fanok.audiobooks.pojo.BookPOJO;
 import com.fanok.audiobooks.pojo.StorageUtil;
@@ -230,6 +232,8 @@ public class SettingsFragment extends PreferenceFragmentCompat implements
         // Set up a listener whenever a key changes
         getPreferenceScreen().getSharedPreferences()
                 .registerOnSharedPreferenceChangeListener(this);
+        ProxyFinder.get(requireContext()).addListener(proxyListener);
+        updateProxySummary();
 
         MainActivity activity = (MainActivity) getActivity();
         if (activity != null) {
@@ -252,6 +256,18 @@ public class SettingsFragment extends PreferenceFragmentCompat implements
         // Unregister the listener whenever a key changes
         getPreferenceScreen().getSharedPreferences()
                 .unregisterOnSharedPreferenceChangeListener(this);
+        ProxyFinder.get(requireContext()).removeListener(proxyListener);
+    }
+
+    /** The proxy entry's summary follows the mode and the automatic search while the settings are visible. */
+    private final ProxyFinder.Listener proxyListener = state -> updateProxySummary();
+
+    private void updateProxySummary() {
+        Preference proxy = findPreference(AppProxy.PREF);
+        Context context = getContext();
+        if (proxy != null && context != null) {
+            proxy.setSummary(ProxyDialogFragment.summary(context));
+        }
     }
 
     private final ActivityResultLauncher<String> requestPermissionLauncher =
@@ -396,6 +412,16 @@ public class SettingsFragment extends PreferenceFragmentCompat implements
             startActivity(new Intent(getContext(), ActivityCookies.class));
             return true;
         });
+
+        preferenceClickListner(AppProxy.PREF, preference -> {
+            if (getChildFragmentManager().findFragmentByTag(ProxyDialogFragment.TAG) == null) {
+                new ProxyDialogFragment().show(getChildFragmentManager(), ProxyDialogFragment.TAG);
+            }
+            return true;
+        });
+        getChildFragmentManager().setFragmentResultListener(ProxyDialogFragment.RESULT_CLOSED, this,
+                (requestKey, result) -> updateProxySummary());
+        updateProxySummary();
 
         boolean ignor;
 
@@ -591,6 +617,9 @@ public class SettingsFragment extends PreferenceFragmentCompat implements
 
     public void onSharedPreferenceChanged(SharedPreferences sharedPreferences,
             String key) {
+        if (AppProxy.PREF_MODE.equals(key)) {
+            updateProxySummary();
+        }
         updatePrefSummary(findPreference(key));
     }
 

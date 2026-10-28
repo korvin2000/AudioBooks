@@ -143,6 +143,15 @@ public class App extends Application {
         return okHttpClientInstance;
     }
 
+    /** After a proxy change: idle pooled connections (direct or via the old proxy) of the shared client are dropped,
+     *  off the calling thread; the download client shares this pool. */
+    public static void evictConnections() {
+        okhttp3.OkHttpClient client = okHttpClientInstance;
+        if (client != null) {
+            new Thread(() -> client.connectionPool().evictAll(), "evict-connections").start();
+        }
+    }
+
     private static volatile okhttp3.OkHttpClient downloadHttpClient;
 
     /**
@@ -252,6 +261,23 @@ public class App extends Application {
                 return chain.proceed(requestBuilder.build());
             });
 
+            // OkHttp 5 tells the ProxySelector only of failed TCP connects; a refused tunnel or handshake through an
+            // automatic proxy is reported here. The download client (newBuilder) inherits this listener.
+            builder.eventListener(new okhttp3.EventListener() {
+                @Override
+                public void connectFailed(@androidx.annotation.NonNull okhttp3.Call call,
+                        @androidx.annotation.NonNull java.net.InetSocketAddress inetSocketAddress,
+                        @androidx.annotation.NonNull java.net.Proxy proxy,
+                        @androidx.annotation.Nullable okhttp3.Protocol protocol,
+                        @androidx.annotation.NonNull IOException ioe) {
+                    if (proxy.type() != java.net.Proxy.Type.DIRECT && !call.isCanceled()) {
+                        AppProxy.reportConnectFailure(proxy.address(), ioe);
+                    }
+                }
+            });
+
+            //no happy-eyeballs race across [current, spare] proxy routes: a lost race would count as a proxy failure
+            builder.fastFallback(false);
             okHttpClientInstance = builder.build();
 
             com.squareup.picasso.Picasso picasso = new com.squareup.picasso.Picasso.Builder(this)
