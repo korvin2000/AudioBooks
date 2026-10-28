@@ -86,6 +86,21 @@ public abstract class Hourglass implements HourglassListener {
         ticker.schedule(tick, 0);
     }
 
+    /**
+     * Adds {@code ms} to a running countdown, counting or paused, without re-arming it. An end-of-chapter boundary
+     * has no time to add; a finished or cancelled timer stays so.
+     */
+    public synchronized void extend(long ms) {
+        if (!running || endOfChapter || ms <= 0) {
+            return;
+        }
+        if (counting) {
+            deadline += ms;
+        } else {
+            remainingMs += ms;
+        }
+    }
+
     /** Stops the timer without finishing it. */
     public synchronized final void cancel() {
         running = false;

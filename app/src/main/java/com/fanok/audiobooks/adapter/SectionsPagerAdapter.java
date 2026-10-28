@@ -19,8 +19,8 @@ import java.util.Arrays;
 /**
  * The book screen's tabs, kept by kind (one of the five known tabs) in that fixed order. Each tab has a stable id
  * derived from its kind, so a tab inserted before an already-created one keeps the created fragment (UI-11); the
- * "other source" tab's id also carries a version that changes with its data, so a stale fragment is replaced rather
- * than kept. Titles are for display only: the comments tab's carries the count.
+ * "other source" and "other artist" tabs' ids also carry a version that changes with their data, so a stale fragment
+ * is replaced rather than kept. Titles are for display only: the comments tab's carries the count.
  */
 public class SectionsPagerAdapter extends FragmentStateAdapter {
 
@@ -36,15 +36,27 @@ public class SectionsPagerAdapter extends FragmentStateAdapter {
     private final ArrayList<Integer> tabItems;
     private final BookPOJO mBookPOJO;
     private ArrayList<OtherArtistPOJO> mArtistPOJO;
+    private ArrayList<OtherArtistPOJO> mOtherArtists;
     private final Context mContext;
     private final String[] knownTabs;
     private long otherSourceVersion = 0;
+    private long otherArtistVersion = 0;
     private int comentsCount;
 
     public void setArtistPOJO(ArrayList<OtherArtistPOJO> artistPOJO) {
         mArtistPOJO = artistPOJO == null ? null : new ArrayList<>(artistPOJO);
         otherSourceVersion++;
         int position = tabItems.indexOf(OTHER_SOURCE);
+        if (position >= 0) {
+            notifyItemChanged(position);
+        }
+    }
+
+    /** The other narrators the "other artist" tab shows; set before the tab is shown. */
+    public void setOtherArtists(ArrayList<OtherArtistPOJO> artists) {
+        mOtherArtists = artists == null ? null : new ArrayList<>(artists);
+        otherArtistVersion++;
+        int position = tabItems.indexOf(OTHER_ARTIST);
         if (position >= 0) {
             notifyItemChanged(position);
         }
@@ -65,7 +77,13 @@ public class SectionsPagerAdapter extends FragmentStateAdapter {
     }
 
     private long idOf(int kind) {
-        return kind == OTHER_SOURCE ? kind + OTHER_SOURCE_VERSION_STEP * (otherSourceVersion + 1) : kind;
+        if (kind == OTHER_SOURCE) {
+            return kind + OTHER_SOURCE_VERSION_STEP * (otherSourceVersion + 1);
+        }
+        if (kind == OTHER_ARTIST) {
+            return kind + OTHER_SOURCE_VERSION_STEP * (otherArtistVersion + 1);
+        }
+        return kind;
     }
 
     @Override
@@ -92,7 +110,8 @@ public class SectionsPagerAdapter extends FragmentStateAdapter {
             case SERIES:
                 return SeriesBookFragment.newInstance(mBookPOJO.getUrl());
             case OTHER_ARTIST:
-                return OtherArtistFragment.newInstance(mBookPOJO);
+                return OtherArtistFragment.newInstance(mBookPOJO,
+                        mOtherArtists == null ? new ArrayList<>() : mOtherArtists);
             case OTHER_SOURCE:
                 return OtherSourceFragment.newInstance(mArtistPOJO == null ? new ArrayList<>() : mArtistPOJO);
             default:

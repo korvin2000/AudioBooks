@@ -21,6 +21,7 @@ import com.fanok.audiobooks.interface_pacatge.main.MainView;
 import com.fanok.audiobooks.model.BooksDBModel;
 import com.fanok.audiobooks.pojo.BookPOJO;
 import com.fanok.audiobooks.search.Provider;
+import com.fanok.audiobooks.service.MediaPlayerService;
 
 @InjectViewState
 public class MainPresenter extends MvpPresenter<MainView> implements
@@ -81,6 +82,12 @@ public class MainPresenter extends MvpPresenter<MainView> implements
             Fragment fragment = FavoriteFragment.newInstance(R.string.menu_saved,
                     Consts.TABLE_SAVED);
             getViewState().showFragment(fragment, "saved");
+        } else if (id == R.id.nav_now_playing || id == R.id.layout_nav_now_playing) {
+            // the activity opens it, so parental control can ask for the PIN on screen
+            BookPOJO book = MediaPlayerService.currentBook();
+            if (book != null) {
+                getViewState().showBooksActivity(book);
+            }
         }
     }
 

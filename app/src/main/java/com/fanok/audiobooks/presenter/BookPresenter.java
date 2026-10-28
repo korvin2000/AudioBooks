@@ -41,6 +41,7 @@ import com.fanok.audiobooks.model.AudioDBModel;
 import com.fanok.audiobooks.model.AudioListDBModel;
 import com.fanok.audiobooks.model.AudioModel;
 import com.fanok.audiobooks.model.BooksDBModel;
+import com.fanok.audiobooks.model.OtherArtistModel;
 import com.fanok.audiobooks.model.OtherSourceModel;
 import com.fanok.audiobooks.pojo.AudioListPOJO;
 import com.fanok.audiobooks.pojo.AudioPOJO;
@@ -131,6 +132,9 @@ public class BookPresenter extends MvpPresenter<Activity> implements ActivityPre
 
     private ArrayList<OtherArtistPOJO> mOtherArtistPOJOS;
 
+    /** The other narrators are being loaded or were loaded; the description asks on every show. */
+    private boolean mOtherArtistsRequested = false;
+
     private int state = BottomSheetBehavior.STATE_COLLAPSED;
 
     public int getState() {
@@ -169,6 +173,34 @@ public class BookPresenter extends MvpPresenter<Activity> implements ActivityPre
 
     public ArrayList<OtherArtistPOJO> getOtherArtistPOJOS() {
         return mOtherArtistPOJOS;
+    }
+
+    /** Loads the book's other narrations once; their tab is shown only when there is at least one. */
+    public void loadOtherArtists() {
+        if (mOtherArtistsRequested) {
+            return;
+        }
+        mOtherArtistsRequested = true;
+        mDisposables.add(new OtherArtistModel().getOtherArtist(mBookPOJO)
+                .subscribeOn(Schedulers.io())
+                .observeOn(AndroidSchedulers.mainThread())
+                .subscribe(artists -> {
+                    if (!artists.isEmpty()) {
+                        getViewState().showOtherArtist(artists);
+                    }
+                }, e -> {
+                    Log.d(TAG, "other narrators not loaded: " + e.getMessage());
+                    mOtherArtistsRequested = false; // the next description show tries again
+                }));
+    }
+
+    /** Other narrations found elsewhere (the description's own search): shown once, no load repeats them. */
+    public void otherArtistsLoaded(@NonNull ArrayList<OtherArtistPOJO> artists) {
+        if (mOtherArtistsRequested || artists.isEmpty()) {
+            return;
+        }
+        mOtherArtistsRequested = true;
+        getViewState().showOtherArtist(artists);
     }
 
     public static void setSpeedWithoutBroadcast(float value) {

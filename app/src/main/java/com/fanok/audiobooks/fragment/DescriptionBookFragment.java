@@ -38,6 +38,7 @@ import com.fanok.audiobooks.adapter.ExpandableText;
 import com.fanok.audiobooks.interface_pacatge.book_content.Description;
 import com.fanok.audiobooks.pojo.BookPOJO;
 import com.fanok.audiobooks.pojo.DescriptionPOJO;
+import com.fanok.audiobooks.pojo.OtherArtistPOJO;
 import com.fanok.audiobooks.policy.DefaultCover;
 import com.fanok.audiobooks.presenter.BookDescriptionPresenter;
 import com.google.gson.Gson;
@@ -342,9 +343,12 @@ public class DescriptionBookFragment extends MvpAppCompatFragment implements Des
                 mSeriesConteiner.setVisibility(View.GONE);
             }
 
-            if (description.isOtherReader()) {
-                if (activity != null) {
-                    activity.showOtherArtist();
+            if (description.isOtherReader() && activity != null) {
+                ArrayList<OtherArtistPOJO> otherReaders = description.getOtherReaders();
+                if (otherReaders != null && !otherReaders.isEmpty()) {
+                    activity.otherArtistsFound(otherReaders); // the description search found them
+                } else {
+                    activity.loadOtherArtist();
                 }
             }
 

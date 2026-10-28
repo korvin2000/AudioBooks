@@ -3,6 +3,7 @@ package com.fanok.audiobooks.presenter;
 
 import android.util.Log;
 import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 import com.arellomobile.mvp.InjectViewState;
 import com.arellomobile.mvp.MvpPresenter;
 import com.fanok.audiobooks.interface_pacatge.book_content.ComentsPresenter;
@@ -33,16 +34,25 @@ public class OtherArtistPresenter extends MvpPresenter<OtherArtist> implements
 
     private final ArrayList<OtherArtistPOJO> mComentsPOJOS;
 
-    public OtherArtistPresenter(@NonNull BookPOJO bookPOJO) {
+    /** {@code loaded}: the narrators the book screen already loaded; empty means this presenter loads them. */
+    public OtherArtistPresenter(@NonNull BookPOJO bookPOJO, @Nullable ArrayList<OtherArtistPOJO> loaded) {
         mComentsPOJOS = new ArrayList<>();
         mComentsModel = new com.fanok.audiobooks.model.OtherArtistModel();
         mBookPOJO = bookPOJO;
+        if (loaded != null && !loaded.isEmpty()) {
+            mComentsPOJOS.addAll(loaded);
+            isLoaded = true;
+        }
     }
 
     @Override
     protected void onFirstViewAttach() {
         super.onFirstViewAttach();
-        loadComents();
+        if (isLoaded) {
+            finish();
+        } else {
+            loadComents();
+        }
     }
 
     @Override

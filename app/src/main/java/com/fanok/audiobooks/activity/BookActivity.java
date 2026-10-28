@@ -81,6 +81,7 @@ import com.fanok.audiobooks.adapter.SectionsPagerAdapter;
 import com.fanok.audiobooks.interface_pacatge.book_content.Activity;
 import com.fanok.audiobooks.pojo.AudioPOJO;
 import com.fanok.audiobooks.pojo.BookPOJO;
+import com.fanok.audiobooks.pojo.OtherArtistPOJO;
 import com.fanok.audiobooks.pojo.StorageUtil;
 import com.fanok.audiobooks.policy.ParentalControl;
 import com.fanok.audiobooks.presenter.BookPresenter;
@@ -970,7 +971,19 @@ public class BookActivity extends MvpAppCompatActivity implements Activity {
         sectionsPagerAdapter.showTab(SectionsPagerAdapter.OTHER_SOURCE);
     }
 
-    public void showOtherArtist() {
+    /** The description says other narrations exist: the presenter loads them and shows the tab only if any. */
+    public void loadOtherArtist() {
+        mPresenter.loadOtherArtists();
+    }
+
+    /** The description already found the other narrations: shown through the presenter's view state, not searched again. */
+    public void otherArtistsFound(@NonNull ArrayList<OtherArtistPOJO> artists) {
+        mPresenter.otherArtistsLoaded(artists);
+    }
+
+    @Override
+    public void showOtherArtist(@NonNull ArrayList<OtherArtistPOJO> artists) {
+        sectionsPagerAdapter.setOtherArtists(artists);
         sectionsPagerAdapter.showTab(SectionsPagerAdapter.OTHER_ARTIST);
     }
 

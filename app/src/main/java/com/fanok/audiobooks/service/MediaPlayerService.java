@@ -37,7 +37,12 @@ import android.content.SharedPreferences;
 import android.content.pm.ServiceInfo;
 import android.graphics.Bitmap;
 import android.graphics.drawable.Drawable;
+import android.hardware.Sensor;
+import android.hardware.SensorEvent;
+import android.hardware.SensorEventListener;
+import android.hardware.SensorManager;
 import android.media.AudioManager;
+import android.media.ToneGenerator;
 import android.media.audiofx.BassBoost;
 import android.media.audiofx.Equalizer;
 import android.media.audiofx.PresetReverb;
@@ -119,6 +124,7 @@ import io.reactivex.schedulers.Schedulers;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -182,8 +188,8 @@ public class MediaPlayerService extends MediaBrowserServiceCompat {
     private static final long SESSION_ACTIONS = PlaybackStateCompat.ACTION_PLAY
             | PlaybackStateCompat.ACTION_PAUSE
             | PlaybackStateCompat.ACTION_PLAY_PAUSE
-            | PlaybackStateCompat.ACTION_SKIP_TO_NEXT
-            | PlaybackStateCompat.ACTION_SKIP_TO_PREVIOUS
+            //no SKIP_TO_NEXT / SKIP_TO_PREVIOUS: Android 13+ would put chapter skips beside play/pause;
+            //the custom actions (rewind 30, forward 30, previous, next chapter) fill those slots instead
             | PlaybackStateCompat.ACTION_SEEK_TO
             | PlaybackStateCompat.ACTION_REWIND
             | PlaybackStateCompat.ACTION_FAST_FORWARD
@@ -195,6 +201,8 @@ public class MediaPlayerService extends MediaBrowserServiceCompat {
     private static volatile boolean running;
     private static volatile boolean isPlay;
     private static volatile String currentBookUrl;
+    @Nullable
+    private static volatile BookPOJO currentBook;
 
     private static final AtomicReference<Request> pendingRequest = new AtomicReference<>();
 
@@ -339,6 +347,12 @@ public class MediaPlayerService extends MediaBrowserServiceCompat {
         return currentBookUrl;
     }
 
+    /** The book the service holds, as the screen that opened it knows it; null without a book. */
+    @Nullable
+    public static BookPOJO currentBook() {
+        return currentBook;
+    }
+
     public static int getNotificationId() {
         return NOTIFICATION_ID;
     }
@@ -376,14 +390,10 @@ public class MediaPlayerService extends MediaBrowserServiceCompat {
         public void onIsPlayingChanged(boolean isPlaying) {
             if (isPlaying) {
                 startProgress();
-                if (sleepTimer != null) {
-                    sleepTimer.resumeTimer();
-                }
+                onSleepTimerPlaying(true);
             } else {
                 stopProgress();
-                if (sleepTimer != null) {
-                    sleepTimer.pauseTimer();
-                }
+                onSleepTimerPlaying(false);
                 sendProgress();
             }
             publishState();
@@ -465,10 +475,7 @@ public class MediaPlayerService extends MediaBrowserServiceCompat {
         checkpointNow(true);
 
         //2. timers, handlers, artwork
-        if (sleepTimer != null) {
-            sleepTimer.cancel();
-            sleepTimer = null;
-        }
+        releaseSleepTimer();
         SleepTimerPresenter.setTimerStarted(false);
         unregisterNetworkCallback();
         cancelRetry();
@@ -508,6 +515,7 @@ public class MediaPlayerService extends MediaBrowserServiceCompat {
         removeNotification();
         isPlay = false;
         currentBookUrl = null;
+        currentBook = null;
 
         //5. the executor goes last; every submit checks isShutdown()
         dbExecutor.shutdown();
@@ -797,9 +805,8 @@ public class MediaPlayerService extends MediaBrowserServiceCompat {
             player.clearMediaItems();
         }
         stopProgress();
-        if (sleepTimer != null) {
-            sleepTimer.cancel();
-            sleepTimer = null;
+        if (sleepTimer != null || wakeWindowOpen) {
+            releaseSleepTimer();
             SleepTimerPresenter.setTimerStarted(false);
             sendInternal(new Intent(bradcast_FinishTimer));
         }
@@ -812,6 +819,7 @@ public class MediaPlayerService extends MediaBrowserServiceCompat {
         ordinals = null;
         contentIntent = null;
         currentBookUrl = null;
+        currentBook = null;
         cancelArtwork();
         image = null;
         imageUrl = "";
@@ -862,11 +870,17 @@ public class MediaPlayerService extends MediaBrowserServiceCompat {
         }
         //the outgoing book keeps where it was left
         checkpointNow(false);
+        if (!Objects.equals(bookUrl, request.bookUrl)) {
+            //a wake window belongs to the book the timer paused: a shake must not start another one
+            closeWakeWindow();
+            wakeWindowBook = null;
+        }
         book = request.book;
         bookUrl = request.bookUrl;
         chapters = request.chapters;
         ordinals = request.ordinals;
         currentBookUrl = bookUrl;
+        currentBook = book;
         contentIntent = buildContentIntent();
         String photo = book != null && book.getPhoto() != null ? book.getPhoto() : "";
         if (!photo.equals(imageUrl)) {
@@ -1615,7 +1629,13 @@ public class MediaPlayerService extends MediaBrowserServiceCompat {
 
     @NonNull
     private PlaybackStateCompat buildPlaybackState() {
-        PlaybackStateCompat.Builder builder = new PlaybackStateCompat.Builder().setActions(SESSION_ACTIONS);
+        PlaybackStateCompat.Builder builder = new PlaybackStateCompat.Builder().setActions(SESSION_ACTIONS)
+                .addCustomAction(ACTION_REWIND, getString(R.string.playback_rewind_30),
+                        R.drawable.ic_notification_rewind_30)
+                .addCustomAction(ACTION_FORWARD, getString(R.string.forward_30),
+                        R.drawable.ic_notification_fast_forward_30)
+                .addCustomAction(ACTION_PREVIOUS, getString(R.string.previous), R.drawable.ic_notification_previous)
+                .addCustomAction(ACTION_NEXT, getString(R.string.next), R.drawable.ic_notification_next);
         int state;
         long position = 0;
         float speed = 0f;
@@ -1827,17 +1847,18 @@ public class MediaPlayerService extends MediaBrowserServiceCompat {
                 .setContentIntent(contentIntent)
                 .setDeleteIntent(PendingIntent.getBroadcast(getApplicationContext(), 0,
                         new Intent(this, OnCancelBroadcastReceiver.class), PendingIntent.FLAG_IMMUTABLE))
-                .addAction(R.drawable.ic_notification_rewind_30, getString(R.string.playback_rewind_30),
-                        playbackAction(ACTION_REWIND, 4))
+                //MediaStyle shows at most five actions: Stop leaves the row, the delete intent still dismisses
                 .addAction(R.drawable.ic_notification_previous, getString(R.string.previous),
                         playbackAction(ACTION_PREVIOUS, 3))
+                .addAction(R.drawable.ic_notification_rewind_30, getString(R.string.playback_rewind_30),
+                        playbackAction(ACTION_REWIND, 4))
                 .addAction(showPause ? R.drawable.ic_notification_pause : R.drawable.ic_notification_play,
                         getString(showPause ? R.string.pause : R.string.play),
                         showPause ? playbackAction(ACTION_PAUSE, 1) : playbackAction(ACTION_PLAY, 0))
+                .addAction(R.drawable.ic_notification_fast_forward_30, getString(R.string.forward_30),
+                        playbackAction(ACTION_FORWARD, 5))
                 .addAction(R.drawable.ic_notification_next, getString(R.string.next),
-                        playbackAction(ACTION_NEXT, 2))
-                .addAction(android.R.drawable.ic_delete, getString(R.string.stop),
-                        playbackAction(ACTION_STOP, 6));
+                        playbackAction(ACTION_NEXT, 2));
         if (book != null && book.getAutor() != null) {
             builder.setSubText(book.getAutor());
         }
@@ -1978,6 +1999,14 @@ public class MediaPlayerService extends MediaBrowserServiceCompat {
             @Override
             public void onFastForward() {
                 seekBy(FAST_FORWARD);
+            }
+
+            /** The playback state's custom actions carry the notification action names. */
+            @Override
+            public void onCustomAction(final String action, final Bundle extras) {
+                if (action != null) {
+                    handleIncomingAction(action);
+                }
             }
 
             @Override
@@ -2134,7 +2163,7 @@ public class MediaPlayerService extends MediaBrowserServiceCompat {
                 break;
             case Broadcast_UPDATE_TIMER_START:
                 if (sleepTimer != null) {
-                    sendInternal(new Intent(bradcast_UpdateTimer).putExtra("time", sleepTimer.getTimeRemaining()));
+                    sendSleepTimerState(sleepTimer.getTimeRemaining());
                 }
                 break;
             case Broadcast_Equalizer:
@@ -2169,36 +2198,103 @@ public class MediaPlayerService extends MediaBrowserServiceCompat {
     // ---------------------------------------------------------------------------------------------------------
     // Sleep timer
 
+    /** The last stretch before a timed stop: beeps, a volume fade and, with "shake", the accelerometer. */
+    private static final long SLEEP_WARNING_MS = 30_000;
+    private static final float SLEEP_MIN_VOLUME = 0.15f;
+    /** After a timed stop with "shake": paused this long with the accelerometer on, then the full stop. */
+    private static final long SLEEP_WAKE_WINDOW_MS = 60_000;
+    /** A clock-mode timer that a shake extends or re-arms ends this much later. */
+    private static final long SLEEP_CLOCK_EXTEND_MS = 15 * 60_000L;
+    private static final float SHAKE_G = 2.4f;
+    private static final long SHAKE_DEBOUNCE_MS = 1_500;
+    private static final int BEEP_VOLUME = 70;
+    private static final int BEEP_MS = 100;
+    private static final long BEEP_PERIOD_MS = BEEP_MS + 150;
+
+    /** The armed timer's {@code SleepTimerPresenter.MODE_*}, countdown duration and options, kept to re-arm it. */
+    private int sleepMode;
+    private long sleepDurationMs;
+    private boolean sleepWarn;
+    private boolean sleepShake;
+    /** The player volume before the warning's fade; -1 while no warning runs. */
+    private float volumeBeforeWarning = -1;
+    private boolean shakeListening;
+    private long lastShakeAt;
+    /** The timer paused the book with "shake" on: a shake within the window plays on and re-arms it. */
+    private boolean wakeWindowOpen;
+    @Nullable
+    private String wakeWindowBook;
+    @Nullable
+    private PowerManager.WakeLock wakeWindowLock;
+    private final Runnable wakeWindowEnd = this::onWakeWindowEnd;
+    /** The beep generator in use; released by its scheduled release or by {@link #releaseSleepTimer()}. */
+    @Nullable
+    private ToneGenerator activeTone;
+    private final SensorEventListener shakeListener = new SensorEventListener() {
+        @Override
+        public void onSensorChanged(SensorEvent event) {
+            float x = event.values[0];
+            float y = event.values[1];
+            float z = event.values[2];
+            double g = Math.sqrt(x * x + y * y + z * z) / SensorManager.GRAVITY_EARTH;
+            long now = SystemClock.elapsedRealtime();
+            if (g > SHAKE_G && now - lastShakeAt > SHAKE_DEBOUNCE_MS) {
+                lastShakeAt = now;
+                onShake();
+            }
+        }
+
+        @Override
+        public void onAccuracyChanged(Sensor sensor, int accuracy) {
+        }
+    };
+
     /**
-     * Arms or cancels the sleep timer. An end-of-chapter timer is a boundary on whatever chapter is current when
-     * one ENDS (spec §8): a manual next/previous/select or a book replacement re-arms it on the new chapter's end,
-     * since only {@link #onChapterEnded()} consumes it.
+     * Arms, extends or cancels the sleep timer. An end-of-chapter timer is a boundary on whatever chapter is current
+     * when one ENDS (spec §8): a manual next/previous/select or a book replacement re-arms it on the new chapter's
+     * end, since only {@link #onChapterEnded()} consumes it.
      */
     private void onSleepTimerCommand(@NonNull Intent intent) {
-        if (sleepTimer != null) {
-            sleepTimer.cancel();
-            sleepTimer = null;
-        }
-        if (!intent.getBooleanExtra("start", false)) {
+        if (intent.hasExtra("extend")) {
+            extendSleepTimer(intent.getLongExtra("extend", 0));
             return;
         }
-        boolean endOfChapter = intent.getBooleanExtra("endOfChapter", false);
-        Hourglass timer = new Hourglass(intent.getLongExtra("time", 0), endOfChapter) {
+        releaseSleepTimer();
+        if (!intent.getBooleanExtra("start", false)) {
+            SleepTimerPresenter.setTimerStarted(false);
+            sendInternal(new Intent(bradcast_FinishTimer));
+            return;
+        }
+        sleepWarn = intent.getBooleanExtra("warn", false);
+        sleepShake = intent.getBooleanExtra("shake", false);
+        long at = intent.getLongExtra("at", 0);
+        if (intent.getBooleanExtra("endOfChapter", false)) {
+            sleepMode = SleepTimerPresenter.MODE_END_OF_CHAPTER;
+            armSleepTimer(0);
+        } else if (at > 0) {
+            sleepMode = SleepTimerPresenter.MODE_CLOCK;
+            armSleepTimer(at - System.currentTimeMillis());
+        } else {
+            sleepMode = SleepTimerPresenter.MODE_COUNTDOWN;
+            sleepDurationMs = intent.getLongExtra("time", 0);
+            armSleepTimer(sleepDurationMs);
+        }
+    }
+
+    /** Starts a timer in {@link #sleepMode}: a countdown counts only while the book plays, a clock-mode one always. */
+    private void armSleepTimer(long timeMs) {
+        Hourglass timer = new Hourglass(timeMs, sleepMode == SleepTimerPresenter.MODE_END_OF_CHAPTER) {
             @Override
             public void onTimerFinish() {
                 if (sleepTimer == this) {
                     sleepTimer = null;
-                }
-                SleepTimerPresenter.setTimerStarted(false);
-                sendInternal(new Intent(bradcast_FinishTimer));
-                if (!isEndOfChapter()) {
-                    stop();
+                    onSleepTimerFired(isEndOfChapter());
                 }
             }
 
             @Override
             public void onTimerTick(final long timeRemaining) {
-                sendInternal(new Intent(bradcast_UpdateTimer).putExtra("time", timeRemaining));
+                onSleepTimerTick(timeRemaining);
             }
 
             @Override
@@ -2207,11 +2303,236 @@ public class MediaPlayerService extends MediaBrowserServiceCompat {
             }
         };
         sleepTimer = timer;
+        SleepTimerPresenter.setTimerStarted(true);
         timer.startTimer();
-        if (player == null || !player.isPlaying()) {
+        if (sleepMode != SleepTimerPresenter.MODE_CLOCK && (player == null || !player.isPlaying())) {
             timer.pauseTimer();
         }
-        sendInternal(new Intent(bradcast_UpdateTimer).putExtra("time", timer.getTimeRemaining()));
+        sendSleepTimerState(timer.getTimeRemaining());
+    }
+
+    /** Playback started or stopped: a countdown counts only while playing; playing on by hand ends a wake window. */
+    private void onSleepTimerPlaying(boolean playing) {
+        if (playing) {
+            closeWakeWindow();
+        }
+        if (volumeBeforeWarning >= 0 && sleepShake) {
+            listenForShake(playing);
+        }
+        if (sleepTimer == null || sleepMode == SleepTimerPresenter.MODE_CLOCK) {
+            return;
+        }
+        if (playing) {
+            sleepTimer.resumeTimer();
+        } else {
+            sleepTimer.pauseTimer();
+        }
+        sendSleepTimerState(sleepTimer.getTimeRemaining());
+    }
+
+    /** Each tick: the warning (beeps once, then the fade) while the book plays, and the screen's update. */
+    private void onSleepTimerTick(long remaining) {
+        if (sleepWarn && sleepMode != SleepTimerPresenter.MODE_END_OF_CHAPTER && remaining <= SLEEP_WARNING_MS
+                && player != null) {
+            if (volumeBeforeWarning < 0 && wantPlaying) {
+                volumeBeforeWarning = player.getVolume();
+                beep(3);
+                if (sleepShake) {
+                    listenForShake(true);
+                }
+            }
+            if (volumeBeforeWarning >= 0) {
+                player.setVolume(volumeBeforeWarning
+                        * Math.max(SLEEP_MIN_VOLUME, remaining / (float) SLEEP_WARNING_MS));
+            }
+        }
+        sendSleepTimerState(remaining);
+    }
+
+    /**
+     * The timer ran out. The volume comes back first, so the next play is at normal volume. An end-of-chapter timer
+     * leaves the pause to {@link #onChapterEnded()}; a timed one pauses with a wake window ("shake", while the book
+     * was playing) or stops the service as it always did.
+     */
+    private void onSleepTimerFired(boolean endOfChapter) {
+        stopSleepWarning();
+        SleepTimerPresenter.setTimerStarted(false);
+        sendInternal(new Intent(bradcast_FinishTimer));
+        if (endOfChapter) {
+            return;
+        }
+        if (sleepShake && wantPlaying && hasAccelerometer()) {
+            pause();
+            openWakeWindow();
+        } else {
+            stop();
+        }
+    }
+
+    /** More time for a running countdown or clock-mode timer; a warning in progress ends (volume back). */
+    private void extendSleepTimer(long ms) {
+        if (sleepTimer == null || sleepMode == SleepTimerPresenter.MODE_END_OF_CHAPTER) {
+            return;
+        }
+        stopSleepWarning();
+        sleepTimer.extend(ms);
+        sendSleepTimerState(sleepTimer.getTimeRemaining());
+    }
+
+    /** A shake during the warning gives the timer its time back; within the wake window it plays on and re-arms. */
+    private void onShake() {
+        boolean clock = sleepMode == SleepTimerPresenter.MODE_CLOCK;
+        if (wakeWindowOpen) {
+            closeWakeWindow();
+            if (!Objects.equals(wakeWindowBook, bookUrl)) {
+                return;
+            }
+            play();
+            armSleepTimer(clock ? SLEEP_CLOCK_EXTEND_MS : sleepDurationMs);
+        } else if (sleepTimer != null && volumeBeforeWarning >= 0) {
+            extendSleepTimer(clock ? SLEEP_CLOCK_EXTEND_MS : sleepDurationMs - sleepTimer.getTimeRemaining());
+        } else {
+            return;
+        }
+        beep(1);
+    }
+
+    /** Cancels the timer and all it started: the fade (volume back), the accelerometer, the wake window. */
+    private void releaseSleepTimer() {
+        if (sleepTimer != null) {
+            sleepTimer.cancel();
+            sleepTimer = null;
+        }
+        stopSleepWarning();
+        closeWakeWindow();
+        releaseTone(activeTone);
+    }
+
+    private void stopSleepWarning() {
+        if (volumeBeforeWarning >= 0) {
+            if (player != null) {
+                player.setVolume(volumeBeforeWarning);
+            }
+            volumeBeforeWarning = -1;
+        }
+        listenForShake(false);
+    }
+
+    /** Paused, foreground and awake for {@link #SLEEP_WAKE_WINDOW_MS}, listening for a shake. */
+    private void openWakeWindow() {
+        wakeWindowOpen = true;
+        wakeWindowBook = bookUrl;
+        holdWakeWindowLock(true);
+        listenForShake(true);
+        handler.postDelayed(wakeWindowEnd, SLEEP_WAKE_WINDOW_MS);
+    }
+
+    private void closeWakeWindow() {
+        if (!wakeWindowOpen) {
+            return;
+        }
+        wakeWindowOpen = false;
+        handler.removeCallbacks(wakeWindowEnd);
+        listenForShake(false);
+        holdWakeWindowLock(false);
+    }
+
+    /** No shake in time: the full stop the timer always made, unless the user played on or changed the book. */
+    private void onWakeWindowEnd() {
+        closeWakeWindow();
+        if (!wantPlaying && Objects.equals(wakeWindowBook, bookUrl)) {
+            stop();
+        }
+    }
+
+    private void holdWakeWindowLock(boolean hold) {
+        try {
+            if (hold) {
+                if (wakeWindowLock == null) {
+                    PowerManager power = (PowerManager) getSystemService(Context.POWER_SERVICE);
+                    if (power == null) {
+                        return;
+                    }
+                    wakeWindowLock = power.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "audiobooks:sleepTimer");
+                    wakeWindowLock.setReferenceCounted(false);
+                }
+                wakeWindowLock.acquire(SLEEP_WAKE_WINDOW_MS + 5_000);
+            } else if (wakeWindowLock != null && wakeWindowLock.isHeld()) {
+                wakeWindowLock.release();
+            }
+        } catch (RuntimeException e) {
+            Log.w(TAG, "sleep timer wake lock", e);
+        }
+    }
+
+    private boolean hasAccelerometer() {
+        SensorManager sensors = (SensorManager) getSystemService(Context.SENSOR_SERVICE);
+        return sensors != null && sensors.getDefaultSensor(Sensor.TYPE_ACCELEROMETER) != null;
+    }
+
+    /** The accelerometer is registered only during the warning and the wake window (battery). */
+    private void listenForShake(boolean listen) {
+        if (listen == shakeListening) {
+            return;
+        }
+        SensorManager sensors = (SensorManager) getSystemService(Context.SENSOR_SERVICE);
+        if (sensors == null) {
+            return;
+        }
+        if (listen) {
+            Sensor accelerometer = sensors.getDefaultSensor(Sensor.TYPE_ACCELEROMETER);
+            shakeListening = accelerometer != null
+                    && sensors.registerListener(shakeListener, accelerometer, SensorManager.SENSOR_DELAY_GAME);
+        } else {
+            sensors.unregisterListener(shakeListener);
+            shakeListening = false;
+        }
+    }
+
+    /** {@code count} short beeps on the music stream; the generator is released after the last one. */
+    private void beep(int count) {
+        releaseTone(activeTone);
+        final ToneGenerator tone;
+        try {
+            tone = new ToneGenerator(AudioManager.STREAM_MUSIC, BEEP_VOLUME);
+        } catch (RuntimeException e) {
+            Log.w(TAG, "cannot beep", e);
+            return;
+        }
+        activeTone = tone;
+        for (int i = 0; i < count; i++) {
+            handler.postDelayed(() -> {
+                if (activeTone == tone) {
+                    tone.startTone(ToneGenerator.TONE_PROP_BEEP, BEEP_MS);
+                }
+            }, i * BEEP_PERIOD_MS);
+        }
+        handler.postDelayed(() -> releaseTone(tone), count * BEEP_PERIOD_MS);
+    }
+
+    /** Releases {@code tone} if it is still the active generator (a teardown may have dropped its scheduled release). */
+    private void releaseTone(@Nullable ToneGenerator tone) {
+        if (tone == null || activeTone != tone) {
+            return;
+        }
+        activeTone = null;
+        try {
+            tone.release();
+        } catch (RuntimeException e) {
+            Log.w(TAG, "cannot release beep", e);
+        }
+    }
+
+    /**
+     * To the screen: "time" (remaining ms), "endAt" (epoch ms of the stop, 0 for end-of-chapter), "paused" (the
+     * countdown waits for playback), "mode" ({@code SleepTimerPresenter.MODE_*}).
+     */
+    private void sendSleepTimerState(long remaining) {
+        //to the second: a clock-mode timer reads as the minute it was set to
+        long endAt = sleepMode == SleepTimerPresenter.MODE_END_OF_CHAPTER ? 0
+                : (System.currentTimeMillis() + remaining + 500) / 1000 * 1000;
+        sendInternal(new Intent(bradcast_UpdateTimer).putExtra("time", remaining).putExtra("endAt", endAt)
+                .putExtra("paused", sleepTimer != null && sleepTimer.isPaused()).putExtra("mode", sleepMode));
     }
 
     /** Media time left in the chapter at the current speed. */

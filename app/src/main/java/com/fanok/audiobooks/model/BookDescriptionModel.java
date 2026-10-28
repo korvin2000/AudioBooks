@@ -169,8 +169,8 @@ public class BookDescriptionModel implements DescriptionModel {
         SourceParser parser = Provider.parserOf(mPageUrl);
         try {
             if (parser != null) {
-                description.setOtherReader(parser.findsOtherReaders()
-                        && !parser.otherReaders(mPageUrl, title, autor, artist).isEmpty());
+                description.setOtherReaders(parser.findsOtherReaders()
+                        ? parser.otherReaders(mPageUrl, title, autor, artist) : null);
             } else if (Url.isHost(mPageUrl, Url.SERVER_IZIBUK)) {
                 HttpUrl search = Objects.requireNonNull(HttpUrl.parse(Url.SERVER_IZIBUK + "/search")).newBuilder()
                         .addQueryParameter("q", title + " " + autor)
@@ -178,23 +178,23 @@ public class BookDescriptionModel implements DescriptionModel {
                 Element list = SiteHttp.get(search.toString()).getElementById("books_list");
                 description.setOtherReader(list != null && list.getElementsByClass("_ccb9b7").size() > 1);
             } else if (Url.isHost(mPageUrl, Url.SERVER_ABMP3)) {
-                description.setOtherReader(
-                        !OtherArtistModel.loadOtherArtistABMP3(title, autor, mPageUrl, artist).isEmpty());
+                description.setOtherReaders(
+                        OtherArtistModel.loadOtherArtistABMP3(title, autor, mPageUrl, artist));
             } else if (Url.isHost(mPageUrl, Url.SERVER_AKNIGA)) {
-                description.setOtherReader(
-                        !OtherArtistModel.loadOtherArtistAbook(title, autor, mPageUrl, artist).isEmpty());
+                description.setOtherReaders(
+                        OtherArtistModel.loadOtherArtistAbook(title, autor, mPageUrl, artist));
             } else if (Url.isHost(mPageUrl, Url.SERVER_BAZA_KNIG)) {
-                description.setOtherReader(
-                        !OtherArtistModel.loadOtherArtistBazaKnig(title, autor, mPageUrl, artist).isEmpty());
+                description.setOtherReaders(
+                        OtherArtistModel.loadOtherArtistBazaKnig(title, autor, mPageUrl, artist));
             } else if (Url.isHost(mPageUrl, Url.SERVER_KNIGOBLUD)) {
-                description.setOtherReader(
-                        !OtherArtistModel.loadOtherArtistKnigoblud(title, autor, mPageUrl, artist).isEmpty());
+                description.setOtherReaders(
+                        OtherArtistModel.loadOtherArtistKnigoblud(title, autor, mPageUrl, artist));
             } else if (Url.isHost(mPageUrl, Url.SERVER_AUDIOBOO)) {
-                description.setOtherReader(
-                        !OtherArtistModel.loadOtherArtistAudioboo(title, autor, mPageUrl, artist).isEmpty());
+                description.setOtherReaders(
+                        OtherArtistModel.loadOtherArtistAudioboo(title, autor, mPageUrl, artist));
             }
         } catch (Exception ignored) {
-            description.setOtherReader(false);
+            description.setOtherReaders(null);
         }
         return description;
     }

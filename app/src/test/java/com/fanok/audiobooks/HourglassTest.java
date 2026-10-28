@@ -158,6 +158,63 @@ public class HourglassTest {
     }
 
     @Test
+    public void extendAddsTimeWhileCounting() {
+        FakeTime time = new FakeTime();
+        Recorder timer = new Recorder(1_000, false, time);
+        timer.startTimer();
+        time.advance(600);
+        timer.extend(2_000);
+        assertEquals(2_400, timer.getTimeRemaining());
+        assertEquals("still one tick chain", 1, time.tasks.size());
+
+        time.advance(2_399);
+        assertEquals(0, timer.finished);
+        time.advance(1);
+        assertEquals(1, timer.finished);
+        assertTrue(time.tasks.isEmpty());
+    }
+
+    @Test
+    public void extendAddsTimeWhilePaused() {
+        FakeTime time = new FakeTime();
+        Recorder timer = new Recorder(1_000, false, time);
+        timer.startTimer();
+        time.advance(400);
+        timer.pauseTimer();
+        timer.extend(5_000);
+        assertTrue(timer.isPaused());
+        assertEquals(5_600, timer.getTimeRemaining());
+        time.advance(60_000);
+        assertEquals(0, timer.finished);
+
+        timer.resumeTimer();
+        time.advance(5_599);
+        assertEquals(0, timer.finished);
+        time.advance(1);
+        assertEquals(1, timer.finished);
+    }
+
+    @Test
+    public void extendNeedsARunningCountdown() {
+        FakeTime time = new FakeTime();
+        Recorder done = new Recorder(100, false, time);
+        done.startTimer();
+        time.advance(100);
+        assertEquals(1, done.finished);
+        done.extend(1_000);
+        assertFalse("a finished timer is not re-armed", done.isRunning());
+        time.advance(10_000);
+        assertEquals(1, done.finished);
+
+        Recorder boundary = new Recorder(0, true, time);
+        boundary.boundary = 42_000;
+        boundary.startTimer();
+        boundary.extend(1_000);
+        assertEquals(42_000, boundary.getTimeRemaining());
+        assertTrue(boundary.isRunning());
+    }
+
+    @Test
     public void split_hoursDoNotWrapAtADay() {
         assertArrayEquals(new long[]{25, 1, 5}, Hourglass.split((25 * 3600 + 65) * 1000L + 999));
         assertArrayEquals(new long[]{0, 0, 0}, Hourglass.split(-5));
