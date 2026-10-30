@@ -6,6 +6,8 @@ import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertSame;
 import static org.junit.Assert.assertTrue;
 
+import com.fanok.audiobooks.search.Provider;
+
 import org.junit.After;
 import org.junit.Test;
 
@@ -20,7 +22,9 @@ import java.net.URI;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 public class AppProxyTest {
 
@@ -61,6 +65,48 @@ public class AppProxyTest {
         assertEquals("the proxy in use, then the spares, in order", Arrays.asList(AUTO, SPARE1, SPARE2),
                 selector.select(URI.create("https://akniga.org/x")));
         assertEquals(Collections.singletonList(Proxy.NO_PROXY), selector.select(URI.create("ftp://files.example/")));
+    }
+
+    @Test
+    public void aDirectSourceBypassesTheProxyAndAnyOtherHostFollowsIt() {
+        AppProxy.Selector selector = new AppProxy.Selector(fallback, () -> Collections.singletonList(SOCKS),
+                host -> !"akniga.org".equals(host), (sa, e) -> { });
+        assertEquals(Collections.singletonList(Proxy.NO_PROXY), selector.select(URI.create("https://akniga.org/x")));
+        assertEquals("www. is the same site", Collections.singletonList(Proxy.NO_PROXY),
+                selector.select(URI.create("https://WWW.akniga.org/x")));
+        assertEquals(Collections.singletonList(SOCKS), selector.select(URI.create("https://uknig.com/x")));
+        assertEquals(Collections.singletonList(SOCKS), selector.select(URI.create("https://cdn.example/a.mp3")));
+    }
+
+    @Test
+    public void onlyTheSourcesSetDirectGoDirect() {
+        Set<String> direct = new HashSet<>(Collections.singletonList(Provider.AKNIGA.prefValue));
+        assertFalse(AppProxy.isProxied(Provider.AKNIGA, direct));
+        assertTrue(AppProxy.isProxied(Provider.UKNIG, direct));
+        assertTrue("an unknown host (a shared CDN) follows the mode", AppProxy.isProxied(null, direct));
+        assertTrue("nothing stored: every source takes the proxy",
+                AppProxy.isProxied(Provider.AKNIGA, Collections.<String>emptySet()));
+    }
+
+    @Test
+    public void theDirectSetIsReadSafely() {
+        FakePrefs prefs = new FakePrefs();
+        assertTrue(AppProxy.readDirect(prefs).isEmpty());
+        prefs.edit().putStringSet(AppProxy.PREF_DIRECT, new HashSet<>(Arrays.asList("abook", "uknig"))).apply();
+        assertEquals(new HashSet<>(Arrays.asList("abook", "uknig")), AppProxy.readDirect(prefs));
+        prefs.edit().putString(AppProxy.PREF_DIRECT, "garbled").apply();
+        assertTrue(AppProxy.readDirect(prefs).isEmpty());
+    }
+
+    @Test
+    public void theAutomaticProxyIsCheckedAgainstASourceThatTakesIt() {
+        FakePrefs prefs = new FakePrefs();
+        prefs.edit().putString("sorce_books", Provider.UKNIG.prefValue).apply();
+        assertEquals(Provider.UKNIG.server + "/", ProxyFinder.targetOf(prefs));
+        prefs.edit().putStringSet(AppProxy.PREF_DIRECT,
+                new HashSet<>(Arrays.asList(Provider.UKNIG.prefValue, Provider.AKNIGA.prefValue))).apply();
+        assertEquals("the selected source goes direct: the first proxied one",
+                Provider.values()[1].server + "/", ProxyFinder.targetOf(prefs));
     }
 
     @Test
@@ -156,5 +202,22 @@ public class AppProxyTest {
         assertNull(Authenticator.requestPasswordAuthentication("", null, 0, "SOCKS5", "SOCKS authentication", null));
         assertSame(Proxy.Type.SOCKS, AppProxy.proxy().type());
         assertTrue(AppProxy.normalize(null).equals(AppProxy.MODE_OFF));
+    }
+
+    /** The settings list ticks the sites that use the proxy; the unticked ones are stored as direct. */
+    @Test
+    public void theSiteListStoresTheUntickedSitesAsDirect() {
+        Set<String> direct = AppProxy.directExcept(
+                new HashSet<>(Arrays.asList(Provider.AKNIGA.prefValue, Provider.UKNIG.prefValue)));
+        assertEquals(Provider.values().length - 2, direct.size());
+        assertFalse(direct.contains(Provider.AKNIGA.prefValue));
+        assertTrue(direct.contains(Provider.IZIBUK.prefValue));
+        assertTrue(AppProxy.isProxied(Provider.AKNIGA, direct));
+        assertFalse(AppProxy.isProxied(Provider.IZIBUK, direct));
+        Set<String> all = new HashSet<>();
+        for (Provider provider : Provider.values()) {
+            all.add(provider.prefValue);
+        }
+        assertTrue("every site ticked: none direct", AppProxy.directExcept(all).isEmpty());
     }
 }

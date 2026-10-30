@@ -67,10 +67,10 @@ public class Url {
     public static final String INDEX_BAZA_KNIG = SERVER_BAZA_KNIG + "/page/";
     public static final String SECTIONS_BAZA_KNIG = SERVER_BAZA_KNIG;
     public static final String NEW_BOOK_BAZA_KNIG = SERVER_BAZA_KNIG + "/page/";
-    public static final String BEST_BAZA_KNIG = SERVER_BAZA_KNIG + "/f/sort=news_read/order=desc/page/";
-    public static final String RATING_BAZA_KNIG = SERVER_BAZA_KNIG + "/f/sort=rating/order=desc/page/";
-    public static final String COMENTS_BAZA_KNIG = SERVER_BAZA_KNIG + "/f/sort=comm_num/order=desc/page/";
-    public static final String YEARS_BAZA_KNIG = SERVER_BAZA_KNIG + "/f/sort=d.god/order=desc/page/";
+    // the rankings leave out paid LitRes books (their page plays a trial fragment only), as the search does
+    public static final String BEST_BAZA_KNIG = SERVER_BAZA_KNIG + "/f/v.litres_buy=litres/sort=news_read/order=desc/page/";
+    public static final String RATING_BAZA_KNIG = SERVER_BAZA_KNIG + "/f/v.litres_buy=litres/sort=rating/order=desc/page/";
+    public static final String COMENTS_BAZA_KNIG = SERVER_BAZA_KNIG + "/f/v.litres_buy=litres/sort=comm_num/order=desc/page/";
 
 
     public static final String SERVER_KNIGOBLUD = "https://www.knigoblud.club";
@@ -111,6 +111,8 @@ public class Url {
         HOST_ALIASES.put("m.knigavuhe.org", "knigavuhe.org");
         HOST_ALIASES.put("pda.izibuk.ru", "izib.uk");
         HOST_ALIASES.put("aknig.xyz", "s2.aknig.xyz");
+        HOST_ALIASES.put("m.otrub.in", "otrub.in");
+        HOST_ALIASES.put("mob.knigoblud.club", "knigoblud.club");
     }
 
     /** Lower-case host of {@code url} without a leading {@code www.}; empty when unparsable. */

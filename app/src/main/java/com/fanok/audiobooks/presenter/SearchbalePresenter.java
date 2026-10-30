@@ -252,7 +252,7 @@ public class SearchbalePresenter extends MvpPresenter<SearchableView> implements
             mSession.dispose();
         }
         List<SearchSession.Source<BookPOJO>> sources = new ArrayList<>();
-        for (Provider provider : Provider.values()) {
+        for (Provider provider : Provider.selectedFirst()) {
             if (mPreferences.getBoolean(provider.prefKey, true)) {
                 sources.add(new SearchSession.Source<BookPOJO>() {
                     @Override

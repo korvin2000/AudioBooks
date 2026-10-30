@@ -8,6 +8,7 @@ import androidx.annotation.Nullable;
 
 import com.fanok.audiobooks.App;
 import com.fanok.audiobooks.Consts;
+import com.fanok.audiobooks.search.Provider;
 
 import java.io.IOException;
 import java.net.Authenticator;
@@ -18,15 +19,20 @@ import java.net.ProxySelector;
 import java.net.SocketAddress;
 import java.net.URI;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.function.BiConsumer;
+import java.util.function.Predicate;
 import java.util.function.Supplier;
 
 /**
  * The "Прокси" setting ({@link #PREF_MODE}): off (the device's network settings), the built-in SOCKS proxy from
  * {@link Consts}, or the automatic mode, where {@link ProxyFinder} supplies a verified public proxy. Installed once as
  * the process-wide {@link ProxySelector}, so every HTTP path (site pages through SiteHttp, audio and downloads through
- * OkHttp, covers) follows the setting without per-request code. The built-in credentials are handed only to the
+ * OkHttp, covers) follows the setting without per-request code. The route is chosen per host: a source the user set to
+ * go direct ({@link #PREF_DIRECT}) bypasses the proxy, with its subdomains and {@code SourceParser.hosts()}; any
+ * other host (a shared CDN) follows the mode. The built-in credentials are handed only to the
  * built-in proxy's host:port, never to a public proxy or a site that asks for authentication.
  */
 public final class AppProxy {
@@ -37,9 +43,15 @@ public final class AppProxy {
     public static final String MODE_OFF = "off";
     public static final String MODE_BUILTIN = "builtin";
     public static final String MODE_AUTO = "auto";
+    /**
+     * The sources that bypass the proxy: a set of {@code Provider.prefValue}. Absent or empty, every source takes the
+     * proxy (as before the setting existed), and so does a source added later.
+     */
+    public static final String PREF_DIRECT = "pref_proxy_direct";
 
     private static volatile String mode = MODE_OFF;
     private static volatile ProxyFinder finder;
+    private static volatile Set<String> direct = Collections.emptySet();
     /** Strong reference: SharedPreferences keeps its listeners weakly. */
     private static SharedPreferences.OnSharedPreferenceChangeListener listener;
     /** The catalog site setting: the automatic proxy must reach the selected site. */
@@ -63,10 +75,22 @@ public final class AppProxy {
     public static void install(@NonNull Context context) {
         SharedPreferences prefs = prefs(context);
         mode = readMode(prefs);
+        direct = readDirect(prefs);
         finder = ProxyFinder.get(context);
         listener = (p, key) -> {
             if (PREF_MODE.equals(key)) {
                 applyMode(readMode(p));
+            } else if (PREF_DIRECT.equals(key)) {
+                Set<String> before = direct;
+                direct = readDirect(p);
+                // a pooled connection keeps the route it was opened with
+                App.evictConnections();
+                ProxyFinder f = finder;
+                String selected = selectedSource(p);
+                if (MODE_AUTO.equals(mode) && f != null
+                        && !ProxyFinder.targetOf(selected, before).equals(ProxyFinder.targetOf(selected, direct))) {
+                    f.recheckCurrent(); // the proxy is now checked against another site
+                }
             } else if (PREF_SOURCE.equals(key) && MODE_AUTO.equals(mode)) {
                 // the proxy in use is checked against the new site; one it rejects is replaced
                 ProxyFinder f = finder;
@@ -78,7 +102,8 @@ public final class AppProxy {
         prefs.registerOnSharedPreferenceChangeListener(listener);
         List<Proxy> builtin = Collections.singletonList(proxy());
         ProxySelector.setDefault(new Selector(ProxySelector.getDefault(),
-                () -> route(mode, configured(), builtin, AppProxy::autoProxies), AppProxy::onConnectFailed));
+                () -> route(mode, configured(), builtin, AppProxy::autoProxies), AppProxy::proxied,
+                AppProxy::onConnectFailed));
         Authenticator.setDefault(new ProxyOnlyAuthenticator(Consts.PROXY_HOST, Consts.PROXY_PORT,
                 Consts.PROXY_USER, Consts.PROXY_PASSWORD));
         if (MODE_AUTO.equals(mode)) {
@@ -141,6 +166,48 @@ public final class AppProxy {
         }
     }
 
+    @Nullable
+    private static String selectedSource(@NonNull SharedPreferences prefs) {
+        try {
+            return prefs.getString(PREF_SOURCE, null);
+        } catch (ClassCastException e) {
+            return null;
+        }
+    }
+
+    /** Pure: the {@link #PREF_DIRECT} set when the user ticks {@code proxied} (prefValues) in the site list. */
+    @NonNull
+    public static Set<String> directExcept(@NonNull Set<?> proxied) {
+        Set<String> direct = new java.util.HashSet<>();
+        for (Provider provider : Provider.values()) {
+            if (!proxied.contains(provider.prefValue)) {
+                direct.add(provider.prefValue);
+            }
+        }
+        return direct;
+    }
+
+    /** The stored {@link #PREF_DIRECT} set; a wrongly typed value means none. */
+    @NonNull
+    public static Set<String> readDirect(@NonNull SharedPreferences prefs) {
+        try {
+            Set<String> stored = prefs.getStringSet(PREF_DIRECT, null);
+            return stored == null ? Collections.<String>emptySet() : new HashSet<>(stored);
+        } catch (ClassCastException e) {
+            return Collections.emptySet();
+        }
+    }
+
+    /** True when requests to {@code host} take the proxy route of the mode: any host but one of a direct source's. */
+    public static boolean proxied(@Nullable String host) {
+        return isProxied(Provider.ofNetworkHost(host), direct);
+    }
+
+    /** Pure: an unknown host (null provider) follows the mode; a known one unless its source is in {@code direct}. */
+    static boolean isProxied(@Nullable Provider provider, @NonNull Set<String> direct) {
+        return provider == null || !direct.contains(provider.prefValue);
+    }
+
     @NonNull
     static String normalize(@Nullable String value) {
         if (MODE_BUILTIN.equals(value) || MODE_AUTO.equals(value)) {
@@ -193,13 +260,14 @@ public final class AppProxy {
     }
 
     /**
-     * From {@link SiteHttp}: the site refused a request (403, 429). In the automatic mode the proxy in use is checked by
-     * one probe and replaced when the site refuses it. Never throws.
+     * From {@link SiteHttp}: the site at {@code host} refused a request (403, 429). In the automatic mode, when that
+     * request went through the proxy, the proxy in use is checked by one probe and replaced when the site refuses it.
+     * Never throws.
      */
-    public static void reportSuspect() {
+    public static void reportSuspect(@Nullable String host) {
         try {
             ProxyFinder f = finder;
-            if (MODE_AUTO.equals(mode) && f != null) {
+            if (MODE_AUTO.equals(mode) && f != null && proxied(host)) {
                 f.reportSuspect();
             }
         } catch (RuntimeException ignored) {
@@ -212,19 +280,26 @@ public final class AppProxy {
     }
 
     /**
-     * Routes web traffic through the proxies {@code route} names, in order; without any, defers to the system selector.
-     * A failed connection is reported to {@code failed} (never thrown back into the client) and passed on to the
-     * system selector.
+     * Routes web traffic to a host {@code proxied} accepts through the proxies {@code route} names, in order; without
+     * any, or for another host, defers to the system selector. A failed connection is reported to {@code failed}
+     * (never thrown back into the client) and passed on to the system selector.
      */
     static final class Selector extends ProxySelector {
         private final ProxySelector fallback;
         private final Supplier<List<Proxy>> route;
+        private final Predicate<String> proxied;
         private final BiConsumer<SocketAddress, IOException> failed;
 
         Selector(@Nullable ProxySelector fallback, @NonNull Supplier<List<Proxy>> route,
                 @NonNull BiConsumer<SocketAddress, IOException> failed) {
+            this(fallback, route, host -> true, failed);
+        }
+
+        Selector(@Nullable ProxySelector fallback, @NonNull Supplier<List<Proxy>> route,
+                @NonNull Predicate<String> proxied, @NonNull BiConsumer<SocketAddress, IOException> failed) {
             this.fallback = fallback;
             this.route = route;
+            this.proxied = proxied;
             this.failed = failed;
         }
 
@@ -232,13 +307,24 @@ public final class AppProxy {
         public List<Proxy> select(URI uri) {
             String scheme = uri == null ? null : uri.getScheme();
             boolean web = "http".equalsIgnoreCase(scheme) || "https".equalsIgnoreCase(scheme) || "socket".equalsIgnoreCase(scheme);
-            if (web) {
+            if (web && proxied.test(hostOf(uri))) {
                 List<Proxy> proxies = route.get();
                 if (proxies != null && !proxies.isEmpty()) {
                     return proxies;
                 }
             }
             return fallback != null ? fallback.select(uri) : Collections.singletonList(Proxy.NO_PROXY);
+        }
+
+        /** The host of {@code uri}, lower case and without {@code www.}; null when it has none. */
+        @Nullable
+        private static String hostOf(@NonNull URI uri) {
+            String host = uri.getHost();
+            if (host == null) {
+                return null;
+            }
+            host = host.toLowerCase(java.util.Locale.ROOT);
+            return host.startsWith("www.") ? host.substring(4) : host;
         }
 
         @Override

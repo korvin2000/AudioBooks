@@ -1,7 +1,5 @@
 package com.fanok.audiobooks.interface_pacatge.books;
 
-import android.content.Context;
-
 import com.fanok.audiobooks.pojo.BookPOJO;
 import com.fanok.audiobooks.search.Provider;
 import com.fanok.audiobooks.search.ProviderPage;
@@ -10,7 +8,7 @@ import java.io.IOException;
 
 public interface BooksModel {
     /** One listing page of {@code url} (a catalog, genre, author, series or similar page). */
-    Single<ProviderPage<BookPOJO>> getBooks(String url, int page, String nameModel, Context context);
+    Single<ProviderPage<BookPOJO>> getBooks(String url, int page);
 
     /** One page of book search results on {@code provider}; blocking, called on an io thread. */
     ProviderPage<BookPOJO> search(Provider provider, String query, int page) throws IOException;

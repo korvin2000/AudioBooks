@@ -35,7 +35,9 @@ import com.fanok.audiobooks.search.GenreSort;
 import com.fanok.audiobooks.search.ListingCursor;
 import com.fanok.audiobooks.search.ListingFilters;
 import com.fanok.audiobooks.search.Provider;
+import com.fanok.audiobooks.source.Sort;
 import com.fanok.audiobooks.search.ProviderPage;
+import com.fanok.audiobooks.search.SearchUrls;
 import com.google.android.material.bottomsheet.BottomSheetDialog;
 import com.squareup.picasso.Picasso;
 import io.reactivex.android.schedulers.AndroidSchedulers;
@@ -93,7 +95,7 @@ public class BooksPresenter extends MvpPresenter<BooksView> implements
     /** @param period the period kept with a rewritten URL ({@link BooksView#rememberUrl}), or null */
     public BooksPresenter(@NonNull String url, int modelId, @NonNull String subTitle,
             ListingFilters.Period period, @NonNull Context context) {
-        mUrl = url;
+        mUrl = Url.canonical(url); // a link on a former or mobile host lists from the current one
         mModelId = modelId;
         mSubTitle = subTitle;
         mBooksDBModel = new BooksDBModel(context);
@@ -278,7 +280,8 @@ public class BooksPresenter extends MvpPresenter<BooksView> implements
 
     /** The period the filter menu shows checked: baza-knig's stored choice, else what the URL carries. */
     private ListingFilters.Period period() {
-        if (mProvider == Provider.BAZA_KNIG && mPeriod != null && !ListingFilters.periods(mProvider, mUrl).isEmpty()) {
+        if (ListingFilters.periodsAreDates(mProvider) && mPeriod != null
+                && !ListingFilters.periods(mProvider, mUrl).isEmpty()) {
             return mPeriod;
         }
         return ListingFilters.periodOf(mProvider, mUrl, today());
@@ -286,7 +289,7 @@ public class BooksPresenter extends MvpPresenter<BooksView> implements
 
     /** Before a page-1 request: baza-knig's date bound counted back from today, never mid-paging. */
     private void refreshPeriodDate() {
-        if (mProvider == Provider.BAZA_KNIG && mPeriod != null) {
+        if (ListingFilters.periodsAreDates(mProvider) && mPeriod != null) {
             setUrl(ListingFilters.withPeriod(mProvider, mUrl, mPeriod, today()));
         }
     }
@@ -350,24 +353,8 @@ public class BooksPresenter extends MvpPresenter<BooksView> implements
         if (mModelId == Consts.MODEL_GENRE) {
             return mUrl;
         }
-        if (mProvider != null && mProvider.parser != null) {
-            return mProvider.parser.pageUrl(mUrl, page);
-        }
-        if (Url.isHost(mUrl, Url.SERVER_AUDIOBOO)) {
-            //the index, genres and the author, reader and series links of cards share one scheme
-            return Url.audiobooListingPage(mUrl, page);
-        } else if (Url.isHost(mUrl, Url.SERVER_ABMP3)) {
-            return Url.abmp3ListingPage(mUrl, page);
-        } else if (mUrl.contains(Url.SERVER_KNIGOBLUD)) {
-            return mUrl.contains("?") ? mUrl + page : mUrl + "/" + page;
-        } else if (mUrl.contains(Url.SERVER_OTRUB) || mUrl.contains(Url.SERVER_POLEKNIG)) {
-            return mUrl.contains("?") ? mUrl + page : mUrl + "?p=" + page;
-        } else if ((!mUrl.contains("genre") || mUrl.contains(Url.SERVER_IZIBUK) || mUrl.contains(Url.SERVER_BAZA_KNIG))
-                && !mUrl.contains(Url.SERVER_AKNIGA)) {
-            return mUrl + page + "/";
-        } else {
-            return mUrl.replace("<page>", Integer.toString(page));
-        }
+        // an unknown host lists nothing
+        return mProvider == null ? mUrl : mProvider.parser.pageUrl(mUrl, page);
     }
 
     @Override
@@ -500,17 +487,12 @@ public class BooksPresenter extends MvpPresenter<BooksView> implements
     @SuppressLint("ApplySharedPref")
     @Override
     public void onOptionItemSelected(int itemId) {
-        String subTitle = mSubTitle.replace(" " + getStringById(R.string.order_new), "");
-        subTitle = subTitle.replace(" " + getStringById(R.string.order_reting), "");
-        subTitle = subTitle.replace(" " + getStringById(R.string.order_popular), "");
-        subTitle = subTitle.replace(" " + getStringById(R.string.order_coments), "");
-        subTitle = subTitle.replace(" " + getStringById(R.string.order_year), "");
-        subTitle = subTitle.replace(" " + getStringById(R.string.order_title), "");
-        subTitle = subTitle.replace(" " + getStringById(R.string.order_duration), "");
-        subTitle = subTitle.replace(" " + getStringById(R.string.knigoblud_today), "");
-        subTitle = subTitle.replace(" " + getStringById(R.string.knigoblud_trending), "");
-        subTitle = subTitle.replace(" " + getStringById(R.string.knigoblud_finished), "");
-        String url = "";
+        // the label of the sort the listing was opened with is replaced, not appended to
+        String subTitle = mSubTitle;
+        for (Sort label : Sort.values()) {
+            subTitle = subTitle.replace(" " + getStringById(label.label), "");
+        }
+        Sort sort = Sort.ofMenuId(itemId);
 
         Provider source = BooksFragment.sourceOf(itemId);
         if (source != null) {
@@ -523,333 +505,25 @@ public class BooksPresenter extends MvpPresenter<BooksView> implements
             getViewState().recreate();
         }
 
-        if (mProvider != null && mProvider.parser != null) {
-            String sort = mProvider.parser.sortUrl(itemId, mUrl);
-            url = sort == null ? "" : sort;
-        } else if (mUrl.contains(Url.SERVER)) {
-            if (!mUrl.contains("genre")) {
-                if (itemId == R.id.new_data) {
-                    url = Url.NEW_BOOK;
-                } else if (itemId == R.id.reting_all_time) {
-                    url = Url.RATING_ALL_TIME;
-                } else if (itemId == R.id.reting_month) {
-                    url = Url.RATING_MONTH;
-                } else if (itemId == R.id.reting_week) {
-                    url = Url.RATING_WEEK;
-                } else if (itemId == R.id.reting_day) {
-                    url = Url.RATING_TODATY;
-                } else if (itemId == R.id.popular_all_time) {
-                    url = Url.BEST_ALL_TIME;
-                } else if (itemId == R.id.popular_month) {
-                    url = Url.BEST_MONTH;
-                } else if (itemId == R.id.popular_week) {
-                    url = Url.BEST_WEEK;
-                } else if (itemId == R.id.popular_day) {
-                    url = Url.BEST_TODAY;
-                }
-            } else {
-                url = mUrl.substring(0, Consts.indexOfByNumber(mUrl, '/', 5) + 1);
-                if (itemId == R.id.new_data) {
-                    url = url + "<page>/";
-                } else if (itemId == R.id.reting_all_time) {
-                    url = url + "rating/<page>/?period=alltime";
-                } else if (itemId == R.id.reting_month) {
-                    url = url + "rating/<page>/?period=month";
-                } else if (itemId == R.id.reting_week) {
-                    url = url + "rating/<page>/?period=week";
-                } else if (itemId == R.id.reting_day) {
-                    url = url + "rating/<page>/?period=today";
-                } else if (itemId == R.id.popular_all_time) {
-                    url = url + "popular/<page>/?period=alltime";
-                } else if (itemId == R.id.popular_month) {
-                    url = url + "popular/<page>/?period=month";
-                } else if (itemId == R.id.popular_week) {
-                    url = url + "popular/<page>/?period=week";
-                } else if (itemId == R.id.popular_day) {
-                    url = url + "popular/<page>/?period=today";
-                }
-            }
-        } else if (mUrl.contains(Url.SERVER_IZIBUK)) {
-            // the index and a genre rank by popularity (all time, no period) with sort_pop=1, the genre kept
-            String newest = mUrl.replace("sort_pop=1&", "");
-            if (itemId == R.id.new_data) {
-                url = newest;
-            } else if (itemId == R.id.popular) {
-                url = newest.replaceFirst("\\?", "?sort_pop=1&");
-            }
-        } else if (mUrl.contains(Url.SERVER_ABMP3)) {
-            if (itemId == R.id.new_data) {
-                url = Url.INDEX_ABMP3;
-            } else if (itemId == R.id.abmp3_top100) {
-                url = Url.ABMP3_TOP;
-            } else if (itemId == R.id.abmp3_random) {
-                url = Url.ABMP3_RANDOM;
-            }
-        } else if (mUrl.contains(Url.SERVER_AKNIGA)) {
-            if (itemId == R.id.new_data) {
-                url = Url.NEW_BOOK_AKNIGA;
-            } else if (itemId == R.id.popular_day) {
-                url = Url.BEST_TODAY_AKNIGA;
-            } else if (itemId == R.id.popular_week) {
-                url = Url.BEST_WEEK_AKNIGA;
-            } else if (itemId == R.id.popular_month) {
-                url = Url.BEST_MONTH_AKNIGA;
-            } else if (itemId == R.id.popular_year) {
-                url = Url.BEST_YEAR_AKNIGA;
-            } else if (itemId == R.id.popular_all_time || itemId == R.id.popular) {
-                url = Url.BEST_ALL_TIME_AKNIGA;
-            } else if (itemId == R.id.reting_day) {
-                url = Url.RATING_TODATY_AKNIGA;
-            } else if (itemId == R.id.reting_week) {
-                url = Url.RATING_WEEK_AKNIGA;
-            } else if (itemId == R.id.reting_month) {
-                url = Url.RATING_MONTH_AKNIGA;
-            } else if (itemId == R.id.reting_year) {
-                url = Url.RATING_YEAR_AKNIGA;
-            } else if (itemId == R.id.reting_all_time || itemId == R.id.reting) {
-                url = Url.RATING_ALL_TIME_AKNIGA;
-            } else if (itemId == R.id.collections_new) {
-                url = Url.COLLECTIONS_AKNIGA;
-            } else if (itemId == R.id.collections_top) {
-                url = Url.COLLECTIONS_TOP_AKNIGA;
-            } else if (itemId == R.id.collections_discussed) {
-                url = Url.COLLECTIONS_DISCUSSED_AKNIGA;
-            } else {
-                url = mUrl;
-            }
-        } else if (mUrl.contains(Url.SERVER_BAZA_KNIG)) {
-            if (itemId == R.id.new_data) {
-                url = Url.NEW_BOOK_BAZA_KNIG;
-            } else if (itemId == R.id.reting) {
-                url = Url.RATING_BAZA_KNIG;
-            } else if (itemId == R.id.popular) {
-                url = Url.BEST_BAZA_KNIG;
-            } else if (itemId == R.id.coments) {
-                url = Url.COMENTS_BAZA_KNIG;
-            } else if (itemId == R.id.years) {
-                url = Url.YEARS_BAZA_KNIG;
-            }
-        } else if (mUrl.contains(Url.SERVER_AUDIOBOO)) {
-            url = mUrl;
-        } else if (mUrl.contains(Url.SERVER_OTRUB)) {
-            if (itemId == R.id.new_data) {
-                url = Url.NEW_BOOK_OTRUB;
-            } else if (itemId == R.id.popular_week || itemId == R.id.reting_week) {
-                url = Url.BEST_WEEK_OTRUB;
-            } else if (itemId == R.id.popular_month || itemId == R.id.reting_month) {
-                url = Url.BEST_MONTH_OTRUB;
-            } else {
-                url = mUrl;
-            }
-        } else if (mUrl.contains(Url.SERVER_POLEKNIG)) {
-            if (itemId == R.id.new_data) {
-                url = Url.NEW_BOOK_POLEKNIG;
-            } else if (itemId == R.id.reting || itemId == R.id.reting_all_time
-                    || itemId == R.id.reting_month || itemId == R.id.reting_week
-                    || itemId == R.id.reting_day || itemId == R.id.popular
-                    || itemId == R.id.popular_all_time || itemId == R.id.popular_month
-                    || itemId == R.id.popular_week || itemId == R.id.popular_day) {
-                url = Url.BEST_POLEKNIG;
-            } else {
-                url = mUrl;
-            }
-        } else if (mUrl.contains(Url.SERVER_KNIGOBLUD)) {
-            if (itemId == R.id.new_data) {
-                url = Url.INDEX_KNIGOBLUD;
-            } else if (itemId == R.id.popular_week) {
-                url = Url.POPULAR_WEEK_KNIGOBLUD;
-            } else if (itemId == R.id.popular_month) {
-                url = Url.POPULAR_MONTH_KNIGOBLUD;
-            } else if (itemId == R.id.knigoblud_today) {
-                url = Url.TODAY_KNIGOBLUD;
-            } else if (itemId == R.id.knigoblud_trending) {
-                url = Url.TRENDING_KNIGOBLUD;
-            } else if (itemId == R.id.knigoblud_finished) {
-                url = Url.FINISHED_KNIGOBLUD;
-            } else {
-                url = mUrl;
-            }
-        }
-
-        if (url.isEmpty() && itemId != R.id.app_bar_search) {
+        String url = sort == null ? null : ListingFilters.sorted(mProvider, sort, mUrl);
+        if (url == null && itemId != R.id.app_bar_search) {
             // a source switch, a submenu parent or an item this site has no listing for
             return;
         }
-        if (!url.equals(mUrl)) {
-            // the sorts above are the site-wide listings; a genre listing's sort stays within its genre
-            url = ListingFilters.inGenre(mProvider, url,
-                    ListingFilters.genreOf(mProvider, mUrl, GenreModel.KNIGOBLUD_GENRE_URLS));
-        }
         if (itemId == R.id.app_bar_search) {
-            if (mUrl.contains(Url.SERVER_ABMP3)) {
-                if (mModelId == Consts.MODEL_AUTOR) {
-                    getViewState().showSearchActivity(Consts.MODEL_AUTOR);
-                } else {
-                    getViewState().showSearchActivity(Consts.MODEL_BOOKS);
-                }
-            } else if (mModelId == Consts.MODEL_GENRE) {
-                // no site searches its genres: from a genre list the search is the book search
+            boolean noPerformerSearch = mModelId == Consts.MODEL_ARTIST && mProvider != null
+                    && SearchUrls.url(mProvider, SearchUrls.Category.PERFORMERS, "q", 1) == null;
+            if (mModelId == Consts.MODEL_GENRE || noPerformerSearch) {
+                // no site searches its genres, some none of their performers: there the search is the book search
                 getViewState().showSearchActivity(Consts.MODEL_BOOKS);
             } else {
                 getViewState().showSearchActivity(mModelId);
             }
-        } else if (itemId == R.id.new_data) {
-            getViewState().showFragment(BooksFragment.newInstance(
-                            url, R.string.menu_audiobooks,
-                            subTitle + " " + getStringById(R.string.order_new), Consts.MODEL_BOOKS),
-                    "audioBooksOrederNew");
-        } else if (itemId == R.id.reting_all_time || itemId == R.id.reting) {
-            getViewState().showFragment(BooksFragment.newInstance(
-                            url,
-                            R.string.menu_audiobooks,
-                            subTitle + " " + getStringById(R.string.order_reting), Consts.MODEL_BOOKS),
-                    "audioBooksOrederBestAllTime");
-        } else if (itemId == R.id.reting_month) {
-            getViewState().showFragment(BooksFragment.newInstance(
-                            url,
-                            R.string.menu_audiobooks,
-                            subTitle + " " + getStringById(R.string.order_reting), Consts.MODEL_BOOKS),
-                    "audioBooksOrederBestMonth");
-        } else if (itemId == R.id.reting_week) {
-            getViewState().showFragment(BooksFragment.newInstance(
-                            url,
-                            R.string.menu_audiobooks,
-                            subTitle + " " + getStringById(R.string.order_reting), Consts.MODEL_BOOKS),
-                    "audioBooksOrederBestWeek");
-        } else if (itemId == R.id.reting_day) {
-            getViewState().showFragment(BooksFragment.newInstance(
-                            url,
-                            R.string.menu_audiobooks,
-                            subTitle + " " + getStringById(R.string.order_reting), Consts.MODEL_BOOKS),
-                    "audioBooksOrederBestDay");
-                            } else if (itemId == R.id.reting_year) {
-                                getViewState().showFragment(BooksFragment.newInstance(
-                            url,
-                            R.string.menu_audiobooks,
-                            subTitle + " " + getStringById(R.string.order_reting),
-                            Consts.MODEL_BOOKS),
-                    "audioBooksOrederBestMonth");
-                            } else if (itemId == R.id.popular_all_time || itemId == R.id.popular) {
-            getViewState().showFragment(BooksFragment.newInstance(
-                            url,
-                            R.string.menu_audiobooks,
-                            subTitle + " " + getStringById(R.string.order_popular),
-                            Consts.MODEL_BOOKS),
-                    "audioBooksOrederDiscussedAllTime");
-        } else if (itemId == R.id.popular_month) {
-            getViewState().showFragment(BooksFragment.newInstance(
-                            url,
-                            R.string.menu_audiobooks,
-                            subTitle + " " + getStringById(R.string.order_popular),
-                            Consts.MODEL_BOOKS),
-                    "audioBooksOrederDiscussedMonth");
-        } else if (itemId == R.id.popular_week) {
-            getViewState().showFragment(BooksFragment.newInstance(
-                            url,
-                            R.string.menu_audiobooks,
-                            subTitle + " " + getStringById(R.string.order_popular),
-                            Consts.MODEL_BOOKS),
-                    "audioBooksOrederDiscussedWeek");
-        } else if (itemId == R.id.popular_day) {
-            getViewState().showFragment(BooksFragment.newInstance(
-                            url,
-                            R.string.menu_audiobooks,
-                            subTitle + " " + getStringById(R.string.order_popular),
-                            Consts.MODEL_BOOKS),
-                    "audioBooksOrederDiscussedDay");
-        } else if (itemId == R.id.popular_year) {
-            getViewState().showFragment(BooksFragment.newInstance(
-                            url,
-                            R.string.menu_audiobooks,
-                            subTitle + " " + getStringById(R.string.order_popular),
-                            Consts.MODEL_BOOKS),
-                    "audioBooksOrederDiscussedMonth");
-                            } else if (itemId == R.id.collections_new) {
-                                getViewState().showFragment(BooksFragment.newInstance(
-                            url,
-                            R.string.menu_audiobooks,
-                            subTitle + " " + getStringById(R.string.order_new),
-                            Consts.MODEL_BOOKS),
-                    "audioBooksOrederNew");
-                            } else if (itemId == R.id.collections_top) {
-                                getViewState().showFragment(BooksFragment.newInstance(
-                            url,
-                            R.string.menu_audiobooks,
-                            subTitle + " " + getStringById(R.string.order_popular),
-                            Consts.MODEL_BOOKS),
-                    "audioBooksOrederDiscussedAllTime");
-                            } else if (itemId == R.id.collections_discussed) {
-                                getViewState().showFragment(BooksFragment.newInstance(
-                            url,
-                            R.string.menu_audiobooks,
-                            subTitle + " " + getStringById(R.string.order_discussed),
-                            Consts.MODEL_BOOKS),
-                    "audioBooksOrederBestAllTime");
-                            } else if (itemId == R.id.coments) {
-            getViewState().showFragment(BooksFragment.newInstance(
-                            url,
-                            R.string.menu_audiobooks,
-                            subTitle + " " + getStringById(R.string.order_coments),
-                            Consts.MODEL_BOOKS),
-                    "audioBooksOrederComents");
-        } else if (itemId == R.id.years) {
-            getViewState().showFragment(BooksFragment.newInstance(
-                            url,
-                            R.string.menu_audiobooks,
-                            subTitle + " " + getStringById(R.string.order_year),
-                            Consts.MODEL_BOOKS),
-                    "audioBooksOrederYears");
-        } else if (itemId == R.id.sort_title) {
-            getViewState().showFragment(BooksFragment.newInstance(
-                            url,
-                            R.string.menu_audiobooks,
-                            subTitle + " " + getStringById(R.string.order_title),
-                            Consts.MODEL_BOOKS),
-                    "audioBooksOrderTitle");
-        } else if (itemId == R.id.sort_duration) {
-            getViewState().showFragment(BooksFragment.newInstance(
-                            url,
-                            R.string.menu_audiobooks,
-                            subTitle + " " + getStringById(R.string.order_duration),
-                            Consts.MODEL_BOOKS),
-                    "audioBooksOrderDuration");
-        } else if (itemId == R.id.knigoblud_today) {
-            getViewState().showFragment(BooksFragment.newInstance(
-                            url,
-                            R.string.menu_audiobooks,
-                            subTitle + " " + getStringById(R.string.knigoblud_today),
-                            Consts.MODEL_BOOKS),
-                    "knigobludToday");
-        } else if (itemId == R.id.knigoblud_trending) {
-            getViewState().showFragment(BooksFragment.newInstance(
-                            url,
-                            R.string.menu_audiobooks,
-                            subTitle + " " + getStringById(R.string.knigoblud_trending),
-                            Consts.MODEL_BOOKS),
-                    "knigobludTrending");
-        } else if (itemId == R.id.knigoblud_finished) {
-            getViewState().showFragment(BooksFragment.newInstance(
-                            url,
-                            R.string.menu_audiobooks,
-                            subTitle + " " + getStringById(R.string.knigoblud_finished),
-                            Consts.MODEL_BOOKS),
-                    "knigobludFinished");
-        } else if (itemId == R.id.abmp3_top100) {
-            getViewState().showFragment(BooksFragment.newInstance(
-                            url,
-                            R.string.menu_audiobooks,
-                            subTitle + " " + getStringById(R.string.abmp3_top100),
-                            Consts.MODEL_BOOKS),
-                    "abmp3Top100");
-        } else if (itemId == R.id.abmp3_random) {
-            getViewState().showFragment(BooksFragment.newInstance(
-                            url,
-                            R.string.menu_audiobooks,
-                            subTitle + " " + getStringById(R.string.abmp3_random),
-                            Consts.MODEL_BOOKS),
-                    "abmp3Random");
+        } else if (sort != null) {
+            getViewState().showFragment(BooksFragment.newInstance(url, R.string.menu_audiobooks,
+                    subTitle + " " + getStringById(sort.label), Consts.MODEL_BOOKS), sort.tag);
         }
-            }
+    }
 
 
     @Override
@@ -904,7 +578,7 @@ public class BooksPresenter extends MvpPresenter<BooksView> implements
         isLoading = true;
         String url = pageUrl(page);
         if (mModelId == Consts.MODEL_BOOKS) {
-            mDisposables.add(mModelBook.getBooks(url, page, mSubTitle.trim(), mContext.getApplicationContext())
+            mDisposables.add(mModelBook.getBooks(url, page)
                     .subscribeOn(Schedulers.io())
                     .observeOn(AndroidSchedulers.mainThread())
                     .subscribe(result -> {

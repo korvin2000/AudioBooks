@@ -147,31 +147,33 @@ public class ListingFiltersTest {
 
     @Test
     public void bazaKnigBoundsTheDurationOnTheServerByWholeHours() {
+        // changed on purpose after the live check (2026-10-30): the baza-knig rankings carry v.litres_buy=litres/ before the sort segment (no paid LitRes trial books)
         String ranking = Url.BEST_BAZA_KNIG;
-        assertEquals(Url.SERVER_BAZA_KNIG + "/f/t.prodolzhitelnost=00:59:59/sort=news_read/order=desc/page/",
+        assertEquals(Url.SERVER_BAZA_KNIG + "/f/t.prodolzhitelnost=00:59:59/v.litres_buy=litres/sort=news_read/order=desc/page/",
                 ListingFilters.withDuration(Provider.BAZA_KNIG, ranking, Duration.UNDER_30M));
-        assertEquals(Url.SERVER_BAZA_KNIG + "/f/f.prodolzhitelnost=01:00:00/t.prodolzhitelnost=01:59:59/sort=news_read/order=desc/page/",
+        assertEquals(Url.SERVER_BAZA_KNIG + "/f/f.prodolzhitelnost=01:00:00/t.prodolzhitelnost=01:59:59/v.litres_buy=litres/sort=news_read/order=desc/page/",
                 ListingFilters.withDuration(Provider.BAZA_KNIG, ranking, Duration.FROM_1H_TO_2H));
-        assertEquals(Url.SERVER_BAZA_KNIG + "/f/f.prodolzhitelnost=02:00:00/sort=news_read/order=desc/page/",
+        assertEquals(Url.SERVER_BAZA_KNIG + "/f/f.prodolzhitelnost=02:00:00/v.litres_buy=litres/sort=news_read/order=desc/page/",
                 ListingFilters.withDuration(Provider.BAZA_KNIG, ranking, Duration.OVER_2H));
         // a new bound replaces the old one, ANY removes it
         String bounded = ListingFilters.withDuration(Provider.BAZA_KNIG, ranking, Duration.FROM_1H_TO_2H);
-        assertEquals(Url.SERVER_BAZA_KNIG + "/f/f.prodolzhitelnost=02:00:00/sort=news_read/order=desc/page/",
+        assertEquals(Url.SERVER_BAZA_KNIG + "/f/f.prodolzhitelnost=02:00:00/v.litres_buy=litres/sort=news_read/order=desc/page/",
                 ListingFilters.withDuration(Provider.BAZA_KNIG, bounded, Duration.OVER_2H));
         assertEquals(ranking, ListingFilters.withDuration(Provider.BAZA_KNIG, bounded, Duration.ANY));
     }
 
     @Test
     public void bazaKnigWidensACustomRangeToWholeHours() {
+        // changed on purpose after the live check (2026-10-30): the baza-knig rankings carry v.litres_buy=litres/ before the sort segment (no paid LitRes trial books)
         String ranking = Url.BEST_BAZA_KNIG;
         // from rounds down (0 h is no bound), to rounds up to the end of the hour before it
-        assertEquals(Url.SERVER_BAZA_KNIG + "/f/t.prodolzhitelnost=01:59:59/sort=news_read/order=desc/page/",
+        assertEquals(Url.SERVER_BAZA_KNIG + "/f/t.prodolzhitelnost=01:59:59/v.litres_buy=litres/sort=news_read/order=desc/page/",
                 ListingFilters.withDuration(Provider.BAZA_KNIG, ranking, Duration.of(45, 90)));
-        assertEquals(Url.SERVER_BAZA_KNIG + "/f/f.prodolzhitelnost=01:00:00/t.prodolzhitelnost=02:59:59/sort=news_read/order=desc/page/",
+        assertEquals(Url.SERVER_BAZA_KNIG + "/f/f.prodolzhitelnost=01:00:00/t.prodolzhitelnost=02:59:59/v.litres_buy=litres/sort=news_read/order=desc/page/",
                 ListingFilters.withDuration(Provider.BAZA_KNIG, ranking, Duration.of(90, 180)));
-        assertEquals(Url.SERVER_BAZA_KNIG + "/f/f.prodolzhitelnost=10:00:00/t.prodolzhitelnost=29:59:59/sort=news_read/order=desc/page/",
+        assertEquals(Url.SERVER_BAZA_KNIG + "/f/f.prodolzhitelnost=10:00:00/t.prodolzhitelnost=29:59:59/v.litres_buy=litres/sort=news_read/order=desc/page/",
                 ListingFilters.withDuration(Provider.BAZA_KNIG, ranking, Duration.of(600, 1800)));
-        assertEquals(Url.SERVER_BAZA_KNIG + "/f/f.prodolzhitelnost=20:00:00/sort=news_read/order=desc/page/",
+        assertEquals(Url.SERVER_BAZA_KNIG + "/f/f.prodolzhitelnost=20:00:00/v.litres_buy=litres/sort=news_read/order=desc/page/",
                 ListingFilters.withDuration(Provider.BAZA_KNIG, ranking, Duration.of(1200, Duration.UNBOUNDED)));
     }
 
@@ -187,7 +189,7 @@ public class ListingFiltersTest {
     public void genrePagesAndOtherSitesFilterDurationOnTheDevice() {
         String genre = Url.SERVER_BAZA_KNIG + "/litrpg/page/";
         assertEquals(genre, ListingFilters.withDuration(Provider.BAZA_KNIG, genre, Duration.UNDER_30M));
-        assertFalse(ListingFilters.filtersDurationOnServer(Provider.BAZA_KNIG, genre));
+        assertEquals(genre, ListingFilters.withDuration(Provider.BAZA_KNIG, genre, Duration.of(90, 180)));
         assertEquals(Url.BEST_WEEK, ListingFilters.withDuration(Provider.KNIGAVUHE, Url.BEST_WEEK, Duration.UNDER_30M));
         assertEquals(Url.BEST_WEEK_AKNIGA, ListingFilters.withDuration(Provider.AKNIGA, Url.BEST_WEEK_AKNIGA, Duration.OVER_2H));
     }
@@ -246,15 +248,16 @@ public class ListingFiltersTest {
 
     @Test
     public void bazaKnigTakesAnyDateBoundAndReadsItBack() {
+        // changed on purpose after the live check (2026-10-30): the baza-knig rankings carry v.litres_buy=litres/ before the sort segment (no paid LitRes trial books)
         String twoWeeks = ListingFilters.withPeriod(Provider.BAZA_KNIG, Url.BEST_BAZA_KNIG, Period.TWO_WEEKS, today());
-        assertEquals(Url.SERVER_BAZA_KNIG + "/f/f.pdate=2026-10-09/sort=news_read/order=desc/page/", twoWeeks);
+        assertEquals(Url.SERVER_BAZA_KNIG + "/f/f.pdate=2026-10-09/v.litres_buy=litres/sort=news_read/order=desc/page/", twoWeeks);
         assertEquals(Period.TWO_WEEKS, ListingFilters.periodOf(Provider.BAZA_KNIG, twoWeeks, today()));
         assertEquals(Period.ALL, ListingFilters.periodOf(Provider.BAZA_KNIG, Url.BEST_BAZA_KNIG, today()));
         // a new date replaces the old one, ALL removes it; the duration bound stays
         String bounded = ListingFilters.withDuration(Provider.BAZA_KNIG, twoWeeks, Duration.OVER_2H);
-        assertEquals(Url.SERVER_BAZA_KNIG + "/f/f.pdate=2026-07-25/f.prodolzhitelnost=02:00:00/sort=news_read/order=desc/page/",
+        assertEquals(Url.SERVER_BAZA_KNIG + "/f/f.pdate=2026-07-25/f.prodolzhitelnost=02:00:00/v.litres_buy=litres/sort=news_read/order=desc/page/",
                 ListingFilters.withPeriod(Provider.BAZA_KNIG, bounded, Period.QUARTER, today()));
-        assertEquals(Url.SERVER_BAZA_KNIG + "/f/f.prodolzhitelnost=02:00:00/sort=news_read/order=desc/page/",
+        assertEquals(Url.SERVER_BAZA_KNIG + "/f/f.prodolzhitelnost=02:00:00/v.litres_buy=litres/sort=news_read/order=desc/page/",
                 ListingFilters.withPeriod(Provider.BAZA_KNIG, bounded, Period.ALL, today()));
         // a date someone else wrote snaps to the nearest offered period
         assertEquals(Period.MONTH, ListingFilters.periodOf(Provider.BAZA_KNIG,
@@ -324,39 +327,40 @@ public class ListingFiltersTest {
     public void aSortInAGenreListingStaysInTheGenre() {
         java.util.Set<String> kbGenres = Collections.singleton(Url.SERVER_KNIGOBLUD + "/0c6d4928-555a-4671-99e9-9bcf9a37d382");
         // akniga: the section's own top/discussed, also when re-sorting a section ranking
-        String section = ListingFilters.genreOf(Provider.AKNIGA, Url.SERVER_AKNIGA + "/section/classic/page<page>/", null);
+        String section = ListingFilters.genreOf(Provider.AKNIGA, Url.SERVER_AKNIGA + "/section/classic/page<page>/");
         assertEquals(Url.SERVER_AKNIGA + "/section/classic/top/page<page>/?period=7",
                 ListingFilters.inGenre(Provider.AKNIGA, Url.BEST_WEEK_AKNIGA, section));
-        assertEquals(section, ListingFilters.genreOf(Provider.AKNIGA, Url.SERVER_AKNIGA + "/section/classic/top/page<page>/?period=7", null));
-        assertNull(ListingFilters.genreOf(Provider.AKNIGA, Url.BEST_WEEK_AKNIGA, null));
+        assertEquals(section, ListingFilters.genreOf(Provider.AKNIGA, Url.SERVER_AKNIGA + "/section/classic/top/page<page>/?period=7"));
+        assertNull(ListingFilters.genreOf(Provider.AKNIGA, Url.BEST_WEEK_AKNIGA));
         // baza-knig: the category root (renamed ones end in "_"); the index and the site-wide filter are no genre
-        String category = ListingFilters.genreOf(Provider.BAZA_KNIG, Url.SERVER_BAZA_KNIG + "/uzhasy-mistika_/page/", null);
-        assertEquals(Url.SERVER_BAZA_KNIG + "/uzhasy-mistika_/f/sort=rating/order=desc/page/",
+        String category = ListingFilters.genreOf(Provider.BAZA_KNIG, Url.SERVER_BAZA_KNIG + "/uzhasy-mistika_/page/");
+        // changed on purpose after the live check (2026-10-30): the baza-knig rankings carry v.litres_buy=litres/ before the sort segment (no paid LitRes trial books)
+        assertEquals(Url.SERVER_BAZA_KNIG + "/uzhasy-mistika_/f/v.litres_buy=litres/sort=rating/order=desc/page/",
                 ListingFilters.inGenre(Provider.BAZA_KNIG, Url.RATING_BAZA_KNIG, category));
         assertEquals(Url.SERVER_BAZA_KNIG + "/uzhasy-mistika_/page/",
                 ListingFilters.inGenre(Provider.BAZA_KNIG, Url.NEW_BOOK_BAZA_KNIG, category));
-        assertNull(ListingFilters.genreOf(Provider.BAZA_KNIG, Url.INDEX_BAZA_KNIG, null));
-        assertNull(ListingFilters.genreOf(Provider.BAZA_KNIG, Url.RATING_BAZA_KNIG, null));
+        assertNull(ListingFilters.genreOf(Provider.BAZA_KNIG, Url.INDEX_BAZA_KNIG));
+        assertNull(ListingFilters.genreOf(Provider.BAZA_KNIG, Url.RATING_BAZA_KNIG));
         // poleknig: /genres/<id>/new and /best
-        String genre = ListingFilters.genreOf(Provider.POLEKNIG, Url.SERVER_POLEKNIG + "/genres/12?p=", null);
+        String genre = ListingFilters.genreOf(Provider.POLEKNIG, Url.SERVER_POLEKNIG + "/genres/12?p=");
         assertEquals(Url.SERVER_POLEKNIG + "/genres/12/best?p=", ListingFilters.inGenre(Provider.POLEKNIG, Url.BEST_POLEKNIG, genre));
-        assertEquals(genre, ListingFilters.genreOf(Provider.POLEKNIG, Url.SERVER_POLEKNIG + "/genres/12/best?p=", null));
-        assertNull(ListingFilters.genreOf(Provider.POLEKNIG, Url.SERVER_POLEKNIG + "/genres?p=", null));
+        assertEquals(genre, ListingFilters.genreOf(Provider.POLEKNIG, Url.SERVER_POLEKNIG + "/genres/12/best?p="));
+        assertNull(ListingFilters.genreOf(Provider.POLEKNIG, Url.SERVER_POLEKNIG + "/genres?p="));
         // otrub, knigoblud: the genre listing for "new", the site-wide ranking narrowed on the device
-        String slug = ListingFilters.genreOf(Provider.OTRUB, Url.SERVER_OTRUB + "/genres/fantastika.html?p=", null);
+        String slug = ListingFilters.genreOf(Provider.OTRUB, Url.SERVER_OTRUB + "/genres/fantastika.html?p=");
         assertEquals(Url.SERVER_OTRUB + "/genres/fantastika.html?p=", ListingFilters.inGenre(Provider.OTRUB, Url.NEW_BOOK_OTRUB, slug));
         String ranking = ListingFilters.inGenre(Provider.OTRUB, Url.BEST_WEEK_OTRUB, slug);
         assertEquals(Url.SERVER_OTRUB + "/popular/?genre=fantastika&period=week&p=", ranking);
         assertEquals("fantastika", ListingFilters.cardGenre(Provider.OTRUB, ranking));
-        assertEquals(slug, ListingFilters.genreOf(Provider.OTRUB, ranking, null));
+        assertEquals(slug, ListingFilters.genreOf(Provider.OTRUB, ranking));
         assertEquals(Url.SERVER_OTRUB + "/popular/?genre=fantastika&period=month&p=",
                 ListingFilters.withPeriod(Provider.OTRUB, ranking, Period.MONTH, today()));
-        String id = ListingFilters.genreOf(Provider.KNIGOBLUD, kbGenres.iterator().next(), kbGenres);
+        String id = ListingFilters.genreOf(Provider.KNIGOBLUD, kbGenres.iterator().next());
         assertEquals(Url.SERVER_KNIGOBLUD + "/today/?genre=" + id + "&page=",
                 ListingFilters.inGenre(Provider.KNIGOBLUD, Url.TODAY_KNIGOBLUD, id));
         assertEquals(kbGenres.iterator().next(), ListingFilters.inGenre(Provider.KNIGOBLUD, Url.INDEX_KNIGOBLUD, id));
         // an author listing looks like a genre one: only the known genres count
-        assertNull(ListingFilters.genreOf(Provider.KNIGOBLUD, Url.SERVER_KNIGOBLUD + "/426b52d3-cd88-4dc3-9cd1-487bcbb0ff30", kbGenres));
+        assertNull(ListingFilters.genreOf(Provider.KNIGOBLUD, Url.SERVER_KNIGOBLUD + "/426b52d3-cd88-4dc3-9cd1-487bcbb0ff30"));
         assertNull(ListingFilters.cardGenre(Provider.OTRUB, Url.BEST_WEEK_OTRUB));
     }
 

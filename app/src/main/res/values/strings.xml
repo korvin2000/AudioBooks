@@ -511,6 +511,20 @@
     <string name="downloads_summary">Скачанные книги и ход загрузок</string>
     <string name="cookies_not_verified">Сессия не подтверждена: прежняя сохранена</string>
     <string name="proxy_title">Прокси</string>
+    <string name="proxy_sources_title">Сайты через прокси</string>
+    <string name="proxy_sources_all">Все сайты</string>
+    <string name="proxy_sources_some">%1$d из %2$d сайтов, остальные напрямую</string>
+    <string name="check_sources_title">Проверить доступность сайтов</string>
+    <string name="check_sources_summary">Открыть первую страницу каталога каждого сайта с текущими настройками прокси</string>
+    <string name="check_sources_running">Проверка…</string>
+    <string name="check_sources_last">Последняя проверка %1$s: работают %2$d из %3$d. Нажмите, чтобы проверить сейчас</string>
+    <string name="proxy_sources_entry_down">%1$s (%2$s)</string>
+    <string name="check_sources_line">%1$s %2$s: %3$s, %4$.1f с</string>
+    <string name="source_status_ok">работает</string>
+    <string name="source_status_empty">пустой ответ</string>
+    <string name="source_status_blocked">заблокирован</string>
+    <string name="source_status_timeout">нет ответа</string>
+    <string name="source_status_error">ошибка</string>
     <string name="proxy_summary">Встроенный прокси для сайтов, недоступных в вашей стране: страницы, аудио, скачивание и обложки</string>
     <string name="browser_not_found">Браузер не найден</string>
     <!-- download status line: "<state> · 12/40 глав · 245 МБ из ≈1,1 ГБ · 950 КБ/с · ~15 мин" -->

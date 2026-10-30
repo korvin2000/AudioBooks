@@ -8,7 +8,6 @@ import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
 import com.fanok.audiobooks.BookRemovedException;
-import com.fanok.audiobooks.R;
 import com.fanok.audiobooks.pojo.BookPOJO;
 import com.fanok.audiobooks.pojo.ComentsPOJO;
 import com.fanok.audiobooks.pojo.DescriptionPOJO;
@@ -57,16 +56,16 @@ public class AknigXyzTest {
 
     @Test
     public void sortItemsArePostedFormsAndPagesKeepThem() {
-        String rating = parser.sortUrl(R.id.reting, AknigXyz.INDEX);
+        String rating = parser.sortUrl(Sort.RATING, AknigXyz.INDEX);
         assertEquals(AknigXyz.SERVER + "/?dlenewssortby=rating&dledirection=desc"
                 + "&set_new_sort=dle_sort_main&set_direction_sort=dle_direction_main", rating);
         assertEquals(AknigXyz.SERVER + "/page/2/?dlenewssortby=rating&dledirection=desc"
                 + "&set_new_sort=dle_sort_main&set_direction_sort=dle_direction_main", parser.pageUrl(rating, 2));
-        assertEquals(rating, parser.sortUrl(R.id.reting, rating));
+        assertEquals(rating, parser.sortUrl(Sort.RATING, rating));
         assertEquals("the plain index is already newest first", AknigXyz.INDEX,
-                parser.sortUrl(R.id.new_data, AknigXyz.INDEX));
-        assertTrue(parser.sortUrl(R.id.sort_title, AknigXyz.INDEX).contains("dlenewssortby=title&dledirection=asc"));
-        assertNull(parser.sortUrl(R.id.years, AknigXyz.INDEX));
+                parser.sortUrl(Sort.NEW, AknigXyz.INDEX));
+        assertTrue(parser.sortUrl(Sort.TITLE, AknigXyz.INDEX).contains("dlenewssortby=title&dledirection=asc"));
+        assertNull(parser.sortUrl(Sort.YEARS, AknigXyz.INDEX));
     }
 
     @Test
@@ -77,7 +76,7 @@ public class AknigXyzTest {
         assertNull(parser.genreOf(AknigXyz.SERVER + "/page/2/"));
         assertNull(parser.genreOf(AknigXyz.SERVER + "/xfsearch/reader/x/"));
         assertNull(parser.genreOf(BOOK));
-        String rating = parser.sortUrl(R.id.reting, genre);
+        String rating = parser.sortUrl(Sort.RATING, genre);
         AknigXyz.learnCategory(genre, fixture("genre-p1.html", genre));
         String inGenre = parser.inGenre(rating, genre);
         assertEquals(genre + "?dlenewssortby=rating&dledirection=desc"
@@ -89,7 +88,7 @@ public class AknigXyzTest {
     @Test
     public void onlyTheIndexAndGenresSort() {
         assertTrue(parser.hasSort(AknigXyz.INDEX));
-        assertTrue(parser.hasSort(parser.sortUrl(R.id.popular, AknigXyz.INDEX)));
+        assertTrue(parser.hasSort(parser.sortUrl(Sort.POPULAR, AknigXyz.INDEX)));
         assertTrue(parser.hasSort(AknigXyz.SERVER + "/boeviki/page/2/"));
         assertFalse(parser.hasSort(AknigXyz.SERVER + "/xfsearch/author/x/"));
         assertFalse(parser.hasSort(parser.searchUrl(SearchUrls.Category.BOOKS, "x", 1)));

@@ -53,6 +53,11 @@ public final class SearchSession<T> {
     private final Scheduler io;
     private final Scheduler main;
     private final long timeoutSeconds;
+    /**
+     * Sources loading at once; the rest start as these answer. Today's number of sites, so their search runs as before;
+     * it bounds the fan-out on a phone's network once there are more.
+     */
+    static final int MAX_PARALLEL = 13;
     private final Listener<T> listener;
 
     private final CompositeDisposable running = new CompositeDisposable();
@@ -183,7 +188,8 @@ public final class SearchSession<T> {
                     .map(p -> new Arrival<>(s, p))
                     .toObservable());
         }
-        running.add(Observable.merge(calls)
+        // merge subscribes lazily: a source's timeout starts when it gets a slot, not while it waits for one
+        running.add(Observable.merge(calls, MAX_PARALLEL)
                 .observeOn(main)
                 .subscribe(a -> {
                     if (gen == generation) {

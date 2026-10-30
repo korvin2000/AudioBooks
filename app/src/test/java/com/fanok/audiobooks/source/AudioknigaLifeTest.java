@@ -8,7 +8,6 @@ import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
 import com.fanok.audiobooks.BookRemovedException;
-import com.fanok.audiobooks.R;
 import com.fanok.audiobooks.pojo.AudioPOJO;
 import com.fanok.audiobooks.pojo.BookPOJO;
 import com.fanok.audiobooks.pojo.ComentsPOJO;
@@ -57,11 +56,11 @@ public class AudioknigaLifeTest {
 
     @Test
     public void sortsStayInTheGenre() {
-        String rating = PARSER.sortUrl(R.id.reting, AudioknigaLife.INDEX);
+        String rating = PARSER.sortUrl(Sort.RATING, AudioknigaLife.INDEX);
         assertEquals(S + "/f/sort=rating/order=desc/", rating);
-        assertEquals(AudioknigaLife.INDEX, PARSER.sortUrl(R.id.new_data, rating));
-        assertEquals(S + "/f/sort=title/order=asc/", PARSER.sortUrl(R.id.sort_title, AudioknigaLife.INDEX));
-        assertNull(PARSER.sortUrl(R.id.popular_week, AudioknigaLife.INDEX));
+        assertEquals(AudioknigaLife.INDEX, PARSER.sortUrl(Sort.NEW, rating));
+        assertEquals(S + "/f/sort=title/order=asc/", PARSER.sortUrl(Sort.TITLE, AudioknigaLife.INDEX));
+        assertNull(PARSER.sortUrl(Sort.POPULAR_WEEK, AudioknigaLife.INDEX));
         // the genre key is the category id, read off the genre root or off a ranking inside it
         assertEquals("9", PARSER.genreOf(S + "/fantastika/"));
         assertEquals("26", PARSER.genreOf(S + "/fantastika/postapokalipsis/page/3/"));

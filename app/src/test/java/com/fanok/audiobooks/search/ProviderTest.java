@@ -31,6 +31,42 @@ public class ProviderTest {
     };
 
     @Test
+    public void aNetworkHostBelongsToItsSourceButIsNoBookHost() {
+        assertSame(Provider.UKNIG, Provider.ofNetworkHost("uknig.com"));
+        assertSame("a subdomain (a CDN of the site)", Provider.UKNIG, Provider.ofNetworkHost("cdn.uknig.com"));
+        assertNull(Provider.ofNetworkHost("archive.org"));
+        assertNull(Provider.ofNetworkHost("notuknig.com"));
+        assertNull(Provider.ofNetworkHost(""));
+        assertNull("a CDN host never makes a link a book of the site", Provider.ofUrl("https://cdn.uknig.com/b/1"));
+    }
+
+    /** Requests to a former host and to a declared host's subdomains follow the site's proxy route and Referer. */
+    @Test
+    public void formerHostsAndDeclaredHostsBelongToTheirSource() {
+        assertSame(Provider.IZIBUK, Provider.ofNetworkHost("izibuk.ru"));
+        assertSame(Provider.BAZA_KNIG, Provider.ofNetworkHost("baza-knig.ink"));
+        assertSame("akniga's HLS host", Provider.AKNIGA, Provider.ofNetworkHost("r1.akniga.club"));
+        assertSame(Provider.AKNIGA, Provider.ofNetworkHost("akniga.club"));
+        assertNull(Provider.ofNetworkHost("akniga.club.example.com"));
+        assertNull(Provider.ofNetworkHost("notakniga.club"));
+    }
+
+    @Test
+    public void theSelectedSourceIsSearchedFirst() {
+        Provider before = Provider.current();
+        Consts.setSOURCE(Provider.UKNIG.prefValue);
+        try {
+            assertSame(Provider.UKNIG, Provider.selectedFirst().get(0));
+            assertEquals(Provider.values().length, Provider.selectedFirst().size());
+            assertEquals(Provider.values().length, new HashSet<>(Provider.selectedFirst()).size());
+        } finally {
+            if (before != null) {
+                Consts.setSOURCE(before.prefValue);
+            }
+        }
+    }
+
+    @Test
     public void theFirstNineRowsKeepTheirStoredValuesAndOrder() {
         Provider[] providers = Provider.values();
         assertTrue(providers.length >= ROWS.length);
@@ -41,7 +77,6 @@ public class ProviderTest {
             assertEquals(p.name(), ROWS[i][2], p.prefValue);
             assertEquals(p.name(), ROWS[i][3], p.prefKey);
             assertEquals(p.name(), Integer.parseInt(ROWS[i][4]), p.sourceId);
-            assertNull(p.name() + " has no parser: its code is in the models", p.parser);
         }
     }
 
@@ -77,7 +112,15 @@ public class ProviderTest {
         assertNull(Provider.ofSource(-1));
         assertThrows(IllegalArgumentException.class, () -> Provider.require("https://knigavuhe.org.example.com/x"));
         assertNull(Provider.parserOf("https://example.com/book"));
-        assertNull(Provider.parserOf("https://knigavuhe.org/book/x/"));
+    }
+
+    /** Every site is an adapter: the shared code has no per-site branches left to fall back on. */
+    @Test
+    public void everySiteHasItsAdapter() {
+        for (Provider provider : Provider.values()) {
+            assertSame(provider.parser, Provider.parserOf(provider.server + "/"));
+            assertTrue(provider + " has no adapter", provider.parser != null);
+        }
     }
 
     @Test
@@ -87,5 +130,16 @@ public class ProviderTest {
         assertSame(Provider.KNIGOBLUD, Provider.ofUrl("https://www.knigoblud.club/e87cc048"));
         assertArrayEquals(new String[]{"akniga.org", "knigavuhe.org", "izib.uk"},
                 new String[]{Provider.AKNIGA.host(), Provider.KNIGAVUHE.host(), Provider.IZIBUK.host()});
+    }
+
+    // changed on purpose after the live check (2026-10-30): m.otrub.in and mob.knigoblud.club are the mobile hosts of Otrub and Knigoblud
+    @Test
+    public void mobileHostsResolveToTheirProvider() {
+        assertSame(Provider.OTRUB, Provider.ofUrl("https://m.otrub.in/book/1"));
+        assertSame(Provider.KNIGOBLUD, Provider.ofUrl("https://mob.knigoblud.club/e87cc048"));
+        assertSame(Provider.KNIGOBLUD.parser, Provider.parserOf("https://mob.knigoblud.club/e87cc048"));
+        assertSame(Provider.OTRUB.parser, Provider.parserOf("http://m.otrub.in/popular/?period=month&p=1"));
+        assertNull(Provider.ofUrl("https://m.otrub.in.evil.com/book/1"));
+        assertNull(Provider.ofUrl("https://mob.knigoblud.club.evil.com/e87cc048"));
     }
 }

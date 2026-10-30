@@ -58,7 +58,13 @@ import com.fanok.audiobooks.pojo.BackupPOJO;
 import com.fanok.audiobooks.pojo.BookPOJO;
 import com.fanok.audiobooks.pojo.StorageUtil;
 import com.fanok.audiobooks.search.Provider;
+import com.fanok.audiobooks.search.ProviderPage;
+import com.fanok.audiobooks.search.SourceProbe;
+import com.fanok.audiobooks.search.SourceHealth;
 import com.fanok.audiobooks.util.DownloadStorageHelper;
+import io.reactivex.android.schedulers.AndroidSchedulers;
+import io.reactivex.disposables.Disposable;
+
 import com.google.android.material.navigation.NavigationView;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
@@ -74,7 +80,10 @@ import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
 import java.util.Locale;
+import java.util.HashSet;
 import java.util.Set;
+
+import java.util.Map;
 
 import org.jetbrains.annotations.NotNull;
 import pub.devrel.easypermissions.EasyPermissions;
@@ -82,9 +91,16 @@ import pub.devrel.easypermissions.EasyPermissions;
 public class SettingsFragment extends PreferenceFragmentCompat implements
         SharedPreferences.OnSharedPreferenceChangeListener, EasyPermissions.PermissionCallbacks {
 
+    /** The "Сайты через прокси" entry ({@link #fillProxySources}). */
+    private static final String PROXY_SOURCES = "pref_proxy_sources";
+    /** The "Проверить доступность сайтов" entry ({@link #initSourceCheck}). */
+    private static final String CHECK_SOURCES = "pref_check_sources";
+    /** Sites checked at once: a mobile link is not flooded, the 13 sites still take seconds. */
+    private static final int CHECK_PARALLEL = 4;
+
+    private Disposable mSourceCheck;
 
     private static final int EXTERNAL_STORAGE_PERMISSION_REQUEST_CODE = 342;
-
 
     private final ActivityResultLauncher<Intent> createBackupLauncher = registerForActivityResult(
             new ActivityResultContracts.StartActivityForResult(),
@@ -210,6 +226,126 @@ public class SettingsFragment extends PreferenceFragmentCompat implements
         }
     }
 
+    /**
+     * "Сайты через прокси": every source, checked unless it goes direct. Not stored itself: the unchecked ones are
+     * {@link AppProxy#PREF_DIRECT}, so a source added later takes the proxy until the user says otherwise.
+     */
+    private void fillProxySources() {
+        MultiSelectListPreference sites = findPreference(PROXY_SOURCES);
+        if (sites == null) {
+            return;
+        }
+        Provider[] providers = Provider.values();
+        CharSequence[] titles = new CharSequence[providers.length];
+        CharSequence[] values = new CharSequence[providers.length];
+        Set<String> direct = AppProxy.readDirect(sites.getSharedPreferences());
+        Map<Provider, ProviderPage.Status> health = SourceHealth.last(sites.getSharedPreferences());
+        Set<String> proxied = new HashSet<>();
+        for (int i = 0; i < providers.length; i++) {
+            ProviderPage.Status status = health.get(providers[i]);
+            titles[i] = status == null || status == ProviderPage.Status.OK ? providers[i].title
+                    : getString(R.string.proxy_sources_entry_down, providers[i].title, getString(statusText(status)));
+            values[i] = providers[i].prefValue;
+            if (!direct.contains(providers[i].prefValue)) {
+                proxied.add(providers[i].prefValue);
+            }
+        }
+        sites.setEntries(titles);
+        sites.setEntryValues(values);
+        sites.setValues(proxied);
+        sites.setSummary(proxySourcesSummary(proxied.size(), providers.length));
+        sites.setOnPreferenceChangeListener((preference, newValue) -> {
+            Set<String> nowDirect = AppProxy.directExcept((Set<?>) newValue);
+            sites.getSharedPreferences().edit().putStringSet(AppProxy.PREF_DIRECT, nowDirect).apply();
+            preference.setSummary(proxySourcesSummary(providers.length - nowDirect.size(), providers.length));
+            return true;
+        });
+    }
+
+    /** Checks every site as the catalog opens it (route, proxy and all) and lists which ones answered with books. */
+    private void initSourceCheck() {
+        Preference check = findPreference(CHECK_SOURCES);
+        if (check == null) {
+            return;
+        }
+        check.setSummary(sourceCheckSummary(check.getSharedPreferences()));
+        check.setOnPreferenceClickListener(preference -> {
+            if (mSourceCheck != null && !mSourceCheck.isDisposed()) {
+                return true; // still running
+            }
+            preference.setSummary(R.string.check_sources_running);
+            mSourceCheck = SourceHealth.check(preference.getSharedPreferences(), CHECK_PARALLEL)
+                    .observeOn(AndroidSchedulers.mainThread())
+                    .doFinally(() -> {
+                        preference.setSummary(sourceCheckSummary(preference.getSharedPreferences()));
+                        fillProxySources(); // its entries say which sites are down
+                    })
+                    .subscribe(this::showSourceCheck, e -> Log.w("SettingsFragment", "Source check failed", e));
+            return true;
+        });
+    }
+
+    /** The last check (by hand or automatic): when, and how many sites answered with books. */
+    private String sourceCheckSummary(SharedPreferences prefs) {
+        long at = SourceHealth.lastCheckedAt(prefs);
+        Map<Provider, ProviderPage.Status> health = SourceHealth.last(prefs);
+        if (at == 0 || health.isEmpty()) {
+            return getString(R.string.check_sources_summary);
+        }
+        int up = 0;
+        for (ProviderPage.Status status : health.values()) {
+            if (status == ProviderPage.Status.OK) {
+                up++;
+            }
+        }
+        return getString(R.string.check_sources_last, android.text.format.DateUtils.formatDateTime(requireContext(),
+                at, android.text.format.DateUtils.FORMAT_SHOW_DATE | android.text.format.DateUtils.FORMAT_SHOW_TIME),
+                up, Provider.values().length);
+    }
+
+    private void showSourceCheck(List<SourceProbe.Result> results) {
+        Context context = getContext();
+        if (context == null) {
+            return;
+        }
+        StringBuilder text = new StringBuilder();
+        for (SourceProbe.Result result : results) {
+            if (text.length() > 0) {
+                text.append('\n');
+            }
+            text.append(getString(R.string.check_sources_line, result.isUp() ? "\u2713" : "\u2717",
+                    result.provider.title, getString(statusText(result.status)), result.millis / 1000f));
+        }
+        new AlertDialog.Builder(context)
+                .setTitle(R.string.check_sources_title)
+                .setMessage(text)
+                .setPositiveButton(android.R.string.ok, null)
+                .show();
+    }
+
+    private static int statusText(ProviderPage.Status status) {
+        switch (status) {
+            case OK: return R.string.source_status_ok;
+            case EMPTY: return R.string.source_status_empty;
+            case BLOCKED: return R.string.source_status_blocked;
+            case TIMEOUT: return R.string.source_status_timeout;
+            default: return R.string.source_status_error;
+        }
+    }
+
+    @Override
+    public void onDestroy() {
+        if (mSourceCheck != null) {
+            mSourceCheck.dispose();
+        }
+        super.onDestroy();
+    }
+
+    private String proxySourcesSummary(int proxied, int all) {
+        return proxied == all ? getString(R.string.proxy_sources_all)
+                : getString(R.string.proxy_sources_some, proxied, all);
+    }
+
     @Override
     public void onNavigateToScreen(PreferenceScreen preferenceScreen) {
         SettingsFragment settingsFragment = new SettingsFragment();
@@ -224,7 +360,6 @@ public class SettingsFragment extends PreferenceFragmentCompat implements
                     .commit();
         }
     }
-
 
     @Override
     public void onResume() {
@@ -281,7 +416,6 @@ public class SettingsFragment extends PreferenceFragmentCompat implements
                 }
             });
 
-
     @UnstableApi
     @SuppressLint("InlinedApi")
     @Override
@@ -298,6 +432,8 @@ public class SettingsFragment extends PreferenceFragmentCompat implements
                 false);
         fillSources(); // before the summaries: the source list's summary is its chosen entry
         initSummary(getPreferenceScreen());
+        fillProxySources(); // after them: its summary is a count, not the list of names
+        initSourceCheck();
 
         preferenceChangeListner("pref_theme", (preference, newValue) -> {
             // the value is stored after this returns; apply night mode and restart once it is

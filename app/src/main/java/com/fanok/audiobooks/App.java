@@ -190,6 +190,7 @@ public class App extends Application {
             StrictMode.setVmPolicy(new StrictMode.VmPolicy.Builder().detectAll().penaltyLog().build());
         }
         instance = this;
+        com.fanok.audiobooks.search.SourceHealth.checkIfDue(this); // at most daily, delayed, unmetered only
 
         registerActivityLifecycleCallbacks(new ActivityLifecycleCallbacks() {
             @Override
@@ -241,21 +242,10 @@ public class App extends Application {
                 }
                 if (original.header("Referer") == null) {
                     String url = original.url().toString();
-                    if (url.contains("poleknig.com")) {
-                        requestBuilder.header("Referer", "https://poleknig.com/");
-                    } else if (url.contains("izib.uk")) {
-                        requestBuilder.header("Referer", Url.SERVER_IZIBUK + "/");
-                    } else if (url.contains("akniga.org")) {
-                        requestBuilder.header("Referer", "https://akniga.org/");
-                    } else {
-                        String host = Url.hostOf(url);
-                        for (Provider provider : Provider.values()) {
-                            if (provider.parser != null && provider.parser.referer() != null
-                                    && (host.equals(provider.host()) || host.endsWith("." + provider.host()))) {
-                                requestBuilder.header("Referer", provider.parser.referer());
-                                break;
-                            }
-                        }
+                    Provider provider = Provider.ofNetworkHost(Url.hostOf(url));
+                    String referer = provider == null ? null : provider.parser.referer();
+                    if (referer != null) {
+                        requestBuilder.header("Referer", referer);
                     }
                 }
                 return chain.proceed(requestBuilder.build());

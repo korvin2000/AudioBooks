@@ -1,7 +1,7 @@
 package com.fanok.audiobooks.search;
 
-import com.fanok.audiobooks.Url;
 import com.fanok.audiobooks.pojo.BookPOJO;
+import com.fanok.audiobooks.source.Sort;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -9,7 +9,6 @@ import java.util.Calendar;
 import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
-import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -28,7 +27,7 @@ import java.util.regex.Pattern;
  * genre of the page it was opened from, so genre pages filter client-side. Cards carry the duration.</li>
  * <li>abmp3, poleknig, audioboo: no period at all (audioboo sorts by duration but cannot bound it); cards carry
  * the duration. izibuk: no period (its popularity sort is all-time); the cards of its mobile site, which
- * {@code BooksModel} lists from, carry the duration.</li>
+ * {@code Izibuk} lists from, carry the duration.</li>
  * </ul>
  * A sort chosen in a genre listing stays within the genre ({@link #inGenre}): akniga ({@code /section/<g>/top/}),
  * baza-knig ({@code /f/cat=<id>/}) and poleknig ({@code /genres/<id>/best}) rank a genre on the server; otrub and
@@ -330,68 +329,26 @@ public final class ListingFilters {
      * akniga's collections ("Подборки") list collections, not books, and carry none.
      */
     public static boolean listsDuration(Provider provider, String url) {
-        if (provider != null && provider.parser != null) {
-            return provider.parser.listsDuration(url);
-        }
-        return provider != null && provider != Provider.OTRUB
-                && !(provider == Provider.AKNIGA && url != null && url.contains("/collections/"));
-    }
-
-    /** True when the server bounds the duration itself for this listing (baza-knig's index and {@code /f/} pages). */
-    public static boolean filtersDurationOnServer(Provider provider, String url) {
-        return provider == Provider.BAZA_KNIG && (isBazaKnigIndex(url) || url.contains("/f/"));
-    }
-
-    private static boolean isBazaKnigIndex(String url) {
-        String base = Url.SERVER_BAZA_KNIG + "/";
-        return url.equals(base) || url.equals(Url.INDEX_BAZA_KNIG) || url.equals(base + "page/1/");
+        return provider != null && provider.parser.listsDuration(url);
     }
 
     /**
-     * {@code url} with the server's own duration bound for {@code duration}, where the server has one; the
-     * baza-knig index becomes its date-sorted {@code /f/} twin. The bound is whole hours (the site compares the
-     * integer part of HH:MM:SS): {@code from} rounds down to its hour, {@code to} up to the end of the hour before
-     * it, so the server never drops a match and the exact range is still applied to the cards afterwards.
+     * {@code url} with the server's own duration bound for {@code duration}, where the server has one
+     * ({@link com.fanok.audiobooks.source.SourceParser#withDuration}); the exact range is still applied to the cards
+     * afterwards.
      */
     public static String withDuration(Provider provider, String url, Duration duration) {
-        if (!filtersDurationOnServer(provider, url) || (duration.isAny() && isBazaKnigIndex(url))) {
-            return url;
-        }
-        String base = isBazaKnigIndex(url) ? Url.SERVER_BAZA_KNIG + "/f/sort=date/order=desc/page/" : url;
-        int fromHours = duration.fromMinutes / 60;
-        String from = fromHours > 0 ? String.format(Locale.ROOT, "%02d:00:00", fromHours) : null;
-        String to = duration.isUnbounded() ? null
-                : String.format(Locale.ROOT, "%02d:59:59", (duration.toMinutes + 59) / 60 - 1);
-        return withSegment(withSegment(base, "t.prodolzhitelnost", to), "f.prodolzhitelnost", from);
+        return provider == null ? url : provider.parser.withDuration(url, duration);
     }
 
     // ---------------------------------------------------------------- period
-
-    private static final List<Period> KNIGAVUHE_PERIODS = Arrays.asList(Period.DAY, Period.WEEK, Period.MONTH, Period.ALL);
-    private static final List<Period> AKNIGA_PERIODS = Arrays.asList(Period.DAY, Period.WEEK, Period.MONTH, Period.YEAR, Period.ALL);
-    private static final List<Period> WEEK_MONTH = Arrays.asList(Period.WEEK, Period.MONTH);
-    private static final List<Period> ANY_PERIOD = Arrays.asList(Period.values());
 
     /** The periods the listing at {@code url} accepts, in menu order; empty when it is not a ranking. */
     public static List<Period> periods(Provider provider, String url) {
         if (provider == null || url == null) {
             return Collections.emptyList();
         }
-        switch (provider) {
-            case KNIGAVUHE:
-                return url.contains("/popular/") || url.contains("/rating/") ? KNIGAVUHE_PERIODS : Collections.<Period>emptyList();
-            case AKNIGA:
-                return (url.contains("/top/") || url.contains("/discussed/")) && url.contains("period=")
-                        ? AKNIGA_PERIODS : Collections.<Period>emptyList();
-            case KNIGOBLUD:
-            case OTRUB:
-                return url.contains("/popular/") ? WEEK_MONTH : Collections.<Period>emptyList();
-            case BAZA_KNIG:
-                // a date bound on the date-sorted list is just a shorter "new" list; rankings take any date
-                return url.contains("/f/") && !url.contains("sort=date") ? ANY_PERIOD : Collections.<Period>emptyList();
-            default:
-                return Collections.emptyList();
-        }
+        return provider.parser.periods(url);
     }
 
     /** The period {@code url} carries, or null when it carries none or the listing takes none. */
@@ -399,42 +356,7 @@ public final class ListingFilters {
         if (periods(provider, url).isEmpty()) {
             return null;
         }
-        switch (provider) {
-            case KNIGAVUHE: {
-                String w = param(url, "w");
-                if (w == null) {
-                    w = param(url, "period");
-                }
-                return fromWord(w);
-            }
-            case AKNIGA: {
-                String p = param(url, "period");
-                if (p == null) {
-                    return null;
-                }
-                if (p.equals("all")) {
-                    return Period.ALL;
-                }
-                for (Period period : AKNIGA_PERIODS) {
-                    if (Integer.toString(period.days).equals(p)) {
-                        return period;
-                    }
-                }
-                return Period.WEEK; // what the site falls back to
-            }
-            case KNIGOBLUD:
-            case OTRUB:
-                return "month".equals(param(url, "period")) ? Period.MONTH : Period.WEEK;
-            case BAZA_KNIG: {
-                String from = segment(url, "f.pdate");
-                if (from == null) {
-                    return Period.ALL;
-                }
-                return nearest(daysBetween(from, today));
-            }
-            default:
-                return null;
-        }
+        return provider.parser.periodOf(url, today);
     }
 
     /** {@code url} with its period replaced by {@code period}; unchanged when the listing takes no period. */
@@ -442,44 +364,16 @@ public final class ListingFilters {
         if (!periods(provider, url).contains(period)) {
             return url;
         }
-        switch (provider) {
-            case KNIGAVUHE:
-                return url.contains("w=") ? withParam(url, "w", toWord(period)) : withParam(url, "period", toWord(period));
-            case AKNIGA:
-                return withParam(url, "period", period == Period.ALL ? "all" : Integer.toString(period.days));
-            case KNIGOBLUD:
-            case OTRUB:
-                return withParam(url, "period", period == Period.MONTH ? "month" : "week");
-            case BAZA_KNIG:
-                return withSegment(url, "f.pdate", period == Period.ALL ? null : isoDate(today, period.days));
-            default:
-                return url;
-        }
+        return provider.parser.withPeriod(url, period, today);
     }
 
-    private static Period fromWord(String w) {
-        if (w == null) {
-            return null;
-        }
-        switch (w) {
-            case "week": return Period.WEEK;
-            case "month": return Period.MONTH;
-            case "alltime": return Period.ALL;
-            default: return Period.DAY; // "today" and the site's fallback for anything else
-        }
-    }
-
-    private static String toWord(Period period) {
-        switch (period) {
-            case WEEK: return "week";
-            case MONTH: return "month";
-            case ALL: return "alltime";
-            default: return "today";
-        }
+    /** True when the listing's period is a date bound recounted from today ({@link com.fanok.audiobooks.source.SourceParser#periodsAreDates}). */
+    public static boolean periodsAreDates(Provider provider) {
+        return provider != null && provider.parser.periodsAreDates();
     }
 
     /** The period whose day count is closest to {@code days}; {@link Period#ALL} never, it has no days. */
-    static Period nearest(int days) {
+    public static Period nearest(int days) {
         Period best = Period.DAY;
         for (Period p : Period.values()) {
             if (p != Period.ALL && Math.abs(p.days - days) < Math.abs(best.days - days)) {
@@ -489,23 +383,11 @@ public final class ListingFilters {
         return best;
     }
 
-    static String isoDate(Calendar today, int daysBack) {
+    public static String isoDate(Calendar today, int daysBack) {
         Calendar c = (Calendar) today.clone();
         c.add(Calendar.DAY_OF_MONTH, -daysBack);
         return String.format(Locale.ROOT, "%04d-%02d-%02d", c.get(Calendar.YEAR), c.get(Calendar.MONTH) + 1,
                 c.get(Calendar.DAY_OF_MONTH));
-    }
-
-    private static int daysBetween(String isoFrom, Calendar today) {
-        try {
-            String[] p = isoFrom.split("-");
-            Calendar from = (Calendar) today.clone();
-            from.set(Integer.parseInt(p[0]), Integer.parseInt(p[1]) - 1, Integer.parseInt(p[2]));
-            long ms = today.getTimeInMillis() - from.getTimeInMillis();
-            return (int) Math.round(ms / (24.0 * 60 * 60 * 1000));
-        } catch (RuntimeException e) {
-            return Period.WEEK.days;
-        }
     }
 
     // ---------------------------------------------------------------- auto paging
@@ -539,95 +421,54 @@ public final class ListingFilters {
 
     // ---------------------------------------------------------------- genre
 
-    private static final Pattern AKNIGA_SECTION =
-            Pattern.compile("^" + Pattern.quote(Url.SERVER_AKNIGA) + "/section/[^/?#]+/");
-    /** A category root followed by its pages or filter; not the index ({@code /page/2/}) nor {@code /f/} itself. */
-    private static final Pattern BAZA_KNIG_CATEGORY =
-            Pattern.compile("^(" + Pattern.quote(Url.SERVER_BAZA_KNIG) + "/[\\w-]+/)(?:page/|f/)");
-    private static final Pattern POLEKNIG_GENRE =
-            Pattern.compile("^" + Pattern.quote(Url.SERVER_POLEKNIG) + "/genres/\\d+(?=[/?#]|$)");
-    private static final Pattern OTRUB_GENRE =
-            Pattern.compile("^" + Pattern.quote(Url.SERVER_OTRUB) + "/genres/([\\w-]+)\\.html");
-
     /**
      * The genre of a genre listing or of a ranking opened from one, as {@link #inGenre} takes it: the genre's root
-     * URL (akniga, baza-knig, poleknig) or its key (otrub slug, knigoblud id); null for any other listing.
+     * URL (akniga, baza-knig, poleknig) or its key ({@link com.fanok.audiobooks.source.SourceParser#genreOf}); null for
+     * any other listing.
      */
-    public static String genreOf(Provider provider, String url, Set<String> knigobludGenres) {
+    public static String genreOf(Provider provider, String url) {
         if (provider == null || url == null) {
             return null;
         }
-        if (provider.parser != null) {
-            return provider.parser.genreOf(url);
-        }
-        Matcher m;
-        switch (provider) {
-            case AKNIGA:
-                m = AKNIGA_SECTION.matcher(url);
-                return m.find() ? m.group() : null;
-            case BAZA_KNIG:
-                m = BAZA_KNIG_CATEGORY.matcher(url);
-                return m.find() ? m.group(1) : null;
-            case POLEKNIG:
-                m = POLEKNIG_GENRE.matcher(url);
-                return m.find() ? m.group() : null;
-            case OTRUB:
-            case KNIGOBLUD: {
-                String narrowed = cardGenre(provider, url);
-                if (narrowed != null) {
-                    return narrowed;
-                }
-                if (provider == Provider.KNIGOBLUD) {
-                    // its genre, author and series links all look alike: /<id>
-                    return knigobludGenres.contains(url) ? lastSegment(url) : null;
-                }
-                m = OTRUB_GENRE.matcher(url);
-                return m.find() ? m.group(1) : null;
-            }
-            default:
-                return null;
-        }
+        return provider.parser.genreOf(url);
     }
 
     /**
      * {@code siteWide}, a listing of the sort menu, within {@code genre} ({@link #genreOf}; null keeps it site-wide).
-     * baza-knig's {@code /<category>/f/} gets the category id when loaded (the filter ignores the path). otrub and
-     * knigoblud have no genre rankings: "new" is the genre listing itself, a ranking carries the genre in a
-     * {@code genre=} parameter their servers ignore, and its cards are filtered by it ({@link #cardGenre}).
+     * baza-knig's {@code /<category>/f/} gets the category id when loaded (the filter ignores the path). A site with no
+     * genre rankings ({@link com.fanok.audiobooks.source.SourceParser#inGenre}) carries the genre in a parameter its
+     * server ignores, and its cards are filtered by it ({@link #cardGenre}).
      */
     public static String inGenre(Provider provider, String siteWide, String genre) {
-        if (genre == null) {
-            return siteWide;
-        }
-        if (provider.parser != null) {
-            return provider.parser.inGenre(siteWide, genre);
-        }
-        switch (provider) {
-            case AKNIGA:
-                return siteWide.replace(Url.SERVER_AKNIGA + "/index/", genre);
-            case BAZA_KNIG:
-                return siteWide.replace(Url.SERVER_BAZA_KNIG + "/", genre);
-            case POLEKNIG:
-                return siteWide.replace(Url.SERVER_POLEKNIG + "/books/novelties", genre + "/new")
-                        .replace(Url.SERVER_POLEKNIG + "/books/popular", genre + "/best");
-            case OTRUB:
-                return siteWide.equals(Url.NEW_BOOK_OTRUB) ? Url.SERVER_OTRUB + "/genres/" + genre + ".html?p="
-                        : siteWide.replace("?", "?genre=" + genre + "&");
-            case KNIGOBLUD:
-                return siteWide.equals(Url.INDEX_KNIGOBLUD) ? Url.SERVER_KNIGOBLUD + "/" + genre
-                        : siteWide.replace("?", "?genre=" + genre + "&");
-            default:
-                return siteWide;
-        }
+        return genre == null ? siteWide : provider.parser.inGenre(siteWide, genre);
     }
 
-    /** The genre a site-wide ranking of otrub or knigoblud is narrowed to on the device, else null. */
+    /**
+     * The listing the Order item {@code sort} opens from the listing {@code url} of {@code provider}: the site's
+     * {@link com.fanok.audiobooks.source.SourceParser#sortUrl}, within the genre of a genre listing ({@link #inGenre});
+     * null when the site has no listing for it.
+     */
+    public static String sorted(Provider provider, Sort sort, String url) {
+        if (provider == null) {
+            return null;
+        }
+        String sorted = provider.parser.sortUrl(sort, url);
+        if (sorted == null || sorted.isEmpty()) {
+            return null;
+        }
+        return sorted.equals(url) ? sorted : inGenre(provider, sorted, genreOf(provider, url));
+    }
+
+    /**
+     * The genre a site-wide ranking is narrowed to on the device
+     * ({@link com.fanok.audiobooks.source.SourceParser#cardGenre}), else null.
+     */
     public static String cardGenre(Provider provider, String url) {
-        return provider == Provider.OTRUB || provider == Provider.KNIGOBLUD ? param(url, "genre") : null;
+        return provider == null ? null : provider.parser.cardGenre(url);
     }
 
     /** The last path segment of {@code url} without {@code .html}: a card's genre link as a genre key. */
-    static String lastSegment(String url) {
+    public static String lastSegment(String url) {
         if (url == null) {
             return null;
         }
@@ -639,13 +480,13 @@ public final class ListingFilters {
     // ---------------------------------------------------------------- url helpers
 
     /** The value of query parameter {@code name} in {@code url}, or null. */
-    static String param(String url, String name) {
+    public static String param(String url, String name) {
         Matcher m = Pattern.compile("[?&]" + Pattern.quote(name) + "=([^&#]*)").matcher(url);
         return m.find() ? m.group(1) : null;
     }
 
     /** {@code url} with query parameter {@code name} set to {@code value} (replaced in place, else appended). */
-    static String withParam(String url, String name, String value) {
+    public static String withParam(String url, String name, String value) {
         Matcher m = Pattern.compile("([?&]" + Pattern.quote(name) + "=)[^&#]*").matcher(url);
         if (m.find()) {
             return url.substring(0, m.end(1)) + value + url.substring(m.end());
@@ -654,13 +495,13 @@ public final class ListingFilters {
     }
 
     /** The value of DLE filter segment {@code name} ({@code /f/.../name=value/...}), or null. */
-    static String segment(String url, String name) {
+    public static String segment(String url, String name) {
         Matcher m = Pattern.compile("/" + Pattern.quote(name) + "=([^/]*)").matcher(url);
         return m.find() ? m.group(1) : null;
     }
 
     /** {@code url} with DLE filter segment {@code name} set to {@code value}, or removed when it is null. */
-    static String withSegment(String url, String name, String value) {
+    public static String withSegment(String url, String name, String value) {
         String without = url.replaceAll("/" + Pattern.quote(name) + "=[^/]*", "");
         if (value == null) {
             return without;

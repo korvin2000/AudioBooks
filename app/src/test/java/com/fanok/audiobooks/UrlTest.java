@@ -128,4 +128,18 @@ public class UrlTest {
         assertEquals("garbage", Url.canonical("garbage"));
         assertEquals("https://user@baza-knig.top:8443/x", Url.canonical("https://user@baza-knig.ink:8443/x"));
     }
+
+    // changed on purpose after the live check (2026-10-30): m.otrub.in and mob.knigoblud.club are the mobile hosts of otrub.in and knigoblud.club
+    @Test
+    public void canonicalRewritesTheMobileHostsOfOtrubAndKnigoblud() {
+        assertEquals("https://otrub.in/book/1", Url.canonical("https://m.otrub.in/book/1"));
+        assertEquals("https://otrub.in/popular/?period=month&p=2", Url.canonical("http://M.OTRUB.in/popular/?period=month&p=2"));
+        assertEquals("https://knigoblud.club/e87cc048?page=2", Url.canonical("http://mob.knigoblud.club/e87cc048?page=2"));
+        assertEquals("https://otrub.in/book/1", Url.canonical("https://otrub.in/book/1"));
+        assertEquals("https://www.knigoblud.club/e87cc048", Url.canonical("https://www.knigoblud.club/e87cc048"));
+        assertEquals("https://m.otrub.in.evil.com/book/1", Url.canonical("https://m.otrub.in.evil.com/book/1"));
+        assertTrue(Url.samePage("https://m.otrub.in/book/1", "https://otrub.in/book/1"));
+        assertTrue(Url.samePage("https://mob.knigoblud.club/e87cc048", "https://www.knigoblud.club/e87cc048"));
+        assertFalse(Url.samePage("https://m.otrub.in/book/1", "https://knigoblud.club/book/1"));
+    }
 }

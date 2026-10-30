@@ -153,7 +153,7 @@ public class BooksListAddapter extends RecyclerView.Adapter<BooksListAddapter.My
                     } else if (photoPath.startsWith("/") || photoPath.contains(":\\")) {
                         Glide.with(mImageView).load(new java.io.File(photoPath)).into(mImageView);
                     } else {
-                        Glide.with(mImageView).load(photoPath).into(mImageView);
+                        Glide.with(mImageView).load(com.fanok.audiobooks.net.Covers.glide(photoPath)).into(mImageView);
                     }
                 } else {
                     mImageView.setImageDrawable(
