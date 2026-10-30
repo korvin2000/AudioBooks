@@ -43,7 +43,8 @@ public class AudioModel implements AudioModelInterfece {
     @Override
     public Observable<ArrayList<AudioPOJO>> getAudio(@NonNull String url) {
         SourceParser parser = Provider.parserOf(url);
-        return audio(url, parser != null ? parser::fetch : SiteHttp::get); // an unknown host fails before fetching
+        // the page the description of this opening fetched too (BookPages); an unknown host fails before fetching
+        return audio(url, parser != null ? page -> BookPages.get(page, parser::fetch) : SiteHttp::get);
     }
 
     static Observable<ArrayList<AudioPOJO>> audio(String url, PageSource pages) {

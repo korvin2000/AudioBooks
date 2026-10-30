@@ -50,6 +50,19 @@ public final class Otrub implements SourceParser {
     private static final Pattern GENRE =
             Pattern.compile("^" + Pattern.quote(Url.SERVER_OTRUB) + "/genres/([\\w-]+)\\.html");
 
+    // The site's class names are build hashes (_cb0a41...) that a rebuild renames: select by structure, links and
+    // schema.org microdata instead.
+    /** A listing card: the div whose child holds the cover link. */
+    private static final String CARD = "div:has(> div > a > img)";
+    /** A card's title link: the book page {@code /<slug>.html}, not the cover. */
+    private static final String TITLE = "a[href~=^/[^/]+\\.html$]:not(:has(img))";
+    /** A card's author, reader or series row: a label span followed by a link. */
+    private static final String PEOPLE_ROW = "div:has(> span + a)";
+    /** A card's description: a div with its own text and no links. */
+    private static final String CARD_DESCRIPTION = "div:matchesOwn(\\S):not(:has(a))";
+    /** A book page's info row (genre, author, reader, series, duration): a div led by a bold label. */
+    private static final String INFO_ROW = "[itemtype$=/Book] div:has(> b):not([itemprop=description], [itemprop=description] *)";
+
     // ---------------------------------------------------------------- SourceParser
 
     @Override
@@ -127,16 +140,16 @@ public final class Otrub implements SourceParser {
 
     @Override
     public ProviderPage<GenrePOJO> genres(Document page, String url, int pageNo) {
-        return ProviderPage.of(Html.rows(page.select("a._b8c4a1"), item -> {
+        return ProviderPage.of(Html.rows(page.select("a[href^=/genres/]:has(> span + span)"), item -> {
             GenrePOJO genrePOJO = new GenrePOJO();
             if (!item.attr("href").isEmpty()) {
                 genrePOJO.setUrl(Url.SERVER_OTRUB + item.attr("href") + "?p=");
             }
-            Element nameEl = item.selectFirst("._28f7ab");
+            Element nameEl = item.selectFirst("span:first-child");
             if (nameEl != null) {
                 genrePOJO.setName(nameEl.text());
             }
-            Element countEl = item.selectFirst("._fb36fb");
+            Element countEl = item.selectFirst("span:nth-child(2)");
             if (countEl != null) {
                 genrePOJO.setDescription(countEl.text());
             }
@@ -201,13 +214,13 @@ public final class Otrub implements SourceParser {
         if (listParent == null) {
             return ProviderPage.empty();
         }
-        ArrayList<BookPOJO> result = cards(listParent.select("._cb0a41 > ._dad4fa"), book -> {
+        ArrayList<BookPOJO> result = cards(listParent.select(CARD), book -> {
             BookPOJO bookPOJO = new BookPOJO();
-            Element img = book.selectFirst("._bce453 img._76d12c");
+            Element img = book.selectFirst("a > img");
             if (img != null) {
                 bookPOJO.setPhoto(img.attr("src"));
             }
-            Element genreLink = book.selectFirst("._eeab32 b a");
+            Element genreLink = book.selectFirst("a[href^=/genres/]");
             if (genreLink != null) {
                 if (!genreLink.attr("href").isEmpty()) {
                     bookPOJO.setUrlGenre(Url.SERVER_OTRUB + genreLink.attr("href") + "?p=");
@@ -216,7 +229,7 @@ public final class Otrub implements SourceParser {
                     bookPOJO.setGenre(genreLink.text());
                 }
             }
-            Element titleLink = book.selectFirst("._3dc935 a");
+            Element titleLink = book.selectFirst(TITLE);
             if (titleLink != null) {
                 if (!titleLink.attr("href").isEmpty()) {
                     bookPOJO.setUrl(Url.SERVER_OTRUB + titleLink.attr("href"));
@@ -225,8 +238,8 @@ public final class Otrub implements SourceParser {
                     bookPOJO.setName(titleLink.text());
                 }
             }
-            for (Element block : book.select("._5d10b1 ._eeab32")) {
-                Element label = block.selectFirst("._a6370b");
+            for (Element block : book.select(PEOPLE_ROW)) {
+                Element label = block.selectFirst("span");
                 Element a = block.selectFirst("a");
                 if (label == null || a == null) {
                     continue;
@@ -239,7 +252,7 @@ public final class Otrub implements SourceParser {
                     if (!href.isEmpty()) {
                         bookPOJO.setUrlAutor(Url.SERVER_OTRUB + href);
                     }
-                } else if (labelText.contains("Читает")) {
+                } else if (labelText.startsWith("Чита")) {
                     bookPOJO.setArtist(name);
                     if (!href.isEmpty()) {
                         bookPOJO.setUrlArtist(Url.SERVER_OTRUB + href);
@@ -251,7 +264,7 @@ public final class Otrub implements SourceParser {
                     }
                 }
             }
-            Element desc = book.selectFirst("._b1f6b9");
+            Element desc = book.selectFirst(CARD_DESCRIPTION);
             if (desc != null) {
                 bookPOJO.setDesc(desc.text());
             }
@@ -267,12 +280,12 @@ public final class Otrub implements SourceParser {
             descriptionPOJO.setTitle(titleElement.first().text().trim());
         }
 
-        Elements img = document.select("._5e0b77 img");
+        Elements img = document.select("[itemtype$=/Book] img");
         if (img.size() > 0) {
             descriptionPOJO.setPoster(img.first().absUrl("src"));
         }
 
-        Elements infoBlocks = document.select("._72ce76 ._5bef20");
+        Elements infoBlocks = document.select(INFO_ROW);
         for (Element block : infoBlocks) {
             String text = block.text();
             Element a = block.select("a").first();
@@ -282,7 +295,7 @@ public final class Otrub implements SourceParser {
             } else if (text.contains("Автор") && a != null) {
                 descriptionPOJO.setAutor(a.text());
                 descriptionPOJO.setAutorUrl(a.absUrl("href"));
-            } else if (text.contains("Читает") && a != null) {
+            } else if (text.startsWith("Чита") && a != null) {
                 descriptionPOJO.setArtist(a.text());
                 descriptionPOJO.setArtistUrl(a.absUrl("href"));
             } else if ((text.contains("Цикл") || text.contains("Серия")) && a != null) {
@@ -304,7 +317,7 @@ public final class Otrub implements SourceParser {
             }
         }
 
-        Elements desc = document.select("._034fb7[itemprop=description]");
+        Elements desc = document.select("div[itemprop=description]");
         if (desc.size() > 0) {
             descriptionPOJO.setDescription(desc.first().text());
         }
@@ -322,12 +335,12 @@ public final class Otrub implements SourceParser {
             bookPOJO.setName(titleElement.first().text().trim());
         }
 
-        Elements img = document.select("._5e0b77 img");
+        Elements img = document.select("[itemtype$=/Book] img");
         if (img.size() > 0) {
             bookPOJO.setPhoto(img.first().absUrl("src"));
         }
 
-        Elements infoBlocks = document.select("._72ce76 ._5bef20");
+        Elements infoBlocks = document.select(INFO_ROW);
         for (Element block : infoBlocks) {
             String text = block.text();
             Element a = block.select("a").first();
@@ -343,7 +356,7 @@ public final class Otrub implements SourceParser {
                 if (!href.isEmpty()) {
                     bookPOJO.setUrlAutor(href);
                 }
-            } else if (text.contains("Читает") && a != null) {
+            } else if (text.startsWith("Чита") && a != null) {
                 bookPOJO.setArtist(a.text());
                 String href = a.absUrl("href");
                 if (!href.isEmpty()) {
@@ -357,7 +370,7 @@ public final class Otrub implements SourceParser {
             }
         }
 
-        Elements desc = document.select("._034fb7[itemprop=description]");
+        Elements desc = document.select("div[itemprop=description]");
         if (desc.size() > 0) {
             bookPOJO.setDesc(desc.first().text());
         }
@@ -377,8 +390,8 @@ public final class Otrub implements SourceParser {
 
     /** The books of a {@code /series/<slug>.html} page, in the site's order. */
     public static ArrayList<SeriesPOJO> parseSeriesPage(Document doc) {
-        return each(doc.select("._3dc935 a"), a -> {
-            Element card = a.closest("._dad4fa");
+        return each(doc.select(CARD + " " + TITLE), a -> {
+            Element card = a.closest(CARD);
             return Html.seriesItem(a, card == null ? null : card.selectFirst("img"));
         });
     }
@@ -392,18 +405,18 @@ public final class Otrub implements SourceParser {
         if (list == null) {
             return new ArrayList<>();
         }
-        return each(list.getElementsByClass("_dad4fa"), book -> {
-            Element a = book.selectFirst("._3dc935 a");
+        return each(list.select(CARD), book -> {
+            Element a = book.selectFirst(TITLE);
             if (a == null) {
                 return null;
             }
             String author = "";
             String reader = "";
-            for (Element block : book.select("._5d10b1 ._eeab32")) {
-                String label = text(block, "._a6370b");
+            for (Element block : book.select(PEOPLE_ROW)) {
+                String label = text(block, "span");
                 if (label.contains("Автор")) {
                     author = text(block, "a");
-                } else if (label.contains("Читает")) {
+                } else if (label.startsWith("Чита")) {
                     reader = text(block, "a");
                 }
             }

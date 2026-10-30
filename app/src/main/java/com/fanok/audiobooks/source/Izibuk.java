@@ -54,6 +54,17 @@ public final class Izibuk implements SourceParser {
 
     private static final List<Sort.Entry> MENU = Sort.menu(Sort.NEW, Sort.POPULAR);
 
+    // The site's class names are build hashes (_ccb9b7, _802db0...) that a rebuild renames: elements are found by
+    // their links, the schema.org Book markup, ids and labels instead.
+    /** A book card: the block whose cover image links to the book. */
+    private static final String CARD = "div:has(> a[href^=/art] > img)";
+    /** Scopes a book-page selector to the book itself, past the genre links of the site menu. */
+    private static final String BOOK = "[itemtype$=/Book] ";
+    /** The genre list: its rows link to a genre and hold a name (the site menu's genre links hold none). */
+    private static final String GENRE_LIST = "div:has(> a[href^=/genre] > span)";
+    /** The book page's Автор(ы) / Читает (Читают) / Время rows. */
+    private static final String INFO = "div:has(> div > b:matchesOwn(^(Авторы?|Чита(ет|ют)|Время):$))";
+
     // ---------------------------------------------------------------- SourceParser
 
     @Override
@@ -87,7 +98,7 @@ public final class Izibuk implements SourceParser {
         }
         if (url.contains("serie") && !result.items.isEmpty()) {
             Document book = fetch(result.items.get(0).getUrl());
-            Element genre = book.selectFirst("._7e215f a");
+            Element genre = book.selectFirst(BOOK + "a[href^=/genre]");
             Element author = book.selectFirst("[itemprop=author] a");
             for (BookPOJO item : result.items) {
                 try {
@@ -210,7 +221,7 @@ public final class Izibuk implements SourceParser {
                 .addQueryParameter("q", description.getTitle() + " " + description.getAutor())
                 .build();
         Element list = fetch(search.toString()).getElementById("books_list");
-        description.setOtherReader(list != null && list.getElementsByClass("_ccb9b7").size() > 1);
+        description.setOtherReader(list != null && list.select(CARD).size() > 1);
     }
 
     /** The search for title and author: the hits of this book with another reader. */
@@ -253,10 +264,10 @@ public final class Izibuk implements SourceParser {
         final String pageTitle = title(document);
         // the listing itself as a link of its cards: without the page (and sort) of this request
         final String listing = url.replaceFirst("[?#].*", "") + "?p=";
-        Elements raw = listParent.getElementsByClass("_ccb9b7");
+        Elements raw = listParent.select(CARD);
         ArrayList<BookPOJO> result = cards(raw, book -> {
             BookPOJO bookPOJO = new BookPOJO();
-            Element genre = book.selectFirst("._680f12 > *");
+            Element genre = book.selectFirst("a[href^=/genre]");
             if (genre != null) {
                 bookPOJO.setGenre(genre.text());
                 bookPOJO.setUrlGenre(Url.SERVER_IZIBUK + genre.attr("href") + "?p=");
@@ -266,31 +277,27 @@ public final class Izibuk implements SourceParser {
                     bookPOJO.setGenre(pageTitle);
                 }
             }
-            Element image = book.selectFirst("._bce453 > *");
+            Element image = book.selectFirst("a[href^=/art] > img");
             if (image != null) {
                 bookPOJO.setPhoto(image.attr("src"));
             }
-            Element content = book.selectFirst("._802db0");
+            Element content = book.selectFirst("div:has(> div > a[href^=/art])");
             if (content == null) {
                 return null;
             }
-            Element titleParent = child(content, 1);
+            Element titleParent = content.selectFirst("> div:has(> a[href^=/art])");
             if (titleParent != null) {
-                if (!titleParent.getElementsByClass("_09ddb7").isEmpty()) {
-                    return null; // fragment
+                if (!titleParent.select("> span:matchesOwn(^(Ф|Фрагмент)$)").isEmpty()) {
+                    return null; // fragment: "Фрагмент" on the desktop site, "Ф" on the mobile one
                 }
-                Element title = child(titleParent, 0);
+                Element title = titleParent.selectFirst("> a[href^=/art]");
                 if (title != null) {
                     bookPOJO.setUrl(Url.SERVER_IZIBUK + title.attr("href"));
                     bookPOJO.setName(title.text());
                 }
             }
             // desktop cards group these rows in a block, mobile ones list them directly and add the duration
-            for (Element element : content.getElementsByClass("_eeab32")) {
-                Element link = child(element, 1);
-                if (link == null) {
-                    continue;
-                }
+            for (Element link : content.select("a[href^=/author], a[href^=/reader], a[href^=/serie]")) {
                 String href = link.attr("href");
                 String name = link.text();
                 if (href.contains("author")) {
@@ -304,7 +311,8 @@ public final class Izibuk implements SourceParser {
                     bookPOJO.setSeries(name);
                 }
             }
-            Element time = content.selectFirst("._eeab32 ._08dd3a");
+            // "8 ч. 12 мин." or "41 мин." (mobile only); the hidden "(41:31)" next to the title does not match
+            Element time = content.selectFirst("span:matchesOwn(^\\d+ (ч|мин)\\.)");
             if (time != null && nonEmpty(time.text()) != null) {
                 bookPOJO.setTime(time.text());
             }
@@ -326,7 +334,9 @@ public final class Izibuk implements SourceParser {
                     bookPOJO.setSeries(pageTitle);
                 }
             }
-            Element description = content.selectFirst("._b1f6b9, [id$=_desc]");
+            // mobile: the hidden "book<N>_desc"; desktop: the text-only block after the title's
+            Element description = content.selectFirst(
+                    "[id$=_desc], div:has(> a[href^=/art]) ~ div:not(:has(a)):matchesOwn(\\S)");
             if (description != null) {
                 bookPOJO.setDesc(description.text());
             }
@@ -337,11 +347,13 @@ public final class Izibuk implements SourceParser {
 
     /** The listing's name: the desktop h1; on the mobile page the bold series name, else the breadcrumb after its link. */
     private static String title(Document document) {
-        Element title = document.selectFirst("h1, ._6eb726 b");
+        Element title = document.selectFirst("h1, div:containsOwn(Серия) > b");
         if (title != null) {
             return nonEmpty(title.text());
         }
-        Element crumbs = document.selectFirst("._6eb726");
+        // the breadcrumb starts at the genre, author or reader index (the site menu has the same links)
+        Element crumbs = document.selectFirst(
+                "div:not(#topmenu *):has(> a[href=/genres], > a[href=/authors], > a[href=/readers])");
         if (crumbs == null) {
             return null;
         }
@@ -354,13 +366,9 @@ public final class Izibuk implements SourceParser {
         return s == null || s.trim().isEmpty() ? null : s.trim();
     }
 
-    private static Element child(Element parent, int index) {
-        return parent != null && parent.childrenSize() > index ? parent.child(index) : null;
-    }
-
     /** The genre list: one page. */
     public static ProviderPage<GenrePOJO> parseGenres(Document doc) {
-        Element items = doc.selectFirst("._e181af");
+        Element items = doc.selectFirst(GENRE_LIST);
         if (items == null) {
             return ProviderPage.empty();
         }
@@ -379,7 +387,7 @@ public final class Izibuk implements SourceParser {
     /** The genre list as parental-control categories: only rows with a name and a link. */
     public static ArrayList<GenrePOJO> parseCategories(Document doc) {
         ArrayList<GenrePOJO> result = new ArrayList<>();
-        Elements items = doc.getElementsByClass("_e181af");
+        Elements items = doc.select(GENRE_LIST);
         if (items.size() != 0) {
             Elements list = items.first().children();
             for (Element item : list) {
@@ -434,17 +442,14 @@ public final class Izibuk implements SourceParser {
             descriptionPOJO.setTitle(elements.first().text());
         }
 
-        Elements imgParent = document.getElementsByClass("_5e0b77");
-        if (imgParent.size() != 0) {
-            Element img = imgParent.first().firstElementChild();
-            if (img != null) {
-                descriptionPOJO.setPoster(img.absUrl("src"));
-            }
+        Element img = document.selectFirst(BOOK + "img");
+        if (img != null) {
+            descriptionPOJO.setPoster(img.absUrl("src"));
         }
 
-        Elements infoParent = document.getElementsByClass("_b264b2");
-        if (infoParent.size() != 0) {
-            for (Element element : infoParent.first().children()) {
+        Element infoParent = document.selectFirst(INFO);
+        if (infoParent != null) {
+            for (Element element : infoParent.children()) {
                 String text = element.text();
                 Element a = element.getElementsByTag("a").first();
                 if (text.contains("Автор")) {
@@ -452,7 +457,7 @@ public final class Izibuk implements SourceParser {
                         descriptionPOJO.setAutorUrl(absUrl(a, "href", "?p="));
                         descriptionPOJO.setAutor(a.text());
                     }
-                } else if (text.contains("Читает")) {
+                } else if (text.startsWith("Чита")) {
                     if (a != null) {
                         descriptionPOJO.setArtistUrl(absUrl(a, "href", "?p="));
                         descriptionPOJO.setArtist(a.text());
@@ -463,22 +468,16 @@ public final class Izibuk implements SourceParser {
             }
         }
 
-        Elements seriesParent = document.getElementsByClass("_c337c7");
-        if (seriesParent.size() != 0) {
-            Element a = seriesParent.first().getElementsByTag("a").first();
-            if (a != null) {
-                descriptionPOJO.setSeriesUrl(absUrl(a, "href", "?p="));
-                descriptionPOJO.setSeries(a.text());
-            }
+        Element a = document.selectFirst(BOOK + "a[href^=/serie]");
+        if (a != null) {
+            descriptionPOJO.setSeriesUrl(absUrl(a, "href", "?p="));
+            descriptionPOJO.setSeries(a.text());
         }
 
-        Elements genreParent = document.getElementsByClass("_7e215f");
-        if (genreParent.size() != 0) {
-            Element genreElement = genreParent.first().firstElementChild();
-            if (genreElement != null) {
-                descriptionPOJO.setGenreUrl(absUrl(genreElement, "href", "?p="));
-                descriptionPOJO.setGenre(genreElement.text());
-            }
+        Element genreElement = document.selectFirst(BOOK + "a[href^=/genre]");
+        if (genreElement != null) {
+            descriptionPOJO.setGenreUrl(absUrl(genreElement, "href", "?p="));
+            descriptionPOJO.setGenre(genreElement.text());
         }
 
         Elements descriptionList = document.getElementsByAttributeValue("itemprop", "description");
@@ -503,20 +502,17 @@ public final class Izibuk implements SourceParser {
             }
         }
 
-        Elements imgParent = document.getElementsByClass("_5e0b77");
-        if (imgParent != null && imgParent.size() != 0) {
-            Element img = imgParent.first().firstElementChild();
-            if (img != null) {
-                String src = img.absUrl("src");
-                if (src != null) {
-                    bookPOJO.setPhoto(src);
-                }
+        Element img = document.selectFirst(BOOK + "img");
+        if (img != null) {
+            String src = img.absUrl("src");
+            if (src != null) {
+                bookPOJO.setPhoto(src);
             }
         }
 
-        Elements infoParent = document.getElementsByClass("_b264b2");
-        if (infoParent != null && infoParent.size() != 0) {
-            Elements info = infoParent.first().children();
+        Element infoParent = document.selectFirst(INFO);
+        if (infoParent != null) {
+            Elements info = infoParent.children();
             if (info != null) {
                 for (Element element : info) {
                     String text = element.text();
@@ -534,7 +530,7 @@ public final class Izibuk implements SourceParser {
                                     bookPOJO.setAutor(name);
                                 }
                             }
-                        } else if (text.contains("Читает")) {
+                        } else if (text.startsWith("Чита")) {
                             Elements aTag = element.getElementsByTag("a");
                             if (aTag != null && aTag.size() != 0) {
                                 Element a = aTag.first();
@@ -556,34 +552,27 @@ public final class Izibuk implements SourceParser {
             }
         }
 
-        Elements seriesParent = document.getElementsByClass("_c337c7");
-        if (seriesParent != null && seriesParent.size() != 0) {
-            Elements aTag = seriesParent.first().getElementsByTag("a");
-            if (aTag != null && aTag.size() != 0) {
-                Element a = aTag.first();
-                String href = a.absUrl("href");
-                if (!href.isEmpty()) {
-                    bookPOJO.setUrlSeries(href + "?p=");
-                }
-                String text = a.text();
-                if (text != null) {
-                    bookPOJO.setSeries(text);
-                }
+        Element a = document.selectFirst(BOOK + "a[href^=/serie]");
+        if (a != null) {
+            String href = a.absUrl("href");
+            if (!href.isEmpty()) {
+                bookPOJO.setUrlSeries(href + "?p=");
+            }
+            String text = a.text();
+            if (text != null) {
+                bookPOJO.setSeries(text);
             }
         }
 
-        Elements genreParent = document.getElementsByClass("_7e215f");
-        if (genreParent != null && genreParent.size() != 0) {
-            Element genreElement = genreParent.first().firstElementChild();
-            if (genreElement != null) {
-                String href = genreElement.absUrl("href");
-                if (!href.isEmpty()) {
-                    bookPOJO.setUrlGenre(href + "?p=");
-                }
-                String text = genreElement.text();
-                if (text != null) {
-                    bookPOJO.setGenre(text);
-                }
+        Element genreElement = document.selectFirst(BOOK + "a[href^=/genre]");
+        if (genreElement != null) {
+            String href = genreElement.absUrl("href");
+            if (!href.isEmpty()) {
+                bookPOJO.setUrlGenre(href + "?p=");
+            }
+            String text = genreElement.text();
+            if (text != null) {
+                bookPOJO.setGenre(text);
             }
         }
 
@@ -619,13 +608,14 @@ public final class Izibuk implements SourceParser {
 
     /** The series block of the book page, the open book included (without a link). */
     public static ArrayList<SeriesPOJO> parseSeries(Document doc) {
-        Element block = doc.selectFirst("._b264b2._49d1b4");
+        Element block = doc.selectFirst(BOOK + "div:has(> div > a[href^=/serie])");
         if (block == null) {
             return new ArrayList<>();
         }
-        return each(block.getElementsByClass("_f61db9"), item -> {
+        // a row per book: its number, then a link, or the open book's name in bold
+        return each(block.select("> div:has(> a[href^=/art], > strong)"), item -> {
             SeriesPOJO seriesPOJO = new SeriesPOJO();
-            String number = text(item, "._bb8bca");
+            String number = text(item, "> span");
             seriesPOJO.setNumber(number);
             Element a = item.selectFirst("a");
             if (a != null) {
@@ -650,14 +640,14 @@ public final class Izibuk implements SourceParser {
         if (list == null) {
             return new ArrayList<>();
         }
-        return each(list.getElementsByClass("_ccb9b7"), book -> {
-            Element a = book.selectFirst("a._3dc935, ._3dc935 a");
+        return each(list.select(CARD), book -> {
+            Element a = book.selectFirst("a[href^=/art]:not(:has(img))");
             if (a == null) {
                 return null;
             }
             String author = "";
             List<String> readers = new ArrayList<>();
-            for (Element person : book.select("._eeab32 a")) {
+            for (Element person : book.select("a[href^=/author], a[href^=/reader]")) {
                 String link = person.attr("href");
                 if (link.contains("author") && author.isEmpty()) {
                     author = person.text().trim();

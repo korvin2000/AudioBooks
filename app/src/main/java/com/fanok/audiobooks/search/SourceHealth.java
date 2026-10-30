@@ -1,5 +1,6 @@
 package com.fanok.audiobooks.search;
 
+import android.annotation.SuppressLint;
 import android.content.Context;
 import android.content.SharedPreferences;
 import android.net.ConnectivityManager;
@@ -50,12 +51,12 @@ public final class SourceHealth {
     }
 
     /** Starts the automatic check when the last one is a day old and the network is unmetered; never fails. */
+    @SuppressLint("CheckResult") // process-wide and short: it ends by itself, nothing to dispose
     public static void checkIfDue(@NonNull Context context) {
         SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(context);
         if (!due(prefs.getLong(PREF_CHECKED_AT, 0), System.currentTimeMillis()) || !unmetered(context)) {
             return;
         }
-        //noinspection ResultOfMethodCallIgnored: process-wide, ends by itself
         Single.timer(START_DELAY_SECONDS, TimeUnit.SECONDS)
                 .flatMap(tick -> unmetered(context) ? check(prefs, BACKGROUND_PARALLEL)
                         : Single.just(Collections.<SourceProbe.Result>emptyList()))

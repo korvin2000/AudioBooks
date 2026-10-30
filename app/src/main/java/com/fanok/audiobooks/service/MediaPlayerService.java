@@ -1313,6 +1313,7 @@ public class MediaPlayerService extends MediaBrowserServiceCompat {
         final int index = chapterIndex;
         final int count = chapters.size();
         holdRetryWakeLock(REFRESH_WAKE_MS);
+        com.fanok.audiobooks.model.BookPages.forget(com.fanok.audiobooks.Url.canonical(url)); // a fresh page, fresh addresses
         refreshTask = new AudioModel(getApplicationContext()).getAudio(url)
                 .subscribeOn(Schedulers.io())
                 .observeOn(AndroidSchedulers.mainThread())

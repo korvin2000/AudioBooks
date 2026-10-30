@@ -41,10 +41,10 @@ public class BookDescriptionModel implements DescriptionModel {
         this(url, fetchFor(url));
     }
 
-    /** The site's own fetch when it has a parser, else {@link SiteHttp#get}. */
+    /** The site's own fetch, shared with the chapter list of this opening ({@link BookPages}); else {@link SiteHttp#get}. */
     private static Function<String, Document> fetchFor(String url) {
         SourceParser parser = Provider.parserOf(url);
-        return parser != null ? parser::fetch : SiteHttp::get;
+        return parser != null ? page -> BookPages.get(page, parser::fetch) : SiteHttp::get;
     }
 
     BookDescriptionModel(String url, Function<String, Document> fetch) {

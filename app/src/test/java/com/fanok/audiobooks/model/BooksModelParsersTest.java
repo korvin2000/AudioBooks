@@ -176,12 +176,13 @@ public class BooksModelParsersTest {
     @Test
     public void izibukMobileSeriesPageWithoutListContainerSkipsFragments() {
         String url = "https://izib.uk/serie703?p=1/";
-        String card = "<div class=_ccb9b7><div class=_680f12> #%d </div><div class=_802db0><span></span>"
-                + "<div class=_3dc935><a href=/art%d>Book %d</a>%s</div>"
+        String card = "<div class=_ccb9b7><div class=_680f12> #%1$d </div>"
+                + "<a class=_bce453 href=/art%1$d><img src=c.jpg></a><div class=_802db0><span></span>"
+                + "<div class=_3dc935><a href=/art%1$d>Book %1$d</a>%2$s</div>"
                 + "<div class=_eeab32><span class=_1d4de8></span><a href=/serie703>Мегрэ</a></div>"
                 + "<div class=_eeab32><span class=_1f6354></span><span class=_08dd3a>4 ч. 2 мин.</span></div></div></div>";
         Document doc = Jsoup.parse("<div class=_6eb726> Серия «<b>Комиссар Мегрэ</b>» </div>"
-                + String.format(card, 1, 1, 1, "") + String.format(card, 2, 2, 2, "<span class=_09ddb7>Ф</span>"), url);
+                + String.format(card, 1, "") + String.format(card, 2, "<span class=_09ddb7>Ф</span>"), url);
         ProviderPage<BookPOJO> page = Izibuk.parseListing(doc, url, 1);
         assertEquals(1, page.items.size());
         assertEquals("Book 1", page.items.get(0).getName());
