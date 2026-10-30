@@ -25,12 +25,10 @@ import java.util.List;
 /** A site that implements only the required methods has no optional feature, and its other-source lookup is its book search. */
 public class SourceParserDefaultsTest {
 
-    /** The smallest site: ten methods. */
+    /** The smallest site: seven methods. */
     private static final class Minimal implements SourceParser {
         @Override public ProviderPage<BookPOJO> listing(Document page, String url, int pageNo) { return ProviderPage.empty(); }
         @Override public String pageUrl(String url, int page) { return url + "?p=" + page; }
-        @Override public int optionsMenu() { return 0; }
-        @Override public String sortUrl(int itemId, String listingUrl) { return null; }
         @Override public ProviderPage<GenrePOJO> genres(Document page, String url, int pageNo) { return ProviderPage.empty(); }
         @Override public String searchUrl(SearchUrls.Category category, String query, int page) {
             return category == SearchUrls.Category.BOOKS ? "https://site.test/search?q=" + SearchUrls.enc(query) + "&p=" + page : null;
@@ -43,7 +41,6 @@ public class SourceParserDefaultsTest {
             return ProviderPage.of(Collections.singletonList(book), false);
         }
         @Override public DescriptionPOJO description(Document page, String bookUrl) { return new DescriptionPOJO(); }
-        @Override public BookPOJO book(Document page, String bookUrl) { return new BookPOJO(); }
         @Override public ArrayList<AudioPOJO> tracks(Document page, String base) { throw new IllegalStateException("no player"); }
     }
 
@@ -52,7 +49,9 @@ public class SourceParserDefaultsTest {
 
     @Test
     public void optionalFeaturesAreOffByDefault() throws Exception {
-        assertTrue(parser.hasSort("https://site.test/"));
+        assertFalse(parser.hasSort("https://site.test/"));
+        assertTrue(parser.sorts("https://site.test/").isEmpty());
+        assertNull(parser.sortUrl(Sort.RATING, "https://site.test/"));
         assertTrue(parser.listsDuration("https://site.test/"));
         assertNull(parser.genreOf("https://site.test/genre/1"));
         assertEquals("https://site.test/new", parser.inGenre("https://site.test/new", "1"));
@@ -60,9 +59,12 @@ public class SourceParserDefaultsTest {
         assertTrue(parser.searchPeople(page, 1, true).items.isEmpty());
         assertTrue(parser.recommendations(page, "https://site.test/book/1").isEmpty());
         assertNull(parser.mediaHeaders("https://site.test/book/1"));
+        assertTrue(parser.mediaCookies("https://site.test/book/1").isEmpty());
         assertTrue(parser.series(page, "https://site.test/book/1").isEmpty());
         assertTrue(parser.comments("https://site.test/book/1", () -> false).isEmpty());
         assertFalse(parser.findsOtherReaders());
+        assertFalse(parser.probesOtherReaders());
+        assertEquals(1, parser.otherSourcePages());
         assertTrue(parser.otherReaders("https://site.test/book/1", "t", "a", "r").isEmpty());
         assertNull(parser.referer());
     }

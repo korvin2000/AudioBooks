@@ -14,13 +14,15 @@ import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 
-import org.jsoup.Connection;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
 import org.jsoup.select.Elements;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -64,6 +66,10 @@ public final class Uknig implements SourceParser {
     private static final Pattern GENRE = Pattern.compile("^https?://[^/]+/genres/[^/?#]+");
     /** Listings of one author, reader, series or year: nothing to re-sort. */
     private static final Pattern UNSORTED = Pattern.compile("^https?://[^/]+/(authors|readers|series|years)/");
+    private static final List<Sort.Entry> MENU = Collections.unmodifiableList(Arrays.asList(Sort.item(Sort.NEW),
+            Sort.submenu(R.string.popular, Sort.POPULAR_DAY, Sort.POPULAR_WEEK, Sort.POPULAR_MONTH,
+                    Sort.POPULAR_ALL_TIME),
+            Sort.item(Sort.RATING)));
     private static final Pattern PLAYLIST = Pattern.compile("createPlayer\\(\\s*[\"']([^\"']+playlist\\.txt[^\"']*)");
 
     // ---------------------------------------------------------------- SourceParser
@@ -97,36 +103,25 @@ public final class Uknig implements SourceParser {
     }
 
     @Override
-    public int optionsMenu() {
-        return R.menu.books_uknig_options_menu;
+    public List<Sort.Entry> sorts(String url) {
+        return UNSORTED.matcher(url).find() ? Collections.<Sort.Entry>emptyList() : MENU;
     }
 
     @Override
-    public String sortUrl(int itemId, String listingUrl) {
+    public String sortUrl(Sort sort, String listingUrl) {
         String siteWide;
-        if (itemId == R.id.new_data) {
-            siteWide = INDEX;
-        } else if (itemId == R.id.popular_day) {
-            siteWide = POPULAR_TODAY;
-        } else if (itemId == R.id.popular_week) {
-            siteWide = POPULAR_WEEK;
-        } else if (itemId == R.id.popular_month) {
-            siteWide = POPULAR_MONTH;
-        } else if (itemId == R.id.popular_all_time) {
-            siteWide = POPULAR_ALL_TIME;
-        } else if (itemId == R.id.reting) {
-            siteWide = BEST;
-        } else {
-            return null;
+        switch (sort) {
+            case NEW: siteWide = INDEX; break;
+            case POPULAR_DAY: siteWide = POPULAR_TODAY; break;
+            case POPULAR_WEEK: siteWide = POPULAR_WEEK; break;
+            case POPULAR_MONTH: siteWide = POPULAR_MONTH; break;
+            case POPULAR_ALL_TIME: siteWide = POPULAR_ALL_TIME; break;
+            case RATING: siteWide = BEST; break;
+            default: return null;
         }
         String genre = genreOf(listingUrl);
         boolean same = genre == null ? siteWide.equals(listingUrl) : inGenre(siteWide, genre).equals(listingUrl);
         return same ? listingUrl : siteWide;
-    }
-
-    @Override
-    public boolean hasSort(String url) {
-        return !UNSORTED.matcher(url).find();
     }
 
     @Override
@@ -201,10 +196,7 @@ public final class Uknig implements SourceParser {
 
     @Override
     public ArrayList<AudioPOJO> tracks(Document page, String base) throws IOException {
-        Connection.Response response = SiteHttp.execute(
-                SiteHttp.connect(playlistUrl(page, base)).ignoreContentType(true)).bufferUp();
-        SiteHttp.parse(response); // fails on an HTTP error
-        return parseTracks(response.body(), text(page, "h1[itemprop=name]"));
+        return parseTracks(SiteHttp.body(SiteHttp.connect(playlistUrl(page, base))), text(page, "h1[itemprop=name]"));
     }
 
     @Override
@@ -355,22 +347,7 @@ public final class Uknig implements SourceParser {
 
     /** A book page opened from a link: the card fields of the book itself. */
     public static BookPOJO parseBook(Document doc, String url) {
-        DescriptionPOJO d = parseDescription(doc);
-        BookPOJO book = new BookPOJO();
-        book.setUrl(url);
-        book.setName(d.getTitle());
-        book.setPhoto(d.getPoster());
-        book.setAutor(d.getAutor());
-        book.setUrlAutor(d.getAutorUrl());
-        book.setArtist(d.getArtist());
-        book.setUrlArtist(d.getArtistUrl());
-        book.setGenre(d.getGenre());
-        book.setUrlGenre(d.getGenreUrl());
-        book.setSeries(d.getSeries());
-        book.setUrlSeries(d.getSeriesUrl());
-        book.setTime(d.getTime());
-        book.setDesc(d.getDescription());
-        return book;
+        return BookPOJO.of(parseDescription(doc), url);
     }
 
     /** The page's "what next" books (same author or genre); the next of the series is left to {@link #parseSeries}. */

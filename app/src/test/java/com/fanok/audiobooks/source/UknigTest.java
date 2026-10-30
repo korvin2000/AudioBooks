@@ -9,7 +9,6 @@ import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
 import com.fanok.audiobooks.BookRemovedException;
-import com.fanok.audiobooks.R;
 import com.fanok.audiobooks.pojo.AudioPOJO;
 import com.fanok.audiobooks.pojo.BookPOJO;
 import com.fanok.audiobooks.pojo.DescriptionPOJO;
@@ -120,7 +119,7 @@ public class UknigTest {
     }
 
     /** As BooksPresenter does it: the site-wide sort, then narrowed to the genre the listing is in. */
-    private static String sorted(int itemId, String listing) {
+    private static String sorted(Sort itemId, String listing) {
         String url = UKNIG.sortUrl(itemId, listing);
         String genre = UKNIG.genreOf(listing);
         return url.equals(listing) || genre == null ? url : UKNIG.inGenre(url, genre);
@@ -129,21 +128,21 @@ public class UknigTest {
     @Test
     public void sortsSiteWideAndInGenre() {
         String home = Uknig.INDEX;
-        assertEquals(Uknig.POPULAR_TODAY, sorted(R.id.popular_day, home));
-        assertEquals(Uknig.POPULAR_WEEK, sorted(R.id.popular_week, home));
-        assertEquals(Uknig.POPULAR_ALL_TIME, sorted(R.id.popular_all_time, home));
-        assertEquals(Uknig.BEST, sorted(R.id.reting, home));
-        assertEquals(home, sorted(R.id.new_data, Uknig.POPULAR_MONTH));
-        assertNull(UKNIG.sortUrl(R.id.coments, home));
+        assertEquals(Uknig.POPULAR_TODAY, sorted(Sort.POPULAR_DAY, home));
+        assertEquals(Uknig.POPULAR_WEEK, sorted(Sort.POPULAR_WEEK, home));
+        assertEquals(Uknig.POPULAR_ALL_TIME, sorted(Sort.POPULAR_ALL_TIME, home));
+        assertEquals(Uknig.BEST, sorted(Sort.RATING, home));
+        assertEquals(home, sorted(Sort.NEW, Uknig.POPULAR_MONTH));
+        assertNull(UKNIG.sortUrl(Sort.COMMENTS, home));
 
         String genre = "https://uknig.com/genres/fantastika?p=";
-        assertEquals("https://uknig.com/genres/fantastika/popular/today?p=", sorted(R.id.popular_day, genre));
-        assertEquals("https://uknig.com/genres/fantastika/popular?p=", sorted(R.id.popular_all_time, genre));
-        String best = sorted(R.id.reting, "https://uknig.com/genres/fantastika/popular/month?p=");
+        assertEquals("https://uknig.com/genres/fantastika/popular/today?p=", sorted(Sort.POPULAR_DAY, genre));
+        assertEquals("https://uknig.com/genres/fantastika/popular?p=", sorted(Sort.POPULAR_ALL_TIME, genre));
+        String best = sorted(Sort.RATING, "https://uknig.com/genres/fantastika/popular/month?p=");
         assertEquals("https://uknig.com/genres/fantastika/best?p=", best);
         assertEquals("https://uknig.com/genres/fantastika/best?p=2", UKNIG.pageUrl(best, 2));
-        assertEquals("already there", best, UKNIG.sortUrl(R.id.reting, best));
-        assertEquals(genre, sorted(R.id.new_data, best));
+        assertEquals("already there", best, UKNIG.sortUrl(Sort.RATING, best));
+        assertEquals(genre, sorted(Sort.NEW, best));
         assertNull(UKNIG.genreOf(Uknig.GENRES));
     }
 

@@ -28,6 +28,7 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Random;
+import java.util.Set;
 import java.util.concurrent.CompletionService;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutionException;
@@ -641,20 +642,37 @@ public final class ProxyFinder {
         }
     }
 
-    /** The home page of the catalog source selected in the settings: the site the proxy has to reach. */
+    /**
+     * The home page of the site the proxy has to reach: the catalog source selected in the settings, unless it goes
+     * direct ({@link AppProxy#PREF_DIRECT}); then the first source that takes the proxy.
+     */
     @NonNull
     static String targetOf(@NonNull SharedPreferences prefs) {
+        String selected;
         try {
-            String value = prefs.getString("sorce_books", null);
-            if (value != null) {
-                for (Provider provider : Provider.values()) {
-                    if (value.equals(provider.prefValue)) {
-                        return provider.server + "/";
-                    }
+            selected = prefs.getString("sorce_books", null);
+        } catch (RuntimeException e) {
+            selected = null; // a wrongly typed value: the default site
+        }
+        return targetOf(selected, AppProxy.readDirect(prefs));
+    }
+
+    /** {@link #targetOf(SharedPreferences)} for the selected source's {@code prefValue} and the direct sources. */
+    @NonNull
+    static String targetOf(@Nullable String selected, @NonNull Set<String> direct) {
+        if (selected != null && !direct.contains(selected)) {
+            for (Provider provider : Provider.values()) {
+                if (selected.equals(provider.prefValue)) {
+                    return provider.server + "/";
                 }
             }
-        } catch (RuntimeException e) {
-            // a wrongly typed value: the default site
+        }
+        if (!direct.isEmpty()) {
+            for (Provider provider : Provider.values()) {
+                if (!direct.contains(provider.prefValue)) {
+                    return provider.server + "/";
+                }
+            }
         }
         return FALLBACK_TARGET;
     }
@@ -792,8 +810,9 @@ public final class ProxyFinder {
                     .callTimeout(timeoutMs * 2L, TimeUnit.MILLISECONDS)
                     .build();
             Request.Builder builder = new Request.Builder().url(target).header("User-Agent", Consts.USER_AGENT);
-            if (Url.isHost(target, Url.SERVER_AUDIOBOO)) {
-                // like SiteHttp: audioboo's Cloudflare answers a GET with a challenge, a POST passes
+            Provider site = Provider.ofUrl(target);
+            if (site != null && site.parser.postsPages() && Url.isHost(target, site.server)) {
+                // like SiteHttp: the site's wall answers a GET with a challenge, a POST passes
                 builder.post(new FormBody.Builder().build());
             } else {
                 builder.header("Range", "bytes=0-0");

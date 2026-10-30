@@ -9,6 +9,7 @@ import static org.junit.Assert.assertTrue;
 
 import com.fanok.audiobooks.model.OtherSourceModel.Hit;
 import com.fanok.audiobooks.search.Provider;
+import com.fanok.audiobooks.source.Abmp3;
 import com.fanok.audiobooks.pojo.BookPOJO;
 import com.fanok.audiobooks.pojo.OtherArtistPOJO;
 import io.reactivex.Single;
@@ -116,7 +117,7 @@ public class OtherSourceModelTest {
 
     @Test
     public void abmp3TitleWithoutParenthesesDoesNotThrow() {
-        List<Hit> hits = OtherSourceModel.parseAbmp3Search(Jsoup.parse("<div class='b-statictop-search'>"
+        List<Hit> hits = Abmp3.parseSearchHits(Jsoup.parse("<div class='b-statictop-search'>"
                 + "<h2 class='b-statictop__title'>Поиск в книгах:</h2><ul class='b-statictop__items'>"
                 + "<li><a href='/audio-1-x'>Книга без скобок</a></li><li>нет ссылки</li></ul></div>",
                 "https://audiobook-mp3.com/search"));
@@ -129,7 +130,7 @@ public class OtherSourceModelTest {
     @Test
     public void oneBadItemIsSkippedNotFatal() {
         Document doc = Jsoup.parse("<ul><li>a</li><li>boom</li><li>c</li></ul>");
-        List<String> items = OtherSourceModel.each(doc.select("li"), li -> {
+        List<String> items = com.fanok.audiobooks.source.Html.each(doc.select("li"), li -> {
             if (li.text().equals("boom")) {
                 throw new IndexOutOfBoundsException("child(3)");
             }

@@ -71,6 +71,40 @@ public class SearchSessionTest {
     }
 
     @Test
+    public void atMostMaxParallelSourcesLoadAtOnceAndAQueuedOneIsNotTimedOutWhileWaiting() {
+        int count = SearchSession.MAX_PARALLEL + 2;
+        List<SearchSession.Source<String>> sources = new ArrayList<>();
+        int[] running = {0};
+        int[] peak = {0};
+        for (int i = 0; i < count; i++) {
+            String name = "S" + i;
+            sources.add(new SearchSession.Source<String>() {
+                @Override
+                public String name() {
+                    return name;
+                }
+
+                @Override
+                public Single<ProviderPage<String>> load(String query, int pageNo) {
+                    return Single.timer(8, TimeUnit.SECONDS, scheduler)
+                            .map(t -> page(false, name))
+                            .doOnSubscribe(d -> peak[0] = Math.max(peak[0], ++running[0]))
+                            .doFinally(() -> running[0]--);
+                }
+            });
+        }
+        SearchSession<String> s = session(sources);
+        s.search("x");
+        scheduler.advanceTimeBy(8, TimeUnit.SECONDS);
+        assertEquals(SearchSession.MAX_PARALLEL, peak[0]);
+        // the last two start at 8 s and answer at 16 s, inside their own 10 s
+        scheduler.advanceTimeBy(8, TimeUnit.SECONDS);
+        assertEquals(1, finished.size());
+        assertEquals(0, finishedFailures);
+        assertEquals(count, finished.get(0).split(",").length);
+    }
+
+    @Test
     public void resultsMergeInOrderOfArrivalAndRenderProgressively() {
         SearchSession<String> s = session(Arrays.asList(
                 source("A", 5, page(false, "a1", "a2"), scheduler),

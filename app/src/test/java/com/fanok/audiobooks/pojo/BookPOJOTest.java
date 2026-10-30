@@ -8,6 +8,8 @@ import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
 import com.fanok.audiobooks.BookPageFixtures;
+import com.fanok.audiobooks.source.Akniga;
+import com.fanok.audiobooks.source.Audioboo;
 import java.io.IOException;
 import org.jsoup.Jsoup;
 import org.junit.Test;
@@ -28,10 +30,10 @@ public class BookPOJOTest {
     @Test
     public void seriesLinksPointToTheBooksOwnSite() throws IOException {
         String akniga = BOOK_PAGES[3][1];
-        BookPOJO book = BookPOJO.parseBookAkniga(BookPageFixtures.load(BOOK_PAGES[3][0], akniga), akniga);
+        BookPOJO book = Akniga.parseBook(BookPageFixtures.load(BOOK_PAGES[3][0], akniga), akniga);
         assertTrue(book.getUrlSeries(), book.getUrlSeries().startsWith("https://akniga.org/series/"));
         String audioboo = BOOK_PAGES[6][1];
-        BookPOJO boo = BookPOJO.parseBookAudioboo(BookPageFixtures.load(BOOK_PAGES[6][0], audioboo), audioboo);
+        BookPOJO boo = Audioboo.parseBook(BookPageFixtures.load(BOOK_PAGES[6][0], audioboo), audioboo);
         assertEquals("https://audioboo.org/xfsearch/cikl/%D0%A1%D0%BE%D0%BB%D0%BE/", boo.getUrlSeries());
     }
 

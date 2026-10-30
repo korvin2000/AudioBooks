@@ -2,8 +2,6 @@ package com.fanok.audiobooks.source;
 
 import androidx.annotation.Nullable;
 
-import com.fanok.audiobooks.R;
-import com.fanok.audiobooks.model.AudioModel;
 import com.fanok.audiobooks.net.SiteHttp;
 import com.fanok.audiobooks.pojo.AudioPOJO;
 import com.fanok.audiobooks.pojo.BookPOJO;
@@ -19,6 +17,7 @@ import io.reactivex.functions.BooleanSupplier;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Matcher;
@@ -41,7 +40,7 @@ import org.jsoup.select.Elements;
  * {@code dle_sort_cat_<id>}/{@code dle_direction_cat_<id>} ({@link #categoryId}). A GET with that query is a 404.
  * The choice sticks to the PHPSESSID session, so a plain GET of a listing the session sorted comes back sorted
  * (the form on the page still says "date"): {@link #fetch} sends index and genre pages with their sort. No
- * periods; the fixed {@code /top100.html} is not offered.</li>
+ * periods. The index also offers the fixed {@link #TOP_100} (one page of 100 cards).</li>
  * <li>genres: {@link #GENRES}; a genre is {@code /<slug>/} with the index's page scheme.</li>
  * <li>search: {@code /index.php?do=search&subaction=search&story=Q&search_start=N}, GET, 10 cards; the "найдено"
  * count stops at 50 while the pages go on.</li>
@@ -57,25 +56,12 @@ public final class AknigXyz implements SourceParser {
 
     public static final String SERVER = "https://s2.aknig.xyz";
     public static final String INDEX = SERVER + "/";
+    public static final String TOP_100 = SERVER + "/top100.html";
     public static final String GENRES = SERVER + "/genres.html";
 
     static final int SEARCH_PAGE_SIZE = 10;
     /** The search reports at most this many hits, however many pages follow. */
     static final int SEARCH_COUNT_CAP = 50;
-
-    /** The DLE sort form: field and direction. */
-    public enum Sort {
-        NEW("date", "desc"), RATING("rating", "desc"), POPULAR("news_read", "desc"),
-        COMMENTS("comm_num", "desc"), TITLE("title", "asc");
-
-        final String field;
-        final String direction;
-
-        Sort(String field, String direction) {
-            this.field = field;
-            this.direction = direction;
-        }
-    }
 
     /** Genre root → DLE category id, learnt from the genre's own pages (their sort form). */
     private static final Map<String, String> CATEGORY_IDS = new ConcurrentHashMap<>();
@@ -102,12 +88,12 @@ public final class AknigXyz implements SourceParser {
         }
         String genre = genreOf(url);
         if (genre == null) {
-            return isIndex(url) ? Dle.fetch(Dle.pageUrl(sortedUrl(INDEX, Sort.NEW, null), pageOf(url)))
+            return isIndex(url) ? Dle.fetch(Dle.pageUrl(sortedUrl(INDEX, Dle.Order.DATE, null), pageOf(url)))
                     : SiteHttp.get(url);
         }
         String id = CATEGORY_IDS.get(genre);
         if (id != null) {
-            return Dle.fetch(Dle.pageUrl(sortedUrl(genre, Sort.NEW, id), pageOf(url)));
+            return Dle.fetch(Dle.pageUrl(sortedUrl(genre, Dle.Order.DATE, id), pageOf(url)));
         }
         return learnCategory(genre, SiteHttp.get(url));
     }
@@ -131,28 +117,29 @@ public final class AknigXyz implements SourceParser {
         return Dle.pageUrl(url, page);
     }
 
-    @Override
-    public int optionsMenu() {
-        return R.menu.books_dle_options_menu;
-    }
-
-    @Override
-    public String sortUrl(int itemId, String listingUrl) {
-        Sort sort = sortOf(itemId);
-        if (sort == null) {
-            return null;
-        }
-        if (sort == Sort.NEW && isIndex(listingUrl)) {
-            return listingUrl;
-        }
-        String url = sortedUrl(INDEX, sort, null);
-        return url.equals(listingUrl) ? listingUrl : url;
-    }
-
     /** The index and genres sort; author, reader, series and search pages do not. */
     @Override
-    public boolean hasSort(String url) {
-        return isIndex(url) || genreOf(url) != null || url.contains("set_new_sort=dle_sort_main");
+    public List<Sort.Entry> sorts(String url) {
+        if (isIndex(url) || url.contains("set_new_sort=dle_sort_main")) {
+            return Dle.MENU_WITH_TOP;
+        }
+        return genreOf(url) != null ? Dle.MENU : Collections.<Sort.Entry>emptyList();
+    }
+
+    @Override
+    public String sortUrl(Sort sort, String listingUrl) {
+        if (sort == Sort.TOP_100) {
+            return TOP_100;
+        }
+        Dle.Order order = Dle.Order.of(sort);
+        if (order == null) {
+            return null;
+        }
+        if (order == Dle.Order.DATE && isIndex(listingUrl)) {
+            return listingUrl;
+        }
+        String url = sortedUrl(INDEX, order, null);
+        return url.equals(listingUrl) ? listingUrl : url;
     }
 
     /** The genre root ({@code https://s2.aknig.xyz/<slug>/}) of a genre listing, plain or sorted; null elsewhere. */
@@ -171,13 +158,8 @@ public final class AknigXyz implements SourceParser {
     public String inGenre(String siteWide, String genre) {
         String id = CATEGORY_IDS.get(genre);
         HttpUrl parsed = HttpUrl.parse(siteWide);
-        String field = parsed == null ? null : parsed.queryParameter(Dle.SORT_PARAM);
-        for (Sort sort : Sort.values()) {
-            if (id != null && sort.field.equals(field)) {
-                return sortedUrl(genre, sort, id);
-            }
-        }
-        return siteWide;
+        Dle.Order order = Dle.Order.ofField(parsed == null ? null : parsed.queryParameter(Dle.SORT_PARAM));
+        return id != null && order != null ? sortedUrl(genre, order, id) : siteWide;
     }
 
     @Override
@@ -213,7 +195,7 @@ public final class AknigXyz implements SourceParser {
     /** The Playerjs playlist, fetched with the book page as Referer; a removed book has no player. */
     @Override
     public ArrayList<AudioPOJO> tracks(Document page, String base) throws IOException {
-        return AudioModel.loadPlayerjs(page, base, text(page, ".full-news-title h1"));
+        return Players.loadPlayerjs(page, base, text(page, ".full-news-title h1"));
     }
 
     @Override
@@ -232,7 +214,7 @@ public final class AknigXyz implements SourceParser {
      * Page 1 of {@code listingUrl} sorted by {@code sort}: the sort form as the query, which {@link Dle#fetch} POSTs
      * to the page itself. {@code categoryId} is the genre's DLE id, null for the index.
      */
-    public static String sortedUrl(String listingUrl, Sort sort, @Nullable String categoryId) {
+    public static String sortedUrl(String listingUrl, Dle.Order sort, @Nullable String categoryId) {
         int query = listingUrl.indexOf('?');
         String key = categoryId == null ? "main" : "cat_" + categoryId;
         return Dle.pageUrl(query == -1 ? listingUrl : listingUrl.substring(0, query), 1)
@@ -246,22 +228,6 @@ public final class AknigXyz implements SourceParser {
         Element key = doc.getElementById("set_new_sort");
         Matcher m = CATEGORY.matcher(key == null ? "" : key.val());
         return m.matches() ? m.group(1) : null;
-    }
-
-    @Nullable
-    private static Sort sortOf(int itemId) {
-        if (itemId == R.id.new_data) {
-            return Sort.NEW;
-        } else if (itemId == R.id.popular) {
-            return Sort.POPULAR;
-        } else if (itemId == R.id.reting) {
-            return Sort.RATING;
-        } else if (itemId == R.id.coments) {
-            return Sort.COMMENTS;
-        } else if (itemId == R.id.sort_title) {
-            return Sort.TITLE;
-        }
-        return null;
     }
 
     /** The plain index: {@code /} or {@code /page/N/}. */
@@ -417,21 +383,8 @@ public final class AknigXyz implements SourceParser {
     /** A book opened by its link: the card fields, read off the book page. */
     public static BookPOJO parseBook(Document doc, String url) {
         DescriptionPOJO d = parseDescription(doc);
-        BookPOJO book = new BookPOJO();
-        book.setUrl(url);
-        book.setName(d.getTitle());
-        book.setPhoto(d.getPoster());
-        book.setAutor(d.getAutor());
-        book.setUrlAutor(d.getAutorUrl());
-        book.setArtist(d.getArtist());
-        book.setUrlArtist(d.getArtistUrl());
-        book.setGenre(d.getGenre());
-        book.setUrlGenre(d.getGenreUrl());
-        book.setSeries(d.getSeries());
-        book.setUrlSeries(d.getSeriesUrl());
-        book.setTime(d.getTime());
+        BookPOJO book = BookPOJO.of(d, url);
         setRating(book, d.getReiting());
-        book.setDesc(d.getDescription());
         return book;
     }
 

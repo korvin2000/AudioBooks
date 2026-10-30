@@ -1,6 +1,5 @@
 package com.fanok.audiobooks.util;
 
-import com.fanok.audiobooks.Consts;
 
 import android.content.Context;
 import android.net.Uri;
@@ -69,7 +68,7 @@ import java.util.concurrent.Executors;
 public class DownloadUtil {
 
     private static final String TAG = "DownloadUtil";
-    private static final String DESKTOP_UA =
+    public static final String DESKTOP_UA =
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/89.0.4389.82 Safari/537.36";
     private static final String LEGACY_REF = "__ref";
 
@@ -107,12 +106,6 @@ public class DownloadUtil {
         Map<String, String> own = parser == null ? null : parser.mediaHeaders(book);
         if (own != null) {
             headers.putAll(own);
-        } else if (Url.isHost(book, Url.SERVER_ABMP3)) {
-            headers.put("User-Agent", DESKTOP_UA);
-            headers.put("Referer", Url.SERVER_ABMP3 + "/");
-        } else if (Url.isHost(book, Url.SERVER_BAZA_KNIG)) {
-            headers.put("User-Agent", DESKTOP_UA);
-            headers.put("Referer", Url.SERVER_BAZA_KNIG + "/");
         } else {
             headers.put("Referer", book);
         }
@@ -120,17 +113,17 @@ public class DownloadUtil {
     }
 
     /**
-     * Cookies the requests for {@code bookUrl} carry to the baza-knig host over https only, unless it set its own
-     * (baza-knig session); see {@link com.fanok.audiobooks.net.MemoryCookieJar#with}.
+     * Cookies the requests for {@code bookUrl} carry to its site's own host over https only, unless it set its own
+     * ({@link SourceParser#mediaCookies}); see {@link com.fanok.audiobooks.net.MemoryCookieJar#with}.
      */
     @NonNull
     static Map<String, String> requestCookies(@Nullable String bookUrl) {
-        String session = Consts.getBazaKnigCookies();
-        if (bookUrl != null && Url.isHost(Url.canonical(bookUrl), Url.SERVER_BAZA_KNIG)
-                && session != null && !session.isEmpty()) {
-            return Collections.singletonMap("PHPSESSID", session);
+        if (bookUrl == null) {
+            return Collections.emptyMap();
         }
-        return Collections.emptyMap();
+        String book = Url.canonical(bookUrl);
+        SourceParser parser = Provider.parserOf(book);
+        return parser == null ? Collections.<String, String>emptyMap() : parser.mediaCookies(book);
     }
 
     /** Network source for every request of one playback of {@code bookUrl}. */
@@ -145,7 +138,8 @@ public class DownloadUtil {
                                           @NonNull okhttp3.OkHttpClient client) {
         Map<String, String> cookies = requestCookies(bookUrl);
         if (!cookies.isEmpty()) {
-            client = client.newBuilder().cookieJar(App.getCookieJar().with(Url.SERVER_BAZA_KNIG, cookies)).build();
+            client = client.newBuilder().cookieJar(App.getCookieJar().with(Provider.ofUrl(bookUrl).server, cookies))
+                    .build();
         }
         OkHttpDataSource.Factory http = new OkHttpDataSource.Factory(client)
                 .setDefaultRequestProperties(requestHeaders(bookUrl));

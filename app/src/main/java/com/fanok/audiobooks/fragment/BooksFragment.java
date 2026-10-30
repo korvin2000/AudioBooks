@@ -57,7 +57,6 @@ import com.fanok.audiobooks.adapter.GenreListAddapter;
 import com.fanok.audiobooks.databinding.DialogDurationFilterBinding;
 import com.fanok.audiobooks.databinding.FragmentBooksBinding;
 import com.fanok.audiobooks.interface_pacatge.books.BooksView;
-import com.fanok.audiobooks.model.GenreModel;
 import com.fanok.audiobooks.pojo.BookPOJO;
 import com.fanok.audiobooks.pojo.GenrePOJO;
 import com.fanok.audiobooks.policy.ParentalControl;
@@ -66,12 +65,12 @@ import com.fanok.audiobooks.search.GenreSort;
 import com.fanok.audiobooks.search.ListingFilters;
 import com.fanok.audiobooks.search.ListingFilters.Duration;
 import com.fanok.audiobooks.search.Provider;
+import com.fanok.audiobooks.source.Sort;
 import com.google.android.material.navigation.NavigationView;
 import com.google.android.material.slider.RangeSlider;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
-import java.util.regex.Pattern;
 import org.jetbrains.annotations.NotNull;
 
 
@@ -220,26 +219,12 @@ public class BooksFragment extends MvpAppCompatFragment implements BooksView {
 
                 menu.clear();
 
-                int menuResId;
-                Provider provider = Provider.ofUrl(mUrl);
-                if (provider != null && provider.parser != null) {
-                    menuResId = provider.parser.optionsMenu();
-                } else if (mUrl.contains(Url.SERVER_IZIBUK)) {
-                    menuResId = R.menu.books_izibuk_options_menu;
-                } else if (mUrl.contains(Url.SERVER_BAZA_KNIG)) {
-                    menuResId = R.menu.books_baza_knig_options_menu;
-                } else if (mUrl.contains(Url.SERVER_AUDIOBOO)) {
-                    menuResId = R.menu.books_audioboo_options_menu;
-                } else if (mUrl.contains(Url.SERVER_AKNIGA)) {
-                    menuResId = R.menu.books_akniga_options_menu;
-                } else if (mUrl.contains(Url.SERVER_OTRUB)) {
-                    menuResId = R.menu.books_otrub_options_menu;
-                } else if (mUrl.contains(Url.SERVER_POLEKNIG)) {
-                    menuResId = R.menu.books_poleknig_options_menu;
-                } else {
-                    menuResId = R.menu.books_options_menu;
+                Provider provider = Provider.ofUrl(mUrl); // null for an unknown host: no sorts
+                String listing = Url.canonical(mUrl); // as the presenter lists it
+                inflater.inflate(R.menu.books_source_options_menu, menu);
+                if (provider != null) {
+                    fillOrderMenu(menu, provider.parser.sorts(listing));
                 }
-                inflater.inflate(menuResId, menu);
                 fillSourceMenu(menu);
 
                 if (modelID != Consts.MODEL_BOOKS || mUrl.contains("reader") || mUrl.contains("author")
@@ -250,16 +235,7 @@ public class BooksFragment extends MvpAppCompatFragment implements BooksView {
                     setColorPrimeriTextInIconItemMenu(menu.findItem(R.id.source), requireContext());
                 }
 
-                boolean noSort = provider != null && provider.parser != null
-                        ? !provider.parser.hasSort(mUrl)
-                        : mUrl.contains("reader") || mUrl.contains("author") ||
-                        mUrl.contains("serie") || mUrl.contains("cikl") ||
-                        (mUrl.contains(Url.SERVER_ABMP3) && mUrl.contains("genre")) ||
-                        (mUrl.contains(Url.SERVER_BAZA_KNIG) && mUrl.contains("ispolnitel")) ||
-                        // knigoblud's author, reader and series listings: /<id> like its genres, but no sort
-                        (mUrl.matches(Pattern.quote(Url.SERVER_KNIGOBLUD) + "/[0-9a-f-]{36}.*")
-                                && ListingFilters.genreOf(Provider.KNIGOBLUD, mUrl,
-                                GenreModel.KNIGOBLUD_GENRE_URLS) == null);
+                boolean noSort = provider == null || !provider.parser.hasSort(listing);
                 if (modelID == Consts.MODEL_GENRE) {
                     fillGenreSortMenu(menu);
                     setGenreSearch(menu.findItem(R.id.app_bar_search));
@@ -281,31 +257,6 @@ public class BooksFragment extends MvpAppCompatFragment implements BooksView {
                 MenuItem item = menu.findItem(SOURCE_ITEM_BASE + Consts.getSOURCE());
                 if (item != null) {
                     item.setChecked(true);
-                }
-                // the listing's own site decides its sort items, not the selected source: an author, reader or
-                // genre listing of another site opens from a book description
-                boolean isKnigoblud = mUrl.contains(Url.SERVER_KNIGOBLUD);
-                MenuItem todayItem = menu.findItem(R.id.knigoblud_today);
-                if (todayItem != null) todayItem.setVisible(isKnigoblud);
-                MenuItem trendingItem = menu.findItem(R.id.knigoblud_trending);
-                if (trendingItem != null) trendingItem.setVisible(isKnigoblud);
-                MenuItem finishedItem = menu.findItem(R.id.knigoblud_finished);
-                if (finishedItem != null) finishedItem.setVisible(isKnigoblud);
-                MenuItem retingParent = menu.findItem(R.id.reting);
-                if (retingParent != null) retingParent.setVisible(!isKnigoblud);
-                boolean isAbmp3 = mUrl.contains(Url.SERVER_ABMP3);
-                MenuItem popularParent = menu.findItem(R.id.popular_parent);
-                if (popularParent != null) popularParent.setVisible(!isAbmp3);
-                MenuItem retingParent2 = menu.findItem(R.id.reting);
-                if (retingParent2 != null) retingParent2.setVisible(!isAbmp3 && !isKnigoblud);
-                MenuItem abmp3Top100 = menu.findItem(R.id.abmp3_top100);
-                if (abmp3Top100 != null) abmp3Top100.setVisible(isAbmp3);
-                MenuItem abmp3Random = menu.findItem(R.id.abmp3_random);
-                if (abmp3Random != null) abmp3Random.setVisible(isAbmp3);
-                // akniga's collections are site-wide: not offered within a genre
-                MenuItem collections = menu.findItem(R.id.collections);
-                if (collections != null) {
-                    collections.setVisible(ListingFilters.genreOf(Provider.AKNIGA, mUrl, null) == null);
                 }
                 prepareFilterMenu(menu);
                 MenuItem genreSort = menu.findItem(GENRE_SORT_ITEM_BASE + getPresenter().getGenreSort().ordinal());
@@ -662,6 +613,25 @@ public class BooksFragment extends MvpAppCompatFragment implements BooksView {
     private static final int SOURCE_ITEM_BASE = Menu.FIRST + 100;
 
     /** The provider a source menu item selects, or null for any other item. */
+    /** The Order submenu of a source's listing, from {@link com.fanok.audiobooks.source.SourceParser#sorts}. */
+    private static void fillOrderMenu(Menu menu, List<Sort.Entry> sorts) {
+        MenuItem order = menu.findItem(R.id.order);
+        SubMenu items = order == null ? null : order.getSubMenu();
+        if (items == null) {
+            return;
+        }
+        for (Sort.Entry entry : sorts) {
+            if (entry.items.isEmpty()) {
+                items.add(Menu.NONE, entry.sort.menuId, Menu.NONE, entry.title);
+            } else {
+                SubMenu submenu = items.addSubMenu(entry.title);
+                for (Sort sort : entry.items) {
+                    submenu.add(Menu.NONE, sort.menuId, Menu.NONE, sort.title);
+                }
+            }
+        }
+    }
+
     public static Provider sourceOf(int itemId) {
         return itemId < SOURCE_ITEM_BASE ? null : Provider.ofSource(itemId - SOURCE_ITEM_BASE);
     }

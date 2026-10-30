@@ -8,18 +8,19 @@ Commands are written for a POSIX shell (Linux, macOS, Git Bash on Windows) and r
 
 1. [Project at a glance](#project-at-a-glance)
 2. [Source layout](#source-layout)
-3. [Setting up the toolchain](#setting-up-the-toolchain)
-4. [Building](#building)
-5. [Testing and lint](#testing-and-lint)
-6. [Release signing](#release-signing)
-7. [Continuous integration and releases](#continuous-integration-and-releases)
-8. [Running on an emulator or device](#running-on-an-emulator-or-device)
-9. [Logs, crashes, and app data](#logs-crashes-and-app-data)
-10. [Network, proxy, and playback diagnostics](#network-proxy-and-playback-diagnostics)
-11. [Memory and leaks](#memory-and-leaks)
-12. [Performance](#performance)
-13. [Verifying an APK](#verifying-an-apk)
-14. [Troubleshooting](#troubleshooting)
+3. [Adding an audiobook site](#adding-an-audiobook-site)
+4. [Setting up the toolchain](#setting-up-the-toolchain)
+5. [Building](#building)
+6. [Testing and lint](#testing-and-lint)
+7. [Release signing](#release-signing)
+8. [Continuous integration and releases](#continuous-integration-and-releases)
+9. [Running on an emulator or device](#running-on-an-emulator-or-device)
+10. [Logs, crashes, and app data](#logs-crashes-and-app-data)
+11. [Network, proxy, and playback diagnostics](#network-proxy-and-playback-diagnostics)
+12. [Memory and leaks](#memory-and-leaks)
+13. [Performance](#performance)
+14. [Verifying an APK](#verifying-an-apk)
+15. [Troubleshooting](#troubleshooting)
 
 ## Project at a glance
 
@@ -47,9 +48,10 @@ Java sources are under `app/src/main/java/com/fanok/audiobooks/`.
 | `App.java` | Application setup: built-in proxy, shared OkHttp client, image loader, crash handler, RxJava error handler |
 | `Consts.java`, `Url.java` | Constants, source site URLs, built-in proxy settings |
 | `activity/`, `fragment/`, `adapter/` | Screens, lists, and settings UI |
-| `presenter/`, `model/`, `interface_pacatge/` | MVP layer (Moxy): presenters, per-site page parsers, view contracts |
-| `search/` | Multi-source search sessions, paged listings, filters |
-| `net/` | `SiteHttp` (page fetching, cookies, challenge detection), `AppProxy` (built-in proxy), cookie jar |
+| `presenter/`, `model/`, `interface_pacatge/` | MVP layer (Moxy): presenters, models that hand each page to the site's adapter, view contracts |
+| `source/` | One adapter per audiobook site (`SourceParser`) and the toolkit they share: `Html`, `Players`, `Dle`, `Sort` |
+| `search/` | `Provider` (the site registry), multi-source search sessions, paged listings, filters, `SourceProbe` (availability check) and `SourceHealth` (its kept results; a daily check on unmetered networks) |
+| `net/` | `SiteHttp` (page and JSON fetching, cookies, challenge detection), `AppProxy` (proxy, per-site route), cookie jar |
 | `service/` | `MediaPlayerService` (playback, media session, notification, sleep timer), `ExoDownloadService`, playback error policies |
 | `download/`, `util/` | Download tracking, storage and SAF access, deletion, Media3 data sources |
 | `room/` | Room database `audioBooksDB`, DAOs, migrations; exported schemas live in `app/schemas/` |
@@ -57,6 +59,53 @@ Java sources are under `app/src/main/java/com/fanok/audiobooks/`.
 | `app/src/main/res/` | Layouts (including `layout-television` and tablet variants), strings, `xml/preferences.xml` (settings), `xml/network_security_config.xml` |
 | `app/src/test/` | JVM unit tests; saved site pages under `resources/fixtures/<source>/` |
 | `app/src/androidTest/` | Instrumentation tests: Room migrations, downloads, player service, export |
+
+## Adding an audiobook site
+
+A site is one row in `search/Provider.java` and one adapter, `source/<Site>.java implements SourceParser`. Everything
+else — catalog and search screens, the Order and filter menus, the multi-site search, "on other sites", the book page,
+player, downloads, parental control, Referer and proxy routing — works through that interface and never branches on a
+site. `source/Poleknig.java` (plain HTML, Playerjs) and `source/AknigXyz.java` (DataLife Engine, POSTed sorts) are
+short complete examples.
+
+1. **Fixtures.** Save the pages the adapter reads under `app/src/test/resources/fixtures/<site>/`: listing page 1 and
+   a later page, a search with results and one without, the genre list, a book page, and the playlist (HTML, JSON or
+   the XHR answer). Tests never contact real sites.
+2. **Adapter.** Seven methods are required: `listing`, `pageUrl`, `genres`, `searchUrl`, `searchResults`,
+   `description`, `tracks`. Keep parsing in pure static functions (`parseListing(Document, int)`, ...) that the tests
+   call on the fixtures. Every other method has a default meaning "the site has no such feature", and the UI hides
+   the feature.
+3. **Register.** Add the `Provider` row: server, title, `prefValue`, `prefKey`, a new unique `sourceId` (never reuse or
+   renumber one: users' settings store it), the drawer URLs (`null` for a section the site lacks) and `new <Site>()`.
+   Add the host to the deep-link intent filter in `AndroidManifest.xml`; a site that moved gets its old hosts in
+   `Url.canonical`.
+4. **Test.** An adapter test on the fixtures (cards, next page, search, sort URLs, description, chapters), then
+   `./gradlew :app:testDebugUnitTest`; finally a short live check on a device: catalog, search, a book, playback, a
+   download.
+
+What the shared toolkit already covers:
+
+| The site has | Use |
+|---|---|
+| Book cards, genre rows, a pager | `Html.cards`, `Html.rows`, `Html.each` (one broken item is skipped, never the page), `Html.lastPage`, `Html.text`, `Html.href`, `Html.imgSrc` |
+| A JSON API | `fetch` returns `SiteHttp.getJson(url)` (a `JsonPage`); the parse methods read `JsonPage.of(page)`. The body decides, not the Content-Type; an HTML anti-bot page answered with 200 is an error, not "no books" |
+| A POST form, extra headers or cookies | override `fetch`; `SiteHttp.postForm`, `SiteHttp.connect(...)` with `SiteHttp.execute` and `SiteHttp.parse` |
+| DataLife Engine | `Dle`: sort forms (`Dle.Order`, `Dle.MENU`, `Dle.fetch`), `/page/N/` paging, search URL, news ids |
+| A player in a page script | `Players.playerScript` with `Players.Chapters`; XSPlayer `Players.xsPlaylist`; Playerjs `Players.loadPlayerjs` or `inlinePlayerjs` (folders, mirrors, obfuscated URLs) |
+| A playlist fetched by XHR | `SiteHttp.body(SiteHttp.connect(url).referrer(bookUrl).header(...))` |
+| Sorts | `sorts(url)` returns the Order menu as data (`Sort.menu`, `Sort.submenu`); `sortUrl(Sort, url)` the listing. A new kind of sort is one row in `source/Sort.java` (menu id, title, subtitle label, back-stack tag) |
+| Sorts inside a genre | `genreOf` with `inGenre` (the server ranks the genre) or `cardGenre` (the cards are narrowed on the device) |
+| Ranking periods, a duration bound | `periods`, `periodOf`, `withPeriod`, `periodsAreDates`; `withDuration`; `listsDuration` false when cards carry no time |
+| Referer, own CDN or API hosts, a slow server | `referer()`, `hosts()`, `timeoutMs()`; `mediaHeaders(bookUrl)` for audio requests |
+| A session cookie, a wall that lets only POST pass | `cookies()` (sent to the site's own host only; `mediaCookies(bookUrl)` for audio), `postsPages()` |
+| Lists read from other pages or built in | override `loadListing`, `loadGenres`, `loadPeople`, `loadSeries` (the defaults fetch the URL and parse it) |
+| Optional sections | `people`, `searchPeople`, `series`, `comments`, `recommendations`, `otherReaders`, `categories` (parental control), `otherSource*` ("on other sites") |
+
+Rules that keep the sites independent: a challenge or an HTTP error is an exception (`SiteHttp` raises it), never an
+empty page; a page without any card is `EMPTY`, while a page whose cards were all filtered keeps its next-page evidence
+(`ProviderPage.of(items, hasMore, rawCards)`); undeclared features stay at their defaults instead of returning
+something approximate. When a site needs something the interface cannot express, add a default method to
+`SourceParser` that leaves the other adapters unchanged, never a branch on the site in shared code.
 
 ## Setting up the toolchain
 
@@ -277,6 +326,15 @@ adb exec-out run-as com.fanok.books tar -cf - databases shared_prefs files > app
 - `net/AppProxy` installs a process-wide `ProxySelector` in `App.onCreate`, before any HTTP client is created, so pages, audio, downloads, and covers all follow the switch. Toggling it takes effect immediately; with the switch off, the system proxy settings apply.
 - The server and credentials are `PROXY_HOST`, `PROXY_PORT`, `PROXY_USER`, and `PROXY_PASSWORD` in `Consts.java`. An empty `PROXY_HOST` disables the feature. The credentials are given only to that proxy host and port, never to a site that asks for authentication.
 - OkHttp lets the proxy resolve host names, so audio and downloads also work where DNS is filtered.
+- **Settings → Сайты через прокси** (`pref_proxy_sources`) chooses which sites use the proxy; the others go direct,
+  which is faster where only some sites are blocked. The selector picks the route per host: a site's server, its
+  subdomains and its `SourceParser.hosts()` follow the site's choice; any other host (a CDN several sites share) follows
+  the proxy mode. The choice is stored inverted, as the set of direct sites (`AppProxy.PREF_DIRECT`), so a newly added
+  site uses the proxy until the user says otherwise. Changing it drops pooled connections; the automatic mode then
+  verifies its proxy against a site that uses it.
+- `SourceProbe.probe(provider)` checks whether a site works from here (its first catalog page through its own adapter,
+  request and route; `OK` only when books are listed) and `SourceProbe.probeAll` checks several in parallel. It is the
+  building block for an availability screen and for choosing per-site routes; no screen calls it yet.
 - The WebView on the cookie screen does not use the proxy.
 - `app/src/main/assets/*.ovpn` are OpenVPN profiles left over from an earlier VPN feature (removed upstream together with its `vpnLib` module); no code reads them.
 

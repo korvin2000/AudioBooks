@@ -6,7 +6,6 @@ import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
-import com.fanok.audiobooks.R;
 import com.fanok.audiobooks.pojo.AudioPOJO;
 import com.fanok.audiobooks.pojo.BookPOJO;
 import com.fanok.audiobooks.pojo.ComentsPOJO;
@@ -15,7 +14,6 @@ import com.fanok.audiobooks.pojo.GenrePOJO;
 import com.fanok.audiobooks.pojo.SeriesPOJO;
 import com.fanok.audiobooks.search.ProviderPage;
 import com.fanok.audiobooks.search.SearchUrls;
-import com.fanok.audiobooks.source.AudioknigiFun.Sort;
 
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
@@ -110,36 +108,36 @@ public class AudioknigiFunTest {
 
     @Test
     public void sortsArePostedWithTheListingsSessionKey() {
-        String main = AudioknigiFun.sorted(AudioknigiFun.INDEX, Sort.RATING);
+        String main = AudioknigiFun.sorted(AudioknigiFun.INDEX, Dle.Order.RATING);
         assertEquals(AudioknigiFun.SERVER + "/?dlenewssortby=rating&dledirection=desc"
                 + "&set_new_sort=dle_sort_main&set_direction_sort=dle_direction_main", main);
         assertEquals(AudioknigiFun.SERVER + "/page/2/?dlenewssortby=rating&dledirection=desc"
                 + "&set_new_sort=dle_sort_main&set_direction_sort=dle_direction_main", P.pageUrl(main, 2));
         assertEquals(AudioknigiFun.INDEX, P.pageUrl(AudioknigiFun.SERVER + "/page/3/", 1));
-        String genre = AudioknigiFun.sorted(GENRE, Sort.TITLE);
+        String genre = AudioknigiFun.sorted(GENRE, Dle.Order.TITLE);
         assertTrue(genre, genre.startsWith(GENRE + "?dlenewssortby=title&dledirection=asc&set_new_sort=dle_sort_xfsearch"));
-        assertTrue(AudioknigiFun.sorted(AudioknigiFun.SERVER + "/podborki/russkie-detektivy/page/3/", Sort.VIEWS)
+        assertTrue(AudioknigiFun.sorted(AudioknigiFun.SERVER + "/podborki/russkie-detektivy/page/3/", Dle.Order.VIEWS)
                 .contains("dlenewssortby=news_read&dledirection=desc&set_new_sort=dle_sort_selection"));
-        assertNull(AudioknigiFun.sorted(AudioknigiFun.TOP_100, Sort.RATING));
-        assertNull(AudioknigiFun.sorted(P.searchUrl(SearchUrls.Category.BOOKS, "ночь", 1), Sort.RATING));
+        assertNull(AudioknigiFun.sorted(AudioknigiFun.TOP_100, Dle.Order.RATING));
+        assertNull(AudioknigiFun.sorted(P.searchUrl(SearchUrls.Category.BOOKS, "ночь", 1), Dle.Order.RATING));
         assertFalse(P.hasSort(AudioknigiFun.TOP_100));
         assertTrue(P.hasSort(GENRE + "page/2/"));
     }
 
     @Test
     public void menuSortsAreSiteWideAndStayInTheGenreOrAuthor() {
-        assertEquals(AudioknigiFun.INDEX, P.sortUrl(R.id.new_data, AudioknigiFun.INDEX));
-        String popular = P.sortUrl(R.id.popular, AudioknigiFun.INDEX);
-        assertEquals(AudioknigiFun.sorted(AudioknigiFun.INDEX, Sort.VIEWS), popular);
-        assertEquals(AudioknigiFun.sorted(AudioknigiFun.INDEX, Sort.RATING), P.sortUrl(R.id.reting, GENRE));
-        assertEquals(AudioknigiFun.sorted(AudioknigiFun.INDEX, Sort.COMMENTS), P.sortUrl(R.id.coments, GENRE));
-        assertEquals(AudioknigiFun.sorted(AudioknigiFun.INDEX, Sort.TITLE), P.sortUrl(R.id.sort_title, GENRE));
-        assertNull(P.sortUrl(R.id.years, GENRE));
+        assertEquals(AudioknigiFun.INDEX, P.sortUrl(Sort.NEW, AudioknigiFun.INDEX));
+        String popular = P.sortUrl(Sort.POPULAR, AudioknigiFun.INDEX);
+        assertEquals(AudioknigiFun.sorted(AudioknigiFun.INDEX, Dle.Order.VIEWS), popular);
+        assertEquals(AudioknigiFun.sorted(AudioknigiFun.INDEX, Dle.Order.RATING), P.sortUrl(Sort.RATING, GENRE));
+        assertEquals(AudioknigiFun.sorted(AudioknigiFun.INDEX, Dle.Order.COMMENTS), P.sortUrl(Sort.COMMENTS, GENRE));
+        assertEquals(AudioknigiFun.sorted(AudioknigiFun.INDEX, Dle.Order.TITLE), P.sortUrl(Sort.TITLE, GENRE));
+        assertNull(P.sortUrl(Sort.YEARS, GENRE));
 
-        String sortedGenre = AudioknigiFun.sorted(GENRE + "page/3/", Sort.RATING);
+        String sortedGenre = AudioknigiFun.sorted(GENRE + "page/3/", Dle.Order.RATING);
         assertEquals(GENRE, P.genreOf(sortedGenre));
-        assertEquals(AudioknigiFun.sorted(GENRE, Sort.VIEWS), P.inGenre(popular, P.genreOf(sortedGenre)));
-        assertEquals(AudioknigiFun.sorted(GENRE, Sort.DATE), P.inGenre(AudioknigiFun.INDEX, GENRE));
+        assertEquals(AudioknigiFun.sorted(GENRE, Dle.Order.VIEWS), P.inGenre(popular, P.genreOf(sortedGenre)));
+        assertEquals(AudioknigiFun.sorted(GENRE, Dle.Order.DATE), P.inGenre(AudioknigiFun.INDEX, GENRE));
         String author = AudioknigiFun.SERVER + "/author/ajzek-azimov/";
         assertEquals(author, P.genreOf(author + "page/2/"));
         assertNull(P.genreOf(AudioknigiFun.INDEX));
@@ -150,8 +148,8 @@ public class AudioknigiFunTest {
     @Test
     public void plainListingsAreFetchedInTheDateSort() {
         String author = AudioknigiFun.SERVER + "/author/ajzek-azimov/page/2/";
-        assertEquals(AudioknigiFun.sorted(author, Sort.DATE), AudioknigiFun.fetchUrl(author));
-        String sorted = AudioknigiFun.sorted(author, Sort.COMMENTS);
+        assertEquals(AudioknigiFun.sorted(author, Dle.Order.DATE), AudioknigiFun.fetchUrl(author));
+        String sorted = AudioknigiFun.sorted(author, Dle.Order.COMMENTS);
         assertEquals(sorted, AudioknigiFun.fetchUrl(sorted));
         String search = P.searchUrl(SearchUrls.Category.BOOKS, "ночь", 1);
         assertEquals(search, AudioknigiFun.fetchUrl(search));

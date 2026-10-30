@@ -5,6 +5,11 @@ import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
 
+import com.fanok.audiobooks.source.Akniga;
+import com.fanok.audiobooks.source.BazaKnig;
+import com.fanok.audiobooks.source.Audioboo;
+import com.fanok.audiobooks.source.Izibuk;
+import com.fanok.audiobooks.source.Knigavuhe;
 import com.fanok.audiobooks.Url;
 import com.fanok.audiobooks.pojo.SeriesPOJO;
 import java.io.FileNotFoundException;
@@ -37,7 +42,7 @@ public class SeriesModelTest {
 
     @Test
     public void knigavuheSeriesFromFixture() throws IOException {
-        List<SeriesPOJO> series = SeriesModel.parseKnigavuheSeries(
+        List<SeriesPOJO> series = Knigavuhe.parseSeries(
                 fixture("knigavuhe/series.html", "https://knigavuhe.org/book/nochnojj-dozor-1/"));
         assertEquals(6, series.size());
         assertEquals("Ночной дозор", series.get(0).getName());
@@ -49,7 +54,7 @@ public class SeriesModelTest {
 
     @Test
     public void izibukSeriesFromFixture() throws IOException {
-        List<SeriesPOJO> series = SeriesModel.parseIzibukSeries(fixture("izibuk/series.html", "https://izib.uk/art1439"));
+        List<SeriesPOJO> series = Izibuk.parseSeries(fixture("izibuk/series.html", "https://izib.uk/art1439"));
         assertEquals(10, series.size());
         assertEquals("", series.get(0).getUrl());
         assertEquals("https://izib.uk/art20481", series.get(1).getUrl());
@@ -59,7 +64,7 @@ public class SeriesModelTest {
 
     @Test
     public void aknigaSeriesFromFixture() throws IOException {
-        List<SeriesPOJO> series = SeriesModel.parseAknigaSeries(
+        List<SeriesPOJO> series = Akniga.parseSeries(
                 fixture("akniga/series.html", "https://akniga.org/sergey-lukyanenko-nochnoy-dozor-2011"));
         assertEquals(10, series.size()); // the "show all" toggle has no link and is not an entry
         assertEquals("1.", series.get(1).getNumber());
@@ -69,12 +74,12 @@ public class SeriesModelTest {
 
     @Test
     public void bazaKnigSeriesFromFixtures() throws IOException {
-        String series = SeriesModel.parseBazaKnigSeriesUrl(fixture("baza-knig/series-book.html",
+        String series = BazaKnig.parseSeriesUrl(fixture("baza-knig/series-book.html",
                 "https://baza-knig.top/fantastika-fentezii/31-lukyanenko-sergey-nochnoy-dozor.html"));
         assertEquals("https://baza-knig.top/xfsearch/cikl/%D0%B4%D0%BE%D0%B7%D0%BE%D1%80/", series);
 
         Document page = fixture("baza-knig/series.html", series);
-        List<SeriesPOJO> books = SeriesModel.parseBazaKnigSeriesPage(page);
+        List<SeriesPOJO> books = BazaKnig.parseSeriesPage(page);
         assertEquals(10, books.size());
         assertEquals("1.", books.get(0).getNumber());
         assertTrue(books.get(0).getName(), books.get(0).getName().startsWith("Ночной Дозор Читает:"));
@@ -86,10 +91,10 @@ public class SeriesModelTest {
     @Test
     public void bazaKnigPagesAreBuiltFromTheCycleUrl() {
         String series = "https://baza-knig.top/xfsearch/cikl/%D0%B4%D0%BE%D0%B7%D0%BE%D1%80/";
-        assertEquals(series, SeriesModel.bazaKnigPageUrl(series, 1));
-        assertEquals(series + "page/2/", SeriesModel.bazaKnigPageUrl(series, 2));
+        assertEquals(series, BazaKnig.seriesPageUrl(series, 1));
+        assertEquals(series + "page/2/", BazaKnig.seriesPageUrl(series, 2));
         assertEquals("https://baza-knig.top/xfsearch/cikl/x/page/3/",
-                SeriesModel.bazaKnigPageUrl("https://baza-knig.top/xfsearch/cikl/x", 3));
+                BazaKnig.seriesPageUrl("https://baza-knig.top/xfsearch/cikl/x", 3));
 
         Document nav = Jsoup.parse("<div class='page-nav'><div class='navigation'><span>1</span>"
                 + "<a href='/page/2/'>2</a><span class='nav_ext'>...</span><a href='/page/12/'>12</a>"
@@ -99,7 +104,7 @@ public class SeriesModelTest {
 
     @Test
     public void knigobludSeriesLinksStayOnKnigoblud() throws IOException {
-        List<SeriesPOJO> series = SeriesModel.parseKnigobludSeries(fixture("knigoblud/series.html",
+        List<SeriesPOJO> series = com.fanok.audiobooks.source.Knigoblud.parseSeries(fixture("knigoblud/series.html",
                 "https://www.knigoblud.club/e87cc048-e59a-4b31-af9c-06abc64025cb"));
         assertEquals(11, series.size());
         assertEquals("Ночной Дозор", series.get(0).getName());
@@ -113,20 +118,20 @@ public class SeriesModelTest {
     @Test
     public void audiobooLiveSeriesFromTheBookPage() throws IOException {
         String book = "https://audioboo.org/fantastika/123139-mahanenko-vasilij-solo-06.html";
-        String series = SeriesModel.parseAudiobooSeriesUrl(fixture("audioboo/book-description.html", book));
+        String series = Audioboo.parseSeriesUrl(fixture("audioboo/book-description.html", book));
         assertEquals("https://audioboo.org/xfsearch/cikl/%D0%A1%D0%BE%D0%BB%D0%BE/", series);
-        List<SeriesPOJO> books = SeriesModel.parseAudiobooSeriesPage(fixture("audioboo/series-solo.html", series));
+        List<SeriesPOJO> books = Audioboo.parseSeriesPage(fixture("audioboo/series-solo.html", series));
         assertEquals(6, books.size());
         assertLinksOn(books, Url.SERVER_AUDIOBOO);
     }
 
     @Test
     public void audiobooSeriesLinksStayOnAudioboo() throws IOException {
-        String series = SeriesModel.parseAudiobooSeriesUrl(
+        String series = Audioboo.parseSeriesUrl(
                 fixture("audioboo/series-book.html", "https://audioboo.org/fantastika/1001-nochnoj-dozor.html"));
         assertEquals("https://audioboo.org/xfsearch/cikl/%D0%94%D0%BE%D0%B7%D0%BE%D1%80/", series);
 
-        List<SeriesPOJO> books = SeriesModel.parseAudiobooSeriesPage(fixture("audioboo/series.html", series));
+        List<SeriesPOJO> books = Audioboo.parseSeriesPage(fixture("audioboo/series.html", series));
         assertEquals(3, books.size()); // the card without a link is skipped
         assertEquals("https://audioboo.org/uploads/posts/1001.jpg", books.get(0).getPhoto()); // placeholder skipped
         assertLinksOn(books, Url.SERVER_AUDIOBOO);
@@ -137,10 +142,10 @@ public class SeriesModelTest {
 
     @Test
     public void otrubSeriesFromFixtures() throws IOException {
-        String series = SeriesModel.parseSeriesLink(
-                fixture("otrub/series-book.html", "https://otrub.in/nochnojj-dozor-2.html"));
+        String series = com.fanok.audiobooks.source.Html.href(
+                fixture("otrub/series-book.html", "https://otrub.in/nochnojj-dozor-2.html"), "a[href*=/series/]");
         assertEquals("https://otrub.in/series/dozor.html", series);
-        List<SeriesPOJO> books = SeriesModel.parseOtrubSeriesPage(fixture("otrub/series.html", series));
+        List<SeriesPOJO> books = com.fanok.audiobooks.source.Otrub.parseSeriesPage(fixture("otrub/series.html", series));
         assertEquals(10, books.size());
         assertFalse(books.get(0).getPhoto().isEmpty());
         assertLinksOn(books, Url.SERVER_OTRUB);
@@ -148,10 +153,10 @@ public class SeriesModelTest {
 
     @Test
     public void poleknigSeriesFromFixtures() throws IOException {
-        String series = SeriesModel.parseSeriesLink(
-                fixture("poleknig/series-book.html", "https://poleknig.com/books/130543"));
+        String series = com.fanok.audiobooks.source.Html.href(
+                fixture("poleknig/series-book.html", "https://poleknig.com/books/130543"), "a[href*=/series/]");
         assertEquals("https://poleknig.com/series/705", series);
-        List<SeriesPOJO> books = SeriesModel.parsePoleknigSeriesPage(fixture("poleknig/series.html", series));
+        List<SeriesPOJO> books = com.fanok.audiobooks.source.Poleknig.parseSeriesPage(fixture("poleknig/series.html", series));
         assertEquals(9, books.size());
         assertEquals("Ночной дозор", books.get(0).getName());
         assertLinksOn(books, Url.SERVER_POLEKNIG);

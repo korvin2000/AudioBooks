@@ -1,7 +1,6 @@
 package com.fanok.audiobooks.source;
 
 import com.fanok.audiobooks.BookRemovedException;
-import com.fanok.audiobooks.R;
 import com.fanok.audiobooks.net.SiteHttp;
 import com.fanok.audiobooks.pojo.AudioPOJO;
 import com.fanok.audiobooks.pojo.BookPOJO;
@@ -22,9 +21,9 @@ import io.reactivex.functions.BooleanSupplier;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.List;
 
 import okhttp3.HttpUrl;
-import org.jsoup.Connection;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
 import org.jsoup.select.Elements;
@@ -63,20 +62,6 @@ public final class AudioknigiFun implements SourceParser {
     public static final String AJAX_HEADER = "X-Requested-With";
     public static final String AJAX_VALUE = "XMLHttpRequest";
 
-    /** The site's sorts; the title sort runs A to Я. */
-    public enum Sort {
-        DATE("date", "desc"), RATING("rating", "desc"), VIEWS("news_read", "desc"),
-        COMMENTS("comm_num", "desc"), TITLE("title", "asc");
-
-        final String field;
-        final String direction;
-
-        Sort(String field, String direction) {
-            this.field = field;
-            this.direction = direction;
-        }
-    }
-
     /** Series pages read at most (30 books each). */
     static final int MAX_SERIES_PAGES = 10;
 
@@ -100,24 +85,19 @@ public final class AudioknigiFun implements SourceParser {
     }
 
     @Override
-    public int optionsMenu() {
-        return R.menu.books_dle_options_menu;
+    public List<Sort.Entry> sorts(String url) {
+        String key = sortKey(url);
+        return key == null ? Collections.<Sort.Entry>emptyList() : "main".equals(key) ? Dle.MENU_WITH_TOP : Dle.MENU;
     }
 
     /** The index in the item's sort; "new" is the bare index, which {@link #fetch} POSTs in the date sort. */
     @Override
-    public String sortUrl(int itemId, String listingUrl) {
-        Sort sort = itemId == R.id.new_data ? Sort.DATE
-                : itemId == R.id.popular ? Sort.VIEWS
-                : itemId == R.id.reting ? Sort.RATING
-                : itemId == R.id.coments ? Sort.COMMENTS
-                : itemId == R.id.sort_title ? Sort.TITLE : null;
-        return sort == null ? null : sort == Sort.DATE ? INDEX : sorted(INDEX, sort);
-    }
-
-    @Override
-    public boolean hasSort(String url) {
-        return sortKey(url) != null;
+    public String sortUrl(Sort sort, String listingUrl) {
+        if (sort == Sort.TOP_100) {
+            return TOP_100;
+        }
+        Dle.Order order = Dle.Order.of(sort);
+        return order == null ? null : order == Dle.Order.DATE ? INDEX : sorted(INDEX, order);
     }
 
     /** The root of a genre, author, reader, series or collection listing: the site sorts each of them on the server. */
@@ -129,13 +109,8 @@ public final class AudioknigiFun implements SourceParser {
 
     @Override
     public String inGenre(String siteWide, String genre) {
-        String field = HttpUrl.get(siteWide).queryParameter(Dle.SORT_PARAM);
-        for (Sort sort : Sort.values()) {
-            if (sort.field.equals(field)) {
-                return sorted(genre, sort);
-            }
-        }
-        return sorted(genre, Sort.DATE);
+        Dle.Order order = Dle.Order.ofField(HttpUrl.get(siteWide).queryParameter(Dle.SORT_PARAM));
+        return sorted(genre, order == null ? Dle.Order.DATE : order);
     }
 
     @Override
@@ -184,12 +159,8 @@ public final class AudioknigiFun implements SourceParser {
             }
             throw new IllegalStateException("audioknigi.fun page has no full audio: " + base);
         }
-        Connection.Response response = SiteHttp.execute(SiteHttp.connect(playlist).referrer(base)
-                .header(AJAX_HEADER, AJAX_VALUE).ignoreContentType(true));
-        if (response.statusCode() >= 400) {
-            SiteHttp.parse(response); // throws the HTTP error
-        }
-        return parseTracks(response.body(), text(page.selectFirst("h1")));
+        return parseTracks(SiteHttp.body(SiteHttp.connect(playlist).referrer(base).header(AJAX_HEADER, AJAX_VALUE)),
+                text(page.selectFirst("h1")));
     }
 
     /** The series listing linked from the book page, all its pages, oldest first. */
@@ -216,7 +187,7 @@ public final class AudioknigiFun implements SourceParser {
     // ---------------------------------------------------------------- URLs
 
     /** The listing (any page of it) in {@code sort}, to be POSTed; null when the listing has no server sort. */
-    public static String sorted(String url, Sort sort) {
+    public static String sorted(String url, Dle.Order sort) {
         String key = sortKey(url);
         if (key == null) {
             return null;
@@ -231,7 +202,7 @@ public final class AudioknigiFun implements SourceParser {
 
     /** What to fetch for {@code url}: a sortable listing without a sort gets the date sort, so no session sort leaks in. */
     public static String fetchUrl(String url) {
-        String sorted = HttpUrl.get(url).query() == null ? sorted(url, Sort.DATE) : null;
+        String sorted = HttpUrl.get(url).query() == null ? sorted(url, Dle.Order.DATE) : null;
         return sorted == null ? url : sorted;
     }
 
@@ -383,33 +354,7 @@ public final class AudioknigiFun implements SourceParser {
 
     /** A book opened by its link. */
     public static BookPOJO parseBook(Document doc, String url) {
-        BookPOJO book = new BookPOJO();
-        book.setUrl(url);
-        book.setName(text(doc.selectFirst("h1")));
-        book.setPhoto(poster(doc));
-        Element a = chipLink(doc, "Автор");
-        if (a != null) {
-            book.setAutor(a.text());
-            book.setUrlAutor(a.absUrl("href"));
-        }
-        a = chipLink(doc, "Исполнитель");
-        if (a != null) {
-            book.setArtist(a.text());
-            book.setUrlArtist(a.absUrl("href"));
-        }
-        a = chipLink(doc, "Жанр");
-        if (a != null) {
-            book.setGenre(a.text());
-            book.setUrlGenre(a.absUrl("href"));
-        }
-        a = chipLink(doc, "Цикл");
-        if (a != null) {
-            book.setSeries(a.text());
-            book.setUrlSeries(a.absUrl("href"));
-        }
-        book.setTime(chipValue(doc, "Длительность"));
-        book.setDesc(annotation(doc));
-        return book;
+        return BookPOJO.of(parseDescription(doc), url);
     }
 
     /** The "Рекомендуем послушать" block. */

@@ -6,8 +6,13 @@ import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
+import com.fanok.audiobooks.source.Akniga;
+import com.fanok.audiobooks.source.BazaKnig;
 import com.fanok.audiobooks.pojo.ComentsPOJO;
 import com.fanok.audiobooks.pojo.SubComentsPOJO;
+import com.fanok.audiobooks.source.Abmp3;
+import com.fanok.audiobooks.source.Audioboo;
+import com.fanok.audiobooks.source.Knigavuhe;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -38,7 +43,7 @@ public class ComentsModelTest {
 
     @Test
     public void knigavuheThreadsKeepEveryReplyUnderItsTopLevelComment() throws IOException {
-        ComentsModel.Parsed parsed = ComentsModel.parseCommentsKnigavuhe(page("knigavuhe/comments.html", KNIGAVUHE), KNIGAVUHE);
+        ComentsModel.Parsed parsed = Knigavuhe.parseComments(page("knigavuhe/comments.html", KNIGAVUHE));
 
         assertEquals(12, parsed.comments.size());
         assertEquals(0, parsed.skipped);
@@ -64,7 +69,7 @@ public class ComentsModelTest {
         Document doc = page("knigavuhe/comments.html", KNIGAVUHE);
         doc.getElementById("comment94864_body").remove();
 
-        ComentsModel.Parsed parsed = ComentsModel.parseCommentsKnigavuhe(doc, KNIGAVUHE);
+        ComentsModel.Parsed parsed = Knigavuhe.parseComments(doc);
 
         assertEquals(11, parsed.comments.size());
         assertEquals(1, parsed.skipped);
@@ -73,7 +78,7 @@ public class ComentsModelTest {
 
     @Test
     public void abmp3NestedReplyBelongsToItsParent() throws IOException {
-        ComentsModel.Parsed parsed = ComentsModel.parseCommentsAbmp3(page("abmp3/comments.html", ABMP3), ABMP3);
+        ComentsModel.Parsed parsed = Abmp3.parseComments(page("abmp3/comments.html", ABMP3));
 
         assertEquals(14, parsed.comments.size());
         assertEquals(0, parsed.skipped);
@@ -94,7 +99,7 @@ public class ComentsModelTest {
     @Test
     public void aknigaReplyToAReplyStaysInTheThread() throws IOException {
         Document doc = page("akniga/comments.html", AKNIGA);
-        ComentsModel.Parsed parsed = ComentsModel.parseCommentsAkniga(doc, AKNIGA);
+        ComentsModel.Parsed parsed = Akniga.parseComments(doc, AKNIGA);
 
         assertEquals(3, parsed.comments.size());
         assertEquals(0, parsed.skipped);
@@ -113,21 +118,21 @@ public class ComentsModelTest {
         assertEquals(2, parsed.comments.get(2).getChildComents().size());
         assertAllImagesHttps(parsed.comments);
 
-        assertEquals("https://akniga.org/rss/comments/17378/", ComentsModel.aknigaFeedUrl(doc));
+        assertEquals("https://akniga.org/rss/comments/17378/", Akniga.feedUrl(doc));
     }
 
     @Test
     public void aknigaFeedKeepsCdataTextAndSkipsCommentsAlreadyOnThePage() throws IOException {
         Document feed = xml("akniga/comments-rss.xml", "https://akniga.org/rss/comments/17378/");
 
-        ComentsModel.Parsed all = ComentsModel.parseCommentsAknigaFeed(feed, Jsoup.parse("<p></p>"));
+        ComentsModel.Parsed all = Akniga.parseCommentsFeed(feed, Jsoup.parse("<p></p>"));
         assertEquals(5, all.comments.size());
         assertEquals("bivis-bez-batheda", all.comments.get(0).getName());
         assertEquals("Очень круто!", all.comments.get(0).getText());
         assertEquals("Mon, 28 Sep 2026 17:44:16", all.comments.get(0).getDate());
 
         Document pageWithFirst = Jsoup.parse("<div id=\"comment1765480\"></div>");
-        ComentsModel.Parsed rest = ComentsModel.parseCommentsAknigaFeed(feed, pageWithFirst);
+        ComentsModel.Parsed rest = Akniga.parseCommentsFeed(feed, pageWithFirst);
         assertEquals(4, rest.comments.size());
         assertEquals("roman-orlov", rest.comments.get(0).getName());
     }
@@ -136,14 +141,14 @@ public class ComentsModelTest {
     public void aknigaPageWithAllCommentsNeedsNoFeed() {
         Document doc = Jsoup.parse("<div id=\"comments\" data-target-id=\"1\">"
                 + "<a class=\"js-comments-load-more\" data-total=\"5\" data-loaded=\"5\"></a></div>", AKNIGA);
-        assertNull(ComentsModel.aknigaFeedUrl(doc));
+        assertNull(Akniga.feedUrl(doc));
     }
 
     @Test
     public void bazaKnigPageReadsQuotesAndProtocolRelativeAvatars() throws IOException {
         String pageUrl = "https://baza-knig.top/engine/ajax/controller.php?mod=comments&cstart=1";
-        String html = ComentsModel.bazaKnigCommentsHtml(resource("baza-knig/comments.json"));
-        ComentsModel.Parsed parsed = ComentsModel.parseCommentsBazaKnig(Jsoup.parseBodyFragment(html, pageUrl), BAZA_KNIG);
+        String html = BazaKnig.commentsHtml(resource("baza-knig/comments.json"));
+        ComentsModel.Parsed parsed = BazaKnig.parseComments(Jsoup.parseBodyFragment(html, pageUrl), BAZA_KNIG);
 
         assertEquals(30, parsed.comments.size());
         assertEquals(0, parsed.skipped);
@@ -161,7 +166,7 @@ public class ComentsModelTest {
     public void bazaKnigPagingStopsAtTheEmptyPageAndReturnsOldestFirst() throws Exception {
         List<String> requested = new ArrayList<>();
         String page1 = resource("baza-knig/comments.json");
-        ComentsModel.Parsed parsed = ComentsModel.loadBazaKnig(BAZA_KNIG, url -> {
+        ComentsModel.Parsed parsed = BazaKnig.loadComments(BAZA_KNIG, url -> {
             requested.add(url);
             return url.contains("cstart=1&") ? page1 : NO_MORE_PAGES;
         }, () -> false);
@@ -176,7 +181,7 @@ public class ComentsModelTest {
     public void bazaKnigPagingIsBounded() throws Exception {
         String page1 = resource("baza-knig/comments.json");
         int[] calls = {0};
-        ComentsModel.Parsed repeated = ComentsModel.loadBazaKnig(BAZA_KNIG, url -> {
+        ComentsModel.Parsed repeated = BazaKnig.loadComments(BAZA_KNIG, url -> {
             calls[0]++;
             return page1; // a site that clamps cstart to its last page
         }, () -> false);
@@ -184,15 +189,15 @@ public class ComentsModelTest {
         assertEquals(30, repeated.comments.size());
 
         calls[0] = 0;
-        ComentsModel.Parsed endless = ComentsModel.loadBazaKnig(BAZA_KNIG, url -> {
+        ComentsModel.Parsed endless = BazaKnig.loadComments(BAZA_KNIG, url -> {
             calls[0]++;
             return "{\"comments\":\"<div class='comm'><div class='comm-text'><div>n" + calls[0] + "</div></div></div>\"}";
         }, () -> false);
-        assertEquals(ComentsModel.BAZA_KNIG_MAX_PAGES, calls[0]);
-        assertEquals(ComentsModel.BAZA_KNIG_MAX_PAGES, endless.comments.size());
+        assertEquals(BazaKnig.MAX_COMMENT_PAGES, calls[0]);
+        assertEquals(BazaKnig.MAX_COMMENT_PAGES, endless.comments.size());
 
         calls[0] = 0;
-        ComentsModel.loadBazaKnig(BAZA_KNIG, url -> {
+        BazaKnig.loadComments(BAZA_KNIG, url -> {
             calls[0]++;
             return page1;
         }, () -> true);
@@ -201,21 +206,21 @@ public class ComentsModelTest {
 
     @Test
     public void bazaKnigAnswerWithoutCommentsIsEmpty() {
-        assertEquals("", ComentsModel.bazaKnigCommentsHtml(NO_MORE_PAGES));
-        assertEquals("", ComentsModel.bazaKnigCommentsHtml("{\"error\":\"no access\"}"));
-        assertEquals("", ComentsModel.bazaKnigCommentsHtml("{\"comments\":null}"));
-        assertEquals("", ComentsModel.bazaKnigCommentsHtml("[]"));
+        assertEquals("", BazaKnig.commentsHtml(NO_MORE_PAGES));
+        assertEquals("", BazaKnig.commentsHtml("{\"error\":\"no access\"}"));
+        assertEquals("", BazaKnig.commentsHtml("{\"comments\":null}"));
+        assertEquals("", BazaKnig.commentsHtml("[]"));
     }
 
     @Test
     public void bazaKnigNewsIdIsTheLeadingNumberOfTheLastPathSegment() {
-        assertEquals("182353", ComentsModel.bazaKnigNewsId(
+        assertEquals("182353", BazaKnig.newsId(
                 "https://baza-knig.top/fantastika-fentezii/182353-taksist-iz-forbes-nik-tarasov.html"));
-        assertEquals("182353", ComentsModel.bazaKnigNewsId("https://baza-knig.top/182353.html"));
-        assertEquals("14278", ComentsModel.bazaKnigNewsId("https://baza-knig.top/popadanci/14278-igrat/"));
-        assertEquals("1", ComentsModel.bazaKnigNewsId("https://baza-knig.top/kniga/1.html?x=1#top"));
+        assertEquals("182353", BazaKnig.newsId("https://baza-knig.top/182353.html"));
+        assertEquals("14278", BazaKnig.newsId("https://baza-knig.top/popadanci/14278-igrat/"));
+        assertEquals("1", BazaKnig.newsId("https://baza-knig.top/kniga/1.html?x=1#top"));
         try {
-            ComentsModel.bazaKnigNewsId("https://baza-knig.top/f/sort=comm_num/order=desc/");
+            BazaKnig.newsId("https://baza-knig.top/f/sort=comm_num/order=desc/");
             fail("a URL without a book id must be rejected");
         } catch (IllegalArgumentException expected) {
             assertTrue(expected.getMessage().contains("no book id"));
@@ -224,7 +229,7 @@ public class ComentsModelTest {
 
     @Test
     public void audiobooCommentsInPageOrderWithoutAnInventedAvatar() throws IOException {
-        ComentsModel.Parsed parsed = ComentsModel.parseCommentsAudioboo(page("audioboo/comments.html", AUDIOBOO), AUDIOBOO);
+        ComentsModel.Parsed parsed = Audioboo.parseComments(page("audioboo/comments.html", AUDIOBOO));
 
         assertEquals(25, parsed.comments.size());
         assertEquals(0, parsed.skipped);
@@ -238,12 +243,12 @@ public class ComentsModelTest {
     @Test
     public void pagesWithoutCommentsGiveEmptyLists() {
         Document empty = Jsoup.parse("<html><body><p>Комментариев нет</p></body></html>", KNIGAVUHE);
-        assertEmpty(ComentsModel.parseCommentsKnigavuhe(empty, KNIGAVUHE));
-        assertEmpty(ComentsModel.parseCommentsAbmp3(empty, ABMP3));
-        assertEmpty(ComentsModel.parseCommentsAkniga(empty, AKNIGA));
-        assertEmpty(ComentsModel.parseCommentsBazaKnig(Jsoup.parseBodyFragment(""), BAZA_KNIG));
-        assertEmpty(ComentsModel.parseCommentsAudioboo(empty, AUDIOBOO));
-        assertNull(ComentsModel.aknigaFeedUrl(empty));
+        assertEmpty(Knigavuhe.parseComments(empty));
+        assertEmpty(Abmp3.parseComments(empty));
+        assertEmpty(Akniga.parseComments(empty, AKNIGA));
+        assertEmpty(BazaKnig.parseComments(Jsoup.parseBodyFragment(""), BAZA_KNIG));
+        assertEmpty(Audioboo.parseComments(empty));
+        assertNull(Akniga.feedUrl(empty));
     }
 
     @Test

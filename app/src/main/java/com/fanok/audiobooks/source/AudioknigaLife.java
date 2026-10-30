@@ -1,7 +1,6 @@
 package com.fanok.audiobooks.source;
 
 import com.fanok.audiobooks.BookRemovedException;
-import com.fanok.audiobooks.R;
 import com.fanok.audiobooks.net.JsonSlice;
 import com.fanok.audiobooks.pojo.AudioPOJO;
 import com.fanok.audiobooks.pojo.BookPOJO;
@@ -22,6 +21,7 @@ import io.reactivex.functions.BooleanSupplier;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.List;
 import java.util.HashMap;
 import java.util.IdentityHashMap;
 import java.util.Locale;
@@ -91,31 +91,21 @@ public final class AudioknigaLife implements SourceParser {
         return Dle.pageUrl(url, page);
     }
 
-    @Override
-    public int optionsMenu() {
-        return R.menu.books_dle_options_menu;
-    }
-
-    @Override
-    public String sortUrl(int itemId, String listingUrl) {
-        if (itemId == R.id.new_data) {
-            return INDEX;
-        } else if (itemId == R.id.popular) {
-            return FILTER + "sort=news_read/order=desc/";
-        } else if (itemId == R.id.reting) {
-            return FILTER + "sort=rating/order=desc/";
-        } else if (itemId == R.id.coments) {
-            return FILTER + "sort=comm_num/order=desc/";
-        } else if (itemId == R.id.sort_title) {
-            return FILTER + "sort=title/order=asc/";
-        }
-        return null;
-    }
-
     /** Authors, readers, series and search results are ranked by the site alone. */
     @Override
-    public boolean hasSort(String url) {
-        return !url.startsWith(SERVER + "/xfsearch/") && !url.startsWith(SERVER + "/search/");
+    public List<Sort.Entry> sorts(String url) {
+        boolean sortable = !url.startsWith(SERVER + "/xfsearch/") && !url.startsWith(SERVER + "/search/");
+        return sortable ? Dle.MENU : Collections.<Sort.Entry>emptyList();
+    }
+
+    /** The DLE sort form as a {@code /f/} filter path; "new" is the index. */
+    @Override
+    public String sortUrl(Sort sort, String listingUrl) {
+        Dle.Order order = Dle.Order.of(sort);
+        if (order == null) {
+            return null;
+        }
+        return order == Dle.Order.DATE ? INDEX : FILTER + "sort=" + order.field + "/order=" + order.direction + "/";
     }
 
     /** The category id of a genre or of a ranking inside one; a genre without a known id is keyed by its root URL. */
@@ -301,21 +291,8 @@ public final class AudioknigaLife implements SourceParser {
 
     /** The book of a deep link. */
     public static BookPOJO parseBook(Document doc, String url) {
-        DescriptionPOJO d = parseDescription(doc);
-        BookPOJO book = new BookPOJO();
-        book.setUrl(url);
-        book.setName(d.getTitle());
-        book.setPhoto(d.getPoster());
-        book.setAutor(d.getAutor());
-        book.setUrlAutor(d.getAutorUrl());
-        book.setArtist(d.getArtist());
-        book.setUrlArtist(d.getArtistUrl());
-        book.setSeries(d.getSeries());
-        book.setUrlSeries(d.getSeriesUrl());
-        book.setGenre(d.getGenre());
-        book.setUrlGenre(d.getGenreUrl());
+        BookPOJO book = BookPOJO.of(parseDescription(doc), url);
         book.setTime(totalTime(doc));
-        book.setDesc(d.getDescription());
         return book;
     }
 

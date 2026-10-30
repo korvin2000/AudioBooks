@@ -1,30 +1,18 @@
 package com.fanok.audiobooks.model;
 
-import com.fanok.audiobooks.AutorsSearchABMP3;
-import com.fanok.audiobooks.Url;
-import com.fanok.audiobooks.net.SiteHttp;
 import com.fanok.audiobooks.pojo.GenrePOJO;
 import com.fanok.audiobooks.search.Provider;
 import com.fanok.audiobooks.search.ProviderPage;
 import com.fanok.audiobooks.search.SearchUrls;
 import com.fanok.audiobooks.source.SourceParser;
-import com.google.gson.JsonElement;
-import com.google.gson.JsonParser;
 import java.io.IOException;
-import java.util.ArrayList;
-import okhttp3.HttpUrl;
-import org.jsoup.Connection;
-import org.jsoup.Jsoup;
-import org.jsoup.nodes.Document;
-import org.jsoup.nodes.Element;
-import org.jsoup.select.Elements;
 
 /** Author and performer listings and their search, one page per call; end of list comes from the pager. */
 public class AutorsModel extends GenreModel {
 
     private boolean mPerformerMode = false;
-    /** audioboo's empty letters passed so far: page N is the letter N plus these (pages load one by one). */
-    private int mAudiobooSkipped;
+    /** This list's state between its pages, for a site that keeps one ({@link SourceParser#loadPeople}). */
+    private final SourceParser.PeopleCursor mPeopleCursor = new SourceParser.PeopleCursor();
 
     public void setPerformerMode(boolean mode) {
         mPerformerMode = mode;
@@ -37,225 +25,12 @@ public class AutorsModel extends GenreModel {
         if (url == null) {
             return ProviderPage.empty();
         }
-        if (provider.parser != null) {
-            return provider.parser.searchPeople(provider.parser.fetch(url), page,
-                    category == SearchUrls.Category.PERFORMERS);
-        }
-        switch (provider) {
-            case KNIGAVUHE: return loadBooksList(url, page);
-            case IZIBUK: return loadBooksListIzibuk(url, page);
-            case ABMP3: return new AutorsSearchABMP3().getAutors(url, page);
-            case AKNIGA: return page > 1 ? ProviderPage.<GenrePOJO>empty() : searchAbook(url);
-            default: return ProviderPage.empty();
-        }
+        return provider.parser.searchPeople(provider.parser.fetch(url), page,
+                category == SearchUrls.Category.PERFORMERS);
     }
 
     @Override
     protected ProviderPage<GenrePOJO> loadParser(SourceParser parser, String url, int page) throws IOException {
-        return parser.people(parser.fetch(url), url, page, mPerformerMode);
-    }
-
-    @Override
-    protected ProviderPage<GenrePOJO> loadBooksList(String url, int page) throws IOException {
-        return parseKnigavuhePeople(SiteHttp.get(url), page);
-    }
-
-    /** knigavuhe's author/reader rows: legacy_people_row on the listings, author_item in the search. */
-    static ProviderPage<GenrePOJO> parseKnigavuhePeople(Document doc, int page) {
-        boolean hasMore = BooksModel.lastPage(doc.select(".pn_page_buttons a")) > page;
-        return ProviderPage.of(rows(doc.select(".author_item, .legacy_people_row"), item -> {
-            GenrePOJO genrePOJO = new GenrePOJO();
-            // a listing row opens with the avatar link, whose text is the initials
-            Element a = item.selectFirst(".legacy_people_name a");
-            if (a == null) {
-                a = item.selectFirst("a");
-            }
-            if (a != null) {
-                if (!a.attr("href").isEmpty()) {
-                    genrePOJO.setUrl(Url.SERVER + a.attr("href"));
-                }
-                if (!a.text().isEmpty()) {
-                    genrePOJO.setName(a.text());
-                }
-            }
-            Element booksCount = item.selectFirst(".author_item_books_count, .legacy_people_books");
-            if (booksCount != null) {
-                genrePOJO.setDescription(booksCount.text());
-            }
-            return genrePOJO;
-        }), hasMore);
-    }
-
-    @Override
-    protected ProviderPage<GenrePOJO> loadBooksListABMP3(String url, int page) throws IOException {
-        Document doc = SiteHttp.get(url);
-        if (doc.selectFirst(".authors_list") == null) {
-            // a paged author listing
-            Element parent = doc.selectFirst(".b-posts");
-            if (parent == null) {
-                return ProviderPage.empty();
-            }
-            boolean hasMore = BooksModel.lastPage(doc.select(".pagination li a")) > page;
-            return ProviderPage.of(authorsRows(parent.children()), hasMore);
-        }
-        // the alphabet index: page N is the N-th letter, Russian letters first
-        Element chars = doc.selectFirst(".alphabet");
-        if (chars == null || chars.childrenSize() == 0) {
-            return ProviderPage.empty();
-        }
-        Elements rus = chars.child(chars.childrenSize() - 1).children();
-        Elements eng = chars.child(0).children();
-        int total = rus.size() + eng.size();
-        if (page > total) {
-            return ProviderPage.empty();
-        }
-        Element letter = page <= rus.size() ? rus.get(page - 1) : eng.get(page - rus.size() - 1);
-        Document letterDoc = SiteHttp.get(Url.SERVER_ABMP3 + letter.attr("href"));
-        Element list = letterDoc.selectFirst(".authors_list");
-        ArrayList<GenrePOJO> result = list == null ? new ArrayList<>() : authorsRows(list.children());
-        return ProviderPage.of(result, page < total);
-    }
-
-    private static ArrayList<GenrePOJO> authorsRows(Elements list) {
-        return rows(list, item -> {
-            GenrePOJO genrePOJO = new GenrePOJO();
-            Element aGenre = item.selectFirst(".title a");
-            if (aGenre != null) {
-                genrePOJO.setUrl(Url.SERVER_ABMP3 + aGenre.attr("href") + "?page=");
-                if (!aGenre.text().isEmpty()) {
-                    genrePOJO.setName(aGenre.text());
-                }
-            }
-            Element ratings = item.selectFirst(".rating");
-            if (ratings != null) {
-                genrePOJO.setDescription(ratings.text().trim().replace("кни", " кни"));
-            }
-            return genrePOJO;
-        });
-    }
-
-    @Override
-    protected ProviderPage<GenrePOJO> loadBooksListAbook(final String url, final int page) throws IOException {
-        Document doc = SiteHttp.get(url);
-        boolean hasMore = !doc.select(".page__nav .page__nav--next").isEmpty();
-        return ProviderPage.of(parseAbookTable(doc), hasMore);
-    }
-
-    /** akniga's ajax search: a security key and cookies from the listing page, then a POST; one page only (SRCH-07). */
-    private ProviderPage<GenrePOJO> searchAbook(String url) throws IOException {
-        HttpUrl parsed = HttpUrl.parse(url);
-        if (parsed == null) {
-            return ProviderPage.empty();
-        }
-        String query = parsed.queryParameter("q");
-        String endpoint = parsed.newBuilder().query(null).build().toString();
-        Document listing = SiteHttp.get(Url.SERVER_AKNIGA + "/authors/");
-        String key = "";
-        for (Element script : listing.getElementsByTag("script")) {
-            String text = script.data();
-            int at = text.indexOf("LIVESTREET_SECURITY_KEY");
-            if (at >= 0) {
-                text = text.substring(at).replace("LIVESTREET_SECURITY_KEY = '", "");
-                key = text.substring(0, Math.max(0, text.indexOf("'")));
-                break;
-            }
-        }
-        Connection connection = SiteHttp.connect(endpoint)
-                .method(Connection.Method.POST)
-                .referrer(Url.SERVER_AKNIGA + "/authors/")
-                .ignoreContentType(true)
-                .data("security_ls_key", key)
-                .data("sText", query == null ? "" : query);
-        String body = SiteHttp.execute(connection).body();
-        JsonElement json = JsonParser.parseString(body.replaceAll("\\n", ""));
-        if (!json.isJsonObject() || !json.getAsJsonObject().has("html")) {
-            return ProviderPage.empty();
-        }
-        String html = json.getAsJsonObject().get("html").getAsString();
-        Document doc = Jsoup.parse("<html><head></head><body><table><tbody>" + html + "</tbody></table></body></html>");
-        return ProviderPage.of(parseAbookTable(doc), false);
-    }
-
-    @Override
-    protected ProviderPage<GenrePOJO> loadBooksListIzibuk(String url, int page) throws IOException {
-        Document doc = SiteHttp.get(url);
-        boolean hasMore = BooksModel.lastPage(doc.select(
-                "#authors_list__pn a[data-page], #readers_list__pn a[data-page]")) > page;
-        Element itemParent = doc.getElementById("authors_list");
-        if (itemParent == null) {
-            itemParent = doc.getElementById("readers_list");
-        }
-        if (itemParent == null) {
-            return ProviderPage.empty();
-        }
-        return ProviderPage.of(rows(itemParent.children(), item -> {
-            GenrePOJO genrePOJO = new GenrePOJO();
-            genrePOJO.setUrl(Url.SERVER_IZIBUK + item.attr("href") + "?p=");
-            Elements children = item.children();
-            if (children.size() == 3) {
-                genrePOJO.setName(children.get(1).text());
-                genrePOJO.setDescription(children.last().text());
-            }
-            return genrePOJO;
-        }), hasMore);
-    }
-
-    /**
-     * audioboo's authors: an index page per letter ("Все авторы на букву А"), linked from every listing page, so
-     * page N is the N-th letter. Its readers are its tags (a card's reader links to one), all on the tag cloud.
-     */
-    @Override
-    protected ProviderPage<GenrePOJO> loadBooksListAudioboo(String url, int page) throws IOException {
-        if (mPerformerMode) {
-            // 17k tags: ~4 MB unpacked (0.3 MB sent), the bound SiteHttp sets for a page
-            int limit = 4 * SiteHttp.MAX_BODY_BYTES;
-            return parseAudiobooReaders(SiteHttp.parse(SiteHttp.execute(SiteHttp.connect(
-                    Url.SERVER_AUDIOBOO + "/tags/").maxBodySize(limit)), limit));
-        }
-        Elements letters = SiteHttp.get(url).select("a.alfavit[href]");
-        if (page <= 1) {
-            mAudiobooSkipped = 0;
-        }
-        int index = page - 1 + mAudiobooSkipped;
-        ArrayList<GenrePOJO> authors = new ArrayList<>();
-        // an empty letter would end the list: the next one is read in its place
-        for (; index < letters.size(); index++) {
-            authors = parseAudiobooAuthors(SiteHttp.get(letters.get(index).absUrl("href")));
-            if (!authors.isEmpty() || index == letters.size() - 1) {
-                break;
-            }
-            mAudiobooSkipped++;
-        }
-        return ProviderPage.of(authors, index < letters.size() - 1);
-    }
-
-    /** A letter of audioboo's authors' index: a table row per author, with the number of their books. */
-    static ArrayList<GenrePOJO> parseAudiobooAuthors(Document doc) {
-        return rows(doc.select("#dle-content tr"), row -> {
-            Element a = row.selectFirst("a[href*=/xfsearch/avtora/]");
-            // the index links "/xfsearch/avtora/А Фонд": encoded and closed by "/" as the cards link it
-            HttpUrl href = a == null ? null : HttpUrl.parse(a.absUrl("href"));
-            if (href == null) {
-                return null;
-            }
-            GenrePOJO author = new GenrePOJO();
-            String link = href.toString();
-            author.setUrl(link.endsWith("/") ? link : link + "/");
-            author.setName(a.text().trim());
-            Elements cells = row.select("td");
-            author.setReting(countOf(cells.last().text()));
-            return author;
-        });
-    }
-
-    /** audioboo's tag cloud: every reader with the number of their books. */
-    static ProviderPage<GenrePOJO> parseAudiobooReaders(Document doc) {
-        return ProviderPage.of(rows(doc.select(".cloud-tags a[href*=/tags/]"), a -> {
-            GenrePOJO reader = new GenrePOJO();
-            reader.setUrl(a.absUrl("href"));
-            reader.setName(a.text().trim());
-            reader.setReting(countOf(a.attr("title"))); // "Найдено публикаций: 12"
-            return reader;
-        }), false);
+        return parser.loadPeople(url, page, mPerformerMode, mPeopleCursor);
     }
 }

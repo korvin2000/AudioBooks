@@ -100,7 +100,7 @@ public class SeriesListAddapter extends RecyclerView.Adapter<SeriesListAddapter.
                 if (book.getPhoto() != null && !book.getPhoto().isEmpty()) {
                     Glide.with(itemView.getContext())
                             .asBitmap()
-                            .load(book.getPhoto())
+                            .load(com.fanok.audiobooks.net.Covers.glide(book.getPhoto()))
                             .listener(new RequestListener<Bitmap>() {
                                 @Override
                                 public boolean onLoadFailed(@Nullable GlideException e, Object model, Target<Bitmap> target, boolean isFirstResource) {
