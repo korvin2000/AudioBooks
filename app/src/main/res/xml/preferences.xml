@@ -1,300 +1,345 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- Seven groups, each its own screen (SettingsFragment#onNavigateToScreen); keys of the entries are unchanged. -->
 <PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android">
-    <ListPreference
-        android:defaultValue="@string/theme_dark_value"
-        android:dialogTitle="@string/setting_theme"
-        android:entries="@array/settings_them_titles"
-        android:entryValues="@array/settings_them_values"
+
+    <PreferenceScreen
         android:icon="@drawable/ic_theme"
-        android:key="pref_theme"
-        android:title="@string/setting_theme" />
+        android:key="group_appearance"
+        android:summary="@string/settings_appearance_summary"
+        android:title="@string/settings_appearance">
 
-    <ListPreference
-        android:defaultValue="@string/abook_value"
-        android:dialogTitle="@string/sorce_books"
-        android:icon="@drawable/ic_web"
-        android:key="sorce_books"
-        android:title="@string/sorce_books" />
+        <ListPreference
+            android:defaultValue="@string/theme_dark_value"
+            android:dialogTitle="@string/setting_theme"
+            android:entries="@array/settings_them_titles"
+            android:entryValues="@array/settings_them_values"
+            android:icon="@drawable/ic_theme"
+            android:key="pref_theme"
+            android:title="@string/setting_theme" />
 
+        <ListPreference
+            android:defaultValue="@string/books_adapter_layout_list_value"
+            android:dialogTitle="@string/books_adapter_layout"
+            android:entries="@array/books_adapter_layout_titles"
+            android:entryValues="@array/books_adapter_layout_values"
+            android:icon="@drawable/ic_list"
+            android:key="books_adapter_layout_pref"
+            android:title="@string/books_adapter_layout" />
 
+        <CheckBoxPreference
+            android:defaultValue="true"
+            android:icon="@drawable/ic_menu_history"
+            android:key="history_procent"
+            android:summary="@string/history_procent_desc"
+            android:title="@string/history_procent" />
 
-    <Preference
-        android:icon="@drawable/ic_download"
-        android:key="pref_download_path"
-        android:summary="@string/select_folder"
-        android:title="@string/pref_download_path" />
-
-    <CheckBoxPreference
-        android:defaultValue="true"
-        android:icon="@drawable/ic_content_cut"
-        android:key="cutting_file"
-        android:summary="@string/cutting_file_desc"
-        android:title="@string/cutting_file" />
-
-    <PreferenceScreen
-        android:icon="@drawable/ic_layers_search"
-        android:key="source_search"
-        android:persistent="true"
-        android:summary="@string/source_search_desc"
-        android:title="@string/source_search">
-
-        <!-- one checkbox per Provider, added by SettingsFragment -->
+        <!-- which book-screen actions are icons in its toolbar; the rest stay in the overflow menu -->
+        <PreferenceScreen
+            android:icon="@drawable/ic_menu_settings"
+            android:key="book_toolbar"
+            android:persistent="true"
+            android:summary="@string/book_toolbar_desc"
+            android:title="@string/book_toolbar">
+            <CheckBoxPreference
+                android:defaultValue="true"
+                android:key="toolbar_title"
+                android:title="@string/toolbar_title" />
+            <CheckBoxPreference
+                android:defaultValue="true"
+                android:key="toolbar_favorite"
+                android:title="@string/add_to_favorite" />
+            <CheckBoxPreference
+                android:defaultValue="true"
+                android:key="toolbar_share"
+                android:title="@string/share" />
+            <CheckBoxPreference
+                android:defaultValue="false"
+                android:key="toolbar_download"
+                android:title="@string/dowland" />
+            <CheckBoxPreference
+                android:defaultValue="false"
+                android:key="toolbar_sleep_timer"
+                android:title="@string/sleep_timer" />
+            <CheckBoxPreference
+                android:defaultValue="false"
+                android:key="toolbar_equalizer"
+                android:title="@string/equalizer" />
+            <CheckBoxPreference
+                android:defaultValue="false"
+                android:key="toolbar_settings"
+                android:title="@string/menu_settings" />
+            <CheckBoxPreference
+                android:defaultValue="false"
+                android:key="toolbar_open_site"
+                android:title="@string/open_site" />
+            <CheckBoxPreference
+                android:defaultValue="false"
+                android:key="toolbar_main_screen"
+                android:title="@string/add_to_main_screen" />
+            <CheckBoxPreference
+                android:defaultValue="false"
+                android:key="toolbar_refresh"
+                android:title="@string/refresh" />
+        </PreferenceScreen>
     </PreferenceScreen>
 
-    <!-- which book-screen actions are icons in its toolbar; the rest stay in the overflow menu -->
     <PreferenceScreen
-        android:icon="@drawable/ic_menu_settings"
-        android:key="book_toolbar"
-        android:persistent="true"
-        android:summary="@string/book_toolbar_desc"
-        android:title="@string/book_toolbar">
+        android:icon="@drawable/ic_menu_audiobooks"
+        android:key="group_playback"
+        android:summary="@string/settings_playback_summary"
+        android:title="@string/settings_playback">
+
+        <CheckBoxPreference
+            android:defaultValue="false"
+            android:icon="@drawable/ic_auto_play"
+            android:key="autoPlayPref"
+            android:summary="@string/autoplay_desc"
+            android:title="@string/autoplay" />
+
         <CheckBoxPreference
             android:defaultValue="true"
-            android:key="toolbar_title"
-            android:title="@string/toolbar_title" />
+            android:icon="@drawable/ic_album"
+            android:key="reproductionPref"
+            android:summary="@string/reproduction_desc"
+            android:title="@string/reproduction_keep" />
+
+        <CheckBoxPreference
+            android:defaultValue="false"
+            android:icon="@drawable/ic_skip_pref"
+            android:key="seekButtonsPref"
+            android:summary="@string/seek_buttons_desc"
+            android:title="@string/seek_buttons" />
+
         <CheckBoxPreference
             android:defaultValue="true"
-            android:key="toolbar_favorite"
-            android:title="@string/add_to_favorite" />
+            android:icon="@drawable/ic_fast_forward_pref"
+            android:key="seekToPausePref"
+            android:summary="@string/seekToPauseDesc"
+            android:title="@string/seekTo" />
+
+        <CheckBoxPreference
+            android:defaultValue="false"
+            android:icon="@drawable/ic_rewind"
+            android:key="rewind_back"
+            android:summary="@string/rewind_desc"
+            android:title="@string/rewind_back" />
+
         <CheckBoxPreference
             android:defaultValue="true"
-            android:key="toolbar_share"
-            android:title="@string/share" />
+            android:icon="@drawable/ic_privacy"
+            android:key="safeNavigationPref"
+            android:summary="@string/safe_navigation_desc"
+            android:title="@string/safe_navigation" />
+
         <CheckBoxPreference
             android:defaultValue="false"
-            android:key="toolbar_download"
-            android:title="@string/dowland" />
+            android:icon="@drawable/ic_scroll_to"
+            android:key="scrollToSelectedPref"
+            android:summary="@string/scrollToSelectedDesc"
+            android:title="@string/scrollToSelected" />
+
         <CheckBoxPreference
-            android:defaultValue="false"
-            android:key="toolbar_sleep_timer"
-            android:title="@string/sleep_timer" />
-        <CheckBoxPreference
-            android:defaultValue="false"
-            android:key="toolbar_equalizer"
-            android:title="@string/equalizer" />
-        <CheckBoxPreference
-            android:defaultValue="false"
-            android:key="toolbar_settings"
-            android:title="@string/menu_settings" />
-        <CheckBoxPreference
-            android:defaultValue="false"
-            android:key="toolbar_open_site"
-            android:title="@string/open_site" />
-        <CheckBoxPreference
-            android:defaultValue="false"
-            android:key="toolbar_main_screen"
-            android:title="@string/add_to_main_screen" />
-        <CheckBoxPreference
-            android:defaultValue="false"
-            android:key="toolbar_refresh"
-            android:title="@string/refresh" />
+            android:defaultValue="true"
+            android:icon="@drawable/ic_content_cut"
+            android:key="cutting_file"
+            android:summary="@string/cutting_file_desc"
+            android:title="@string/cutting_file" />
+
+        <EditTextPreference
+            android:defaultValue="60"
+            android:icon="@drawable/ic_buffer"
+            android:key="bufferSize"
+            android:title="@string/buffer_size" />
     </PreferenceScreen>
 
-
-    <ListPreference
-        android:defaultValue="@string/books_adapter_layout_list_value"
-        android:dialogTitle="@string/books_adapter_layout"
-        android:entries="@array/books_adapter_layout_titles"
-        android:entryValues="@array/books_adapter_layout_values"
-        android:icon="@drawable/ic_list"
-        android:key="books_adapter_layout_pref"
-        android:title="@string/books_adapter_layout" />
-
-    <CheckBoxPreference
-        android:defaultValue="true"
-        android:icon="@drawable/ic_menu_history"
-        android:key="history_procent"
-        android:summary="@string/history_procent_desc"
-        android:title="@string/history_procent" />
-
-
-    <ListPreference
-        android:defaultValue="0"
-        android:dialogTitle="@string/setting_start_menu"
-        android:entries="@array/settings_start_screen_titles"
-        android:entryValues="@array/settings_start_screen_values"
-        android:icon="@drawable/ic_application"
-        android:key="pref_start_screen"
-        android:title="@string/setting_start_menu" />
-
-    <CheckBoxPreference
-        android:defaultValue="false"
-        android:icon="@drawable/ic_magnify"
-        android:key="search_pref"
-        android:summary="@string/search_desc"
-        android:title="@string/search" />
-
-    <CheckBoxPreference
-        android:defaultValue="false"
-        android:icon="@drawable/ic_web"
-        android:key="offline"
-        android:summary="@string/ofline_desc"
-        android:title="@string/offline" />
-
-    <CheckBoxPreference
-        android:defaultValue="false"
-        android:icon="@drawable/ic_rewind"
-        android:key="rewind_back"
-        android:summary="@string/rewind_desc"
-        android:title="@string/rewind_back" />
-
-    <CheckBoxPreference
-        android:defaultValue="true"
-        android:icon="@drawable/ic_album"
-        android:key="reproductionPref"
-        android:summary="@string/reproduction_desc"
-        android:title="@string/reproduction" />
-
-    <CheckBoxPreference
-        android:defaultValue="false"
-        android:icon="@drawable/ic_auto_play"
-        android:key="autoPlayPref"
-        android:summary="@string/autoplay_desc"
-        android:title="@string/autoplay" />
-
-    <CheckBoxPreference
-        android:defaultValue="true"
-        android:icon="@drawable/ic_fast_forward_pref"
-        android:key="seekToPausePref"
-        android:summary="@string/seekToPauseDesc"
-        android:title="@string/seekTo" />
-
-    <CheckBoxPreference
-        android:defaultValue="false"
-        android:icon="@drawable/ic_skip_pref"
-        android:key="seekButtonsPref"
-        android:summary="@string/seek_buttons_desc"
-        android:title="@string/seek_buttons" />
-
-    <CheckBoxPreference
-        android:defaultValue="true"
-        android:icon="@drawable/ic_privacy"
-        android:key="safeNavigationPref"
-        android:summary="@string/safe_navigation_desc"
-        android:title="@string/safe_navigation" />
-
-    <CheckBoxPreference
-        android:defaultValue="false"
-        android:icon="@drawable/ic_scroll_to"
-        android:key="scrollToSelectedPref"
-        android:summary="@string/scrollToSelectedDesc"
-        android:title="@string/scrollToSelected" />
-
-    <EditTextPreference
-        android:defaultValue="60"
-        android:icon="@drawable/ic_buffer"
-        android:key="bufferSize"
-        android:title="@string/buffer_size" />
-
-    <Preference
-        android:icon="@drawable/ic_lock"
-        android:key="parentalControl"
-        android:title="@string/parental_control" />
-
-    <Preference
-        android:icon="@drawable/ic_download"
-        android:key="download"
-        android:summary="@string/downloads_summary"
-        android:title="@string/download" />
-
-    <Preference
-        android:icon="@drawable/ic_web"
-        android:key="cookies"
-        android:summary="@string/cookies_site_summary"
-        android:title="@string/cookies_site" />
-
-    <Preference
-        android:icon="@drawable/ic_web"
-        android:key="pref_proxy"
-        android:persistent="false"
-        android:title="@string/proxy_title" />
-
-    <!-- filled from Provider; stored inverted as AppProxy.PREF_DIRECT, so a new site takes the proxy -->
-    <MultiSelectListPreference
-        android:icon="@drawable/ic_web"
-        android:key="pref_proxy_sources"
-        android:persistent="false"
-        android:title="@string/proxy_sources_title" />
-
-    <!-- search.SourceProbe: every site's first catalog page through its current route -->
-    <Preference
-        android:icon="@drawable/ic_check_decagram"
-        android:key="pref_check_sources"
-        android:persistent="false"
-        android:summary="@string/check_sources_summary"
-        android:title="@string/check_sources_title" />
-
-    <ListPreference
-        android:defaultValue="@string/sort_value_date"
-        android:dialogTitle="@string/setting_sort_favorite"
-        android:entries="@array/settings_sort_titles"
-        android:entryValues="@array/settings_sort_values"
-        android:icon="@drawable/ic_sort"
-        android:key="pref_sort_favorite"
-        android:title="@string/setting_sort_favorite" />
-
     <PreferenceScreen
-        android:icon="@drawable/ic_import"
-        android:key="import"
-        android:persistent="true"
-        android:summary="@string/import_description"
-        android:title="@string/import_favorite">
-        <Preference
-            android:key="import_kniga_v_uhe"
-            android:summary="@string/kniga_v_uhe_description"
-            android:title="@string/kniga_v_uhe" />
+        android:icon="@drawable/ic_web"
+        android:key="group_sources"
+        android:summary="@string/settings_sources_summary"
+        android:title="@string/settings_sources">
+
+        <ListPreference
+            android:defaultValue="@string/abook_value"
+            android:dialogTitle="@string/sorce_books"
+            android:icon="@drawable/ic_web"
+            android:key="sorce_books"
+            android:title="@string/sorce_books" />
+
+        <PreferenceScreen
+            android:icon="@drawable/ic_layers_search"
+            android:key="source_search"
+            android:persistent="true"
+            android:summary="@string/source_search_desc"
+            android:title="@string/source_search">
+
+            <!-- one checkbox per Provider, added by SettingsFragment -->
+        </PreferenceScreen>
 
         <Preference
-            android:key="import_abook"
-            android:summary="@string/abook_description"
-            android:title="@string/abook" />
+            android:icon="@drawable/ic_proxy"
+            android:key="pref_proxy"
+            android:persistent="false"
+            android:title="@string/proxy_title" />
+
+        <!-- filled from Provider; stored inverted as AppProxy.PREF_DIRECT, so a new site takes the proxy -->
+        <MultiSelectListPreference
+            android:icon="@drawable/ic_web"
+            android:key="pref_proxy_sources"
+            android:persistent="false"
+            android:title="@string/proxy_sources_title" />
+
+        <!-- search.SourceProbe: every site's first catalog page through its current route -->
+        <Preference
+            android:icon="@drawable/ic_check_sources"
+            android:key="pref_check_sources"
+            android:persistent="false"
+            android:summary="@string/check_sources_summary"
+            android:title="@string/check_sources_title" />
+
+        <Preference
+            android:icon="@drawable/ic_cookie"
+            android:key="cookies"
+            android:summary="@string/cookies_site_summary"
+            android:title="@string/cookies_site" />
     </PreferenceScreen>
 
+    <PreferenceScreen
+        android:icon="@drawable/ic_download_pref"
+        android:key="group_downloads"
+        android:summary="@string/settings_downloads_summary"
+        android:title="@string/settings_downloads">
 
-    <Preference
+        <Preference
+            android:icon="@drawable/ic_folder"
+            android:key="pref_download_path"
+            android:summary="@string/select_folder"
+            android:title="@string/pref_download_path" />
+
+        <Preference
+            android:icon="@drawable/ic_download_pref"
+            android:key="download"
+            android:summary="@string/downloads_summary"
+            android:title="@string/downloads_manager" />
+
+        <CheckBoxPreference
+            android:defaultValue="false"
+            android:icon="@drawable/ic_web"
+            android:key="offline"
+            android:summary="@string/ofline_desc"
+            android:title="@string/offline" />
+    </PreferenceScreen>
+
+    <PreferenceScreen
+        android:icon="@drawable/ic_menu_favorite"
+        android:key="group_library"
+        android:summary="@string/settings_library_summary"
+        android:title="@string/settings_library">
+
+        <ListPreference
+            android:defaultValue="@string/sort_value_date"
+            android:dialogTitle="@string/setting_sort_favorite"
+            android:entries="@array/settings_sort_titles"
+            android:entryValues="@array/settings_sort_values"
+            android:icon="@drawable/ic_sort"
+            android:key="pref_sort_favorite"
+            android:title="@string/setting_sort_favorite" />
+
+        <CheckBoxPreference
+            android:defaultValue="false"
+            android:icon="@drawable/ic_magnify"
+            android:key="search_pref"
+            android:summary="@string/search_desc"
+            android:title="@string/search" />
+
+        <PreferenceScreen
+            android:icon="@drawable/ic_import"
+            android:key="import"
+            android:persistent="true"
+            android:summary="@string/import_description"
+            android:title="@string/import_favorite">
+            <Preference
+                android:key="import_kniga_v_uhe"
+                android:summary="@string/kniga_v_uhe_description"
+                android:title="@string/kniga_v_uhe" />
+
+            <Preference
+                android:key="import_abook"
+                android:summary="@string/abook_description"
+                android:title="@string/abook" />
+        </PreferenceScreen>
+    </PreferenceScreen>
+
+    <PreferenceScreen
         android:icon="@drawable/ic_backup"
-        android:key="backup"
-        android:summary="@string/backup_summary"
-        android:title="@string/backup" />
-
-    <Preference
-        android:icon="@drawable/ic_restore"
-        android:key="restore"
-        android:summary="@string/restore_summary"
-        android:title="@string/restore" />
-
-
-    <PreferenceScreen
-        android:icon="@drawable/ic_clear"
-        android:key="clear"
-        android:persistent="true"
-        android:title="@string/clear">
-        <Preference
-            android:key="clear_history_search"
-            android:title="@string/clear_history_search" />
+        android:key="group_data"
+        android:summary="@string/settings_data_summary"
+        android:title="@string/settings_data">
 
         <Preference
-            android:key="clear_history"
-            android:title="@string/clear_history" />
+            android:icon="@drawable/ic_backup"
+            android:key="backup"
+            android:summary="@string/backup_summary"
+            android:title="@string/backup_create" />
 
         <Preference
-            android:key="clear_favorite"
-            android:title="@string/clear_favorite" />
+            android:icon="@drawable/ic_restore"
+            android:key="restore"
+            android:summary="@string/restore_summary"
+            android:title="@string/restore" />
 
-        <Preference
-            android:key="clear_audio_list"
-            android:title="@string/clear_audio_list" />
+        <PreferenceScreen
+            android:icon="@drawable/ic_clear"
+            android:key="clear"
+            android:persistent="true"
+            android:summary="@string/clear_summary"
+            android:title="@string/clear">
+            <Preference
+                android:key="clear_history_search"
+                android:title="@string/clear_history_search" />
 
-        <Preference
-            android:key="clear_savind"
-            android:title="@string/clear_saving" />
+            <Preference
+                android:key="clear_history"
+                android:title="@string/clear_history" />
+
+            <Preference
+                android:key="clear_favorite"
+                android:title="@string/clear_favorite" />
+
+            <Preference
+                android:key="clear_audio_list"
+                android:title="@string/clear_audio_list" />
+
+            <Preference
+                android:key="clear_savind"
+                android:title="@string/clear_saving" />
+        </PreferenceScreen>
     </PreferenceScreen>
 
-    <Preference
-        android:icon="@drawable/ic_battery"
-        android:key="reqest_ignor_battery_optimizetion"
-        android:summary="@string/reqest_battary_optimisation"
-        android:title="@string/battary_optimize" />
+    <PreferenceScreen
+        android:icon="@drawable/ic_application"
+        android:key="group_general"
+        android:summary="@string/settings_general_summary"
+        android:title="@string/settings_general">
 
+        <ListPreference
+            android:defaultValue="0"
+            android:dialogTitle="@string/setting_start_menu"
+            android:entries="@array/settings_start_screen_titles"
+            android:entryValues="@array/settings_start_screen_values"
+            android:icon="@drawable/ic_application"
+            android:key="pref_start_screen"
+            android:title="@string/setting_start_menu" />
+
+        <Preference
+            android:icon="@drawable/ic_lock"
+            android:key="parentalControl"
+            android:title="@string/parental_control" />
+
+        <Preference
+            android:icon="@drawable/ic_battery"
+            android:key="reqest_ignor_battery_optimizetion"
+            android:summary="@string/reqest_battary_optimisation"
+            android:title="@string/battary_optimize" />
+    </PreferenceScreen>
 
 </PreferenceScreen>

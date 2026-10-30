@@ -13,4 +13,12 @@
     <style name="ThemeOverlay.App.SleepTimer.TimePicker" parent="ThemeOverlay.MaterialComponents.TimePicker">
         <item name="colorPrimary">?attr/hrefColor</item>
     </style>
+
+    <!-- The presets in one row on a phone: less padding around the text than a choice chip has -->
+    <style name="Widget.App.SleepTimer.Preset" parent="Widget.MaterialComponents.Chip.Choice">
+        <item name="chipStartPadding">4dp</item>
+        <item name="chipEndPadding">4dp</item>
+        <item name="textStartPadding">4dp</item>
+        <item name="textEndPadding">4dp</item>
+    </style>
 </resources>

@@ -24,6 +24,7 @@ import static com.fanok.audiobooks.presenter.BookPresenter.Broadcast_SET_SPEED;
 import static com.fanok.audiobooks.presenter.BookPresenter.Broadcast_SHOW_TITLE;
 import static com.fanok.audiobooks.presenter.SleepTimerPresenter.Broadcast_SleepTimer;
 
+import android.app.ActivityManager;
 import android.app.Notification;
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
@@ -125,6 +126,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -161,6 +163,16 @@ public class MediaPlayerService extends MediaBrowserServiceCompat {
 
     public static final String ACTION_STOP = "audioBook.ACTION_STOP";
 
+    /** The notification's close button: stop, as {@link #ACTION_STOP}, and close every screen of the app. */
+    public static final String ACTION_EXIT = "audioBook.ACTION_EXIT";
+
+    /**
+     * The service is exported (media browser), so a start command may come from another app: Exit, which closes the
+     * app's screens, is obeyed only with this token, known to this process and to the notification it posted.
+     */
+    private static final String EXIT_TOKEN = UUID.randomUUID().toString();
+    private static final String EXTRA_EXIT_TOKEN = "exitToken";
+
     private static final String TAG = "MediaPlayerService";
     //AudioPlayer notification ID
     private static final int NOTIFICATION_ID = 101;
@@ -189,7 +201,7 @@ public class MediaPlayerService extends MediaBrowserServiceCompat {
             | PlaybackStateCompat.ACTION_PAUSE
             | PlaybackStateCompat.ACTION_PLAY_PAUSE
             //no SKIP_TO_NEXT / SKIP_TO_PREVIOUS: Android 13+ would put chapter skips beside play/pause;
-            //the two custom actions (rewind 30, forward 30) take those slots, so the card has three buttons
+            //the first two custom actions (rewind 30, forward 30) take those slots; the third, exit, follows them
             | PlaybackStateCompat.ACTION_SEEK_TO
             | PlaybackStateCompat.ACTION_REWIND
             | PlaybackStateCompat.ACTION_FAST_FORWARD
@@ -351,6 +363,31 @@ public class MediaPlayerService extends MediaBrowserServiceCompat {
     @Nullable
     public static BookPOJO currentBook() {
         return currentBook;
+    }
+
+    /**
+     * "Выход" (the drawer, the notification's close button): playback ends, the notification goes, and every screen
+     * of the app closes and leaves the recent apps. Downloads have their own service and go on.
+     */
+    public static void exitApp(@NonNull Context context) {
+        if (running) {
+            try {
+                context.startService(new Intent(context, MediaPlayerService.class).setAction(ACTION_STOP));
+            } catch (IllegalStateException e) {
+                Log.w(TAG, "stop command refused, stopping the service", e);
+                context.stopService(new Intent(context, MediaPlayerService.class));
+            }
+        }
+        closeScreens(context);
+    }
+
+    private static void closeScreens(@NonNull Context context) {
+        ActivityManager manager = (ActivityManager) context.getSystemService(Context.ACTIVITY_SERVICE);
+        if (manager != null) {
+            for (ActivityManager.AppTask task : manager.getAppTasks()) {
+                task.finishAndRemoveTask();
+            }
+        }
     }
 
     public static int getNotificationId() {
@@ -595,6 +632,8 @@ public class MediaPlayerService extends MediaBrowserServiceCompat {
             if (event != null) {
                 handleMediaKey(event);
             }
+        } else if (ACTION_EXIT.equals(action) && !EXIT_TOKEN.equals(intent.getStringExtra(EXTRA_EXIT_TOKEN))) {
+            Log.w(TAG, "exit without the notification's token ignored");
         } else if (action != null) {
             handleIncomingAction(action);
         }
@@ -1634,7 +1673,9 @@ public class MediaPlayerService extends MediaBrowserServiceCompat {
                 .addCustomAction(ACTION_REWIND, getString(R.string.playback_rewind_30),
                         R.drawable.ic_notification_rewind_30)
                 .addCustomAction(ACTION_FORWARD, getString(R.string.forward_30),
-                        R.drawable.ic_notification_fast_forward_30);
+                        R.drawable.ic_notification_fast_forward_30)
+                //Android 13+ puts a third custom action after forward 30
+                .addCustomAction(ACTION_EXIT, getString(R.string.exit), R.drawable.ic_notification_close);
         int state;
         long position = 0;
         float speed = 0f;
@@ -1846,7 +1887,8 @@ public class MediaPlayerService extends MediaBrowserServiceCompat {
                 .setContentIntent(contentIntent)
                 .setDeleteIntent(PendingIntent.getBroadcast(getApplicationContext(), 0,
                         new Intent(this, OnCancelBroadcastReceiver.class), PendingIntent.FLAG_IMMUTABLE))
-                //three buttons, as in the Android 13+ card: rewind 30, play/pause, forward 30; chapters stay on
+                //three buttons in the compact view, as in the Android 13+ card: rewind 30, play/pause, forward 30, and
+                //exit when expanded; chapters stay on
                 //the headset and car keys. A paused notification is dismissed by swiping (the delete intent).
                 .addAction(R.drawable.ic_notification_rewind_30, getString(R.string.playback_rewind_30),
                         playbackAction(ACTION_REWIND, 4))
@@ -1854,7 +1896,9 @@ public class MediaPlayerService extends MediaBrowserServiceCompat {
                         getString(showPause ? R.string.pause : R.string.play),
                         showPause ? playbackAction(ACTION_PAUSE, 1) : playbackAction(ACTION_PLAY, 0))
                 .addAction(R.drawable.ic_notification_fast_forward_30, getString(R.string.forward_30),
-                        playbackAction(ACTION_FORWARD, 5));
+                        playbackAction(ACTION_FORWARD, 5))
+                //the expanded notification only; the compact one keeps the three above
+                .addAction(R.drawable.ic_notification_close, getString(R.string.exit), exitAction());
         if (book != null && book.getAutor() != null) {
             builder.setSubText(book.getAutor());
         }
@@ -1881,6 +1925,13 @@ public class MediaPlayerService extends MediaBrowserServiceCompat {
         }
         return PendingIntent.getActivity(this, 0, intent,
                 PendingIntent.FLAG_IMMUTABLE | PendingIntent.FLAG_UPDATE_CURRENT);
+    }
+
+    /** The notification's Exit, with this process's token (a notification left by an earlier process gets the new one). */
+    private PendingIntent exitAction() {
+        Intent exit = new Intent(this, MediaPlayerService.class).setAction(ACTION_EXIT)
+                .putExtra(EXTRA_EXIT_TOKEN, EXIT_TOKEN);
+        return PendingIntent.getService(this, 6, exit, PendingIntent.FLAG_IMMUTABLE | PendingIntent.FLAG_UPDATE_CURRENT);
     }
 
     private PendingIntent playbackAction(String action, int requestCode) {
@@ -2086,6 +2137,10 @@ public class MediaPlayerService extends MediaBrowserServiceCompat {
                 break;
             case ACTION_STOP:
                 stop();
+                break;
+            case ACTION_EXIT:
+                stop();
+                closeScreens(this);
                 break;
             case ACTION_REWIND:
                 seekBy(-REWIND);

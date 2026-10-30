@@ -39,6 +39,10 @@ public interface Activity extends MvpView {
     @StateStrategyType(AddToEndSingleStrategy.class)
     void updateTime(int timeCurent, int timeEnd, int buffered);
 
+    /** Another book keeps playing while this one opens: the hint on holding play and the seek buttons, once ever. */
+    @StateStrategyType(OneExecutionStateStrategy.class)
+    void showSwitchBookHint();
+
     @StateStrategyType(AddToEndSingleStrategy.class)
     void setTimeEnd(int timeEnd);
 

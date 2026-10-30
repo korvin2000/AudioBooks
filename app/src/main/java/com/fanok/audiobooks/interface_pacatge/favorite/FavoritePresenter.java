@@ -23,6 +23,9 @@ public interface FavoritePresenter {
 
     void commitRemove();
 
+    /** Empties the whole list (favorites or history) after the user confirmed. */
+    void clearAll();
+
     void onSearch(String qery);
 
     void onOptionsItemSelected(int id);

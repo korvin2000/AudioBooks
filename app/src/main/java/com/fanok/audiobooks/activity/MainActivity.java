@@ -147,10 +147,9 @@ public class MainActivity extends MvpAppCompatActivity
                     intent.getBooleanExtra("notificationClick", false));
         }
 
-        // one decision at a time, each with its reason (UI-18)
+        // one decision at a time, each with its reason (UI-18); parental control is in the settings, not asked here
         if (!preferences.getBoolean("first", false)) {
             dialogs.add(this::showPrivacyDialog);
-            dialogs.add(this::showParentalControlDialog);
         }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU
                 && ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS)
@@ -204,23 +203,6 @@ public class MainActivity extends MvpAppCompatActivity
                     preferences.edit().putBoolean("first", true).apply();
                     dialog.cancel();
                 })
-                .setOnDismissListener(dialog -> done.run())
-                .show();
-    }
-
-    private void showParentalControlDialog(@NonNull Runnable done) {
-        new AlertDialog.Builder(this)
-                .setTitle(R.string.parental_control)
-                .setMessage(R.string.enabled_parental_control)
-                .setIcon(R.drawable.ic_lock)
-                .setCancelable(false)
-                .setPositiveButton(getString(R.string.yes), (dialogInterface, i) -> {
-                    dialogInterface.dismiss();
-                    Intent intent = new Intent(getApplicationContext(), ParentalControlActivity.class);
-                    intent.putExtra("enabled", true);
-                    startActivity(intent);
-                })
-                .setNegativeButton(getString(R.string.cancel), null)
                 .setOnDismissListener(dialog -> done.run())
                 .show();
     }
@@ -328,6 +310,10 @@ public class MainActivity extends MvpAppCompatActivity
                     if (view instanceof TextView) {
                         mTextViewArrayList.add((TextView) view);
                         view.setOnClickListener(view1 -> {
+                            if (view1.getId() == R.id.layout_nav_exit) {
+                                MediaPlayerService.exitApp(this);
+                                return;
+                            }
                             if (view1.getId() == R.id.layout_nav_now_playing) {
                                 // opens the book screen, so the current section stays highlighted
                                 mPresenter.onItemSelected(view1.getId());
@@ -389,6 +375,10 @@ public class MainActivity extends MvpAppCompatActivity
 
     @Override
     public boolean onNavigationItemSelected(@NonNull MenuItem item) {
+        if (item.getItemId() == R.id.nav_exit) {
+            MediaPlayerService.exitApp(this);
+            return true;
+        }
         mPresenter.onItemSelected(item.getItemId());
         DrawerLayout drawer = findViewById(R.id.drawer_layout);
         if (drawer != null) {

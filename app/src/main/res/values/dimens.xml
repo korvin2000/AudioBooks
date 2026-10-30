@@ -37,4 +37,8 @@
     <integer name="isTablet">0</integer>
 
     <dimen name="margin_small">8dp</dimen>
+    <!-- the book screen's toolbar without title and author: its 24dp icons and a little room -->
+    <dimen name="book_toolbar_compact">40dp</dimen>
+    <!-- the sleep timer's hour and minute wheels: three rows of 48dp, as the selection lines are apart -->
+    <dimen name="sleep_timer_picker_height">144dp</dimen>
 </resources>

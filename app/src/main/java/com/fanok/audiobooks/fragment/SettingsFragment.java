@@ -57,6 +57,7 @@ import com.fanok.audiobooks.net.ProxyFinder;
 import com.fanok.audiobooks.pojo.BackupPOJO;
 import com.fanok.audiobooks.pojo.BookPOJO;
 import com.fanok.audiobooks.pojo.StorageUtil;
+import com.fanok.audiobooks.presenter.FavoritePresenter;
 import com.fanok.audiobooks.search.Provider;
 import com.fanok.audiobooks.search.ProviderPage;
 import com.fanok.audiobooks.search.SourceProbe;
@@ -372,6 +373,9 @@ public class SettingsFragment extends PreferenceFragmentCompat implements
 
         MainActivity activity = (MainActivity) getActivity();
         if (activity != null) {
+            // a group shows its own name; here, not in onCreatePreferences, so Back from a group restores the title
+            CharSequence group = getArguments() != null ? getPreferenceScreen().getTitle() : null;
+            activity.setTitle(group != null ? group : getString(R.string.menu_settings));
             NavigationView navigationView = activity.getNavigationView();
             ArrayList<TextView> mTextViewArrayList = activity.getTextViewArrayList();
             final TypedValue SelectedValue = new TypedValue();
@@ -426,7 +430,6 @@ public class SettingsFragment extends PreferenceFragmentCompat implements
         } else {
             setPreferencesFromResource(R.xml.preferences, rootKey);
         }
-        requireActivity().setTitle(R.string.menu_settings);
         PreferenceManager.setDefaultValues(
                 requireActivity().getApplicationContext(), R.xml.preferences,
                 false);
@@ -474,25 +477,14 @@ public class SettingsFragment extends PreferenceFragmentCompat implements
         preferenceClickListner("clear_history", preference -> {
             final Context app = preference.getContext().getApplicationContext();
             showAllert(preference.getContext(), R.string.confirm_clear_history,
-                    (dialogInterface, i) -> DownloadStorageHelper.submit(() -> {
-                        BooksDBModel booksDBModel = new BooksDBModel(app);
-                        booksDBModel.clearHistory();
-                        booksDBModel.closeDB();
-                        AudioDBModel audioDBModel = new AudioDBModel(app);
-                        audioDBModel.clearAll();
-                        audioDBModel.closeDB();
-                    }));
+                    (dialogInterface, i) -> FavoritePresenter.clearTable(app, Consts.TABLE_HISTORY, null));
             return true;
         });
 
         preferenceClickListner("clear_favorite", preference -> {
             final Context app = preference.getContext().getApplicationContext();
             showAllert(preference.getContext(), R.string.confirm_clear_favorite,
-                    (dialogInterface, i) -> DownloadStorageHelper.submit(() -> {
-                        BooksDBModel dbModel = new BooksDBModel(app);
-                        dbModel.clearFavorite();
-                        dbModel.closeDB();
-                    }));
+                    (dialogInterface, i) -> FavoritePresenter.clearTable(app, Consts.TABLE_FAVORITE, null));
             return true;
         });
 

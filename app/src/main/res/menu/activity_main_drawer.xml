@@ -59,6 +59,12 @@
             android:id="@+id/nav_about"
             android:icon="@drawable/ic_menu_about"
             android:title="@string/menu_about" />
+        <!-- ends playback and closes the app (MediaPlayerService.exitApp); never left checked -->
+        <item
+            android:id="@+id/nav_exit"
+            android:checkable="false"
+            android:icon="@drawable/ic_exit"
+            android:title="@string/exit" />
     </group>
 
 </menu>

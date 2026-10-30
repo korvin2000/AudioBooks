@@ -3,6 +3,8 @@ package com.fanok.audiobooks.presenter;
 
 import android.content.Context;
 import android.content.SharedPreferences;
+import android.os.Handler;
+import android.os.Looper;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.annotation.OptIn;
@@ -315,6 +317,52 @@ public class FavoritePresenter
                 audioDBModel.closeDB();
             }
             booksDBModel.closeDB();
+        });
+    }
+
+    /** Empties the whole list, rows on the storage worker; the toolbar asked and the user confirmed. */
+    @Override
+    public void clearAll() {
+        if (mContext == null) {
+            return;
+        }
+        // a load or a filter still on its way would bring the old rows back; the swiped book goes with the rest
+        disposables.clear();
+        isLoading = false;
+        pendingRemoval = null;
+        books = new ArrayList<>();
+        flter = null;
+        isFilterSaved = false;
+        getViewState().setSubTitle("");
+        getViewState().showProgres(false);
+        onSearch(mQuery);
+        // the tables as they are once the deletion ran, whatever was read meanwhile
+        clearTable(mContext.getApplicationContext(), table, () -> {
+            if (mContext != null) {
+                loadBooks();
+            }
+        });
+    }
+
+    /**
+     * Favorites, or history with its listening positions (as the settings' "Очистить" does), on the storage worker;
+     * {@code then} runs on the main thread afterwards.
+     */
+    public static void clearTable(@NonNull Context app, int table, @Nullable Runnable then) {
+        DownloadStorageHelper.submit(() -> {
+            BooksDBModel booksDBModel = new BooksDBModel(app);
+            if (table == Consts.TABLE_FAVORITE) {
+                booksDBModel.clearFavorite();
+            } else if (table == Consts.TABLE_HISTORY) {
+                booksDBModel.clearHistory();
+                AudioDBModel audioDBModel = new AudioDBModel(app);
+                audioDBModel.clearAll();
+                audioDBModel.closeDB();
+            }
+            booksDBModel.closeDB();
+            if (then != null) {
+                new Handler(Looper.getMainLooper()).post(then);
+            }
         });
     }
 

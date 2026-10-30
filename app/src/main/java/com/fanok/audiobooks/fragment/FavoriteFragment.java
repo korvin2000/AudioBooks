@@ -22,6 +22,7 @@ import android.view.MenuInflater;
 import android.view.MenuItem;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.Button;
 import android.widget.ImageView;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -29,6 +30,7 @@ import android.widget.Toast;
 import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.annotation.NonNull;
+import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.widget.PopupMenu;
 import androidx.appcompat.widget.SearchView;
 import androidx.core.view.MenuHost;
@@ -70,6 +72,8 @@ public class FavoriteFragment extends MvpAppCompatFragment implements FavoriteVi
     private static final String TAG = "FavoriteFragment";
     private static final String ARG_TITLE = "title";
     private static final String ARG_TABLE = "table";
+    /** Seconds before "Yes" of the clear-all question can be pressed. */
+    private static final int CLEAR_CONFIRM_DELAY_S = 3;
 
     @InjectPresenter
     FavoritePresenter mPresenter;
@@ -189,10 +193,20 @@ public class FavoriteFragment extends MvpAppCompatFragment implements FavoriteVi
                 }
 
                 setColorPrimeriTextInIconItemMenu(menu.findItem(R.id.app_bar_search), requireContext());
+
+                if (table == TABLE_FAVORITE || table == TABLE_HISTORY) {
+                    MenuItem clear = menu.findItem(R.id.clear_list);
+                    clear.setVisible(true);
+                    setColorPrimeriTextInIconItemMenu(clear, requireContext());
+                }
             }
 
             @Override
             public boolean onMenuItemSelected(@NonNull MenuItem item) {
+                if (item.getItemId() == R.id.clear_list) {
+                    confirmClear();
+                    return true;
+                }
                 mPresenter.onOptionsItemSelected(item.getItemId());
                 item.setChecked(true);
                 return true;
@@ -390,6 +404,40 @@ public class FavoriteFragment extends MvpAppCompatFragment implements FavoriteVi
         if (activity != null) {
             activity.showFragment(fragment, tag);
         }
+    }
+
+    /**
+     * Asks before emptying the list; "Yes" counts down {@link #CLEAR_CONFIRM_DELAY_S} seconds before it can be
+     * pressed, so a stray tap on the toolbar icon clears nothing.
+     */
+    private void confirmClear() {
+        final String yes = getString(R.string.yes);
+        final AlertDialog dialog = new AlertDialog.Builder(requireContext())
+                .setTitle(titleId != 0 ? titleId : R.string.app_name)
+                .setMessage(table == TABLE_HISTORY ? R.string.confirm_clear_history : R.string.confirm_clear_favorite)
+                .setPositiveButton(yes, (d, which) -> mPresenter.clearAll())
+                .setNegativeButton(R.string.cancel, null)
+                .show();
+        final Button button = dialog.getButton(AlertDialog.BUTTON_POSITIVE);
+        button.setEnabled(false);
+        button.post(new Runnable() {
+            private int left = CLEAR_CONFIRM_DELAY_S;
+
+            @Override
+            public void run() {
+                if (!dialog.isShowing()) {
+                    return;
+                }
+                if (left > 0) {
+                    // the dialog's context: the fragment may have left the screen while the dialog stays
+                    button.setText(dialog.getContext().getString(R.string.yes_countdown, yes, left--));
+                    button.postDelayed(this, 1000);
+                } else {
+                    button.setText(yes);
+                    button.setEnabled(true);
+                }
+            }
+        });
     }
 
     /** The swiped book is gone from the list; it is deleted unless "undo" is tapped before the bar leaves (UI-10). */

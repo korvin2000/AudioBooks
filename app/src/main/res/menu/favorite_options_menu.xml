@@ -7,14 +7,14 @@
         android:icon="@drawable/ic_search_black_24dp"
         android:title="@string/search"
         app:actionViewClass="androidx.appcompat.widget.SearchView"
-        app:showAsAction="collapseActionView|ifRoom" />
+        app:showAsAction="collapseActionView|always" />
 
     <item
         android:id="@+id/filter"
         android:icon="@drawable/ic_filter"
         android:title="@string/filter"
         android:visible="false"
-        app:showAsAction="ifRoom">
+        app:showAsAction="always">
         <menu>
             <item
                 android:id="@+id/genre_filter"
@@ -43,7 +43,7 @@
         android:icon="@drawable/ic_sort"
         android:title="@string/order"
         android:visible="false"
-        app:showAsAction="ifRoom">
+        app:showAsAction="always">
         <menu>
             <group android:checkableBehavior="single">
                 <item
@@ -76,5 +76,14 @@
             </group>
         </menu>
     </item>
+
+    <!-- favorites and history only; asks first (FavoriteFragment#confirmClear). Every item is "always": the clear
+         icon is a fourth one, it never pushes search, filter or order into the overflow menu -->
+    <item
+        android:id="@+id/clear_list"
+        android:icon="@drawable/ic_delete_sweep"
+        android:title="@string/clear_list"
+        android:visible="false"
+        app:showAsAction="always" />
 
 </menu>

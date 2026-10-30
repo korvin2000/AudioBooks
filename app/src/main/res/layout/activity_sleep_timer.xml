@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- One layout for phones, tablets and TV: it scrolls, and the controls follow D-pad order top to bottom. -->
+<!-- One layout for phones, tablets and TV: it scrolls, and the controls follow D-pad order top to bottom. Compact
+     enough that the setup fits a phone screen without scrolling. -->
 <androidx.coordinatorlayout.widget.CoordinatorLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
@@ -92,7 +93,7 @@
                                 android:focusable="true"
                                 android:background="@drawable/focusable"
                                 android:layout_width="96dp"
-                                android:layout_height="wrap_content"
+                                android:layout_height="@dimen/sleep_timer_picker_height"
                                 android:contentDescription="@string/sleep_timer_hours_label"
                                 android:descendantFocusability="blocksDescendants"
                                 android:nextFocusLeft="@id/modeCountdown"
@@ -119,7 +120,7 @@
                                 android:focusable="true"
                                 android:background="@drawable/focusable"
                                 android:layout_width="96dp"
-                                android:layout_height="wrap_content"
+                                android:layout_height="@dimen/sleep_timer_picker_height"
                                 android:contentDescription="@string/sleep_timer_minutes_label"
                                 android:descendantFocusability="blocksDescendants"
                                 android:nextFocusLeft="@id/hours"
@@ -141,13 +142,14 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:layout_gravity="center_horizontal"
-                        android:layout_marginTop="8dp"
+                        android:layout_marginTop="4dp"
+                        app:chipSpacingHorizontal="4dp"
                         app:selectionRequired="false"
                         app:singleSelection="true">
 
                         <com.google.android.material.chip.Chip
                             android:id="@id/preset15"
-                            style="@style/Widget.MaterialComponents.Chip.Choice"
+                            style="@style/Widget.App.SleepTimer.Preset"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:tag="15"
@@ -155,7 +157,7 @@
 
                         <com.google.android.material.chip.Chip
                             android:id="@+id/preset30"
-                            style="@style/Widget.MaterialComponents.Chip.Choice"
+                            style="@style/Widget.App.SleepTimer.Preset"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:tag="30"
@@ -163,7 +165,7 @@
 
                         <com.google.android.material.chip.Chip
                             android:id="@+id/preset45"
-                            style="@style/Widget.MaterialComponents.Chip.Choice"
+                            style="@style/Widget.App.SleepTimer.Preset"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:tag="45"
@@ -171,7 +173,7 @@
 
                         <com.google.android.material.chip.Chip
                             android:id="@+id/preset60"
-                            style="@style/Widget.MaterialComponents.Chip.Choice"
+                            style="@style/Widget.App.SleepTimer.Preset"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:tag="60"
@@ -179,7 +181,7 @@
 
                         <com.google.android.material.chip.Chip
                             android:id="@+id/preset90"
-                            style="@style/Widget.MaterialComponents.Chip.Choice"
+                            style="@style/Widget.App.SleepTimer.Preset"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:tag="90"
@@ -232,14 +234,14 @@
                     style="@style/Widget.MaterialComponents.Button.OutlinedButton"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="16dp"
+                    android:layout_marginTop="8dp"
                     android:text="@string/sleep_timer_end_of_chapter" />
 
                 <com.google.android.material.switchmaterial.SwitchMaterial
                     android:id="@+id/warn"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="16dp"
+                    android:layout_marginTop="4dp"
                     android:minHeight="48dp"
                     android:text="@string/sleep_timer_warn_title"
                     android:textColor="?attr/colorPrimaryText"
@@ -262,7 +264,7 @@
                         android:id="@+id/shake"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:layout_marginTop="8dp"
+                        android:layout_marginTop="4dp"
                         android:minHeight="48dp"
                         android:text="@string/sleep_timer_shake_title"
                         android:textColor="?attr/colorPrimaryText"
@@ -282,7 +284,7 @@
                     style="@style/Widget.MaterialComponents.Button"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="24dp"
+                    android:layout_marginTop="12dp"
                     android:minHeight="56dp"
                     android:text="@string/sleep_timer_start"
                     android:textSize="16sp" />

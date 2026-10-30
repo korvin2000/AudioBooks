@@ -128,11 +128,10 @@
     <string name="confirm_clear_history_search">Вы уверены что хотите очистить историю поиска?</string>
     <string name="yes">Да</string>
     <string name="cancel">Отмена</string>
-    <string name="confirm_clear_history">Вы уверены что хотите очистить историю?</string>
-    <string name="confirm_clear_favorite">Вы уверены что хотите очистить избранное?</string>
+    <string name="confirm_clear_history">Вы действительно хотите очистить историю?</string>
+    <string name="confirm_clear_favorite">Вы действительно хотите очистить избранное?</string>
     <string name="clear_history">Очистить историю</string>
     <string name="clear_favorite">Очистить избранное</string>
-    <string name="backup">Резервное копирование</string>
     <string name="backup_summary">Начать резервное копирование</string>
     <string name="restore">Восстановление</string>
     <string name="restore_summary">Начать восстановление из резервной копии</string>
@@ -262,7 +261,6 @@
     <string name="good">Хорошо</string>
 
     <string name="parental_control">Родительский контроль</string>
-    <string name="enabled_parental_control">Вы хотите включить родительский контроль?</string>
     <string name="title_activity_parental_control">Родительский контроль</string>
     <string name="parental_control_enabled">Включить родительский контроль</string>
     <string name="enter_password">Введите пароль</string>
@@ -312,7 +310,6 @@
     <string name="no">Нет</string>
     <string name="not_can_writing">Недостаточно прав на запись в данную папку.</string>
     <string name="no_sdcard">SD карта не установлена</string>
-    <string name="reproduction">Воспроизведение</string>
     <string name="reproduction_desc">При открытии новой книги продолжать воспроизводить старую</string>
     <string name="switched_to_this_book">Воспроизведение переключено на эту книгу</string>
     <string name="autoplay">Автовоспроизведение</string>
@@ -588,4 +585,34 @@
         <item>мин</item>
         <item>ч</item>
     </string-array>
+
+    <!-- Settings groups (xml/preferences.xml) -->
+    <string name="settings_appearance">Оформление</string>
+    <string name="settings_appearance_summary">Тема, вид списка, процент прослушанного, панель книги</string>
+    <string name="settings_playback">Воспроизведение</string>
+    <string name="settings_playback_summary">Запуск, кнопки и перемотка, главы, буфер</string>
+    <string name="settings_sources">Источники и сеть</string>
+    <string name="settings_sources_summary">Сайт каталога, сайты поиска, прокси, проверка сайтов</string>
+    <string name="settings_downloads">Загрузки</string>
+    <string name="settings_downloads_summary">Папка для скачивания, скачанные книги, офлайн</string>
+    <string name="settings_library">Избранное и история</string>
+    <string name="settings_library_summary">Сортировка, поиск, импорт избранного</string>
+    <string name="settings_data">Резервное копирование</string>
+    <string name="settings_data_summary">Резервная копия, восстановление, очистка данных</string>
+    <string name="settings_general">Общие</string>
+    <string name="settings_general_summary">Раздел при запуске, родительский контроль</string>
+    <string name="reproduction_keep">Не прерывать текущую книгу</string>
+    <string name="downloads_manager">Скачанные книги</string>
+    <string name="backup_create">Создать резервную копию</string>
+    <string name="clear_summary">История поиска, история, избранное, скачанное</string>
+
+    <!-- Favorites and history toolbar -->
+    <string name="clear_list">Очистить список</string>
+    <!-- "Да (3)": the confirmation button while it still waits -->
+    <string name="yes_countdown">%1$s (%2$d)</string>
+
+    <!-- One-time hint on the book screen while another book is in the player -->
+    <string name="hint_switch_book_title">Подсказка</string>
+    <string name="hint_switch_book">Сейчас в плеере другая книга.\n\n1. Удержание кнопки воспроизведения дольше 2 секунд запускает эту книгу.\n\n2. При длительном удержании кнопок перемотки перемотка ускоряется.</string>
+    <string name="got_it">Понял</string>
 </resources>

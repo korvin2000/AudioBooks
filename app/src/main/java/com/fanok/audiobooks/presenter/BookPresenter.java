@@ -372,6 +372,9 @@ public class BookPresenter extends MvpPresenter<Activity> implements ActivityPre
             if (!keepOtherBook) {
                 //one command; autoplay decides the intent, nothing toggles afterwards
                 playAudio(curentTrack, checkpoint.positionMs, pref.getBoolean("autoPlayPref", false));
+            } else {
+                //play now toggles the other book: say once how to switch to this one
+                getViewState().showSwitchBookHint();
             }
             getViewState().setSelected(curentTrack, pojo.getName());
 

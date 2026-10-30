@@ -39,6 +39,7 @@ import android.view.MenuInflater;
 import android.view.MenuItem;
 import android.view.MotionEvent;
 import android.view.View;
+import android.view.ViewGroup;
 import android.view.ViewParent;
 import android.widget.Button;
 import android.widget.ImageButton;
@@ -164,6 +165,11 @@ public class BookActivity extends MvpAppCompatActivity implements Activity {
     private static final int TOOLBAR_OVERFLOW_DP = 40;
     /** Below this width left by the icons the title and author are not shown at all. */
     private static final int TOOLBAR_TITLE_MIN_DP = 120;
+    /** Set once the hint on holding play and the seek buttons was shown; it is shown only once. */
+    private static final String PREF_HINT_SWITCH_BOOK = "hint_switch_book_shown";
+    /** The toolbar's height from the layout, for when title and author are shown. */
+    private int mToolbarHeight;
+    private boolean mSwitchHintShowing;
     @InjectPresenter
     BookPresenter mPresenter;
     private ImageButton mSpeed;
@@ -1115,10 +1121,23 @@ public class BookActivity extends MvpAppCompatActivity implements Activity {
                 menu.findItem(R.id.removeFavorite).setShowAsAction(action);
             }
         }
+        boolean title = pref.getBoolean("toolbar_title", true) && room >= TOOLBAR_TITLE_MIN_DP;
         ActionBar actionBar = getSupportActionBar();
         if (actionBar != null) {
-            actionBar.setDisplayShowTitleEnabled(
-                    pref.getBoolean("toolbar_title", true) && room >= TOOLBAR_TITLE_MIN_DP);
+            actionBar.setDisplayShowTitleEnabled(title);
+        }
+        // without title and author the bar is only as tall as its icons, not an empty band above the tabs
+        Toolbar toolbar = findViewById(R.id.toolbar);
+        if (toolbar != null) {
+            ViewGroup.LayoutParams params = toolbar.getLayoutParams();
+            if (mToolbarHeight == 0) {
+                mToolbarHeight = params.height;
+            }
+            int height = title ? mToolbarHeight : getResources().getDimensionPixelSize(R.dimen.book_toolbar_compact);
+            if (params.height != height) {
+                params.height = height;
+                toolbar.setLayoutParams(params);
+            }
         }
     }
 
@@ -1328,6 +1347,25 @@ public class BookActivity extends MvpAppCompatActivity implements Activity {
         if (mAudioAdapter != null) {
             mAudioAdapter.setData(data, chaptersTotal);
         }
+    }
+
+    /**
+     * Says once what the hidden gestures do while another book keeps playing: holding play switches the player to
+     * this book ({@link SwitchBookHold}), holding a seek button speeds up ({@link SeekHold}). Spent when dismissed, so
+     * a rotation that drops the dialog unread does not spend it.
+     */
+    @Override
+    public void showSwitchBookHint() {
+        if (mSwitchHintShowing || pref.getBoolean(PREF_HINT_SWITCH_BOOK, false) || isFinishing()) {
+            return;
+        }
+        mSwitchHintShowing = true; // a reload of the chapters while it is open does not stack a second one
+        new AlertDialog.Builder(this)
+                .setTitle(R.string.hint_switch_book_title)
+                .setMessage(R.string.hint_switch_book)
+                .setPositiveButton(R.string.got_it, null)
+                .setOnDismissListener(dialog -> pref.edit().putBoolean(PREF_HINT_SWITCH_BOOK, true).apply())
+                .show();
     }
 
     @Override
