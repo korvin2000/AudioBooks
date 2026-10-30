@@ -31,6 +31,7 @@ import com.fanok.audiobooks.pojo.BookPOJO;
 import com.fanok.audiobooks.pojo.GenrePOJO;
 import com.fanok.audiobooks.policy.DefaultCover;
 import com.fanok.audiobooks.policy.ParentalControl;
+import com.fanok.audiobooks.search.GenrePicks;
 import com.fanok.audiobooks.search.GenreSort;
 import com.fanok.audiobooks.search.ListingCursor;
 import com.fanok.audiobooks.search.ListingFilters;
@@ -45,7 +46,9 @@ import io.reactivex.disposables.CompositeDisposable;
 import io.reactivex.schedulers.Schedulers;
 import java.util.ArrayList;
 import java.util.Calendar;
+import java.util.Collections;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Objects;
 
 @InjectViewState
@@ -77,6 +80,8 @@ public class BooksPresenter extends MvpPresenter<BooksView> implements
     private ListingFilters.Duration mDuration = ListingFilters.Duration.ANY;
     /** The local order of a genre list ({@link #genre} is the cursor's genres in this order). */
     private GenreSort mGenreSort = GenreSort.NONE;
+    /** The genre picks {@link #genre} was last sorted with: a pick made since re-sorts it on return. */
+    private Map<String, ?> mPicks = Collections.emptyMap();
     /** The genre list's toolbar search: only the genres whose names contain it are shown. */
     private String mGenreQuery = "";
     /** Cards shown and pages fetched since the user's last action, bounding the automatic hunt for matches. */
@@ -159,6 +164,9 @@ public class BooksPresenter extends MvpPresenter<BooksView> implements
         // a listing whose load was cancelled before anything arrived starts again
         if (!isLoading && !cursor().isEnd() && cursor().items().isEmpty()) {
             loadBoks();
+        } else if (mGenreSort == GenreSort.FAVORITE && !cursor().items().isEmpty()
+                && !GenrePicks.all(mContext).equals(mPicks)) {
+            showGenres();
         }
     }
 
@@ -213,7 +221,8 @@ public class BooksPresenter extends MvpPresenter<BooksView> implements
 
     /** The loaded genres in the chosen order, narrowed to the search. */
     private void showGenres() {
-        genre = mGenreSort.sorted(mGenreCursor.items());
+        mPicks = GenrePicks.all(mContext);
+        genre = mGenreSort.sorted(mGenreCursor.items(), mPicks);
         if (!mGenreQuery.isEmpty()) {
             ArrayList<GenrePOJO> matching = new ArrayList<>();
             for (GenrePOJO item : genre) {
@@ -457,6 +466,7 @@ public class BooksPresenter extends MvpPresenter<BooksView> implements
             genre.setVisibility(View.VISIBLE);
             genre.setOnClickListener(view1 -> {
                 dialog.dismiss();
+                GenrePicks.record(mContext, books.get(position).getGenre());
                 getViewState().showFragment(BooksFragment.newInstance(
                         books.get(position).getUrlGenre(),
                         R.string.menu_audiobooks,
@@ -568,6 +578,9 @@ public class BooksPresenter extends MvpPresenter<BooksView> implements
         }
 
         if (genre != null && genre.size() - 1 >= position) {
+            if (mModelId == Consts.MODEL_GENRE) {
+                GenrePicks.record(mContext, genre.get(position).getName());
+            }
             String url = genre.get(position).getUrl();
             getViewState().showFragment(BooksFragment.newInstance(
                     url,

@@ -12,6 +12,7 @@ import androidx.media3.common.util.UnstableApi;
 import androidx.preference.PreferenceManager;
 import com.arellomobile.mvp.InjectViewState;
 import com.arellomobile.mvp.MvpPresenter;
+import com.fanok.audiobooks.App;
 import com.fanok.audiobooks.Consts;
 import com.fanok.audiobooks.R;
 import com.fanok.audiobooks.fragment.BooksFragment;
@@ -20,6 +21,7 @@ import com.fanok.audiobooks.model.AudioDBModel;
 import com.fanok.audiobooks.model.BooksDBModel;
 import com.fanok.audiobooks.model.FavoriteModel;
 import com.fanok.audiobooks.pojo.BookPOJO;
+import com.fanok.audiobooks.search.GenrePicks;
 import com.fanok.audiobooks.util.DownloadStorageHelper;
 import io.reactivex.android.schedulers.AndroidSchedulers;
 import io.reactivex.disposables.CompositeDisposable;
@@ -217,6 +219,7 @@ public class FavoritePresenter
 
     @Override
     public void onMenuGenre(@NonNull String url, String title) {
+        GenrePicks.record(App.getInstance(), title);
         getViewState().showFragment(BooksFragment.newInstance(url, R.string.menu_audiobooks, title,
                 Consts.MODEL_BOOKS), "genreBooks");
     }

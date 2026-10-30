@@ -228,12 +228,6 @@ public final class Akniga implements SourceParser {
         return ProviderPage.of(parseTable(page), hasMore);
     }
 
-    /** The sections table; a row without name or URL is left out. */
-    @Override
-    public List<GenrePOJO> categories(String sectionsUrl) throws IOException {
-        return parseCategories(fetch(sectionsUrl));
-    }
-
     @Override
     public String searchUrl(SearchUrls.Category category, String query, int page) {
         String q = SearchUrls.enc(query);
@@ -548,35 +542,6 @@ public final class Akniga implements SourceParser {
             }
             return genrePOJO;
         });
-    }
-
-    /** The parental-control categories: the rows of the first sections table with both a name and a URL. */
-    public static ArrayList<GenrePOJO> parseCategories(Document doc) {
-        ArrayList<GenrePOJO> result = new ArrayList<>();
-        Elements items = doc.getElementsByClass("table-authors");
-        if (items.size() != 0) {
-            Elements tbody = items.first().getElementsByTag("tbody");
-            if (tbody.size() != 0) {
-                Elements list = tbody.first().children();
-                for (Element item : list) {
-                    String url = "";
-                    String name = "";
-                    Elements titles = item.getElementsByClass("name-obj");
-                    if (titles.size() != 0) {
-                        Elements aGenre = titles.first().getElementsByTag("a");
-                        if (aGenre.size() != 0 && !aGenre.first().absUrl("href").isEmpty()) {
-                            url = aGenre.first().absUrl("href") + "page<page>/";
-                            name = aGenre.first().text();
-                        }
-                    }
-
-                    if (!url.isEmpty() && !name.isEmpty()) {
-                        result.add(new GenrePOJO(name, url)); // unchecked, as parental control always stored it
-                    }
-                }
-            }
-        }
-        return result;
     }
 
     /** The "other books" block of the page. */

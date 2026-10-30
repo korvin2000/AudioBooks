@@ -16,21 +16,6 @@ import org.junit.Test;
 
 public class GenreModelTest {
 
-    /** One relative or odd category link is resolved or skipped, never the loss of every akniga category. */
-    @Test
-    public void aknigaCategoriesResolveARelativeLink() {
-        org.jsoup.nodes.Document doc = org.jsoup.Jsoup.parse("<table class=\"table-authors\"><tbody>"
-                + "<tr><td class=\"name-obj\"><a href=\"https://akniga.org/section/biography/\">Биографии</a></td></tr>"
-                + "<tr><td class=\"name-obj\"><a href=\"/section/fantasy/\">Фантастика</a></td></tr>"
-                + "<tr><td class=\"name-obj\"><a>Без ссылки</a></td></tr>"
-                + "</tbody></table>", "https://akniga.org/sections/");
-        java.util.List<com.fanok.audiobooks.pojo.GenrePOJO> rows =
-                com.fanok.audiobooks.source.Akniga.parseCategories(doc);
-        assertEquals(2, rows.size());
-        assertEquals("https://akniga.org/section/biography/page<page>/", rows.get(0).getUrl());
-        assertEquals("https://akniga.org/section/fantasy/page<page>/", rows.get(1).getUrl());
-    }
-
     @Test
     public void audiobooGenresComeFromTheNavigationMenuWithTheSiteUrls() throws IOException {
         ProviderPage<GenrePOJO> page = Audioboo.parseGenres(
@@ -130,12 +115,6 @@ public class GenreModelTest {
         assertEquals(12, genres.items.get(0).getReting());
         assertEquals("Детективы", genres.items.get(1).getName());
         assertEquals(Url.SERVER + "/genre/detective/<page>/", genres.items.get(1).getUrl());
-        java.util.List<GenrePOJO> categories = Knigavuhe.parseCategories(doc);
-        assertEquals(2, categories.size());
-        assertEquals("Фантастика", categories.get(0).getName());
-        assertEquals(Url.SERVER + "/genre/fantasy/<page>/", categories.get(0).getUrl());
-        assertEquals("Детективы", categories.get(1).getName());
-        assertEquals(Url.SERVER + "/genre/detective/<page>/", categories.get(1).getUrl());
     }
 
     // changed on purpose after the live check (2026-10-30): a genre row that links to another site is skipped

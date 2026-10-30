@@ -155,12 +155,6 @@ public final class Knigoblud implements SourceParser {
         return ProviderPage.of(genreList(), false);
     }
 
-    /** The built-in genre list; nothing is fetched. */
-    @Override
-    public List<GenrePOJO> categories(String sectionsUrl) {
-        return genreList();
-    }
-
     @Override
     public String searchUrl(SearchUrls.Category category, String query, int page) {
         return category == SearchUrls.Category.BOOKS

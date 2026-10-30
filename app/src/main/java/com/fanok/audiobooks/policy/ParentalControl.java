@@ -7,25 +7,22 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.core.content.ContextCompat;
 import com.fanok.audiobooks.R;
-import com.fanok.audiobooks.Url;
 import com.fanok.audiobooks.pojo.BookPOJO;
+import com.fanok.audiobooks.search.Genre;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
+import java.util.EnumSet;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
-import java.util.TreeMap;
-import java.util.TreeSet;
 
 /**
- * The one parental-control decision: a book is allowed when the control is off, or when its source + category id
- * is on the allow-list. The id is normalised ({@link #categoryId}) so the editor (category URLs) and the books
- * (genre URLs) agree whatever host alias, {@code www.} prefix, page marker or trailing slash the URL carries. A book
- * without a known category is blocked while the control is on. The PIN is stored salted-hashed with a lockout.
+ * The one parental-control decision: a book is allowed when the control is off, or when the app's genres its site's
+ * genre name maps onto ({@link Genre}) are all on the allow-list, the same list for every site. Only a recognised
+ * genre can be blocked. The PIN is stored salted-hashed with a lockout.
  */
 public final class ParentalControl {
 
@@ -44,7 +41,8 @@ public final class ParentalControl {
     static final int FAILURES_BEFORE_LOCK = 5;
     static final long FIRST_LOCK_MS = 30_000L;
 
-    private static final String ID_SEPARATOR = "|";
+    /** The allow-list entry of a genre: {@code GENRE_KEY + genre.name()} → allowed. */
+    static final String GENRE_KEY = "genre:";
 
     private ParentalControl() {
     }
@@ -88,7 +86,11 @@ public final class ParentalControl {
         return enabled instanceof Boolean && (Boolean) enabled;
     }
 
-    /** Whether {@code book} may be shown unmasked and opened without the PIN. */
+    /**
+     * Whether {@code book} may be shown unmasked and opened without the PIN: when the control is off, or when every
+     * genre its genre name is recognised as ({@link Genre#allOf}) is allowed. A genre name that names no known genre,
+     * or no genre name at all, cannot be blocked.
+     */
     public static boolean isAllowed(@NonNull Context context, @Nullable BookPOJO book) {
         return isAllowed(store(context), book);
     }
@@ -97,65 +99,53 @@ public final class ParentalControl {
         if (!isEnabled(store)) {
             return true;
         }
-        if (book == null) {
-            return false;
-        }
-        String id = categoryId(book.getUrl(), book.getUrlGenre());
-        return id != null && allowedIds(store).contains(id);
+        return book != null && allowedGenres(store).containsAll(Genre.allOf(book.getGenre()));
     }
 
     /**
-     * The allow-list as normalised ids. Legacy entries keyed by a raw genre URL are migrated on the way; when several
-     * entries (legacy aliases or the canonical one) name the same id, any {@code false} among them wins, so a
-     * migration can never turn a blocked category into an allowed one. The migration is written in sorted order.
+     * The allowed genres. The allow-list of earlier versions, keyed by a site's genre URL or "host|path", is dropped
+     * on the way: its genres are now blocked until allowed again, so the update never unblocks anything.
      */
     @NonNull
-    public static Set<String> allowedIds(@NonNull Store store) {
-        Map<String, Boolean> resolved = new TreeMap<>();
-        Map<String, Boolean> migrated = new TreeMap<>();
-        Set<String> legacyKeys = new TreeSet<>();
+    public static Set<Genre> allowedGenres(@NonNull Store store) {
+        Set<Genre> allowed = EnumSet.noneOf(Genre.class);
+        boolean legacy = false;
         for (Map.Entry<String, ?> entry : store.all().entrySet()) {
             String key = entry.getKey();
             if (!(entry.getValue() instanceof Boolean) || ENABLED.equals(key)) {
                 continue;
             }
-            boolean allowed = (Boolean) entry.getValue();
-            if (key.startsWith("http://") || key.startsWith("https://")) {
-                legacyKeys.add(key);
-                key = categoryId(key, key);
-                if (key == null) {
-                    continue;
-                }
-                migrated.put(key, true);
-            }
-            Boolean previous = resolved.get(key);
-            resolved.put(key, allowed && (previous == null || previous));
-        }
-        for (String key : legacyKeys) {
-            store.remove(key);
-        }
-        for (String id : migrated.keySet()) {
-            store.putBoolean(id, resolved.get(id));
-        }
-        Set<String> ids = new HashSet<>();
-        for (Map.Entry<String, Boolean> entry : resolved.entrySet()) {
-            if (entry.getValue()) {
-                ids.add(entry.getKey());
+            Genre genre = key.startsWith(GENRE_KEY) ? genre(key.substring(GENRE_KEY.length())) : null;
+            if (genre == null) {
+                store.remove(key);
+                legacy = true;
+            } else if ((Boolean) entry.getValue()) {
+                allowed.add(genre);
             }
         }
-        return ids;
-    }
-
-    public static boolean isCategoryAllowed(@NonNull Store store, @Nullable String categoryUrl) {
-        String id = categoryId(categoryUrl, categoryUrl);
-        return id != null && allowedIds(store).contains(id);
-    }
-
-    public static void setCategoryAllowed(@NonNull Store store, @Nullable String categoryUrl, boolean allowed) {
-        String id = categoryId(categoryUrl, categoryUrl);
-        if (id != null && !Boolean.valueOf(allowed).equals(store.all().get(id))) {
-            store.putBoolean(id, allowed);
+        if (legacy) {
             bumpVersion(store);
+        }
+        return allowed;
+    }
+
+    public static boolean isGenreAllowed(@NonNull Store store, @NonNull Genre genre) {
+        return allowedGenres(store).contains(genre);
+    }
+
+    public static void setGenreAllowed(@NonNull Store store, @NonNull Genre genre, boolean allowed) {
+        if (isGenreAllowed(store, genre) != allowed) {
+            store.putBoolean(GENRE_KEY + genre.name(), allowed);
+            bumpVersion(store);
+        }
+    }
+
+    @Nullable
+    private static Genre genre(@NonNull String name) {
+        try {
+            return Genre.valueOf(name);
+        } catch (IllegalArgumentException e) {
+            return null;
         }
     }
 
@@ -183,82 +173,6 @@ public final class ParentalControl {
     @Nullable
     public static Drawable coverMask(@NonNull Context context, @Nullable BookPOJO book) {
         return isAllowed(context, book) ? null : ContextCompat.getDrawable(context, R.drawable.ic_parental_control);
-    }
-
-    /**
-     * The normalised "source|category" id: the current, lower-case host of the book (or of the category URL when
-     * the book URL has none) and the category path without query, page markers or trailing slash. Null when either
-     * part is unknown, which the policy treats as "blocked".
-     */
-    @Nullable
-    public static String categoryId(@Nullable String bookUrl, @Nullable String categoryUrl) {
-        String slug = slug(categoryUrl);
-        if (slug == null) {
-            return null;
-        }
-        String host = hostOf(bookUrl);
-        if (host.isEmpty()) {
-            host = hostOf(categoryUrl);
-        }
-        if (host.isEmpty()) {
-            return null;
-        }
-        return host + ID_SEPARATOR + slug;
-    }
-
-    private static String hostOf(@Nullable String url) {
-        if (url == null) {
-            return "";
-        }
-        String cleaned = url.replace("<page>", "").trim();
-        try {
-            return Url.hostOf(Url.canonical(cleaned));
-        } catch (RuntimeException e) {
-            return Url.hostOf(cleaned);
-        }
-    }
-
-    /** The category path of a URL, lower-case, without query, page markers or trailing slash; null when empty. */
-    @Nullable
-    static String slug(@Nullable String url) {
-        if (url == null) {
-            return null;
-        }
-        String s = url.trim().replace("<page>", "").replace("%3Cpage%3E", "");
-        int schemeEnd = s.indexOf("://");
-        if (schemeEnd >= 0) {
-            int pathStart = s.indexOf('/', schemeEnd + 3);
-            s = pathStart < 0 ? "" : s.substring(pathStart);
-        }
-        int cut = s.indexOf('?');
-        if (cut >= 0) {
-            s = s.substring(0, cut);
-        }
-        cut = s.indexOf('#');
-        if (cut >= 0) {
-            s = s.substring(0, cut);
-        }
-        s = s.toLowerCase(Locale.ROOT);
-        while (true) {
-            while (s.endsWith("/")) {
-                s = s.substring(0, s.length() - 1);
-            }
-            int lastSlash = s.lastIndexOf('/');
-            String last = s.substring(lastSlash + 1);
-            if (last.isEmpty() && lastSlash >= 0) {
-                s = s.substring(0, lastSlash);
-                continue;
-            }
-            if (last.matches("page\\d*")) {
-                s = s.substring(0, Math.max(0, lastSlash));
-                continue;
-            }
-            break;
-        }
-        if (!s.startsWith("/")) {
-            s = "/" + s;
-        }
-        return "/".equals(s) ? null : s;
     }
 
     // ----- PIN -----

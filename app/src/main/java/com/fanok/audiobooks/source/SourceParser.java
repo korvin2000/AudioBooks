@@ -207,14 +207,6 @@ public interface SourceParser {
         public int skipped;
     }
 
-    /**
-     * The categories parental control lists for the site: a name and the URL a card's genre link is matched with. By
-     * default its genre list at {@code sectionsUrl} ({@code Provider.sections}).
-     */
-    default List<GenrePOJO> categories(String sectionsUrl) throws IOException {
-        return genres(fetch(sectionsUrl), sectionsUrl, 1).items;
-    }
-
     // ---------------------------------------------------------------- search
 
     /**

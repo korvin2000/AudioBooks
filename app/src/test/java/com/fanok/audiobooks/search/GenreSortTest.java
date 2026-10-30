@@ -5,7 +5,10 @@ import static org.junit.Assert.assertEquals;
 import com.fanok.audiobooks.pojo.GenrePOJO;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import org.junit.Test;
 
 public class GenreSortTest {
@@ -30,7 +33,7 @@ public class GenreSortTest {
 
     @Test
     public void noneKeepsTheSiteOrderInACopy() {
-        List<GenrePOJO> sorted = GenreSort.NONE.sorted(site);
+        List<GenrePOJO> sorted = GenreSort.NONE.sorted(site, Collections.emptyMap());
         assertEquals(names(site), names(sorted));
         sorted.clear();
         assertEquals(5, site.size());
@@ -39,13 +42,13 @@ public class GenreSortTest {
     @Test
     public void nameSortsAlphabeticallyIgnoringCase() {
         assertEquals(Arrays.asList("аудиоспектакль", "Боевик", "Детектив", "Ёлки", "фэнтези"),
-                names(GenreSort.NAME.sorted(site)));
+                names(GenreSort.NAME.sorted(site, Collections.emptyMap())));
     }
 
     @Test
     public void countPutsMostBooksFirstAndGenresWithoutACountLastInTheSiteOrder() {
         assertEquals(Arrays.asList("Детектив", "Ёлки", "аудиоспектакль", "фэнтези", "Боевик"),
-                names(GenreSort.COUNT.sorted(site)));
+                names(GenreSort.COUNT.sorted(site, Collections.emptyMap())));
     }
 
     @Test
@@ -62,6 +65,27 @@ public class GenreSortTest {
         assertEquals(953, GenreSort.count(bracketed));
         assertEquals(0, GenreSort.count(text));
         assertEquals(5, GenreSort.count(rated));
+    }
+
+    @Test
+    public void favoritePutsTheMostPickedGenresOfAnySiteFirst() {
+        Map<String, Object> picks = new HashMap<>();
+        picks.put(Genre.HORROR.name(), 3);
+        picks.put(Genre.KIDS.name(), 1);
+        picks.put(GenrePicks.key("Искусственный голос"), 2);
+        List<GenrePOJO> genres = Arrays.asList(genre("Фэнтези", 0), genre("Ужасы, мистика", 0), genre("Для детей", 0),
+                genre("Искусственный  голос", 0), genre("Мистика и ужасы", 0));
+        assertEquals(Arrays.asList("Ужасы, мистика", "Мистика и ужасы", "Искусственный  голос", "Для детей", "Фэнтези"),
+                names(GenreSort.FAVORITE.sorted(genres, picks)));
+    }
+
+    @Test
+    public void aPickCountsForTheGenreOnEverySiteAndAnUnknownNameForItself() {
+        assertEquals(Genre.HORROR.name(), GenrePicks.key("Ужасы, мистика"));
+        assertEquals(Genre.HORROR.name(), GenrePicks.key("Мистика и ужасы"));
+        assertEquals("?искусственный голос", GenrePicks.key(" Искусственный  голос "));
+        assertEquals(null, GenrePicks.key(" "));
+        assertEquals(null, GenrePicks.key(null));
     }
 
     @Test

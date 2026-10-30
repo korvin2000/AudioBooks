@@ -6,8 +6,10 @@ import com.fanok.audiobooks.pojo.GenrePOJO;
 import java.text.Collator;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -17,7 +19,9 @@ public enum GenreSort {
     NONE(R.string.genre_sort_none),
     NAME(R.string.genre_sort_name),
     /** Most books first ({@link #count}); a genre without a count (0) goes last. */
-    COUNT(R.string.genre_sort_count);
+    COUNT(R.string.genre_sort_count),
+    /** The genres the user opens most on any site first ({@link GenrePicks}). */
+    FAVORITE(R.string.genre_sort_favorite);
 
     public final int title;
 
@@ -39,15 +43,24 @@ public enum GenreSort {
         return NONE;
     }
 
-    /** A sorted copy: {@code genres} itself is left as it is, and equal ones keep the site's order. */
+    /**
+     * A sorted copy: {@code genres} itself is left as it is, and equal ones keep the site's order. {@code picks} are
+     * the {@link GenrePicks#all} counts {@link #FAVORITE} sorts by.
+     */
     @NonNull
-    public ArrayList<GenrePOJO> sorted(@NonNull List<GenrePOJO> genres) {
+    public ArrayList<GenrePOJO> sorted(@NonNull List<GenrePOJO> genres, @NonNull Map<String, ?> picks) {
         ArrayList<GenrePOJO> list = new ArrayList<>(genres);
         if (this == NAME) {
             Collator collator = Collator.getInstance(new Locale("ru"));
             Collections.sort(list, (a, b) -> collator.compare(a.getName(), b.getName()));
         } else if (this == COUNT) {
             Collections.sort(list, (a, b) -> Integer.compare(count(b), count(a)));
+        } else if (this == FAVORITE) {
+            Map<GenrePOJO, Integer> counts = new IdentityHashMap<>();
+            for (GenrePOJO genre : list) {
+                counts.put(genre, GenrePicks.count(picks, genre.getName()));
+            }
+            Collections.sort(list, (a, b) -> Integer.compare(counts.get(b), counts.get(a)));
         }
         return list;
     }

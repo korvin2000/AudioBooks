@@ -106,8 +106,6 @@ public class IzibukSelectorsTest {
                         () -> Izibuk.parseListing(saved, url, 1), () -> Izibuk.parseListing(rebuilt, url, 1));
             }
             assertSameResult(name + " parseGenres", () -> Izibuk.parseGenres(saved), () -> Izibuk.parseGenres(rebuilt));
-            assertSameResult(name + " parseCategories",
-                    () -> Izibuk.parseCategories(saved), () -> Izibuk.parseCategories(rebuilt));
             assertSameResult(name + " parsePeople",
                     () -> Izibuk.parsePeople(saved, 1), () -> Izibuk.parsePeople(rebuilt, 1));
             assertSameResult(name + " parseDescription",

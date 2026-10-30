@@ -9,32 +9,25 @@ import android.util.Xml;
 import android.view.Menu;
 import android.view.MenuInflater;
 import android.view.MenuItem;
-import android.view.View;
 import android.widget.Button;
 import android.widget.Toast;
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.ActionBar;
 import androidx.appcompat.app.AlertDialog;
+import androidx.appcompat.app.AppCompatActivity;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import com.alimuzaffar.lib.pin.PinEntryEditText;
-import com.arellomobile.mvp.MvpAppCompatActivity;
-import com.arellomobile.mvp.presenter.InjectPresenter;
 import com.fanok.audiobooks.AppThemes;
 import com.fanok.audiobooks.R;
 import com.fanok.audiobooks.adapter.ParentalControlAddapter;
 import com.fanok.audiobooks.databinding.ActivityParentalControlBinding;
-import com.fanok.audiobooks.pojo.ParentControlPOJO;
 import com.fanok.audiobooks.policy.ParentalControl;
-import com.fanok.audiobooks.presenter.ParentalControlPresenter;
 import com.r0adkll.slidr.Slidr;
-import java.util.ArrayList;
 import java.util.Objects;
-import org.jetbrains.annotations.NotNull;
 import org.xmlpull.v1.XmlPullParser;
 
 
-public class ParentalControlActivity extends MvpAppCompatActivity implements
-        com.fanok.audiobooks.interface_pacatge.parental_control.View {
+public class ParentalControlActivity extends AppCompatActivity {
 
     public static final String PARENTAL_CONTROL_PREFERENCES = ParentalControl.PREFERENCES;
 
@@ -48,9 +41,6 @@ public class ParentalControlActivity extends MvpAppCompatActivity implements
     public static final String PARENTAL_PASSWORD = "Parental Password";
 
     private static boolean isShowDialog;
-
-    @InjectPresenter
-    ParentalControlPresenter mPresenter;
 
     private ParentalControl.Store mStore;
 
@@ -101,7 +91,7 @@ public class ParentalControlActivity extends MvpAppCompatActivity implements
         }
 
         binding.parentalControlParent.setLayoutManager(new LinearLayoutManager(this));
-        mAddapter = new ParentalControlAddapter(mStore);
+        mAddapter = new ParentalControlAddapter(this, mStore);
         binding.parentalControlParent.setAdapter(mAddapter);
     }
 
@@ -135,15 +125,6 @@ public class ParentalControlActivity extends MvpAppCompatActivity implements
             finish();
         }
         return (super.onOptionsItemSelected(menuItem));
-    }
-
-    @Override
-    public void showProgress(boolean b) {
-        if (b) {
-            binding.progressBar.setVisibility(View.VISIBLE);
-        } else {
-            binding.progressBar.setVisibility(View.GONE);
-        }
     }
 
     /** A dialog with the four-digit PIN field; {@code onPin} runs on the confirm button and on the fourth digit. */
@@ -217,18 +198,7 @@ public class ParentalControlActivity extends MvpAppCompatActivity implements
         return context.getString(R.string.incorect_password);
     }
 
-    @Override
-    public void showData(@NotNull ArrayList<ParentControlPOJO> arrayList) {
-        mAddapter.setItem(arrayList);
-    }
-
-    @Override
-    public void showToast(int id) {
-        Toast.makeText(this, getString(id), Toast.LENGTH_SHORT).show();
-    }
-
-    @Override
-    public void showToast(@NonNull String text) {
+    private void showToast(@NonNull String text) {
         Toast.makeText(this, text, Toast.LENGTH_LONG).show();
     }
 }

@@ -159,12 +159,6 @@ public final class Knigavuhe implements SourceParser {
         return parseGenres(page);
     }
 
-    /** Every row of the genre list with a name link, as parental control has always listed them. */
-    @Override
-    public List<GenrePOJO> categories(String sectionsUrl) throws IOException {
-        return parseCategories(fetch(sectionsUrl));
-    }
-
     @Override
     public ProviderPage<GenrePOJO> people(Document page, String url, int pageNo, boolean performers) {
         return parsePeople(page, pageNo);
@@ -396,21 +390,6 @@ public final class Knigavuhe implements SourceParser {
             }
             return genrePOJO;
         }), false);
-    }
-
-    /** The genre list as parental-control categories: every row with a name link. */
-    public static ArrayList<GenrePOJO> parseCategories(Document doc) {
-        ArrayList<GenrePOJO> result = new ArrayList<>();
-        Elements items = doc.getElementsByClass("genre2_item");
-        for (Element item : items) {
-            Elements name = item.getElementsByClass("genre2_item_name");
-            if (name.size() != 0 && ownPath(name.first().attr("href"))) {
-                String href = Url.SERVER + name.first().attr("href") + "<page>/";
-                String nameValue = name.first().text();
-                result.add(new GenrePOJO(nameValue, href));
-            }
-        }
-        return result;
     }
 
     /** The author/reader rows: legacy_people_row on the listings, author_item in the search. */

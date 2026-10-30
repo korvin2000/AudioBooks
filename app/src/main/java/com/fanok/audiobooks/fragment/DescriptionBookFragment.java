@@ -41,6 +41,7 @@ import com.fanok.audiobooks.pojo.DescriptionPOJO;
 import com.fanok.audiobooks.pojo.OtherArtistPOJO;
 import com.fanok.audiobooks.policy.DefaultCover;
 import com.fanok.audiobooks.presenter.BookDescriptionPresenter;
+import com.fanok.audiobooks.search.GenrePicks;
 import com.google.gson.Gson;
 import com.squareup.picasso.Picasso;
 import java.util.ArrayList;
@@ -394,9 +395,11 @@ public class DescriptionBookFragment extends MvpAppCompatFragment implements Des
             }
 
             if (description.getGenreUrl() != null && !description.getGenreUrl().isEmpty()) {
-                mGenre.setOnClickListener(
-                        view -> MainActivity.startMainActivity(requireContext(),
-                                Consts.FRAGMENT_AUDIOBOOK, description.getGenreUrl()));
+                mGenre.setOnClickListener(view -> {
+                    GenrePicks.record(requireContext(), description.getGenre());
+                    MainActivity.startMainActivity(requireContext(), Consts.FRAGMENT_AUDIOBOOK,
+                            description.getGenreUrl());
+                });
             }
 
             if (description.getAutorUrl() != null && !description.getAutorUrl().isEmpty()) {

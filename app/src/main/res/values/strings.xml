@@ -46,7 +46,7 @@
     <string name="tab_text_2">Отзывы</string>
     <string name="tab_text_2_count">Отзывы (%d)</string>
     <string name="tab_text_3">Серия</string>
-    <string name="tab_text_5">Альтернативы</string>
+    <string name="tab_text_5">Зеркала</string>
     <string name="time_zero" translatable="false">00:00</string>
     <string name="previous">Предыдущий</string>
     <string name="play">Воспроизвести</string>
@@ -108,6 +108,41 @@
     <string name="genre_sort_none">Без сортировки</string>
     <string name="genre_sort_name">По алфавиту</string>
     <string name="genre_sort_count">По количеству книг</string>
+    <string name="genre_sort_favorite">Любимые жанры</string>
+    <string name="genre_sf_fantasy">Фантастика и фэнтези</string>
+    <string name="genre_litrpg">ЛитРПГ</string>
+    <string name="genre_popadancy">Попаданцы</string>
+    <string name="genre_postapocalypse">Постапокалипсис</string>
+    <string name="genre_alt_history">Альтернативная история</string>
+    <string name="genre_romantic_fantasy">Любовное фэнтези</string>
+    <string name="genre_detective">Детективы и триллеры</string>
+    <string name="genre_action">Боевики</string>
+    <string name="genre_true_crime">Тру-крайм</string>
+    <string name="genre_horror">Ужасы и мистика</string>
+    <string name="genre_adventure">Приключения</string>
+    <string name="genre_romance">Любовные романы</string>
+    <string name="genre_erotica">Эротика, 18+</string>
+    <string name="genre_prose">Роман и проза</string>
+    <string name="genre_classic">Классика</string>
+    <string name="genre_humor">Юмор и сатира</string>
+    <string name="genre_kids">Для детей</string>
+    <string name="genre_teens">Для подростков</string>
+    <string name="genre_poetry">Поэзия</string>
+    <string name="genre_performance">Аудиоспектакли</string>
+    <string name="genre_ranobe">Ранобэ</string>
+    <string name="genre_history">История</string>
+    <string name="genre_war">Война</string>
+    <string name="genre_biography">Биографии и мемуары</string>
+    <string name="genre_science">Научпоп и документальное</string>
+    <string name="genre_psychology">Психология и философия</string>
+    <string name="genre_business">Бизнес и финансы</string>
+    <string name="genre_health">Медицина и здоровье</string>
+    <string name="genre_education">Обучение</string>
+    <string name="genre_foreign">На иностранных языках</string>
+    <string name="genre_religion">Религия</string>
+    <string name="genre_esoteric">Эзотерика</string>
+    <string name="genre_podcasts">Подкасты и интервью</string>
+    <string name="genre_other">Разное</string>
 
     <string name="sort_value_date" translatable="false">date</string>
     <string name="sort_value_name" translatable="false">name</string>
@@ -491,7 +526,6 @@
     <string name="no_other_sources">Других источников нет</string>
     <string name="notification_permission_rationale">Разрешение на уведомления нужно, чтобы показывать плеер и ход загрузок в шторке</string>
     <string name="pin_locked">Слишком много попыток. Повторите через %1$d с</string>
-    <string name="parental_control_sources_failed">Не удалось загрузить жанры: %1$s. Книги этих источников остаются заблокированы</string>
     <string name="equalizer_off">Выкл</string>
     <string name="equalizer_unavailable">Эквалайзер недоступен на этом устройстве</string>
     <string name="equalizer_custom">Свой</string>
@@ -604,8 +638,8 @@
     <string name="settings_general_summary">Раздел при запуске, буфер, родительский контроль</string>
     <string name="reproduction_keep">Не прерывать текущую книгу</string>
     <string name="downloads_manager">Скачанные книги</string>
-    <string name="auto_export">Автоэкспорт обычных загрузок</string>
-    <string name="auto_export_desc">Скачанные главы копируются в папку для скачивания обычными файлами (mp3, m4a, m4b, aac, ogg, opus), после чего копия в кеше удаляется. На время копирования нужно вдвое больше места. Если выключить, книга остаётся только в кеше и слушается в приложении офлайн; копию можно сделать вручную в «Скачанных книгах»</string>
+    <string name="auto_export">Автоэкспорт в mp3</string>
+    <string name="auto_export_desc">Автоматический экспорт скачанных аудиокниг в стандартные аудиоформаты</string>
     <string name="store_dir">Место хранения кеша загрузок</string>
     <string name="store_dir_summary">%1$s\nсвободно %2$s</string>
     <string name="store_dir_dialog">Кеш загрузок (Media3)</string>

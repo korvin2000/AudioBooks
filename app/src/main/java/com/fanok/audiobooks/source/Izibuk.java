@@ -153,12 +153,6 @@ public final class Izibuk implements SourceParser {
         return parseGenres(page);
     }
 
-    /** The first page of the genre list; a row without name or link is left out. */
-    @Override
-    public List<GenrePOJO> categories(String sectionsUrl) throws IOException {
-        return parseCategories(fetch(sectionsUrl + 1));
-    }
-
     @Override
     public ProviderPage<GenrePOJO> people(Document page, String url, int pageNo, boolean performers) {
         return parsePeople(page, pageNo);
@@ -382,33 +376,6 @@ public final class Izibuk implements SourceParser {
             }
             return genrePOJO;
         }), false);
-    }
-
-    /** The genre list as parental-control categories: only rows with a name and a link. */
-    public static ArrayList<GenrePOJO> parseCategories(Document doc) {
-        ArrayList<GenrePOJO> result = new ArrayList<>();
-        Elements items = doc.select(GENRE_LIST);
-        if (items.size() != 0) {
-            Elements list = items.first().children();
-            for (Element item : list) {
-                String nameValue = "";
-                String url = "";
-                String src = item.attr("href");
-                if (!src.isEmpty()) {
-                    url = Url.SERVER_IZIBUK + src + "?p=";
-                }
-
-                Elements children = item.children();
-                if (children.size() == 2) {
-                    nameValue = children.first().text();
-                }
-
-                if (!nameValue.isEmpty() && !url.isEmpty()) {
-                    result.add(new GenrePOJO(nameValue, url));
-                }
-            }
-        }
-        return result;
     }
 
     /** The author or reader index and their search. */

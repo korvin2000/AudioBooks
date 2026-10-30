@@ -233,32 +233,6 @@ public final class BazaKnig implements SourceParser {
         }), false);
     }
 
-    /** The left menu as parental control has always read it. */
-    @Override
-    public List<GenrePOJO> categories(String sectionsUrl) throws IOException {
-        ArrayList<GenrePOJO> result = new ArrayList<>();
-        Document doc = SiteHttp.get(sectionsUrl);
-
-        Elements items = doc.getElementsByClass("reset left-menu-items");
-        if (items.size() != 0) {
-            Elements list = items.first().getElementsByTag("li");
-            for (Element item : list) {
-                String name = "";
-                String url = "";
-                Elements aGenre = item.getElementsByTag("a");
-                if (aGenre.size() != 0) {
-                    url = Url.SERVER_BAZA_KNIG + aGenre.first().attr("href") + "page/";
-                    name = item.text();
-                }
-                if (!name.isEmpty() && !url.isEmpty()) {
-                    // unvalidated, as the legacy ParentControlPOJO row: an odd href keeps its row, not fails the source
-                    result.add(new GenrePOJO(name, url));
-                }
-            }
-        }
-        return result;
-    }
-
     // ---------------------------------------------------------------- SourceParser: search
 
     @Override

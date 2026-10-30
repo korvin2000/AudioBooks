@@ -27,6 +27,7 @@ import com.fanok.audiobooks.pojo.GenrePOJO;
 import com.fanok.audiobooks.pojo.SearcheblPOJO;
 import com.fanok.audiobooks.pojo.SearchebleArrayPOJO;
 import com.fanok.audiobooks.policy.DefaultCover;
+import com.fanok.audiobooks.search.GenrePicks;
 import com.fanok.audiobooks.search.Provider;
 import com.fanok.audiobooks.search.ProviderPage;
 import com.fanok.audiobooks.search.SearchSession;
@@ -455,6 +456,7 @@ public class SearchbalePresenter extends MvpPresenter<SearchableView> implements
             genre.setVisibility(View.VISIBLE);
             genre.setOnClickListener(view1 -> {
                 dialog.dismiss();
+                GenrePicks.record(view1.getContext(), bookPOJO.getGenre());
                 getViewState().returnResult(bookPOJO.getUrlGenre(),
                         bookPOJO.getGenre(), Consts.MODEL_BOOKS, "searchebleBooks");
             });

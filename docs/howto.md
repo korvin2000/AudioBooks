@@ -99,7 +99,8 @@ What the shared toolkit already covers:
 | Referer, own CDN or API hosts, a slow server | `referer()`, `hosts()`, `timeoutMs()`; `mediaHeaders(bookUrl)` for audio requests |
 | A session cookie, a wall that lets only POST pass | `cookies()` (sent to the site's own host only; `mediaCookies(bookUrl)` for audio), `postsPages()` |
 | Lists read from other pages or built in | override `loadListing`, `loadGenres`, `loadPeople`, `loadSeries` (the defaults fetch the URL and parse it) |
-| Optional sections | `people`, `searchPeople`, `series`, `comments`, `recommendations`, `otherReaders`, `categories` (parental control), `otherSource*` ("on other sites") |
+| Optional sections | `people`, `searchPeople`, `series`, `comments`, `recommendations`, `otherReaders`, `otherSource*` ("on other sites") |
+| Genres for parental control and "favorite genres" | nothing per site: a card's genre name maps onto the app's own genres (`search/Genre.java`). Check the site's genre names against `Genre.of`/`Genre.allOf` and add them to `app/src/test/resources/genres/names.tsv`; a name that maps wrongly is fixed with a stem in `Genre`'s data, never a site branch |
 
 Rules that keep the sites independent: a challenge or an HTTP error is an exception (`SiteHttp` raises it), never an
 empty page; a page without any card is `EMPTY`, while a page whose cards were all filtered keeps its next-page evidence

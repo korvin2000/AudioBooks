@@ -160,37 +160,6 @@ public final class Abmp3 implements SourceParser {
         return ProviderPage.of(result, pageNo < total);
     }
 
-    /** The genre list's rows whose first {@code .title} has a link with a name. */
-    @Override
-    public List<GenrePOJO> categories(String sectionsUrl) throws IOException {
-        List<GenrePOJO> result = new ArrayList<>();
-        Document doc = fetch(sectionsUrl);
-
-        Elements items = doc.getElementsByClass("b-posts");
-        if (items.size() != 0) {
-            Elements list = items.first().children();
-            for (Element item : list) {
-                String name = "";
-                String url = "";
-                Elements titles = item.getElementsByClass("title");
-                if (titles.size() != 0) {
-                    Elements aGenre = titles.first().getElementsByTag("a");
-                    if (aGenre.size() != 0 && ownPath(aGenre.first().attr("href"))) {
-                        url = Url.SERVER_ABMP3 + aGenre.first().attr("href") + "?page=";
-                        name = aGenre.first().text();
-                    }
-                }
-                if (!url.isEmpty() && !name.isEmpty()) {
-                    GenrePOJO genrePOJO = new GenrePOJO();
-                    genrePOJO.setUrl(url);
-                    genrePOJO.setName(name);
-                    result.add(genrePOJO);
-                }
-            }
-        }
-        return result;
-    }
-
     /** One static results page; {@link #parseSearch} slices it into pages of {@link #SEARCH_PAGE_SIZE}. */
     @Override
     public String searchUrl(SearchUrls.Category category, String query, int page) {

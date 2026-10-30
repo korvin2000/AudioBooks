@@ -172,12 +172,6 @@ public final class Audioboo implements SourceParser {
         return ProviderPage.of(authors, index < letters.size() - 1);
     }
 
-    /** The genre list as the genre screen loads it ({@link #loadGenres}). */
-    @Override
-    public List<GenrePOJO> categories(String sectionsUrl) throws IOException {
-        return loadGenres(sectionsUrl, 1).items;
-    }
-
     @Override
     public String searchUrl(SearchUrls.Category category, String query, int page) {
         return category == SearchUrls.Category.BOOKS ? Dle.searchUrl(SERVER, query, page) : null;
