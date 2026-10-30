@@ -16,7 +16,7 @@
     <string name="sleep_timer_duration_m">%d мин</string>
     <string name="sleep_timer_end_of_chapter">Остановить в конце главы</string>
     <string name="sleep_timer_warn_title">Предупреждать за 30 секунд</string>
-    <string name="sleep_timer_warn_summary">Короткие сигналы и плавное снижение громкости перед остановкой</string>
+    <string name="sleep_timer_warn_summary">Громкие сигналы за 30, 20 и 10 секунд до остановки, книга плавно затихает</string>
     <string name="sleep_timer_shake_title">Встряхнуть, чтобы продолжить</string>
     <string name="sleep_timer_shake_summary">Встряхните телефон во время сигнала или в течение минуты после остановки — таймер запустится заново</string>
     <string name="sleep_timer_start">Запустить</string>

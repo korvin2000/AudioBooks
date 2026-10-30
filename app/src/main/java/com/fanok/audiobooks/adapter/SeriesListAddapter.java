@@ -2,6 +2,8 @@ package com.fanok.audiobooks.adapter;
 
 import android.annotation.SuppressLint;
 import android.graphics.Bitmap;
+import android.graphics.Typeface;
+import android.util.TypedValue;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -16,8 +18,8 @@ import com.bumptech.glide.load.DataSource;
 import com.bumptech.glide.load.engine.GlideException;
 import com.bumptech.glide.request.RequestListener;
 import com.bumptech.glide.request.target.Target;
-import com.fanok.audiobooks.Consts;
 import com.fanok.audiobooks.R;
+import com.fanok.audiobooks.Url;
 import com.fanok.audiobooks.pojo.SeriesPOJO;
 import java.util.ArrayList;
 
@@ -35,6 +37,9 @@ public class SeriesListAddapter extends RecyclerView.Adapter<SeriesListAddapter.
 
         private final TextView mText;
 
+        /** The row's own background (the theme's touch feedback), restored when a recycled row is not the book. */
+        private final int mDefaultBackground;
+
 
         MyHolder(@NonNull final View itemView) {
             super(itemView);
@@ -43,6 +48,9 @@ public class SeriesListAddapter extends RecyclerView.Adapter<SeriesListAddapter.
             mImage = itemView.findViewById(R.id.image);
             mText = itemView.findViewById(R.id.text);
             mLinearLayout = itemView.findViewById(R.id.item);
+            TypedValue value = new TypedValue();
+            itemView.getContext().getTheme().resolveAttribute(android.R.attr.selectableItemBackground, value, true);
+            mDefaultBackground = value.resourceId;
 
             itemView.setOnClickListener(view -> {
                 int position = getBindingAdapterPosition();
@@ -81,11 +89,11 @@ public class SeriesListAddapter extends RecyclerView.Adapter<SeriesListAddapter.
         }
 
         void bind(SeriesPOJO book) {
-            if (book.getUrl().equals(carentUrl)) {
-                mLinearLayout.setBackgroundColor(
-                        Consts.getAttributeColor(mLinearLayout.getContext(),
-                                R.attr.mySelectableItemBackground));
-            }
+            boolean current = isCurrent(book.getUrl(), carentUrl);
+            mLinearLayout.setBackgroundResource(current ? R.drawable.bg_series_current : mDefaultBackground);
+            mLine.setTypeface(null, current ? Typeface.BOLD : Typeface.NORMAL);
+            mText.setTypeface(null, current ? Typeface.BOLD : Typeface.NORMAL);
+            itemView.setSelected(current);
             mLine.setText(book.getNumber());
             mText.setText(book.getName());
             if (mImage != null) {
@@ -117,6 +125,14 @@ public class SeriesListAddapter extends RecyclerView.Adapter<SeriesListAddapter.
                 }
             }
         }
+    }
+
+    /**
+     * Whether a series entry is the book on screen: its link opens the same page, or it has no link at all (the
+     * sites that list the open book without one: knigavuhe, izibuk, knigoblud).
+     */
+    static boolean isCurrent(@NonNull String entryUrl, @NonNull String bookUrl) {
+        return entryUrl.isEmpty() || Url.samePage(entryUrl, bookUrl);
     }
 
     public interface OnListItemSelectedInterface {

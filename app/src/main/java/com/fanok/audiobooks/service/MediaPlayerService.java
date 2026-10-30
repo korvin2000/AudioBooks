@@ -189,7 +189,7 @@ public class MediaPlayerService extends MediaBrowserServiceCompat {
             | PlaybackStateCompat.ACTION_PAUSE
             | PlaybackStateCompat.ACTION_PLAY_PAUSE
             //no SKIP_TO_NEXT / SKIP_TO_PREVIOUS: Android 13+ would put chapter skips beside play/pause;
-            //the custom actions (rewind 30, forward 30, previous, next chapter) fill those slots instead
+            //the two custom actions (rewind 30, forward 30) take those slots, so the card has three buttons
             | PlaybackStateCompat.ACTION_SEEK_TO
             | PlaybackStateCompat.ACTION_REWIND
             | PlaybackStateCompat.ACTION_FAST_FORWARD
@@ -1633,9 +1633,7 @@ public class MediaPlayerService extends MediaBrowserServiceCompat {
                 .addCustomAction(ACTION_REWIND, getString(R.string.playback_rewind_30),
                         R.drawable.ic_notification_rewind_30)
                 .addCustomAction(ACTION_FORWARD, getString(R.string.forward_30),
-                        R.drawable.ic_notification_fast_forward_30)
-                .addCustomAction(ACTION_PREVIOUS, getString(R.string.previous), R.drawable.ic_notification_previous)
-                .addCustomAction(ACTION_NEXT, getString(R.string.next), R.drawable.ic_notification_next);
+                        R.drawable.ic_notification_fast_forward_30);
         int state;
         long position = 0;
         float speed = 0f;
@@ -1847,23 +1845,20 @@ public class MediaPlayerService extends MediaBrowserServiceCompat {
                 .setContentIntent(contentIntent)
                 .setDeleteIntent(PendingIntent.getBroadcast(getApplicationContext(), 0,
                         new Intent(this, OnCancelBroadcastReceiver.class), PendingIntent.FLAG_IMMUTABLE))
-                //MediaStyle shows at most five actions: Stop leaves the row, the delete intent still dismisses
-                .addAction(R.drawable.ic_notification_previous, getString(R.string.previous),
-                        playbackAction(ACTION_PREVIOUS, 3))
+                //three buttons, as in the Android 13+ card: rewind 30, play/pause, forward 30; chapters stay on
+                //the headset and car keys. A paused notification is dismissed by swiping (the delete intent).
                 .addAction(R.drawable.ic_notification_rewind_30, getString(R.string.playback_rewind_30),
                         playbackAction(ACTION_REWIND, 4))
                 .addAction(showPause ? R.drawable.ic_notification_pause : R.drawable.ic_notification_play,
                         getString(showPause ? R.string.pause : R.string.play),
                         showPause ? playbackAction(ACTION_PAUSE, 1) : playbackAction(ACTION_PLAY, 0))
                 .addAction(R.drawable.ic_notification_fast_forward_30, getString(R.string.forward_30),
-                        playbackAction(ACTION_FORWARD, 5))
-                .addAction(R.drawable.ic_notification_next, getString(R.string.next),
-                        playbackAction(ACTION_NEXT, 2));
+                        playbackAction(ACTION_FORWARD, 5));
         if (book != null && book.getAutor() != null) {
             builder.setSubText(book.getAutor());
         }
         androidx.media.app.NotificationCompat.MediaStyle style =
-                new androidx.media.app.NotificationCompat.MediaStyle().setShowActionsInCompactView(1, 2, 3);
+                new androidx.media.app.NotificationCompat.MediaStyle().setShowActionsInCompactView(0, 1, 2);
         if (mediaSession != null) {
             style.setMediaSession(mediaSession.getSessionToken());
         }
@@ -2198,8 +2193,8 @@ public class MediaPlayerService extends MediaBrowserServiceCompat {
     // ---------------------------------------------------------------------------------------------------------
     // Sleep timer
 
-    /** The last stretch before a timed stop: beeps, a volume fade and, with "shake", the accelerometer. */
-    private static final long SLEEP_WARNING_MS = 30_000;
+    /** The last stretch before a timed stop: beep bursts, a volume fade and, with "shake", the accelerometer. */
+    private static final long SLEEP_WARNING_MS = SleepWarning.WARNING_MS;
     private static final float SLEEP_MIN_VOLUME = 0.15f;
     /** After a timed stop with "shake": paused this long with the accelerometer on, then the full stop. */
     private static final long SLEEP_WAKE_WINDOW_MS = 60_000;
@@ -2207,9 +2202,17 @@ public class MediaPlayerService extends MediaBrowserServiceCompat {
     private static final long SLEEP_CLOCK_EXTEND_MS = 15 * 60_000L;
     private static final float SHAKE_G = 2.4f;
     private static final long SHAKE_DEBOUNCE_MS = 1_500;
-    private static final int BEEP_VOLUME = 70;
-    private static final int BEEP_MS = 100;
-    private static final long BEEP_PERIOD_MS = BEEP_MS + 150;
+    /**
+     * A beep: a DTMF tone, which lasts as long as asked (the old TONE_PROP_BEEP was cut to 35 ms whatever the
+     * duration), at full tone volume. 941 + 1633 Hz stands out of speech.
+     */
+    private static final int BEEP_TONE = ToneGenerator.TONE_DTMF_D;
+    private static final int BEEP_VOLUME = ToneGenerator.MAX_VOLUME;
+    private static final int BEEP_MS = 300;
+    private static final long BEEP_PERIOD_MS = 500;
+    private static final int BEEPS_PER_BURST = 4;
+    /** Under a burst the book plays this share of its volume before the warning, so the beeps are heard over it. */
+    private static final float BEEP_DUCK = 0.2f;
 
     /** The armed timer's {@code SleepTimerPresenter.MODE_*}, countdown duration and options, kept to re-arm it. */
     private int sleepMode;
@@ -2218,6 +2221,10 @@ public class MediaPlayerService extends MediaBrowserServiceCompat {
     private boolean sleepShake;
     /** The player volume before the warning's fade; -1 while no warning runs. */
     private float volumeBeforeWarning = -1;
+    /** Bursts already sounded in the warning running, and the uptime until which the book is ducked under one. */
+    private int beepBursts;
+    private long duckedUntil;
+    private final Runnable burstEnd = this::applyWarningVolume;
     private boolean shakeListening;
     private long lastShakeAt;
     /** The timer paused the book with "shake" on: a shake within the window plays on and re-arms it. */
@@ -2319,6 +2326,9 @@ public class MediaPlayerService extends MediaBrowserServiceCompat {
         if (volumeBeforeWarning >= 0 && sleepShake) {
             listenForShake(playing);
         }
+        if (!playing) {
+            releaseTone(activeTone); //a pause silences a burst still sounding
+        }
         if (sleepTimer == null || sleepMode == SleepTimerPresenter.MODE_CLOCK) {
             return;
         }
@@ -2330,23 +2340,46 @@ public class MediaPlayerService extends MediaBrowserServiceCompat {
         sendSleepTimerState(sleepTimer.getTimeRemaining());
     }
 
-    /** Each tick: the warning (beeps once, then the fade) while the book plays, and the screen's update. */
+    /**
+     * Each tick: the warning while the book plays (a burst of beeps at 30, 20 and 10 s left over the ducked book,
+     * and the fade), and the screen's update.
+     */
     private void onSleepTimerTick(long remaining) {
         if (sleepWarn && sleepMode != SleepTimerPresenter.MODE_END_OF_CHAPTER && remaining <= SLEEP_WARNING_MS
                 && player != null) {
             if (volumeBeforeWarning < 0 && wantPlaying) {
                 volumeBeforeWarning = player.getVolume();
-                beep(3);
+                beepBursts = 0;
                 if (sleepShake) {
                     listenForShake(true);
                 }
             }
             if (volumeBeforeWarning >= 0) {
-                player.setVolume(volumeBeforeWarning
-                        * Math.max(SLEEP_MIN_VOLUME, remaining / (float) SLEEP_WARNING_MS));
+                int due = SleepWarning.burstsDue(remaining);
+                if (wantPlaying && beepBursts < due) {
+                    beepBursts = due;
+                    duckedUntil = SystemClock.uptimeMillis() + BEEPS_PER_BURST * BEEP_PERIOD_MS;
+                    beep(BEEPS_PER_BURST);
+                    handler.removeCallbacks(burstEnd);
+                    handler.postDelayed(burstEnd, BEEPS_PER_BURST * BEEP_PERIOD_MS);
+                }
+                applyWarningVolume();
             }
         }
         sendSleepTimerState(remaining);
+    }
+
+    /** The fade for the time left, lower still while a burst sounds. */
+    private void applyWarningVolume() {
+        if (volumeBeforeWarning < 0 || player == null || sleepTimer == null) {
+            return;
+        }
+        float level = volumeBeforeWarning
+                * Math.max(SLEEP_MIN_VOLUME, sleepTimer.getTimeRemaining() / (float) SLEEP_WARNING_MS);
+        if (SystemClock.uptimeMillis() < duckedUntil) {
+            level = Math.min(level, volumeBeforeWarning * BEEP_DUCK);
+        }
+        player.setVolume(level);
     }
 
     /**
@@ -2409,7 +2442,11 @@ public class MediaPlayerService extends MediaBrowserServiceCompat {
     }
 
     private void stopSleepWarning() {
+        handler.removeCallbacks(burstEnd);
+        duckedUntil = 0;
+        beepBursts = 0;
         if (volumeBeforeWarning >= 0) {
+            releaseTone(activeTone); //a burst still sounding stops with the warning
             if (player != null) {
                 player.setVolume(volumeBeforeWarning);
             }
@@ -2503,7 +2540,7 @@ public class MediaPlayerService extends MediaBrowserServiceCompat {
         for (int i = 0; i < count; i++) {
             handler.postDelayed(() -> {
                 if (activeTone == tone) {
-                    tone.startTone(ToneGenerator.TONE_PROP_BEEP, BEEP_MS);
+                    tone.startTone(BEEP_TONE, BEEP_MS);
                 }
             }, i * BEEP_PERIOD_MS);
         }

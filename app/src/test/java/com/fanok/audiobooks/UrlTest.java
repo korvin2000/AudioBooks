@@ -27,6 +27,19 @@ public class UrlTest {
     }
 
     @Test
+    public void samePageIgnoresSchemeWwwTrailingSlashQueryAndFormerHosts() {
+        assertTrue(Url.samePage("https://knigavuhe.org/book/devjatiehtazhka-2/",
+                "http://www.knigavuhe.org/book/devjatiehtazhka-2"));
+        assertTrue(Url.samePage("https://m.knigavuhe.org/book/x/?ref=1#comments", "https://knigavuhe.org/book/x/"));
+        assertTrue(Url.samePage("https://izibuk.ru/book123", "https://izib.uk/book123"));
+        assertTrue(Url.samePage("https://akniga.org/%D0%BA%D0%BD%D0%B8%D0%B3%D0%B0", "https://akniga.org/книга/"));
+        assertFalse(Url.samePage("https://knigavuhe.org/book/x/", "https://knigavuhe.org/book/x-2/"));
+        assertFalse(Url.samePage("https://knigavuhe.org/book/x/", "https://akniga.org/book/x/"));
+        assertFalse(Url.samePage("", "https://knigavuhe.org/book/x/"));
+        assertFalse(Url.samePage(null, null));
+    }
+
+    @Test
     public void hostOfToleratesWhatBrowsersEncode() {
         // akniga links authors and readers with raw spaces; the filters on the book screen route by host
         assertEquals("akniga.org", Url.hostOf("https://akniga.org/author/Кинг Стивен/page1/"));

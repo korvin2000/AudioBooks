@@ -184,6 +184,29 @@ public class Url {
         return !host.isEmpty() && host.equals(hostOf(server));
     }
 
+    /**
+     * Whether two links open the same page: the same host (a leading {@code www.} and a site's former hosts do not
+     * count) and the same path, whatever the scheme, a trailing slash, the query or the fragment.
+     */
+    public static boolean samePage(String a, String b) {
+        String host = hostOf(a);
+        if (host.isEmpty()) {
+            return false;
+        }
+        String other = hostOf(b);
+        if (!HOST_ALIASES.getOrDefault(host, host).equals(HOST_ALIASES.getOrDefault(other, other))) {
+            return false;
+        }
+        return pathOf(a).equals(pathOf(b));
+    }
+
+    /** The decoded path of {@code url} without a trailing slash; empty for the root or an unparsable link. */
+    private static String pathOf(String url) {
+        URI uri = parse(url);
+        String path = uri == null || uri.getPath() == null ? "" : uri.getPath();
+        return path.endsWith("/") ? path.substring(0, path.length() - 1) : path;
+    }
+
     /** Drops a first-page marker ({@code /page/1/}, {@code /page/1}) that DataLife Engine sites redirect away. */
     public static String withoutFirstPage(String url) {
         int end = pathEnd(url);

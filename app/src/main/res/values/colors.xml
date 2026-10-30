@@ -35,6 +35,6 @@
 
     <color name="primaryColorBlack">#202022</color>
     <color name="primaryDarkColorBlack">#1A1A1B</color>
-    <color name="backgroundSelectedBlack">#3A3A3E</color>
+    <color name="backgroundSelectedBlack">#5C5C60</color>
     <color name="backgraundColorBlack">#0B0B0B</color>
 </resources>
