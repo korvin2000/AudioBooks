@@ -59,13 +59,6 @@ public class IzibukMenuTest {
         assertTrue(PARSER.sorts(S + "/serie10166?p=").isEmpty());
     }
 
-    // HEAD BooksFragment.java:227-228 + books_izibuk_options_menu.xml:8, 15, 22, 37: toolbar items showAsAction="ifRoom".
-    @Test
-    public void toolbarIfRoom() {
-        assertTrue(PARSER.toolbarIfRoom(S + "/?p="));
-        assertTrue(PARSER.toolbarIfRoom(S + "/genre1?p="));
-    }
-
     // ---------------------------------------------------------------- expectations
 
     // HEAD books_izibuk_options_menu.xml: new_data, popular, both always visible; HEAD BooksPresenter.java:572-579

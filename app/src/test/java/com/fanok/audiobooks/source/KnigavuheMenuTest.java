@@ -73,13 +73,6 @@ public class KnigavuheMenuTest {
         assertTrue(PARSER.sorts(S + "/serie/dozory/?page=").isEmpty());
     }
 
-    // HEAD books_options_menu.xml:8, 15, 22, 85: toolbar items showAsAction="always".
-    @Test
-    public void toolbarAlwaysShown() {
-        assertFalse(PARSER.toolbarIfRoom(S + "/new/?page="));
-        assertFalse(PARSER.toolbarIfRoom(GENRE + "<page>/"));
-    }
-
     // ---------------------------------------------------------------- expectations
 
     // HEAD books_options_menu.xml + BooksFragment.java:287-304 (not knigoblud, not abmp3): new, the popular_parent

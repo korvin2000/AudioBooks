@@ -222,11 +222,6 @@ public class BooksFragment extends MvpAppCompatFragment implements BooksView {
                 Provider provider = Provider.ofUrl(mUrl); // null for an unknown host: no sorts
                 String listing = Url.canonical(mUrl); // as the presenter lists it
                 inflater.inflate(R.menu.books_source_options_menu, menu);
-                if (provider != null && provider.parser.toolbarIfRoom(listing)) {
-                    for (int i = 0; i < menu.size(); i++) {
-                        menu.getItem(i).setShowAsAction(MenuItem.SHOW_AS_ACTION_IF_ROOM);
-                    }
-                }
                 if (provider != null) {
                     fillOrderMenu(menu, provider.parser.sorts(listing));
                 }

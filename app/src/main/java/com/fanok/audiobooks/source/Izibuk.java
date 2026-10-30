@@ -126,12 +126,6 @@ public final class Izibuk implements SourceParser {
         return MENU;
     }
 
-    /** Its menu has always shown its items only if there is room. */
-    @Override
-    public boolean toolbarIfRoom(String url) {
-        return true;
-    }
-
     /** The index and a genre rank by popularity (all time, no period) with {@code sort_pop=1}, the genre kept. */
     @Override
     public String sortUrl(Sort sort, String listingUrl) {

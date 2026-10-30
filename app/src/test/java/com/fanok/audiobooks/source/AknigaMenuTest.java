@@ -84,13 +84,6 @@ public class AknigaMenuTest {
         assertTrue(PARSER.sorts(S + "/series/%D0%94%D0%BE%D0%B7%D0%BE%D1%80%D1%8B/").isEmpty());
     }
 
-    // HEAD books_akniga_options_menu.xml:8, 15, 22, 86: toolbar items showAsAction="always".
-    @Test
-    public void toolbarAlwaysShown() {
-        assertFalse(PARSER.toolbarIfRoom(S + "/index/page<page>/"));
-        assertFalse(PARSER.toolbarIfRoom(SECTION + "page<page>/"));
-    }
-
     // ---------------------------------------------------------------- expectations
 
     // HEAD books_akniga_options_menu.xml (new, popular x5, discussed x5, collections x3) with all items visible

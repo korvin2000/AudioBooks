@@ -100,14 +100,6 @@ public interface SourceParser {
     }
 
     /**
-     * True when the toolbar items of the listing at {@code url} are shown only if there is room (the rest go to the
-     * overflow menu); by default they are always shown as icons.
-     */
-    default boolean toolbarIfRoom(String url) {
-        return false;
-    }
-
-    /**
      * The site-wide listing for {@code sort}, one of {@link #sorts}, as {@link #pageUrl} takes it; {@code listingUrl}
      * itself when it already is that listing; null when the sort is none of this site's. A genre listing's sort is
      * then narrowed by {@link #inGenre}.
