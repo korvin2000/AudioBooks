@@ -19,6 +19,7 @@ import com.fanok.audiobooks.net.MemoryCookieJar;
 import com.fanok.audiobooks.pojo.StorageUtil;
 import com.fanok.audiobooks.presenter.BookPresenter;
 import com.fanok.audiobooks.search.Provider;
+import com.fanok.audiobooks.service.PlaybackSettings;
 import com.fanok.audiobooks.util.DownloadStorageHelper;
 import com.fanok.audiobooks.util.DownloadUtil;
 
@@ -36,8 +37,14 @@ import java.util.concurrent.Executors;
 public class App extends Application {
 
     /** Name of the Media3 download store below the app-specific files directory. */
-    static final String DOWNLOAD_CACHE_DIR = "media3_downloads";
+    public static final String DOWNLOAD_CACHE_DIR = "media3_downloads";
     private static final String PREF_DOWNLOAD_CACHE_DIR = "media3_download_cache_dir";
+    /** The store a move left behind, deleted at the next start ({@link #moveStoreOnNextStart}). */
+    private static final String PREF_OLD_STORE_DIR = "media3_old_store_dir";
+    /** The id file name ({@code *.uid}) the moved store holds: the old one goes only once the open store has it. */
+    private static final String PREF_STORE_UID = "media3_store_uid";
+    /** Set once the stored "bufferSize" was moved from the old default (60 s) to the new one. */
+    private static final String PREF_BUFFER_120 = "buffer_default_120";
 
     // One download manager, cache and executor for the process lifetime, created once on first use and never
     // released or re-created: the download folder setting only names where explicit exports go.
@@ -56,6 +63,16 @@ public class App extends Application {
     }
 
     private static volatile String currentActivityName = "None";
+
+    /** The app's activities from creation to destruction (main thread only). */
+    private static final java.util.Set<android.app.Activity> LIVE_ACTIVITIES = new java.util.LinkedHashSet<>();
+
+    /** Closes every screen of the app; its tasks stay in the recent apps. Main thread only. */
+    public static void finishActivities() {
+        for (android.app.Activity activity : new java.util.ArrayList<>(LIVE_ACTIVITIES)) {
+            activity.finish();
+        }
+    }
 
     private static void appendCapped(File file, String content, int maxBytes) {
         try {
@@ -194,7 +211,9 @@ public class App extends Application {
 
         registerActivityLifecycleCallbacks(new ActivityLifecycleCallbacks() {
             @Override
-            public void onActivityCreated(@androidx.annotation.NonNull android.app.Activity activity, @androidx.annotation.Nullable android.os.Bundle savedInstanceState) {}
+            public void onActivityCreated(@androidx.annotation.NonNull android.app.Activity activity, @androidx.annotation.Nullable android.os.Bundle savedInstanceState) {
+                LIVE_ACTIVITIES.add(activity);
+            }
             @Override
             public void onActivityStarted(@androidx.annotation.NonNull android.app.Activity activity) {
                 currentActivityName = activity.getClass().getSimpleName();
@@ -210,7 +229,9 @@ public class App extends Application {
             @Override
             public void onActivitySaveInstanceState(@androidx.annotation.NonNull android.app.Activity activity, @androidx.annotation.NonNull android.os.Bundle outState) {}
             @Override
-            public void onActivityDestroyed(@androidx.annotation.NonNull android.app.Activity activity) {}
+            public void onActivityDestroyed(@androidx.annotation.NonNull android.app.Activity activity) {
+                LIVE_ACTIVITIES.remove(activity);
+            }
         });
 
         final Thread.UncaughtExceptionHandler previousHandler = Thread.getDefaultUncaughtExceptionHandler();
@@ -284,6 +305,14 @@ public class App extends Application {
         // User's original code
         SharedPreferences pref = PreferenceManager
                 .getDefaultSharedPreferences(this);
+        // the default buffer grew from 60 s to 120 s: the old default the settings screen stored moves with it, once
+        if (!pref.getBoolean(PREF_BUFFER_120, false)) {
+            SharedPreferences.Editor editor = pref.edit().putBoolean(PREF_BUFFER_120, true);
+            if ("60".equals(pref.getString("bufferSize", null))) {
+                editor.putString("bufferSize", String.valueOf(PlaybackSettings.DEFAULT_BUFFER_SECONDS));
+            }
+            editor.apply();
+        }
 
         AppThemes.applyNightMode(this);
 
@@ -297,6 +326,7 @@ public class App extends Application {
         Consts.setSOURCE(source);
 
         getDownloadManager();
+        deleteOldStore();
         // before the download service can resume the manager: the monitor sees every run from its first event and
         // takes over the resting notification an earlier process left
         DownloadMonitor.get();
@@ -366,6 +396,43 @@ public class App extends Application {
         } catch (java.util.concurrent.ExecutionException e) {
             throw new IllegalStateException("DownloadManager creation failed", e.getCause());
         }
+    }
+
+    /**
+     * Makes {@code dir}, a copy of the store, the store from the next start on, and {@code old} the store to delete
+     * then. Committed at once: the process ends right after ({@link com.fanok.audiobooks.download.StoreLocation}).
+     */
+    public void moveStoreOnNextStart(@androidx.annotation.NonNull File dir, @androidx.annotation.NonNull File old,
+                                     @androidx.annotation.NonNull String uid) {
+        PreferenceManager.getDefaultSharedPreferences(this).edit()
+                .putString(PREF_DOWNLOAD_CACHE_DIR, dir.getAbsolutePath())
+                .putString(PREF_OLD_STORE_DIR, old.getAbsolutePath())
+                .putString(PREF_STORE_UID, uid)
+                .commit();
+    }
+
+    /**
+     * The store a move left behind, now that its copy is open: deleted file by file, never through SimpleCache (that
+     * would drop the database tables the copy uses). Only a directory named like a store and not the open one, and
+     * only once the open store holds the copied id file: a store the cache had to create anew (a memory card taken
+     * out or wiped) has an id of its own. On the storage worker, after and before any move.
+     */
+    private void deleteOldStore() {
+        SharedPreferences pref = PreferenceManager.getDefaultSharedPreferences(this);
+        String old = pref.getString(PREF_OLD_STORE_DIR, null);
+        String uid = pref.getString(PREF_STORE_UID, null);
+        if (old == null) return;
+        File oldDir = new File(old);
+        File current = getDownloadCacheDir();
+        DownloadStorageHelper.submit(() -> {
+            if (uid == null || !new File(current, uid).isFile()) {
+                return; // the copy is not there: the old store stays, and waits for the next start
+            }
+            if (!oldDir.equals(current) && DOWNLOAD_CACHE_DIR.equals(oldDir.getName())) {
+                com.fanok.audiobooks.download.StoreLocation.deleteTree(oldDir);
+            }
+            pref.edit().remove(PREF_OLD_STORE_DIR).remove(PREF_STORE_UID).apply();
+        });
     }
 
     /** Directory of the Media3 download store (app-specific, never the user folder or the clearable cache dir). */

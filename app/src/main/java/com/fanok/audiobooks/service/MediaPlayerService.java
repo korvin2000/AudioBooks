@@ -24,7 +24,6 @@ import static com.fanok.audiobooks.presenter.BookPresenter.Broadcast_SET_SPEED;
 import static com.fanok.audiobooks.presenter.BookPresenter.Broadcast_SHOW_TITLE;
 import static com.fanok.audiobooks.presenter.SleepTimerPresenter.Broadcast_SleepTimer;
 
-import android.app.ActivityManager;
 import android.app.Notification;
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
@@ -95,6 +94,7 @@ import androidx.media3.exoplayer.source.MediaSource;
 import androidx.media3.exoplayer.trackselection.DefaultTrackSelector;
 import androidx.media3.extractor.DefaultExtractorsFactory;
 import androidx.preference.PreferenceManager;
+import com.fanok.audiobooks.App;
 import com.fanok.audiobooks.Hourglass;
 import com.fanok.audiobooks.R;
 import com.fanok.audiobooks.activity.BookActivity;
@@ -367,25 +367,21 @@ public class MediaPlayerService extends MediaBrowserServiceCompat {
 
     /**
      * "Выход" (the drawer, the notification's close button): playback ends, the notification goes, and every screen
-     * of the app closes and leaves the recent apps. Downloads have their own service and go on.
+     * of the app closes; the app stays in the recent apps. Downloads have their own service and go on.
      */
     public static void exitApp(@NonNull Context context) {
+        stopPlayback(context);
+        App.finishActivities();
+    }
+
+    /** Ends playback, if any, and its notification; the position is kept as on any stop. */
+    public static void stopPlayback(@NonNull Context context) {
         if (running) {
             try {
                 context.startService(new Intent(context, MediaPlayerService.class).setAction(ACTION_STOP));
             } catch (IllegalStateException e) {
                 Log.w(TAG, "stop command refused, stopping the service", e);
                 context.stopService(new Intent(context, MediaPlayerService.class));
-            }
-        }
-        closeScreens(context);
-    }
-
-    private static void closeScreens(@NonNull Context context) {
-        ActivityManager manager = (ActivityManager) context.getSystemService(Context.ACTIVITY_SERVICE);
-        if (manager != null) {
-            for (ActivityManager.AppTask task : manager.getAppTasks()) {
-                task.finishAndRemoveTask();
             }
         }
     }
@@ -2140,7 +2136,7 @@ public class MediaPlayerService extends MediaBrowserServiceCompat {
                 break;
             case ACTION_EXIT:
                 stop();
-                closeScreens(this);
+                App.finishActivities();
                 break;
             case ACTION_REWIND:
                 seekBy(-REWIND);
@@ -2697,14 +2693,15 @@ public class MediaPlayerService extends MediaBrowserServiceCompat {
             if (Settings.equalizerModel == null) {
                 Settings.equalizerModel = new EqualizerModel();
                 Settings.equalizerModel.setReverbPreset(PresetReverb.PRESET_NONE);
-                Settings.equalizerModel.setBassStrength((short) (1000 / 19));
+                Settings.equalizerModel.setBassStrength((short) 0);
             }
 
             try {
                 mEqualizer = new Equalizer(0, audioSesionId);
 
                 bassBoost = new BassBoost(0, audioSesionId);
-                bassBoost.setEnabled(Settings.isEqualizerEnabled);
+                // at the knob's minimum the effect stays off instead of running at a low strength
+                bassBoost.setEnabled(Settings.isBassOn(Settings.equalizerModel.getBassStrength()));
                 BassBoost.Settings bassBoostSettingTemp = bassBoost.getProperties();
                 BassBoost.Settings bassBoostSetting = new BassBoost.Settings(
                         bassBoostSettingTemp.toString());

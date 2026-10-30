@@ -320,6 +320,30 @@ public class BooksPresenter extends MvpPresenter<BooksView> implements
         return ListingFilters.filter(items, effectiveDuration(), ListingFilters.cardGenre(mProvider, mUrl));
     }
 
+    /**
+     * The list ends on screen, so no scroll asks for more: the next page, unless a duration or genre filter is on —
+     * its hunt fetches within its own budget and the filter strip offers the rest.
+     */
+    public void loadToFill() {
+        boolean filtering = mModelId == Consts.MODEL_BOOKS
+                && !(effectiveDuration().isAny() && ListingFilters.cardGenre(mProvider, mUrl) == null);
+        if (filtering || isLoading || cursor().isEnd()) {
+            return;
+        }
+        int count = cursor().items().size();
+        // a site that keeps sending pages without a card: a few, then scrolling or a refresh decides
+        mFillsWithoutCards = count == mFillCount ? mFillsWithoutCards + 1 : 0;
+        mFillCount = count;
+        if (mFillsWithoutCards <= MAX_FILLS_WITHOUT_CARDS) {
+            loadBoks();
+        }
+    }
+
+    private static final int MAX_FILLS_WITHOUT_CARDS = 3;
+    /** The list size the last {@link #loadToFill} saw, and how many fills in a row found it unchanged. */
+    private int mFillCount = -1;
+    private int mFillsWithoutCards;
+
     /** Starts a hunt that counts the matches beyond {@code baseShown} cards. */
     private void startHunt(int baseShown) {
         mHuntBaseShown = baseShown;

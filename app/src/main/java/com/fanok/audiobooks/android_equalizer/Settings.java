@@ -48,6 +48,24 @@ public class Settings {
         }
     }
 
+    /** Steps of the bass knob above 0, "off". */
+    public static final int BASS_STEPS = 19;
+
+    /** The bass knob's step of a strength (0..1000); a strength below the first step is "off". */
+    public static int bassStep(short strength) {
+        return Math.max(0, Math.min(BASS_STEPS, strength * BASS_STEPS / 1000));
+    }
+
+    /** The strength of a bass knob step, the smallest that reads back as that step. */
+    public static short bassStrength(int step) {
+        return (short) Math.ceil(step * 1000.0 / BASS_STEPS);
+    }
+
+    /** Bass boost runs only above "off": at the knob's minimum the effect is disabled, not run at a low strength. */
+    public static boolean isBassOn(short strength) {
+        return isEqualizerEnabled && bassStep(strength) > 0;
+    }
+
     /** An insert reverb runs only with a room chosen: even at PRESET_NONE it takes over the session's volume. */
     public static boolean isReverbOn(short preset) {
         return isEqualizerEnabled && preset != PresetReverb.PRESET_NONE;

@@ -14,6 +14,22 @@ import org.junit.Test;
 public class DownloadStorageHelperTest {
 
     @Test
+    public void everySiteHasItsFolderByItsCurrentHostAndAliases() {
+        assertEquals("Knigoblud", DownloadStorageHelper.getSourceName("https://www.knigoblud.club/book/x"));
+        assertEquals("Knigoblud", DownloadStorageHelper.getSourceName("https://mob.knigoblud.club/book/x"));
+        assertEquals("Otrub", DownloadStorageHelper.getSourceName("https://otrub.in/book/x.html"));
+        assertEquals("Otrub", DownloadStorageHelper.getSourceName("https://m.otrub.in/book/x.html"));
+        assertEquals("BazaKnig", DownloadStorageHelper.getSourceName("https://baza-knig.top/x.html"));
+        assertEquals("Audioboo", DownloadStorageHelper.getSourceName("https://audioboo.org/x.html"));
+        assertEquals("Uknig", DownloadStorageHelper.getSourceName("https://uknig.com/x.html"));
+        for (com.fanok.audiobooks.search.Provider provider : com.fanok.audiobooks.search.Provider.values()) {
+            assertNotEquals(provider.name(), "Audiobooks", DownloadStorageHelper.getSourceName(provider.server + "/b"));
+        }
+        assertEquals("Audiobooks", DownloadStorageHelper.getSourceName("https://example.com/b"));
+        assertEquals("Audiobooks", DownloadStorageHelper.getSourceName(null));
+    }
+
+    @Test
     public void aPendingDownloadInAnyStateKeepsTheBookRows() {
         for (int state : new int[]{Download.STATE_QUEUED, Download.STATE_DOWNLOADING, Download.STATE_STOPPED,
                 Download.STATE_FAILED, Download.STATE_RESTARTING, Download.STATE_COMPLETED}) {

@@ -23,6 +23,7 @@ import android.provider.SearchRecentSuggestions;
 import android.util.Log;
 import android.util.TypedValue;
 import android.widget.TextView;
+import android.text.format.Formatter;
 import android.widget.Toast;
 
 import androidx.activity.result.ActivityResultLauncher;
@@ -40,6 +41,7 @@ import androidx.preference.PreferenceFragmentCompat;
 import androidx.preference.PreferenceGroup;
 import androidx.preference.PreferenceManager;
 import androidx.preference.PreferenceScreen;
+import com.fanok.audiobooks.App;
 import com.fanok.audiobooks.AppThemes;
 import com.fanok.audiobooks.Consts;
 import com.fanok.audiobooks.MySuggestionProvider;
@@ -49,6 +51,7 @@ import com.fanok.audiobooks.activity.ActivityImport;
 import com.fanok.audiobooks.activity.ClearSavedActivity;
 import com.fanok.audiobooks.activity.MainActivity;
 import com.fanok.audiobooks.activity.ParentalControlActivity;
+import com.fanok.audiobooks.download.StoreLocation;
 import com.fanok.audiobooks.model.AudioDBModel;
 import com.fanok.audiobooks.model.AudioListDBModel;
 import com.fanok.audiobooks.model.BooksDBModel;
@@ -622,6 +625,90 @@ public class SettingsFragment extends PreferenceFragmentCompat implements
         preferenceClickListner("pref_download_path", preference -> {
             showDownloadFolderDialog();
             return true;
+        });
+
+        Preference storePref = findPreference("pref_store_dir");
+        if (storePref != null) {
+            File store = App.getInstance().getDownloadCacheDir();
+            storePref.setSummary(getString(R.string.store_dir_summary, store.getAbsolutePath(),
+                    Formatter.formatShortFileSize(requireContext(), store.getUsableSpace())));
+            storePref.setOnPreferenceClickListener(preference -> {
+                showStoreDialog();
+                return true;
+            });
+        }
+
+        preferenceChangeListner(DownloadStorageHelper.PREF_AUTO_EXPORT, (preference, newValue) -> {
+            if (Boolean.TRUE.equals(newValue)) {
+                // once the value is stored: downloads completed while it was off go to the download folder now
+                Context app = requireContext().getApplicationContext();
+                new android.os.Handler(android.os.Looper.getMainLooper())
+                        .post(() -> DownloadStorageHelper.exportPending(app));
+            }
+            return true;
+        });
+    }
+
+    /** The volumes the download store can live on, the current one checked; another one moves it there. */
+    private void showStoreDialog() {
+        Context context = requireContext();
+        List<StoreLocation.Volume> volumes = StoreLocation.volumes(context);
+        File current = App.getInstance().getDownloadCacheDir();
+        CharSequence[] items = new CharSequence[volumes.size()];
+        int checked = -1;
+        for (int i = 0; i < items.length; i++) {
+            StoreLocation.Volume volume = volumes.get(i);
+            items[i] = getString(R.string.store_volume_item,
+                    getString(volume.removable ? R.string.store_volume_removable : R.string.store_volume_primary),
+                    Formatter.formatShortFileSize(context, volume.freeBytes()), volume.store.getAbsolutePath());
+            if (volume.store.equals(current)) {
+                checked = i;
+            }
+        }
+        new AlertDialog.Builder(context)
+                .setTitle(R.string.store_dir_dialog)
+                .setSingleChoiceItems(items, checked, (dialog, which) -> {
+                    dialog.dismiss();
+                    File target = volumes.get(which).store;
+                    if (!target.equals(current)) {
+                        confirmStoreMove(current, target);
+                    }
+                })
+                .setNegativeButton(R.string.cancel, null)
+                .show();
+    }
+
+    private void confirmStoreMove(@NonNull File current, @NonNull File target) {
+        final Context app = requireContext().getApplicationContext();
+        DownloadStorageHelper.submit(() -> {
+            long size = StoreLocation.size(current);
+            new android.os.Handler(android.os.Looper.getMainLooper()).post(() -> {
+                Context context = getContext();
+                if (context == null) {
+                    return;
+                }
+                String where = target.getAbsolutePath();
+                String message = size > 0
+                        ? getString(R.string.store_move_confirm, Formatter.formatShortFileSize(context, size), where)
+                        : getString(R.string.store_switch_confirm, where);
+                new AlertDialog.Builder(context)
+                        .setTitle(R.string.store_dir_dialog)
+                        .setMessage(message)
+                        .setNegativeButton(R.string.cancel, null)
+                        .setPositiveButton(R.string.ok, (d, w) -> {
+                            AlertDialog progress = new AlertDialog.Builder(context)
+                                    .setMessage(R.string.store_moving)
+                                    .setCancelable(false)
+                                    .show();
+                            StoreLocation.move(app, target, error -> {
+                                if (progress.isShowing()) {
+                                    progress.dismiss();
+                                }
+                                Toast.makeText(app, error, Toast.LENGTH_LONG).show();
+                            });
+                        })
+                        .show();
+            });
         });
     }
 

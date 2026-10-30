@@ -177,11 +177,13 @@ public class SearchableActivity extends MvpAppCompatActivity implements Searchab
             @Override
             public void onScrolled(@NonNull RecyclerView recyclerView, int dx, int dy) {
                 super.onScrolled(recyclerView, dx, dy);
-                int lastCompletelyVisibleItemPosition =
-                        ((LinearLayoutManager) Objects.requireNonNull(
-                                recyclerView.getLayoutManager())).findLastVisibleItemPosition();
-                if (mModelId != Consts.MODEL_GENRE
-                        && lastCompletelyVisibleItemPosition > getCount() - 3 && dy > 0) {
+                if (dy == 0) {
+                    loadToFill(); // a layout changed the visible range
+                    return;
+                }
+                int lastVisible = ((LinearLayoutManager) Objects.requireNonNull(
+                        recyclerView.getLayoutManager())).findLastVisibleItemPosition();
+                if (mModelId != Consts.MODEL_GENRE && dy > 0 && lastVisible > getCount() - 3) {
                     mPresenter.loadNext();
                 }
             }
@@ -432,6 +434,13 @@ public class SearchableActivity extends MvpAppCompatActivity implements Searchab
             binding.progressBarLayout.getRoot().setVisibility(View.VISIBLE);
         } else {
             binding.progressBarLayout.getRoot().setVisibility(View.GONE);
+        }
+    }
+
+    /** Results that end on screen (a tablet's grid holds a whole page) leave nothing to scroll for the next page. */
+    private void loadToFill() {
+        if (mModelId != Consts.MODEL_GENRE && getCount() > 0 && !binding.list.canScrollVertically(1)) {
+            mPresenter.loadNext();
         }
     }
 

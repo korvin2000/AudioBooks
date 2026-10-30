@@ -18,6 +18,7 @@ import androidx.media3.datasource.cache.Cache;
 import androidx.media3.exoplayer.offline.Download;
 import androidx.media3.exoplayer.offline.DownloadIndex;
 import androidx.media3.exoplayer.offline.DownloadService;
+import com.fanok.audiobooks.App;
 import com.fanok.audiobooks.activity.BookActivity;
 import com.fanok.audiobooks.download.DownloadIds;
 import com.fanok.audiobooks.broadcasts.DownloadActionReceiver;
@@ -25,6 +26,7 @@ import com.fanok.audiobooks.model.AudioListDBModel;
 import com.fanok.audiobooks.model.BooksDBModel;
 import com.fanok.audiobooks.pojo.BookPOJO;
 import com.fanok.audiobooks.room.BooksAudioEntity;
+import com.fanok.audiobooks.search.Provider;
 import com.fanok.audiobooks.service.ExoDownloadService;
 import java.io.File;
 import java.io.IOException;
@@ -41,6 +43,15 @@ import java.util.concurrent.Executors;
 public class DownloadStorageHelper {
 
     public static final String PREF_DOWNLOAD_PATH = "pref_download_path";
+    public static final String PREF_AUTO_EXPORT = "auto_export";
+
+    /**
+     * Whether completed downloads go to the download folder on their own (the default); off, a book stays in the
+     * download store only, played offline by the app, and "Экспорт в папку" copies it on request.
+     */
+    public static boolean autoExport(@NonNull Context context) {
+        return PreferenceManager.getDefaultSharedPreferences(context).getBoolean(PREF_AUTO_EXPORT, true);
+    }
     public static final String PREF_DOWNLOAD_URI = "pref_download_uri";
 
     /** One worker serialises library scans and deletions so their read-modify-write passes never interleave. */
@@ -245,9 +256,18 @@ public class DownloadStorageHelper {
     @androidx.annotation.OptIn(markerClass = androidx.media3.common.util.UnstableApi.class)
     public static void exportBooks(@NonNull Context context, @NonNull Collection<String> bookUrls,
                                    @Nullable ExportCallback callback) {
+        exportBooks(context, bookUrls, false, callback);
+    }
+
+    /** {@code automatic}: asked by the "auto_export" setting, and dropped if it is off by the time the export runs. */
+    public static void exportBooks(@NonNull Context context, @NonNull Collection<String> bookUrls, boolean automatic,
+                                   @Nullable ExportCallback callback) {
         final Context app = context.getApplicationContext();
         final List<String> urls = new ArrayList<>(bookUrls);
         STORAGE.execute(() -> {
+            if (automatic && !autoExport(app)) {
+                return;
+            }
             Tally tally = new Tally();
             try {
                 Cache cache = DownloadUtil.getDownloadCache();
@@ -277,6 +297,7 @@ public class DownloadStorageHelper {
     public static void exportPending(@NonNull Context context) {
         final Context app = context.getApplicationContext();
         STORAGE.execute(() -> {
+            if (!autoExport(app)) return;
             Set<String> bookUrls = new java.util.LinkedHashSet<>();
             try (androidx.media3.exoplayer.offline.DownloadCursor cursor = DownloadUtil.getDownloadManager()
                     .getDownloadIndex().getDownloads(Download.STATE_COMPLETED)) {
@@ -287,7 +308,7 @@ public class DownloadStorageHelper {
             } catch (Exception e) {
                 android.util.Log.w("DownloadStorageHelper", "Download index unreadable", e);
             }
-            if (!bookUrls.isEmpty()) exportBooks(app, bookUrls, null);
+            if (!bookUrls.isEmpty()) exportBooks(app, bookUrls, true, null);
         });
     }
 
@@ -400,7 +421,8 @@ public class DownloadStorageHelper {
                 return 0;
             }
         }
-        final File work = toDir ? dir : context.getCacheDir();
+        // a stream's chapter is cut out next to the store, on the volume chosen for it, before going to a SAF folder
+        final File work = toDir ? dir : App.getInstance().getDownloadCacheDir().getParentFile();
         removeStaleTemps(work);
         List<ChapterExtractor.Clip> clips = new ArrayList<>(at.size());
         for (int i : at) {
@@ -805,20 +827,27 @@ public class DownloadStorageHelper {
         }
     }
 
+    /** The book's site folder below the download folder, by {@link Provider#ofUrl}: every host alias of a site. */
     @NonNull
     public static String getSourceName(@Nullable String bookUrl) {
-        if (bookUrl == null || bookUrl.isEmpty()) return "Audiobooks";
-        if (bookUrl.contains("akniga.org")) return "Akniga";
-        if (bookUrl.contains("knigavuhe.org")) return "KnigaVUhe";
-        if (bookUrl.contains("abook.org")) return "Abook";
-        if (bookUrl.contains("izib.uk") || bookUrl.contains("izibuc")) return "Izibuk";
-        if (bookUrl.contains("abmp3.org") || bookUrl.contains("audiobook-mp3")) return "AudioBookMP3";
-        if (bookUrl.contains("baza-knig.ru")) return "BazaKnig";
-        if (bookUrl.contains("knigoblud.com")) return "Knigoblud";
-        if (bookUrl.contains("audioboo.ru")) return "Audioboo";
-        if (bookUrl.contains("otrub.ru")) return "Otrub";
-        if (bookUrl.contains("poleknig.com")) return "Poleknig";
-        return "Audiobooks";
+        Provider provider = bookUrl == null || bookUrl.isEmpty() ? null : Provider.ofUrl(bookUrl);
+        if (provider == null) return "Audiobooks";
+        switch (provider) {
+            case AKNIGA: return "Akniga";
+            case KNIGAVUHE: return "KnigaVUhe";
+            case IZIBUK: return "Izibuk";
+            case ABMP3: return "AudioBookMP3";
+            case BAZA_KNIG: return "BazaKnig";
+            case KNIGOBLUD: return "Knigoblud";
+            case AUDIOBOO: return "Audioboo";
+            case OTRUB: return "Otrub";
+            case POLEKNIG: return "Poleknig";
+            case UKNIG: return "Uknig";
+            case AUDIOKNIGI_FUN: return "AudioknigiFun";
+            case AKNIG_XYZ: return "AknigXyz";
+            case AUDIOKNIGA_LIFE: return "AudioknigaLife";
+            default: return "Audiobooks";
+        }
     }
 
     @NonNull

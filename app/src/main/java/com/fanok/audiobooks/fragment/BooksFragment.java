@@ -325,12 +325,17 @@ public class BooksFragment extends MvpAppCompatFragment implements BooksView {
             @Override
             public void onScrolled(@NonNull RecyclerView recyclerView, int dx, int dy) {
                 super.onScrolled(recyclerView, dx, dy);
-                int lastCompletelyVisibleItemPosition =
-                        ((LinearLayoutManager) Objects.requireNonNull(
-                                recyclerView.getLayoutManager())).findLastVisibleItemPosition();
-                if (modelID != Consts.MODEL_GENRE
-                        && lastCompletelyVisibleItemPosition > getCount() - 15 && dy > 0) {
-                    getPresenter().loadBoks();
+                if (modelID == Consts.MODEL_GENRE) {
+                    return;
+                }
+                if (dy > 0) {
+                    int lastVisible = ((LinearLayoutManager) Objects.requireNonNull(
+                            recyclerView.getLayoutManager())).findLastVisibleItemPosition();
+                    if (lastVisible > getCount() - 15) {
+                        getPresenter().loadBoks();
+                    }
+                } else if (dy == 0) {
+                    fillScreen(); // a layout changed the visible range: a page came, the view came back, a resize
                 }
             }
         });
@@ -441,6 +446,9 @@ public class BooksFragment extends MvpAppCompatFragment implements BooksView {
     public void showDataBooks(@NonNull ArrayList<BookPOJO> books) {
         if (mAddapterBooks != null) {
             mAddapterBooks.setItem(books); // Используем setData, который мы ранее исправили
+            // after the layout: a page that added no card (all filtered out, or an empty page) moves no visible
+            // range, so no scroll event asks for the next one
+            binding.list.post(this::fillScreen);
         } else {
             // Если адаптер еще не создан, это может быть ошибкой в логике,
             // но на всякий случай можно добавить обработку.
@@ -904,6 +912,13 @@ public class BooksFragment extends MvpAppCompatFragment implements BooksView {
                     }
                     break;
             }
+        }
+    }
+
+    /** A list that ends on screen (a page fits a tablet's grid) leaves nothing to scroll for the next page. */
+    private void fillScreen() {
+        if (binding != null && modelID != Consts.MODEL_GENRE && !binding.list.canScrollVertically(1)) {
+            getPresenter().loadToFill();
         }
     }
 

@@ -149,7 +149,7 @@ public class DialogEqualizerFragment extends DialogFragment {
         if (Settings.equalizerModel == null) {
             Settings.equalizerModel = new EqualizerModel();
             Settings.equalizerModel.setReverbPreset(PresetReverb.PRESET_NONE);
-            Settings.equalizerModel.setBassStrength((short) (1000 / 19));
+            Settings.equalizerModel.setBassStrength((short) 0);
         }
 
         try {
@@ -163,7 +163,7 @@ public class DialogEqualizerFragment extends DialogFragment {
             BassBoost.Settings bassBoostSetting = new BassBoost.Settings(bassBoost.getProperties().toString());
             bassBoostSetting.strength = Settings.equalizerModel.getBassStrength();
             bassBoost.setProperties(bassBoostSetting);
-            bassBoost.setEnabled(Settings.isEqualizerEnabled);
+            bassBoost.setEnabled(Settings.isBassOn(bassBoostSetting.strength));
         } catch (RuntimeException e) {
             Log.w(TAG, "No bass boost", e);
             bassBoost = null;
@@ -235,10 +235,10 @@ public class DialogEqualizerFragment extends DialogFragment {
         equalizerSwitch.setChecked(Settings.isEqualizerEnabled);
         equalizerSwitch.setOnCheckedChangeListener((buttonView, isChecked) -> {
             mEqualizer.setEnabled(isChecked);
-            if (bassBoost != null) {
-                bassBoost.setEnabled(isChecked);
-            }
             Settings.isEqualizerEnabled = isChecked;
+            if (bassBoost != null) {
+                bassBoost.setEnabled(Settings.isBassOn(Settings.equalizerModel.getBassStrength()));
+            }
             if (presetReverb != null) {
                 presetReverb.setEnabled(Settings.isReverbOn(Settings.equalizerModel.getReverbPreset()));
             }
@@ -255,6 +255,8 @@ public class DialogEqualizerFragment extends DialogFragment {
         bassController = view.findViewById(R.id.controllerBass);
         reverbController = view.findViewById(R.id.controller3D);
 
+        bassController.setMax(Settings.BASS_STEPS);
+        reverbController.setMax(PresetReverb.PRESET_PLATE); // one step per room, 0 being none
         bassController.setLabel(getString(R.string.equalizer_bass));
         reverbController.setLabel(getString(R.string.equalizer_3d));
         bassController.setEnabled(bassBoost != null);
@@ -272,7 +274,7 @@ public class DialogEqualizerFragment extends DialogFragment {
         if (!Settings.isEqualizerReloaded) {
             if (bassBoost != null) {
                 try {
-                    x = ((bassBoost.getRoundedStrength() * 19) / 1000);
+                    x = Settings.bassStep(bassBoost.getRoundedStrength());
                 } catch (Exception e) {
                     Log.e(TAG, "onViewCreated: " + e.getLocalizedMessage());
                 }
@@ -280,24 +282,25 @@ public class DialogEqualizerFragment extends DialogFragment {
 
             if (presetReverb != null) {
                 try {
-                    y = (presetReverb.getPreset() * 19) / 6;
+                    y = presetReverb.getPreset();
                 } catch (Exception e) {
                     Log.e(TAG, "onViewCreated: " + e.getLocalizedMessage());
                 }
             }
         } else {
-            x = ((Settings.bassStrength * 19) / 1000);
-            y = (Settings.reverbPreset * 19) / 6;
+            x = Settings.bassStep(Settings.bassStrength);
+            y = Settings.reverbPreset;
         }
-        bassController.setProgress(x == 0 ? 1 : x);
-        reverbController.setProgress(y == 0 ? 1 : y);
+        bassController.setProgress(x);
+        reverbController.setProgress(y);
 
         bassController.setOnProgressChangedListener(
                 progress -> {
-                    Settings.bassStrength = (short) (((float) 1000 / 19) * (progress));
+                    Settings.bassStrength = Settings.bassStrength(progress);
                     try {
                         if (bassBoost != null) {
                             bassBoost.setStrength(Settings.bassStrength);
+                            bassBoost.setEnabled(Settings.isBassOn(Settings.bassStrength));
                         }
                         Settings.equalizerModel.setBassStrength(Settings.bassStrength);
                     } catch (Exception e) {
@@ -307,7 +310,7 @@ public class DialogEqualizerFragment extends DialogFragment {
 
         reverbController.setOnProgressChangedListener(
                 progress -> {
-                    Settings.reverbPreset = (short) ((progress * 6) / 19);
+                    Settings.reverbPreset = (short) progress;
                     try {
                         if (presetReverb != null) {
                             presetReverb.setPreset(Settings.reverbPreset);

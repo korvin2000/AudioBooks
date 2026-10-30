@@ -141,7 +141,9 @@ public class ExoDownloadService extends DownloadService {
                     }
                     notifyChanged(context);
                     String bookUrl = DownloadUtil.bookUrlOf(download.request);
-                    if (bookUrl != null && !bookUrl.isEmpty()) export(context, bookUrl);
+                    if (bookUrl != null && !bookUrl.isEmpty() && DownloadStorageHelper.autoExport(context)) {
+                        export(context, bookUrl);
+                    }
                 });
             } else {
                 notifyChanged(context);
@@ -150,7 +152,7 @@ public class ExoDownloadService extends DownloadService {
 
         /** The completed chapters of the book go to the download folder; a failure is told, the download stays. */
         private static void export(@NonNull Context context, @NonNull String bookUrl) {
-            DownloadStorageHelper.exportBooks(context, java.util.Collections.singleton(bookUrl),
+            DownloadStorageHelper.exportBooks(context, java.util.Collections.singleton(bookUrl), true,
                     (exported, failed, error) -> {
                         if (failed == 0) return;
                         android.widget.Toast.makeText(context, context.getString(R.string.auto_export_failed,

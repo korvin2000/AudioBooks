@@ -145,11 +145,6 @@
             android:summary="@string/cutting_file_desc"
             android:title="@string/cutting_file" />
 
-        <EditTextPreference
-            android:defaultValue="60"
-            android:icon="@drawable/ic_buffer"
-            android:key="bufferSize"
-            android:title="@string/buffer_size" />
     </PreferenceScreen>
 
     <PreferenceScreen
@@ -214,6 +209,18 @@
             android:key="pref_download_path"
             android:summary="@string/select_folder"
             android:title="@string/pref_download_path" />
+
+        <Preference
+            android:icon="@drawable/ic_sd_storage"
+            android:key="pref_store_dir"
+            android:title="@string/store_dir" />
+
+        <CheckBoxPreference
+            android:defaultValue="true"
+            android:icon="@drawable/ic_file_copy"
+            android:key="auto_export"
+            android:summary="@string/auto_export_desc"
+            android:title="@string/auto_export" />
 
         <Preference
             android:icon="@drawable/ic_download_pref"
@@ -329,6 +336,12 @@
             android:icon="@drawable/ic_application"
             android:key="pref_start_screen"
             android:title="@string/setting_start_menu" />
+
+        <EditTextPreference
+            android:defaultValue="120"
+            android:icon="@drawable/ic_buffer"
+            android:key="bufferSize"
+            android:title="@string/buffer_size" />
 
         <Preference
             android:icon="@drawable/ic_lock"

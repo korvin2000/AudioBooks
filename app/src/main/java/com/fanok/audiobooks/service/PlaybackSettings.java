@@ -16,7 +16,7 @@ public final class PlaybackSettings {
     public static final float MIN_SPEED = 0.25f;
     public static final float MAX_SPEED = 4.0f;
 
-    public static final int DEFAULT_BUFFER_SECONDS = 60;
+    public static final int DEFAULT_BUFFER_SECONDS = 120;
     /** The settings screen accepts at most three digits. */
     public static final int MAX_BUFFER_SECONDS = 999;
     public static final int BACK_BUFFER_MS = 30_000;
