@@ -260,6 +260,7 @@ public class DownloadStorageHelper {
     }
 
     /** {@code automatic}: asked by the "auto_export" setting, and dropped if it is off by the time the export runs. */
+    @androidx.annotation.OptIn(markerClass = androidx.media3.common.util.UnstableApi.class)
     public static void exportBooks(@NonNull Context context, @NonNull Collection<String> bookUrls, boolean automatic,
                                    @Nullable ExportCallback callback) {
         final Context app = context.getApplicationContext();
