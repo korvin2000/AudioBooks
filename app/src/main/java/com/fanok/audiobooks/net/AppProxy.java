@@ -255,6 +255,23 @@ public final class AppProxy {
     }
 
     /**
+     * {@code client} for the audio of a book of {@code provider}: a source set to go direct fetches it the device's
+     * own way on every host, as its pages. The per-host route would send a CDN that several sites share (archive.org)
+     * through the mode's proxy, which may not serve it: the book page loads and the audio fails.
+     */
+    @NonNull
+    public static okhttp3.OkHttpClient mediaClient(@Nullable Provider provider, @NonNull okhttp3.OkHttpClient client) {
+        return provider != null && isDirect(provider) ? onDeviceRoute(client, system) : client;
+    }
+
+    /** {@code client} with the device's own route ({@code device}, the selector before ours) for every host. */
+    @NonNull
+    static okhttp3.OkHttpClient onDeviceRoute(@NonNull okhttp3.OkHttpClient client, @Nullable ProxySelector device) {
+        return device != null ? client.newBuilder().proxySelector(device).build()
+                : client.newBuilder().proxy(Proxy.NO_PROXY).build();
+    }
+
+    /**
      * True when the mode's proxy can carry a request now: the built-in proxy of a build that has it, or a verified
      * public proxy in the automatic mode. Otherwise "through the proxy" is in fact direct.
      */

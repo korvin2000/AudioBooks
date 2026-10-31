@@ -88,6 +88,36 @@ public class AppProxyTest {
                 AppProxy.isProxied(Provider.AKNIGA, Collections.<String>emptySet()));
     }
 
+    /** A direct source's audio leaves the app's selector for the device's own route, so a shared CDN goes direct too. */
+    @Test
+    public void aDirectSourcesMediaTakeTheDeviceRouteOnEveryHost() {
+        okhttp3.OkHttpClient shared = new okhttp3.OkHttpClient.Builder().proxySelector(new ProxySelector() {
+            @Override
+            public java.util.List<Proxy> select(URI uri) {
+                return Collections.singletonList(SOCKS);
+            }
+
+            @Override
+            public void connectFailed(URI uri, java.net.SocketAddress sa, java.io.IOException ioe) {
+            }
+        }).build();
+        ProxySelector device = new ProxySelector() {
+            @Override
+            public java.util.List<Proxy> select(URI uri) {
+                return Collections.singletonList(Proxy.NO_PROXY);
+            }
+
+            @Override
+            public void connectFailed(URI uri, java.net.SocketAddress sa, java.io.IOException ioe) {
+            }
+        };
+        assertSame(device, AppProxy.onDeviceRoute(shared, device).proxySelector());
+        assertEquals("before the selector is installed", Proxy.NO_PROXY, AppProxy.onDeviceRoute(shared, null).proxy());
+        assertSame("a source on the proxy route keeps the shared client", shared,
+                AppProxy.mediaClient(Provider.UKNIG, shared));
+        assertSame(shared, AppProxy.mediaClient(null, shared));
+    }
+
     @Test
     public void theDirectSetIsReadSafely() {
         FakePrefs prefs = new FakePrefs();

@@ -37,6 +37,7 @@ import com.fanok.audiobooks.model.AudioListDBModel;
 import com.fanok.audiobooks.pojo.AudioPOJO;
 import com.fanok.audiobooks.pojo.BookPOJO;
 import com.fanok.audiobooks.room.BooksAudioEntity;
+import com.fanok.audiobooks.net.AppProxy;
 import com.fanok.audiobooks.search.Provider;
 import com.fanok.audiobooks.service.ExoDownloadService;
 import com.fanok.audiobooks.source.SourceParser;
@@ -136,6 +137,7 @@ public class DownloadUtil {
     @NonNull
     static DataSource.Factory upstreamFor(@NonNull Context context, @Nullable String bookUrl,
                                           @NonNull okhttp3.OkHttpClient client) {
+        client = AppProxy.mediaClient(bookUrl == null ? null : Provider.ofUrl(bookUrl), client);
         Map<String, String> cookies = requestCookies(bookUrl);
         if (!cookies.isEmpty()) {
             client = client.newBuilder().cookieJar(App.getCookieJar().with(Provider.ofUrl(bookUrl).server, cookies))
