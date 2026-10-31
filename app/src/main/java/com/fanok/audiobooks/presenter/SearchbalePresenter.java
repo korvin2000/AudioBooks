@@ -46,7 +46,8 @@ import java.util.List;
 public class SearchbalePresenter extends MvpPresenter<SearchableView> implements
         SearchablePresenter {
 
-    private static final long SOURCE_TIMEOUT_SECONDS = 10;
+    /** A site's search may take this long; one that declares slow pages ({@code timeoutMs}) gets longer. */
+    private static final long SOURCE_TIMEOUT_SECONDS = 20;
 
     private final int mModelId;
     private final SharedPreferences mPreferences;
@@ -264,6 +265,11 @@ public class SearchbalePresenter extends MvpPresenter<SearchableView> implements
                     @Override
                     public Single<ProviderPage<BookPOJO>> load(String query, int page) {
                         return Single.fromCallable(() -> mBooksModel.search(provider, query, page));
+                    }
+
+                    @Override
+                    public long timeoutSeconds() {
+                        return provider.requestSeconds();
                     }
                 });
             }

@@ -157,23 +157,27 @@ public class OtherSourceModelTest {
     }
 
     @Test
-    public void slowSourceTimesOutAtTenSecondsWhileTheOthersAreDelivered() {
+    public void slowSourceTimesOutAtItsLimitWhileTheOthersAreDelivered() {
         TestScheduler time = new TestScheduler();
         List<Single<ArrayList<OtherArtistPOJO>>> lookups = Arrays.asList(
                 Single.just(found("https://akniga.org/a")),
                 Single.timer(60, TimeUnit.SECONDS, time).map(t -> found("https://slow.example.com/")),
                 Single.error(new IOException("connection reset")),
-                Single.timer(5, TimeUnit.SECONDS, time).map(t -> found("https://izib.uk/b")));
+                Single.timer(5, TimeUnit.SECONDS, time).map(t -> found("https://izib.uk/b")),
+                // a site that declares slow pages has its own, longer limit
+                Single.timer(12, TimeUnit.SECONDS, time).map(t -> found("https://audioknigi.fun/c")));
 
-        TestObserver<ArrayList<OtherArtistPOJO>> observer = OtherSourceModel.searchAll(lookups, time).test();
-        time.advanceTimeBy(9, TimeUnit.SECONDS);
+        TestObserver<ArrayList<OtherArtistPOJO>> observer =
+                OtherSourceModel.searchAll(lookups, Arrays.asList(10L, 10L, 10L, 10L, 30L), time).test();
+        time.advanceTimeBy(11, TimeUnit.SECONDS);
         observer.assertNoValues().assertNotComplete();
         time.advanceTimeBy(1, TimeUnit.SECONDS);
         observer.assertComplete().assertNoErrors().assertValueCount(1);
         List<OtherArtistPOJO> all = observer.values().get(0);
-        assertEquals(2, all.size());
+        assertEquals(3, all.size());
         assertEquals("https://akniga.org/a", all.get(0).getUrl());
         assertEquals("https://izib.uk/b", all.get(1).getUrl());
+        assertEquals("https://audioknigi.fun/c", all.get(2).getUrl());
     }
 
     @Test

@@ -36,8 +36,11 @@ public class LiveDumpTest {
 
     private static final int CARDS = 40;
     private static final String QUERY = "Кинг";
+    /** Searches timed against the site's limit ({@link Provider#requestSeconds}): several words are slower. */
+    private static final String[] TIMED = {"Чужой", "маг поневоле"};
 
     private File pages;
+    private final StringBuilder timings = new StringBuilder();
     /** URLs fetched live in this run: each once. */
     private final java.util.Set<String> fetched = new java.util.HashSet<>();
     private StringBuilder out;
@@ -63,6 +66,26 @@ public class LiveDumpTest {
                 line("ABORTED " + t);
             }
             Files.write(new File(target, p.name() + ".txt").toPath(), out.toString().getBytes(StandardCharsets.UTF_8));
+            time(p);
+        }
+        // live times differ between runs: kept apart from the outputs that are compared
+        Files.write(new File(target, "search-times.txt").toPath(), timings.toString().getBytes(StandardCharsets.UTF_8));
+    }
+
+    /** One line per timed search; "SLOW" above half the limit, where a phone's slower network ends it as TIMEOUT. */
+    private void time(Provider p) {
+        for (String q : TIMED) {
+            String url = p.parser.searchUrl(SearchUrls.Category.BOOKS, q, 1);
+            long start = System.nanoTime();
+            String result;
+            try {
+                result = p.parser.searchResults(p.parser.fetch(url), 1).status.name();
+            } catch (Throwable t) {
+                result = "FAILED " + t;
+            }
+            long ms = (System.nanoTime() - start) / 1_000_000;
+            timings.append(String.format("%-16s %-14s %6d ms of %d s %s%s%n", p, q, ms, p.requestSeconds(), result,
+                    ms > p.requestSeconds() * 500 ? " SLOW" : ""));
         }
     }
 
@@ -72,7 +95,7 @@ public class LiveDumpTest {
         line("# " + p + " " + p.server);
         BookPOJOHolder first = new BookPOJOHolder();
         listing(p, "index", p.index, 1, first);
-        listing(p, "index p2", site.pageUrl(p.index, 2), 2, null);
+        listing(p, "index p2", p.index, 2, null);
         line("listsDuration(index)=" + site.listsDuration(p.index) + " cardGenre=" + site.cardGenre(p.index));
         for (ListingFilters.Duration d : new ListingFilters.Duration[]{ListingFilters.Duration.UNDER_30M,
                 ListingFilters.Duration.FROM_1H_TO_2H, ListingFilters.Duration.OVER_2H}) {
@@ -92,8 +115,9 @@ public class LiveDumpTest {
         }
         String genre = null;
         if (p.sections != null) {
-            ProviderPage<com.fanok.audiobooks.pojo.GenrePOJO> genres = call("genres", () -> site.genres(
-                    page(site, p.sections), p.sections, 1));
+            // as the genre screen loads it (BooksPresenter: pageUrl, then loadGenres)
+            ProviderPage<com.fanok.audiobooks.pojo.GenrePOJO> genres = call("genres", () -> site.loadGenres(
+                    site.pageUrl(p.sections, 1), 1));
             if (genres != null) {
                 line("== genres " + genres.status + " more=" + genres.hasMore + " n=" + genres.items.size());
                 for (Object g : genres.items) {
@@ -104,7 +128,7 @@ public class LiveDumpTest {
         }
         if (genre != null) {
             listing(p, "genre", genre, 1, null);
-            listing(p, "genre p2", site.pageUrl(genre, 2), 2, null);
+            listing(p, "genre p2", genre, 2, null);
             String root = site.genreOf(genre);
             line("genreOf(genre)=" + root + " sorts=" + sorts(site, genre) + " listsDuration="
                     + site.listsDuration(genre) + " cardGenre=" + site.cardGenre(genre));
@@ -141,12 +165,15 @@ public class LiveDumpTest {
                 rows(found);
             }
         }
-        if (first.book != null) {
-            book(p, first.book);
+        for (com.fanok.audiobooks.pojo.BookPOJO card : first.cards) {
+            if (book(p, card)) {
+                break; // the first card that is a playable book (an index may start with a collection)
+            }
         }
     }
 
-    private void book(Provider p, com.fanok.audiobooks.pojo.BookPOJO card) {
+    /** True when the book has chapters. */
+    private boolean book(Provider p, com.fanok.audiobooks.pojo.BookPOJO card) {
         SourceParser site = p.parser;
         String url = card.getUrl();
         line("== book " + url);
@@ -154,14 +181,18 @@ public class LiveDumpTest {
                 site.otherSourceTerms(card), 1) + " pages=" + site.otherSourcePages());
         Document doc = call("book page", () -> page(site, url));
         if (doc == null) {
-            return;
+            return false;
         }
         line("description " + call("description", () -> describe(site.description(doc, url))));
         line("book " + call("book", () -> describe(site.book(doc, url))));
         List<?> recommendations = call("recommendations", () -> site.recommendations(doc, url));
         dumpList("recommendations", recommendations);
         dumpList("series", call("series", () -> site.series(doc, url)));
-        dumpList("tracks", call("tracks", () -> site.tracks(doc, doc.location(), url)));
+        List<?> tracks = call("tracks", () -> site.tracks(doc, doc.location(), url));
+        dumpList("tracks", tracks);
+        if (tracks == null) {
+            return false;
+        }
         line("mediaHeaders=" + site.mediaHeaders(url) + " findsOtherReaders=" + site.findsOtherReaders()
                 + " probes=" + site.probesOtherReaders());
         dumpList("comments", call("comments", () -> site.comments(url, () -> false)));
@@ -170,21 +201,24 @@ public class LiveDumpTest {
                 listing(p, "link of book", link, 1, null);
             }
         }
+        return true;
     }
 
-    private void listing(Provider p, String what, String url, int pageNo, BookPOJOHolder first) {
-        line("== " + what + " " + url);
-        if (url == null) {
+    /** Page {@code pageNo} of the listing {@code listing}, fetched as the catalog does ({@code pageUrl}). */
+    private void listing(Provider p, String what, String listing, int pageNo, BookPOJOHolder first) {
+        line("== " + what + " " + listing);
+        if (listing == null) {
             return;
         }
         SourceParser site = p.parser;
+        String url = site.pageUrl(listing, pageNo);
         ProviderPage<com.fanok.audiobooks.pojo.BookPOJO> page = call(what, () -> site.listing(page(site, url), url,
                 pageNo));
         cards(page);
         line("sorts=" + sorts(site, url) + " hasSort=" + site.hasSort(url) + " periods=" + site.periods(url)
                 + " genreOf=" + site.genreOf(url) + " p2=" + site.pageUrl(url, pageNo + 1));
-        if (first != null && page != null && !page.items.isEmpty()) {
-            first.book = page.items.get(0);
+        if (first != null && page != null) {
+            first.cards.addAll(page.items.subList(0, Math.min(3, page.items.size())));
         }
     }
 
@@ -194,7 +228,7 @@ public class LiveDumpTest {
             return;
         }
         SourceParser site = p.parser;
-        rows(call(what, () -> site.people(page(site, url), url, 1, performers)));
+        rows(call(what, () -> site.loadPeople(site.pageUrl(url, 1), 1, performers, new SourceParser.PeopleCursor())));
     }
 
     private void cards(ProviderPage<com.fanok.audiobooks.pojo.BookPOJO> page) {
@@ -323,6 +357,6 @@ public class LiveDumpTest {
     }
 
     private static final class BookPOJOHolder {
-        com.fanok.audiobooks.pojo.BookPOJO book;
+        final List<com.fanok.audiobooks.pojo.BookPOJO> cards = new ArrayList<>();
     }
 }

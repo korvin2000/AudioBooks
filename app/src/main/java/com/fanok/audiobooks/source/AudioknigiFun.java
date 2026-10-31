@@ -75,6 +75,12 @@ public final class AudioknigiFun implements SourceParser {
         return Dle.fetch(fetchUrl(url));
     }
 
+    /** Its search is slow: 7 s of server time for two words (31.10.2026), more than the default on a phone. */
+    @Override
+    public int timeoutMs() {
+        return 25_000;
+    }
+
     @Override
     public ProviderPage<BookPOJO> listing(Document page, String url, int pageNo) {
         return parseListing(page, pageNo);

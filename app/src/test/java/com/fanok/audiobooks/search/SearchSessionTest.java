@@ -168,6 +168,36 @@ public class SearchSessionTest {
         assertEquals(1, finishedFailures);
     }
 
+    /** A slow site's own limit (its declared page timeout) replaces the session's shorter one. */
+    @Test
+    public void slowSourceGetsItsOwnLongerLimit() {
+        SearchSession.Source<String> late = source("S", 15, page(false, "s1"), scheduler);
+        SearchSession.Source<String> slow = new SearchSession.Source<String>() {
+            @Override
+            public String name() {
+                return late.name();
+            }
+
+            @Override
+            public Single<ProviderPage<String>> load(String query, int pageNo) {
+                return late.load(query, pageNo);
+            }
+
+            @Override
+            public long timeoutSeconds() {
+                return 35;
+            }
+        };
+        SearchSession<String> s = session(Arrays.asList(source("A", 1, page(false, "a1"), scheduler), slow));
+        s.search("маг поневоле");
+        scheduler.advanceTimeBy(14, TimeUnit.SECONDS);
+        assertTrue(s.isRunning());
+        scheduler.advanceTimeBy(1, TimeUnit.SECONDS);
+        assertEquals(Collections.singletonList("a1,s1"), finished);
+        assertEquals(ProviderPage.Status.OK, s.statuses().get("S"));
+        assertEquals(0, finishedFailures);
+    }
+
     @Test
     public void emptyEverywhereFinishesEmptyWithoutSentinelsAndRetriesOnlyOnce() {
         final int[] calls = {0};

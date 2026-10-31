@@ -82,6 +82,7 @@ public class OtherSourceModel implements
         }
         String url = Url.canonical(bookPOJO.getUrl());
         List<Single<ArrayList<OtherArtistPOJO>>> lookups = new ArrayList<>();
+        List<Long> limits = new ArrayList<>();
         for (Provider site : Sources.active()) {
             if (!Url.isHost(url, site.server)) {
                 lookups.add(Single.<ArrayList<OtherArtistPOJO>>create(emitter -> {
@@ -91,23 +92,25 @@ public class OtherSourceModel implements
                         emitter.tryOnError(e); // after a timeout nobody listens: dropped, not a crash
                     }
                 }).subscribeOn(Schedulers.io()));
+                limits.add(Math.max(SOURCE_TIMEOUT_SECONDS, site.requestSeconds()));
             }
         }
-        return searchAll(lookups, Schedulers.computation()).toObservable();
+        return searchAll(lookups, limits, Schedulers.computation()).toObservable();
     }
 
     /**
-     * Runs the lookups in parallel; each is cut off after {@link #SOURCE_TIMEOUT_SECONDS} on {@code timer},
-     * and a failed or timed-out lookup counts as "not found". Results keep the order of {@code lookups}.
+     * Runs the lookups in parallel; each is cut off after its {@code limits} seconds on {@code timer} (at least
+     * {@link #SOURCE_TIMEOUT_SECONDS}; longer for a site that declares slow pages), and a failed or timed-out lookup
+     * counts as "not found". Results keep the order of {@code lookups}.
      */
     static Single<ArrayList<OtherArtistPOJO>> searchAll(List<Single<ArrayList<OtherArtistPOJO>>> lookups,
-            Scheduler timer) {
+            List<Long> limits, Scheduler timer) {
         if (lookups.isEmpty()) {
             return Single.just(new ArrayList<>());
         }
         List<Single<ArrayList<OtherArtistPOJO>>> bounded = new ArrayList<>();
-        for (Single<ArrayList<OtherArtistPOJO>> lookup : lookups) {
-            bounded.add(lookup.timeout(SOURCE_TIMEOUT_SECONDS, TimeUnit.SECONDS, timer)
+        for (int i = 0; i < lookups.size(); i++) {
+            bounded.add(lookups.get(i).timeout(limits.get(i), TimeUnit.SECONDS, timer)
                     .onErrorReturn(e -> new ArrayList<>()));
         }
         return Single.zip(bounded, results -> {

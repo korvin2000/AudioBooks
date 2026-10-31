@@ -28,6 +28,11 @@ public final class SearchSession<T> {
         String name();
 
         Single<ProviderPage<T>> load(String query, int page);
+
+        /** How long this source may take when that is longer than the session's limit (a slow site); 0: the session's. */
+        default long timeoutSeconds() {
+            return 0;
+        }
     }
 
     public interface Listener<T> {
@@ -183,7 +188,7 @@ public final class SearchSession<T> {
             final String q = queryOf.get(s) == null ? query : queryOf.get(s);
             calls.add(Single.defer(() -> s.load(q, page))
                     .subscribeOn(io)
-                    .timeout(timeoutSeconds, TimeUnit.SECONDS, io)
+                    .timeout(Math.max(timeoutSeconds, s.timeoutSeconds()), TimeUnit.SECONDS, io)
                     .onErrorReturn(e -> ProviderPage.<T>failed(e))
                     .map(p -> new Arrival<>(s, p))
                     .toObservable());

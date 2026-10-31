@@ -89,6 +89,14 @@ public enum Provider {
         this.parser = java.util.Objects.requireNonNull(parser);
     }
 
+    /**
+     * How long one request of the site may take in a search or lookup over many sites: its page timeout
+     * ({@link SourceParser#timeoutMs}) and a margin, so the request's own timeout, not the operation's, ends it.
+     */
+    public long requestSeconds() {
+        return java.util.concurrent.TimeUnit.MILLISECONDS.toSeconds(parser.timeoutMs()) + 5;
+    }
+
     /** Host without {@code www.}, used to filter a mixed result list by site. */
     public String host() {
         return Url.hostOf(server);
