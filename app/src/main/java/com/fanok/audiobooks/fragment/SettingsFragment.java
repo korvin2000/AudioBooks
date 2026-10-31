@@ -453,6 +453,15 @@ public class SettingsFragment extends PreferenceFragmentCompat implements
         });
         getChildFragmentManager().setFragmentResultListener(ProxyDialogFragment.RESULT_CLOSED, this,
                 (requestKey, result) -> updateProxySummary());
+        preferenceClickListner("pref_proxy_custom", preference -> {
+            if (getChildFragmentManager().findFragmentByTag(CustomProxyDialogFragment.TAG) == null) {
+                new CustomProxyDialogFragment().show(getChildFragmentManager(), CustomProxyDialogFragment.TAG);
+            }
+            return true;
+        });
+        // saving may have switched the built-in mode on or off
+        getChildFragmentManager().setFragmentResultListener(CustomProxyDialogFragment.RESULT_CLOSED, this,
+                (requestKey, result) -> updateProxySummary());
         updateProxySummary();
 
         boolean ignor;

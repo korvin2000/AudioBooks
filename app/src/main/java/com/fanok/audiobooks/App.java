@@ -291,6 +291,9 @@ public class App extends Application {
 
             //no happy-eyeballs race across [current, spare] proxy routes: a lost race would count as a proxy failure
             builder.fastFallback(false);
+            // an HTTP built-in proxy asks for its login with a 407; a SOCKS one gets it from the Authenticator
+            builder.proxyAuthenticator(AppProxy::proxyLogin);
+            builder.addNetworkInterceptor(AppProxy::keepProxyLoginToProxy);
             okHttpClientInstance = builder.build();
 
             com.squareup.picasso.Picasso picasso = new com.squareup.picasso.Picasso.Builder(this)

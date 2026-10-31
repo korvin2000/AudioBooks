@@ -659,7 +659,7 @@
     <string name="settings_data">Резервное копирование</string>
     <string name="settings_data_summary">Резервная копия, восстановление, очистка данных</string>
     <string name="settings_general">Общие</string>
-    <string name="settings_general_summary">Раздел при запуске, буфер, родительский контроль</string>
+    <string name="settings_general_summary">Раздел при запуске, буфер, деление файла на разделы, родительский контроль</string>
     <string name="reproduction_keep">Не прерывать текущую книгу</string>
     <string name="downloads_manager">Скачанные книги</string>
     <string name="auto_export">Автоэкспорт в mp3</string>

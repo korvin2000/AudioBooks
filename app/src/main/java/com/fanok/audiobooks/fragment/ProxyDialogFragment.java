@@ -19,6 +19,7 @@ import androidx.fragment.app.DialogFragment;
 
 import com.fanok.audiobooks.R;
 import com.fanok.audiobooks.net.AppProxy;
+import com.fanok.audiobooks.net.ProxyConfig;
 import com.fanok.audiobooks.net.ProxyCandidate;
 import com.fanok.audiobooks.net.ProxyFinder;
 
@@ -172,7 +173,8 @@ public class ProxyDialogFragment extends DialogFragment implements ProxyFinder.L
     public static CharSequence summary(@NonNull Context context) {
         switch (AppProxy.mode()) {
             case AppProxy.MODE_BUILTIN:
-                return context.getString(R.string.proxy_summary_builtin);
+                ProxyConfig own = AppProxy.custom();
+                return context.getString(R.string.proxy_summary_builtin, own.host + ":" + own.port);
             case AppProxy.MODE_AUTO:
                 ProxyFinder.State state = ProxyFinder.get(context).state();
                 ProxyCandidate current = state.current;

@@ -323,10 +323,10 @@ adb exec-out run-as com.fanok.books tar -cf - databases shared_prefs files > app
 
 ### Built-in proxy
 
-**Settings → Proxy** (`Настройки → Прокси`, preference `pref_proxy`) sends the app's HTTP and HTTPS traffic through a SOCKS5 proxy for users in countries where some source sites are blocked.
+**Settings → Proxy** (`Настройки → Прокси`, preference `pref_proxy`) sends the app's HTTP and HTTPS traffic through a proxy for users in countries where some source sites are blocked: off, the built-in proxy, or an automatically found public one.
 
 - `net/AppProxy` installs a process-wide `ProxySelector` in `App.onCreate`, before any HTTP client is created, so pages, audio, downloads, and covers all follow the switch. Toggling it takes effect immediately; with the switch off, the system proxy settings apply.
-- The server and credentials are `PROXY_HOST`, `PROXY_PORT`, `PROXY_USER`, and `PROXY_PASSWORD` in `Consts.java`. An empty `PROXY_HOST` disables the feature. The credentials are given only to that proxy host and port, never to a site that asks for authentication.
+- **Settings → Свой прокси** (`fragment/CustomProxyDialogFragment`, `net/ProxyConfig`) sets the built-in proxy's server: SOCKS5 or HTTP (an HTTP proxy tunnels https sites with CONNECT; a proxy reached over TLS is not supported), host, port, and an optional login. A value the user never saved is the build's own (`PROXY_HOST`, `PROXY_PORT`, `PROXY_USER`, `PROXY_PASSWORD` in `Consts.java`); the build's password is never stored or shown (the eye appears only for a typed one). The dialog's check sends one request through exactly the typed server to the selected source's site (any answer but the proxy's 407 counts as working). The login is given only to that proxy's host and port: a SOCKS handshake through the `Authenticator`, an HTTP proxy's 407 through `AppProxy.proxyLogin` (OkHttp's proxy authenticator); never to a site or to a public proxy.
 - OkHttp lets the proxy resolve host names, so audio and downloads also work where DNS is filtered.
 - **Settings → Источники и сеть → Управление источниками** (`fragment/SourcesDialogFragment`) is one dialog for the
   sources: their order (drag a row by its handle, or the row's menu on TV and with TalkBack), the active ones (above

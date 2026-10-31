@@ -138,13 +138,6 @@
             android:summary="@string/scrollToSelectedDesc"
             android:title="@string/scrollToSelected" />
 
-        <CheckBoxPreference
-            android:defaultValue="true"
-            android:icon="@drawable/ic_content_cut"
-            android:key="cutting_file"
-            android:summary="@string/cutting_file_desc"
-            android:title="@string/cutting_file" />
-
     </PreferenceScreen>
 
     <PreferenceScreen
@@ -182,6 +175,14 @@
             android:key="pref_proxy"
             android:persistent="false"
             android:title="@string/proxy_title" />
+
+        <!-- CustomProxyDialogFragment: the server of the built-in proxy mode (net.ProxyConfig) -->
+        <Preference
+            android:icon="@drawable/vpn"
+            android:key="pref_proxy_custom"
+            android:persistent="false"
+            android:summary="@string/proxy_custom_summary"
+            android:title="@string/proxy_custom_title" />
 
         <Preference
             android:icon="@drawable/ic_cookie"
@@ -334,6 +335,13 @@
             android:icon="@drawable/ic_buffer"
             android:key="bufferSize"
             android:title="@string/buffer_size" />
+
+        <CheckBoxPreference
+            android:defaultValue="true"
+            android:icon="@drawable/ic_content_cut"
+            android:key="cutting_file"
+            android:summary="@string/cutting_file_desc"
+            android:title="@string/cutting_file" />
 
         <Preference
             android:icon="@drawable/ic_lock"

@@ -11,6 +11,9 @@ import com.fanok.audiobooks.Consts;
 import com.fanok.audiobooks.search.Provider;
 import com.fanok.audiobooks.search.Sources;
 
+import io.reactivex.Single;
+import io.reactivex.schedulers.Schedulers;
+
 import java.io.IOException;
 import java.net.Authenticator;
 import java.net.InetSocketAddress;
@@ -23,18 +26,21 @@ import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
 import java.util.function.BiConsumer;
+import java.util.function.BiFunction;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
 
 /**
- * The "Прокси" setting ({@link #PREF_MODE}): off (the device's network settings), the built-in SOCKS proxy from
- * {@link Consts}, or the automatic mode, where {@link ProxyFinder} supplies a verified public proxy. Installed once as
+ * The "Прокси" setting ({@link #PREF_MODE}): off (the device's network settings), the built-in proxy ("Свой прокси",
+ * {@link ProxyConfig}: the build's server until the user sets another), or the automatic mode, where {@link ProxyFinder} supplies a verified public proxy. Installed once as
  * the process-wide {@link ProxySelector}, so every HTTP path (site pages through SiteHttp, audio and downloads through
  * OkHttp, covers) follows the setting without per-request code. The route is chosen per host: a source the user set to
  * go direct ({@link #PREF_DIRECT}) bypasses the proxy, with its subdomains and {@code SourceParser.hosts()}; any
- * other host (a shared CDN) follows the mode. The built-in credentials are handed only to the
- * built-in proxy's host:port, never to a public proxy or a site that asks for authentication.
+ * other host (a shared CDN) follows the mode. The built-in proxy's login is handed only to its own host:port (a SOCKS
+ * handshake through {@link Authenticator}, an HTTP proxy's 407 through {@link #proxyLogin}), never to a public proxy or
+ * a site that asks for authentication.
  */
 public final class AppProxy {
 
@@ -57,15 +63,43 @@ public final class AppProxy {
     private static SharedPreferences.OnSharedPreferenceChangeListener listener;
     /** The platform's selector, which ours defers to for anything it does not route. */
     private static ProxySelector system;
+    /** The built-in proxy ("Свой прокси") and its route; the selectors read them on every request. */
+    private static volatile ProxyConfig custom = ProxyConfig.builtIn();
+    private static volatile List<Proxy> customRoute = Collections.singletonList(custom.toProxy());
+    /** A server the "Свой прокси" dialog is checking: it gets its own login for that one request. */
+    private static volatile ProxyConfig testing;
     /** The catalog site setting: the automatic proxy must reach the selected site. */
     private static final String PREF_SOURCE = "sorce_books";
 
     private AppProxy() {
     }
 
-    /** True when this build carries the built-in proxy's values; without them the built-in mode is inert. */
+    /** True when the built-in proxy has a server; without one the built-in mode is inert. */
     public static boolean configured() {
-        return !Consts.PROXY_HOST.isEmpty() && Consts.PROXY_PORT > 0;
+        return custom.usable();
+    }
+
+    /** The built-in proxy's server ("Свой прокси"). */
+    @NonNull
+    public static ProxyConfig custom() {
+        return custom;
+    }
+
+    /** Stores the built-in proxy's server and routes through it from the next connection; null restores the build's. */
+    public static void setCustom(@NonNull SharedPreferences prefs, @Nullable ProxyConfig config) {
+        if (config == null) {
+            ProxyConfig.reset(prefs);
+            config = ProxyConfig.builtIn();
+        } else {
+            config.save(prefs);
+        }
+        boolean changed = !config.equals(custom);
+        custom = config;
+        customRoute = Collections.singletonList(config.toProxy());
+        if (changed && MODE_BUILTIN.equals(mode)) {
+            App.evictConnections();
+            installSelector();
+        }
     }
 
     /** {@link #MODE_OFF}, {@link #MODE_BUILTIN} or {@link #MODE_AUTO}. */
@@ -84,6 +118,8 @@ public final class AppProxy {
         SharedPreferences prefs = prefs(context);
         mode = readMode(prefs);
         direct = readDirect(prefs);
+        custom = ProxyConfig.read(prefs);
+        customRoute = Collections.singletonList(custom.toProxy());
         finder = ProxyFinder.get(context);
         listener = (p, key) -> {
             if (PREF_MODE.equals(key)) {
@@ -111,8 +147,7 @@ public final class AppProxy {
         prefs.registerOnSharedPreferenceChangeListener(listener);
         system = ProxySelector.getDefault();
         installSelector();
-        Authenticator.setDefault(new ProxyOnlyAuthenticator(Consts.PROXY_HOST, Consts.PROXY_PORT,
-                Consts.PROXY_USER, Consts.PROXY_PASSWORD));
+        Authenticator.setDefault(new ProxyOnlyAuthenticator(AppProxy::loginFor));
         if (MODE_AUTO.equals(mode)) {
             finder.recheckCurrent();
         }
@@ -125,9 +160,8 @@ public final class AppProxy {
      * page from going out on a pooled connection of the old route.
      */
     private static void installSelector() {
-        List<Proxy> builtin = Collections.singletonList(proxy());
         ProxySelector.setDefault(new Selector(system,
-                () -> route(mode, configured(), builtin, AppProxy::autoProxies), AppProxy::proxied,
+                () -> route(mode, configured(), customRoute, AppProxy::autoProxies), AppProxy::proxied,
                 AppProxy::onConnectFailed));
     }
 
@@ -324,7 +358,113 @@ public final class AppProxy {
     }
 
     static Proxy proxy() {
-        return new Proxy(Proxy.Type.SOCKS, InetSocketAddress.createUnresolved(Consts.PROXY_HOST, Math.max(Consts.PROXY_PORT, 1)));
+        return custom.toProxy();
+    }
+
+    /** The login for the proxy at {@code host}:{@code port}: the built-in one's, or the server being checked; else none. */
+    @Nullable
+    static PasswordAuthentication loginFor(@Nullable String host, int port) {
+        // the server being checked first: the typed login, not a saved one of the same host:port
+        for (ProxyConfig config : new ProxyConfig[]{testing, custom}) {
+            if (config != null && !config.user.isEmpty() && config.isAt(host, port)) {
+                return new PasswordAuthentication(config.user, config.password.toCharArray());
+            }
+        }
+        return null;
+    }
+
+    /**
+     * OkHttp's answer to an HTTP proxy's 407 (the CONNECT of an https site too): the login, once, and only to the
+     * built-in proxy or the server being checked. SOCKS logins go through the {@link Authenticator} instead.
+     */
+    @Nullable
+    public static okhttp3.Request proxyLogin(@Nullable okhttp3.Route route, @NonNull okhttp3.Response response) {
+        InetSocketAddress at = proxyOf(route);
+        return at == null ? null : withLogin(response, loginFor(at.getHostString(), at.getPort()));
+    }
+
+    @Nullable
+    private static InetSocketAddress proxyOf(@Nullable okhttp3.Route route) {
+        SocketAddress address = route == null ? null : route.proxy().address();
+        return address instanceof InetSocketAddress ? (InetSocketAddress) address : null;
+    }
+
+    @Nullable
+    private static okhttp3.Request withLogin(@NonNull okhttp3.Response response, @Nullable PasswordAuthentication login) {
+        if (login == null || response.request().header("Proxy-Authorization") != null) {
+            return null; // none, or refused once: asking again would loop
+        }
+        return response.request().newBuilder()
+                .header("Proxy-Authorization",
+                        okhttp3.Credentials.basic(login.getUserName(), new String(login.getPassword())))
+                .build();
+    }
+
+    /**
+     * A network interceptor for every client: a proxy login stays only on a plain-http request that goes to an HTTP
+     * proxy itself. OkHttp keeps the header on a redirect, which would carry it inside the TLS of an https site (its
+     * CONNECT is authenticated apart) or to a direct route.
+     */
+    @NonNull
+    public static okhttp3.Response keepProxyLoginToProxy(@NonNull okhttp3.Interceptor.Chain chain) throws IOException {
+        okhttp3.Request request = chain.request();
+        if (request.header("Proxy-Authorization") == null) {
+            return chain.proceed(request);
+        }
+        okhttp3.Connection connection = chain.connection();
+        boolean toProxy = connection != null && !request.isHttps()
+                && connection.route().proxy().type() == Proxy.Type.HTTP;
+        return chain.proceed(toProxy ? request : request.newBuilder().removeHeader("Proxy-Authorization").build());
+    }
+
+    /** What the "Свой прокси" dialog's check found: the site's HTTP code (0 when none came) and the time taken. */
+    public static final class Check {
+        public final int code;
+        public final long millis;
+        @Nullable
+        public final IOException failure;
+
+        Check(int code, long millis, @Nullable IOException failure) {
+            this.code = code;
+            this.millis = millis;
+            this.failure = failure;
+        }
+    }
+
+    /**
+     * One request to {@code url} through {@code config} alone (not the saved setting, not the selector), with its
+     * login; on an io thread, cancelled with the subscription.
+     */
+    @NonNull
+    public static Single<Check> check(@NonNull ProxyConfig config, @NonNull String url) {
+        return Single.<Check>create(emitter -> {
+            PasswordAuthentication login = config.user.isEmpty() ? null
+                    : new PasswordAuthentication(config.user, config.password.toCharArray());
+            okhttp3.OkHttpClient client = new okhttp3.OkHttpClient.Builder()
+                    .proxy(config.toProxy())
+                    .proxyAuthenticator((route, response) -> withLogin(response, login)) // the typed login only
+                    .addNetworkInterceptor(AppProxy::keepProxyLoginToProxy)
+                    .retryOnConnectionFailure(false)
+                    .connectTimeout(10, TimeUnit.SECONDS)
+                    .callTimeout(20, TimeUnit.SECONDS)
+                    .build();
+            okhttp3.Call call = client.newCall(new okhttp3.Request.Builder().url(url)
+                    .header("User-Agent", Consts.USER_AGENT).build());
+            emitter.setCancellable(call::cancel);
+            testing = config;
+            long start = System.nanoTime();
+            try (okhttp3.Response response = call.execute()) {
+                emitter.onSuccess(new Check(response.code(), (System.nanoTime() - start) / 1_000_000, null));
+            } catch (IOException e) {
+                emitter.onSuccess(new Check(0, (System.nanoTime() - start) / 1_000_000, e));
+            } finally {
+                if (testing == config) {
+                    testing = null;
+                }
+                client.dispatcher().executorService().shutdown();
+                client.connectionPool().evictAll();
+            }
+        }).subscribeOn(Schedulers.io());
     }
 
     /**
@@ -390,24 +530,20 @@ public final class AppProxy {
 
     /** Answers only the proxy's own challenge (SEC-03: the old global authenticator answered every challenger). */
     static final class ProxyOnlyAuthenticator extends Authenticator {
-        private final String host;
-        private final int port;
-        private final String user;
-        private final String password;
+        private final BiFunction<String, Integer, PasswordAuthentication> login;
+
+        ProxyOnlyAuthenticator(@NonNull BiFunction<String, Integer, PasswordAuthentication> login) {
+            this.login = login;
+        }
 
         ProxyOnlyAuthenticator(String host, int port, String user, String password) {
-            this.host = host;
-            this.port = port;
-            this.user = user;
-            this.password = password;
+            this((h, p) -> user.isEmpty() || !host.equalsIgnoreCase(h) || p != port ? null
+                    : new PasswordAuthentication(user, password.toCharArray()));
         }
 
         @Override
         protected PasswordAuthentication getPasswordAuthentication() {
-            if (user.isEmpty() || !host.equalsIgnoreCase(getRequestingHost()) || getRequestingPort() != port) {
-                return null;
-            }
-            return new PasswordAuthentication(user, password.toCharArray());
+            return login.apply(getRequestingHost(), getRequestingPort());
         }
     }
 }
