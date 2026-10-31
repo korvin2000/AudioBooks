@@ -343,6 +343,13 @@
             android:summary="@string/cutting_file_desc"
             android:title="@string/cutting_file" />
 
+        <CheckBoxPreference
+            android:defaultValue="true"
+            android:icon="@drawable/ic_error"
+            android:key="pref_error_reports"
+            android:summary="@string/error_reports_desc"
+            android:title="@string/error_reports" />
+
         <Preference
             android:icon="@drawable/ic_lock"
             android:key="parentalControl"

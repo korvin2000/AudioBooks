@@ -47,6 +47,7 @@ import android.widget.LinearLayout;
 import android.widget.ProgressBar;
 import android.widget.RadioButton;
 import android.widget.SeekBar;
+import android.widget.ScrollView;
 import android.widget.TextView;
 import android.widget.Toast;
 import androidx.activity.OnBackPressedCallback;
@@ -1277,6 +1278,36 @@ public class BookActivity extends MvpAppCompatActivity implements Activity {
     @Override
     public void showToast(String s) {
         Toast.makeText(this, s, Toast.LENGTH_SHORT).show();
+    }
+
+    @Override
+    public void showLoadError(String message, String report) {
+        if (!PreferenceManager.getDefaultSharedPreferences(this).getBoolean("pref_error_reports", true)) {
+            showToast(message);
+            return;
+        }
+        String full = message + "\n\n" + report;
+        TextView text = new TextView(this);
+        text.setText(full);
+        text.setTextIsSelectable(true);
+        int pad = (int) (16 * getResources().getDisplayMetrics().density);
+        text.setPadding(pad, pad / 2, pad, 0);
+        ScrollView scroll = new ScrollView(this);
+        scroll.addView(text);
+        new AlertDialog.Builder(this)
+                .setTitle(R.string.error_report_title)
+                .setView(scroll)
+                .setPositiveButton(R.string.copy, (d, which) -> {
+                    android.content.ClipboardManager clipboard =
+                            (android.content.ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
+                    if (clipboard != null) {
+                        clipboard.setPrimaryClip(android.content.ClipData.newPlainText(
+                                getString(R.string.error_report_title), full));
+                        showToast(R.string.copied);
+                    }
+                })
+                .setNegativeButton(R.string.close, null)
+                .show();
     }
 
     @Override

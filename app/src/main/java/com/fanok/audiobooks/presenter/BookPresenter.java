@@ -52,6 +52,7 @@ import com.fanok.audiobooks.service.Checkpoint;
 import com.fanok.audiobooks.service.MediaPlayerService;
 import com.fanok.audiobooks.service.PlaybackSettings;
 import com.fanok.audiobooks.util.DownloadUtil;
+import com.fanok.audiobooks.util.ErrorReport;
 
 import com.google.android.material.bottomsheet.BottomSheetBehavior;
 import io.reactivex.Observer;
@@ -804,8 +805,9 @@ public class BookPresenter extends MvpPresenter<Activity> implements ActivityPre
                     error = true;
                 } else {
                     String errDetail = mLastError != null ? (" (" + mLastError.getClass().getSimpleName() + (mLastError.getMessage() != null ? ": " + mLastError.getMessage() : "") + ")") : "";
-                    getViewState().showToast(mContext.getString(R.string.error_load_data)
-                            + errDetail + "\n" + mContext.getString(R.string.go_offline));
+                    getViewState().showLoadError(mContext.getString(R.string.error_load_data)
+                            + errDetail + "\n" + mContext.getString(R.string.go_offline),
+                            ErrorReport.of(mLastError, mBookPOJO.getUrl()));
                     error = true;
                 }
             }

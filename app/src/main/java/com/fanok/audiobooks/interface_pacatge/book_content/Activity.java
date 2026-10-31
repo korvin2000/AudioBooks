@@ -87,6 +87,13 @@ public interface Activity extends MvpView {
     @StateStrategyType(SkipStrategy.class)
     void showToast(String s);
 
+    /**
+     * The chapters could not be loaded: {@code message} and the full {@code report} (the exception with its stack trace)
+     * in a dialog that can copy it, or {@code message} alone when the user turned the reports off.
+     */
+    @StateStrategyType(OneExecutionStateStrategy.class)
+    void showLoadError(String message, String report);
+
     /** A notice that must be read: shown long, and on the next attach when the screen was stopped. */
     @StateStrategyType(OneExecutionStateStrategy.class)
     void showLongToast(int id);

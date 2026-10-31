@@ -114,7 +114,8 @@ differs writes its own lines or overrides the default, never a branch in the sha
 | Sorts | `sorts(url)` returns the Order menu as data (`Sort.menu`, `Sort.submenu`); `sortUrl(Sort, url)` the listing. A new kind of sort is one row in `source/Sort.java` (menu id, title, subtitle label, back-stack tag) |
 | Sorts inside a genre | `genreOf` with `inGenre` (the server ranks the genre) or `cardGenre` (the cards are narrowed on the device) |
 | Ranking periods, a duration bound | `periods`, `periodOf`, `withPeriod`, `periodsAreDates`; `withDuration`; `listsDuration` false when cards carry no time |
-| Referer, own CDN or API hosts, a slow server | `referer()`, `hosts()`, `timeoutMs()`; `mediaHeaders(bookUrl)` for audio requests |
+| Referer, own CDN or API hosts, a slow server | `referer()`, `hosts()`, `timeoutMs()`; `mediaHeaders(bookUrl)` for audio requests. `timeoutMs()` also lengthens the site's limit in the multi-site search and "on other sites" (`Provider.requestSeconds`); raise it when `LiveDumpTest`'s `search-times.txt` marks the site SLOW (a two-word search above half its limit). A site set to go direct fetches its audio direct on every host, a CDN it shares with other sites included (`AppProxy.mediaClient`) |
+| A card that is a list of books (a collection) | `opensAsListing(url)`: the catalog opens it as a listing, never as a book page |
 | A session cookie, a wall that lets only POST pass | `cookies()` (sent to the site's own host only; `mediaCookies(bookUrl)` for audio), `postsPages()` |
 | Lists read from other pages or built in | override `loadListing`, `loadGenres`, `loadPeople`, `loadSeries` (the defaults fetch the URL and parse it) |
 | Optional sections | `people`, `searchPeople`, `series`, `comments`, `recommendations`, `otherReaders`, `otherSource*` ("on other sites") |

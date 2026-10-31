@@ -452,7 +452,7 @@ public class BooksPresenter extends MvpPresenter<BooksView> implements
 
         open.setOnClickListener(view1 -> {
             dialog.dismiss();
-            getViewState().showBooksActivity(books.get(position));
+            open(books.get(position));
         });
 
         add.setOnClickListener(view1 -> {
@@ -594,7 +594,18 @@ public class BooksPresenter extends MvpPresenter<BooksView> implements
 
     @Override
     public void onBookItemClick(View view, int position) {
-        getViewState().showBooksActivity(books.get(position));
+        open(books.get(position));
+    }
+
+    /** A book opens its page; a card that is a list of books (a site's collection) opens as a listing. */
+    private void open(BookPOJO book) {
+        Provider provider = Provider.ofUrl(book.getUrl());
+        if (provider != null && provider.parser.opensAsListing(book.getUrl())) {
+            getViewState().showFragment(BooksFragment.newInstance(book.getUrl(), R.string.menu_audiobooks,
+                    book.getName(), Consts.MODEL_BOOKS), "collectionBooks");
+        } else {
+            getViewState().showBooksActivity(book);
+        }
     }
 
     @Override

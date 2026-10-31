@@ -136,10 +136,17 @@ public final class Akniga implements SourceParser {
         return url.replace("<page>", Integer.toString(page));
     }
 
-    /** Author, reader and series listings are not re-sorted; the collections are not offered within a genre. */
+    /** A collection ("Подборка") card opens as the list of its books, all on one page in the listing's markup. */
+    @Override
+    public boolean opensAsListing(String url) {
+        return url.contains("/collection/");
+    }
+
+    /** Author, reader, series and collection listings are not re-sorted; the collections are not offered within a genre. */
     @Override
     public List<Sort.Entry> sorts(String url) {
-        if (url.contains("reader") || url.contains("author") || url.contains("serie") || url.contains("cikl")) {
+        if (url.contains("reader") || url.contains("author") || url.contains("serie") || url.contains("cikl")
+                || opensAsListing(url)) {
             return Collections.emptyList();
         }
         return genreOf(url) == null ? MENU : MENU_IN_GENRE;

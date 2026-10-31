@@ -659,7 +659,10 @@
     <string name="settings_data">Резервное копирование</string>
     <string name="settings_data_summary">Резервная копия, восстановление, очистка данных</string>
     <string name="settings_general">Общие</string>
-    <string name="settings_general_summary">Раздел при запуске, буфер, деление файла на разделы, родительский контроль</string>
+    <string name="settings_general_summary">Раздел при запуске, буфер, деление файла на разделы, отчёты об ошибках, родительский контроль</string>
+    <string name="error_reports">Отчеты об ошибках</string>
+    <string name="error_reports_desc">Показывать подробный отчет об ошибке в диалоге</string>
+    <string name="error_report_title">Невозможно воспроизвести книгу</string>
     <string name="reproduction_keep">Не прерывать текущую книгу</string>
     <string name="downloads_manager">Скачанные книги</string>
     <string name="auto_export">Автоэкспорт в mp3</string>

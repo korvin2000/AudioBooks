@@ -238,6 +238,14 @@ public interface SourceParser {
         return BookPOJO.of(description(page, bookUrl), bookUrl);
     }
 
+    /**
+     * True when a card's {@code url} is a list of books rather than a book (a site's collection): the catalog opens it
+     * as a {@link #listing}, never as a book page. False by default.
+     */
+    default boolean opensAsListing(String url) {
+        return false;
+    }
+
     /** The "other books" block of the page. */
     default ArrayList<BookPOJO> recommendations(Document page, String bookUrl) {
         return new ArrayList<>();
