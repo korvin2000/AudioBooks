@@ -1,6 +1,7 @@
 package com.fanok.audiobooks.net;
 
 import com.google.gson.JsonElement;
+import com.google.gson.JsonParser;
 
 import org.jsoup.nodes.Document;
 
@@ -17,6 +18,14 @@ public final class JsonPage extends Document {
     JsonPage(String location, JsonElement json) {
         super(location);
         this.json = json;
+    }
+
+    /**
+     * The JSON {@code text} answered at {@code location} as a page, as {@link SiteHttp#getJson} returns it: what a JSON
+     * site's fixture tests hand its parse methods. Malformed text is a {@link com.google.gson.JsonParseException}.
+     */
+    public static JsonPage parse(String location, String text) {
+        return new JsonPage(location, JsonParser.parseString(text));
     }
 
     /**

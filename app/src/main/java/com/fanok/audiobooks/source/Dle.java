@@ -7,6 +7,7 @@ import com.fanok.audiobooks.net.SiteHttp;
 import com.fanok.audiobooks.search.SearchUrls;
 
 import org.jsoup.nodes.Document;
+import org.jsoup.nodes.Element;
 
 import java.io.IOException;
 import java.net.URI;
@@ -67,6 +68,7 @@ public final class Dle {
     }
 
     private static final Pattern NEWS_ID = Pattern.compile("/(\\d+)[^/]*/?$");
+    private static final Pattern CATEGORY = Pattern.compile("dle_sort_cat_(\\d+)");
 
     private Dle() {
     }
@@ -81,13 +83,22 @@ public final class Dle {
     }
 
     /**
-     * The listing {@code base} (the index or a category root, with its trailing slash) sorted by {@code sortBy}
-     * ({@code date}, {@code rating}, {@code news_read}, {@code comm_num}, {@code title}), newest first; {@code setNewSort}
-     * is {@code dle_sort_main} for the index, {@code dle_sort_cat_<id>} for a category.
+     * {@code listing} (a URL without query) sorted by {@code order}: the engine's sort form as the query, which
+     * {@link #fetch} POSTs to the page itself. {@code key} names the listing's sort in the session: {@code main} for
+     * the index, {@code cat_<id>} for a category ({@link #categoryId}), the template's own for others
+     * ({@code xfsearch}, ...). Which page and which listings go out sorted is the site's policy.
      */
-    public static String sortedListing(String base, String sortBy, String setNewSort) {
-        return base + "?" + SORT_PARAM + "=" + sortBy + "&dledirection=desc&set_new_sort=" + setNewSort
-                + "&set_direction_sort=desc";
+    public static String sorted(String listing, Order order, String key) {
+        return listing + "?" + SORT_PARAM + "=" + order.field + "&dledirection=" + order.direction
+                + "&set_new_sort=dle_sort_" + key + "&set_direction_sort=dle_direction_" + key;
+    }
+
+    /** The DLE id of the category a listing page shows (its sort form's {@code set_new_sort}); null elsewhere. */
+    @Nullable
+    public static String categoryId(Document page) {
+        Element key = page.getElementById("set_new_sort");
+        Matcher m = CATEGORY.matcher(key == null ? "" : key.val());
+        return m.matches() ? m.group(1) : null;
     }
 
     /** Page {@code page} of a DLE listing: {@code page/N/} before the query; page 1 is the bare listing. */

@@ -385,7 +385,7 @@ public final class Otrub implements SourceParser {
         if (player == null) {
             return Players.inlinePlayerjs(doc, bookUrl, bookName);
         }
-        return Players.xsPlaylist(Players.object(player), bookUrl, bookName, "otrub player");
+        return Players.xsPlaylist(Json.object(player), bookUrl, bookName, "otrub player");
     }
 
     /** The books of a {@code /series/<slug>.html} page, in the site's order. */

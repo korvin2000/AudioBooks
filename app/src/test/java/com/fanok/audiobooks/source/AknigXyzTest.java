@@ -96,8 +96,8 @@ public class AknigXyzTest {
 
     @Test
     public void categoryIdComesFromTheGenrePageSortForm() throws IOException {
-        assertEquals("20", AknigXyz.categoryId(fixture("genre-p1.html", AknigXyz.SERVER + "/ljubovnoe-fjentezi/")));
-        assertNull(AknigXyz.categoryId(fixture("listing-index-p1.html", AknigXyz.INDEX)));
+        assertEquals("20", Dle.categoryId(fixture("genre-p1.html", AknigXyz.SERVER + "/ljubovnoe-fjentezi/")));
+        assertNull(Dle.categoryId(fixture("listing-index-p1.html", AknigXyz.INDEX)));
     }
 
     @Test

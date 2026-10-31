@@ -28,17 +28,10 @@ public final class Html {
         T parse(Element element);
     }
 
-    public interface Card {
-        BookPOJO parse(Element card) throws Exception;
-    }
-
-    public interface Row {
-        GenrePOJO parse(Element row) throws Exception;
-    }
-
     /**
      * Applies {@code parser} to every element: an element that throws is skipped and counted (logged once
-     * per list), so one odd card never loses the whole list.
+     * per list), so one odd card never loses the whole list. The parser throws no checked exception: an item that
+     * needs a request handles its failure itself, so a timeout or a block is never taken for one odd card.
      */
     public static <T> ArrayList<T> each(Iterable<Element> elements, ItemParser<T> parser) {
         ArrayList<T> result = new ArrayList<>();
@@ -63,35 +56,20 @@ public final class Html {
         return result;
     }
 
-    /** Parses every card on its own: one broken card is skipped, the page survives (SRCH-08). */
-    public static ArrayList<BookPOJO> cards(Elements cards, Card parser) {
-        ArrayList<BookPOJO> out = new ArrayList<>();
-        for (Element card : cards) {
-            try {
-                BookPOJO book = parser.parse(card);
-                if (book != null && !book.isNull()) {
-                    out.add(book);
-                }
-            } catch (Exception ignored) {
-                // a malformed card (empty title, bad URL, missing block) is not a page failure
-            }
-        }
-        return out;
+    /** {@link #each} over book cards; a card without URL or name ({@link BookPOJO#isNull}) is dropped too (SRCH-08). */
+    public static ArrayList<BookPOJO> cards(Iterable<Element> cards, ItemParser<BookPOJO> parser) {
+        return each(cards, card -> {
+            BookPOJO book = parser.parse(card);
+            return book == null || book.isNull() ? null : book;
+        });
     }
 
-    /** Parses every row on its own: one malformed row (empty name, bad URL) is skipped, not the page. */
-    public static ArrayList<GenrePOJO> rows(Elements rows, Row parser) {
-        ArrayList<GenrePOJO> out = new ArrayList<>();
-        for (Element row : rows) {
-            try {
-                GenrePOJO item = parser.parse(row);
-                if (item != null && !item.isNull()) {
-                    out.add(item);
-                }
-            } catch (Exception ignored) {
-            }
-        }
-        return out;
+    /** {@link #each} over genre or people rows; a row without URL or name is dropped too. */
+    public static ArrayList<GenrePOJO> rows(Iterable<Element> rows, ItemParser<GenrePOJO> parser) {
+        return each(rows, row -> {
+            GenrePOJO item = parser.parse(row);
+            return item == null || item.isNull() ? null : item;
+        });
     }
 
     /** The largest page number among pager links (text, else {@code data-page}); 0 when there is none. */
@@ -119,9 +97,9 @@ public final class Html {
         return e == null ? "" : e.text().trim();
     }
 
-    /** Trimmed text of the first match of {@code css} under {@code scope}; "" when absent. */
-    public static String text(Element scope, String css) {
-        return text(scope.selectFirst(css));
+    /** Trimmed text of the first match of {@code css} under {@code scope}; "" when either is absent. */
+    public static String text(@Nullable Element scope, String css) {
+        return scope == null ? "" : text(scope.selectFirst(css));
     }
 
     /** True for a link to a path of the page's own site ({@code /x}); false for another host, {@code //host/x} included. */
@@ -129,10 +107,40 @@ public final class Html {
         return href.startsWith("/") && !href.startsWith("//");
     }
 
-    /** Absolute href of the first match of {@code css} under {@code scope}; "" when absent or unresolvable. */
-    public static String href(Element scope, String css) {
-        Element element = scope.selectFirst(css);
+    /** Absolute href of the first match of {@code css} under {@code scope}; "" when either is absent or unresolvable. */
+    public static String href(@Nullable Element scope, String css) {
+        Element element = scope == null ? null : scope.selectFirst(css);
         return element == null ? "" : element.absUrl("href");
+    }
+
+    /**
+     * The first {@code rowsCss} row under {@code scope} whose text starts with {@code label}: the "Автор: ..." rows of a
+     * card or a book page. Null when there is none; {@link #afterLabel}, {@link #text} and {@link #href} take null.
+     */
+    @Nullable
+    public static Element labelled(Element scope, String rowsCss, String label) {
+        for (Element row : scope.select(rowsCss)) {
+            if (row.text().startsWith(label)) {
+                return row;
+            }
+        }
+        return null;
+    }
+
+    /** The text after a row's "Label:" (both authors of "Автор: A, B"), all of it without a colon; "" for no row. */
+    public static String afterLabel(@Nullable Element row) {
+        if (row == null) {
+            return "";
+        }
+        String text = row.text();
+        int colon = text.indexOf(':');
+        return (colon == -1 ? text : text.substring(colon + 1)).trim();
+    }
+
+    /** The text next to an icon ({@code <div><i class="fi-rr-comment"></i>3</div>} → "3"); "" without the icon. */
+    public static String iconText(Element scope, String iconCss) {
+        Element icon = scope.selectFirst(iconCss);
+        return icon == null || icon.parent() == null ? "" : icon.parent().text().trim();
     }
 
     /** Absolute cover of a lazy-loaded image (data-original, data-src, then src), skipping placeholders. */

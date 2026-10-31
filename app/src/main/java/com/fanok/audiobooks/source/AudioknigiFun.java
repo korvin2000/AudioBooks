@@ -1,5 +1,7 @@
 package com.fanok.audiobooks.source;
 
+import static com.fanok.audiobooks.source.Html.text;
+
 import com.fanok.audiobooks.BookRemovedException;
 import com.fanok.audiobooks.net.SiteHttp;
 import com.fanok.audiobooks.pojo.AudioPOJO;
@@ -192,12 +194,7 @@ public final class AudioknigiFun implements SourceParser {
         if (key == null) {
             return null;
         }
-        return HttpUrl.get(url).newBuilder().query(null)
-                .addQueryParameter(Dle.SORT_PARAM, sort.field)
-                .addQueryParameter("dledirection", sort.direction)
-                .addQueryParameter("set_new_sort", "dle_sort_" + key)
-                .addQueryParameter("set_direction_sort", "dle_direction_" + key)
-                .build().toString();
+        return Dle.sorted(HttpUrl.get(url).newBuilder().query(null).fragment(null).build().toString(), sort, key);
     }
 
     /** What to fetch for {@code url}: a sortable listing without a sort gets the date sort, so no session sort leaks in. */
@@ -507,9 +504,5 @@ public final class AudioknigiFun implements SourceParser {
         Element copy = text.clone();
         copy.select("h2").remove();
         return copy.text().trim();
-    }
-
-    private static String text(Element e) {
-        return e == null ? "" : e.text().trim();
     }
 }

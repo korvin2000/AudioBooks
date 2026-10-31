@@ -26,33 +26,33 @@ import java.util.List;
  * new site is a new adapter and one row here, with no other wiring.
  */
 public enum Provider {
-    AKNIGA(Url.SERVER_AKNIGA, "Akniga", "abook", "search_abook", Consts.SOURCE_ABOOK,
+    AKNIGA(Url.SERVER_AKNIGA, "Akniga", "abook", "search_abook", Consts.SOURCE_ABOOK, "Akniga",
             Url.INDEX_AKNIGA, Url.SECTIONS_AKNIGA, Url.AUTHORS_AKNIGA, Url.PERFORMERS_AKNIGA, new Akniga()),
     KNIGAVUHE(Url.SERVER, "Книга в ухе", "kniga_v_uhe", "search_kniga_v_uhe", Consts.SOURCE_KNIGA_V_UHE,
-            Url.INDEX, Url.SECTIONS, Url.AUTHORS, Url.PERFORMERS, new Knigavuhe()),
-    IZIBUK(Url.SERVER_IZIBUK, "ИзиБук", "izibuc", "search_izibuc", Consts.SOURCE_IZI_BUK,
+            "KnigaVUhe", Url.INDEX, Url.SECTIONS, Url.AUTHORS, Url.PERFORMERS, new Knigavuhe()),
+    IZIBUK(Url.SERVER_IZIBUK, "ИзиБук", "izibuc", "search_izibuc", Consts.SOURCE_IZI_BUK, "Izibuk",
             Url.INDEX_IZIBUK, Url.SECTIONS_IZIBUK, Url.AUTHORS_IZIBUK, Url.PERFORMERS_IZIBUK, new Izibuk()),
     ABMP3(Url.SERVER_ABMP3, "AudioBook-mp3", "audiobook_mp3", "search_abmp3", Consts.SOURCE_AUDIO_BOOK_MP3,
-            Url.INDEX_ABMP3, Url.SECTIONS_ABMP3, Url.AUTHORS_ABMP3, Url.PERFORMERS_ABMP3, new Abmp3()),
+            "AudioBookMP3", Url.INDEX_ABMP3, Url.SECTIONS_ABMP3, Url.AUTHORS_ABMP3, Url.PERFORMERS_ABMP3, new Abmp3()),
     BAZA_KNIG(Url.SERVER_BAZA_KNIG, "База Книг", "baza_knig", "search_baza_knig", Consts.SOURCE_BAZA_KNIG,
-            Url.INDEX_BAZA_KNIG, Url.SECTIONS_BAZA_KNIG, null, null, new BazaKnig()),
+            "BazaKnig", Url.INDEX_BAZA_KNIG, Url.SECTIONS_BAZA_KNIG, null, null, new BazaKnig()),
     KNIGOBLUD(Url.SERVER_KNIGOBLUD, "Книгоблуд", "knigoblud", "search_knigoblud", Consts.SOURCE_KNIGOBLUD,
-            Url.INDEX_KNIGOBLUD, Url.SECTIONS_KNIGOBLUD, null, null, new Knigoblud()),
-    AUDIOBOO(Url.SERVER_AUDIOBOO, "Audioboo", "audioboo", "search_audioboo", Consts.SOURCE_AUDIOBOO,
+            "Knigoblud", Url.INDEX_KNIGOBLUD, Url.SECTIONS_KNIGOBLUD, null, null, new Knigoblud()),
+    AUDIOBOO(Url.SERVER_AUDIOBOO, "Audioboo", "audioboo", "search_audioboo", Consts.SOURCE_AUDIOBOO, "Audioboo",
             Url.INDEX_AUDIOBOO, Url.INDEX_AUDIOBOO, Url.INDEX_AUDIOBOO, Url.INDEX_AUDIOBOO, new Audioboo()),
-    OTRUB(Url.SERVER_OTRUB, "Отрубин", "otrub", "search_otrub", Consts.SOURCE_OTRUB,
+    OTRUB(Url.SERVER_OTRUB, "Отрубин", "otrub", "search_otrub", Consts.SOURCE_OTRUB, "Otrub",
             Url.INDEX_OTRUB, Url.SECTIONS_OTRUB, null, null, new Otrub()),
-    POLEKNIG(Url.SERVER_POLEKNIG, "Полекниг", "poleknig", "search_poleknig", Consts.SOURCE_POLEKNIG,
+    POLEKNIG(Url.SERVER_POLEKNIG, "Полекниг", "poleknig", "search_poleknig", Consts.SOURCE_POLEKNIG, "Poleknig",
             Url.INDEX_POLEKNIG, Url.SECTIONS_POLEKNIG, null, null, new Poleknig()),
-    UKNIG(Uknig.SERVER, "уКниг", "uknig", "search_uknig", 9,
+    UKNIG(Uknig.SERVER, "уКниг", "uknig", "search_uknig", 9, "Uknig",
             Uknig.INDEX, Uknig.GENRES, Uknig.AUTHORS, Uknig.READERS, new Uknig()),
     AUDIOKNIGI_FUN(AudioknigiFun.SERVER, "Аудиокниги.fun", "audioknigi_fun", "search_audioknigi_fun", 10,
-            AudioknigiFun.INDEX, AudioknigiFun.GENRES, AudioknigiFun.AUTHORS, AudioknigiFun.READERS,
-            new AudioknigiFun()),
-    AKNIG_XYZ(AknigXyz.SERVER, "Aknig.xyz", "aknig_xyz", "search_aknig_xyz", 11,
+            "AudioknigiFun", AudioknigiFun.INDEX, AudioknigiFun.GENRES, AudioknigiFun.AUTHORS,
+            AudioknigiFun.READERS, new AudioknigiFun()),
+    AKNIG_XYZ(AknigXyz.SERVER, "Aknig.xyz", "aknig_xyz", "search_aknig_xyz", 11, "AknigXyz",
             AknigXyz.INDEX, AknigXyz.GENRES, null, null, new AknigXyz()),
     AUDIOKNIGA_LIFE(AudioknigaLife.SERVER, "Аудиокнига Life", "audiokniga_life", "search_audiokniga_life", 12,
-            AudioknigaLife.INDEX, AudioknigaLife.GENRES, null, null, new AudioknigaLife());
+            "AudioknigaLife", AudioknigaLife.INDEX, AudioknigaLife.GENRES, null, null, new AudioknigaLife());
 
     /** {@code https://host} without a trailing slash. */
     public final String server;
@@ -64,6 +64,8 @@ public enum Provider {
     public final String prefKey;
     /** The {@code Consts.SOURCE_*} id of the site. */
     public final int sourceId;
+    /** The folder of the site's downloads below the download root; never renamed: saved books are found by it. */
+    public final String folder;
     /** The drawer sections: the listing URL each opens, or null when the site has no such section. */
     public final String index;
     public final String sections;
@@ -72,13 +74,14 @@ public enum Provider {
     /** The site's code; never null. Must not touch {@code Provider} while it initialises. */
     public final SourceParser parser;
 
-    Provider(String server, String title, String prefValue, String prefKey, int sourceId,
+    Provider(String server, String title, String prefValue, String prefKey, int sourceId, String folder,
             String index, String sections, String authors, String performers, SourceParser parser) {
         this.server = server;
         this.title = title;
         this.prefValue = prefValue;
         this.prefKey = prefKey;
         this.sourceId = sourceId;
+        this.folder = folder;
         this.index = index;
         this.sections = sections;
         this.authors = authors;

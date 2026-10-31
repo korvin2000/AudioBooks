@@ -1,5 +1,7 @@
 package com.fanok.audiobooks.source;
 
+import static com.fanok.audiobooks.source.Html.text;
+
 import com.fanok.audiobooks.BookRemovedException;
 import com.fanok.audiobooks.net.JsonSlice;
 import com.fanok.audiobooks.pojo.AudioPOJO;
@@ -495,11 +497,6 @@ public final class AudioknigaLife implements SourceParser {
         }
         String src = img.absUrl("data-src");
         return src.isEmpty() ? img.absUrl("src") : src;
-    }
-
-    private static String text(Element scope, String query) {
-        Element e = scope.selectFirst(query);
-        return e == null ? "" : e.text().trim();
     }
 
     private static String string(JsonObject o, String key) {

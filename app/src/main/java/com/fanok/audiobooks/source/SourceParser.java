@@ -215,8 +215,10 @@ public interface SourceParser {
      */
     String searchUrl(SearchUrls.Category category, String query, int page);
 
-    /** One page of book search results. */
-    ProviderPage<BookPOJO> searchResults(Document page, int pageNo);
+    /** One page of book search results; by default the page is a listing of its own URL, as on most sites. */
+    default ProviderPage<BookPOJO> searchResults(Document page, int pageNo) {
+        return listing(page, page.location(), pageNo);
+    }
 
     /** One page of author or reader search results. */
     default ProviderPage<GenrePOJO> searchPeople(Document page, int pageNo, boolean performers) {

@@ -1,5 +1,7 @@
 package com.fanok.audiobooks.source;
 
+import static com.fanok.audiobooks.source.Html.text;
+
 import com.fanok.audiobooks.BookRemovedException;
 import com.fanok.audiobooks.R;
 import com.fanok.audiobooks.net.SiteHttp;
@@ -450,10 +452,5 @@ public final class Uknig implements SourceParser {
     private static String cover(Document doc) {
         Element img = doc.selectFirst(".book-details .cover img");
         return img == null ? "" : img.absUrl("src");
-    }
-
-    private static String text(Element root, String css) {
-        Element e = root.selectFirst(css);
-        return e == null ? "" : e.text().trim();
     }
 }

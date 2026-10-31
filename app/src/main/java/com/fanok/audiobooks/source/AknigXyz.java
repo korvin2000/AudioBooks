@@ -1,5 +1,11 @@
 package com.fanok.audiobooks.source;
 
+import static com.fanok.audiobooks.source.Html.afterLabel;
+import static com.fanok.audiobooks.source.Html.href;
+import static com.fanok.audiobooks.source.Html.iconText;
+import static com.fanok.audiobooks.source.Html.labelled;
+import static com.fanok.audiobooks.source.Html.text;
+
 import androidx.annotation.Nullable;
 
 import com.fanok.audiobooks.net.SiteHttp;
@@ -66,12 +72,13 @@ public final class AknigXyz implements SourceParser {
     /** Genre root → DLE category id, learnt from the genre's own pages (their sort form). */
     private static final Map<String, String> CATEGORY_IDS = new ConcurrentHashMap<>();
 
-    private static final Pattern CATEGORY = Pattern.compile("dle_sort_cat_(\\d+)");
     private static final Pattern GENRE_PATH = Pattern.compile("^/([a-z0-9-]+)/(page/\\d+/?)?$");
     private static final Pattern INDEX_PATH = Pattern.compile("^/(page/(\\d+)/?)?$");
     private static final Pattern PAGE = Pattern.compile("/page/(\\d+)/?$");
     private static final Pattern SEARCH_FOUND =
             Pattern.compile("найдено (\\d+) ответов \\(Результаты запроса \\d+ - (\\d+)\\)");
+    /** The "Автор:", "Читает:", "Жанр:" rows of a card. */
+    private static final String ROWS = ".main-news-info > div";
     private static final Pattern SERIES_ITEM = Pattern.compile("^#\\s*(\\d+)\\.?\\s*(.*)$");
 
     // ---------------------------------------------------------------- SourceParser
@@ -100,7 +107,7 @@ public final class AknigXyz implements SourceParser {
 
     /** Remembers the category id {@code page} of {@code genre} shows; returns the page. */
     static Document learnCategory(String genre, Document page) {
-        String id = categoryId(page);
+        String id = Dle.categoryId(page);
         if (id != null) {
             CATEGORY_IDS.put(genre, id);
         }
@@ -216,18 +223,8 @@ public final class AknigXyz implements SourceParser {
      */
     public static String sortedUrl(String listingUrl, Dle.Order sort, @Nullable String categoryId) {
         int query = listingUrl.indexOf('?');
-        String key = categoryId == null ? "main" : "cat_" + categoryId;
-        return Dle.pageUrl(query == -1 ? listingUrl : listingUrl.substring(0, query), 1)
-                + "?" + Dle.SORT_PARAM + "=" + sort.field + "&dledirection=" + sort.direction
-                + "&set_new_sort=dle_sort_" + key + "&set_direction_sort=dle_direction_" + key;
-    }
-
-    /** The DLE id of the genre a listing page shows (its sort form's key); null on the index and xfsearch pages. */
-    @Nullable
-    public static String categoryId(Document doc) {
-        Element key = doc.getElementById("set_new_sort");
-        Matcher m = CATEGORY.matcher(key == null ? "" : key.val());
-        return m.matches() ? m.group(1) : null;
+        return Dle.sorted(Dle.pageUrl(query == -1 ? listingUrl : listingUrl.substring(0, query), 1), sort,
+                categoryId == null ? "main" : "cat_" + categoryId);
     }
 
     /** The plain index: {@code /} or {@code /page/N/}. */
@@ -248,7 +245,7 @@ public final class AknigXyz implements SourceParser {
     /** Index, sorted, genre, xfsearch and top-100 pages. */
     public static ProviderPage<BookPOJO> parseListing(Document doc, int page) {
         Elements raw = doc.select("div.main-news.ajax-news");
-        return ProviderPage.of(cards(raw), lastPage(doc) > page, raw.size());
+        return ProviderPage.of(Html.cards(raw, AknigXyz::card), lastPage(doc) > page, raw.size());
     }
 
     /** A search page; also the other-source search (a card's url, name, autor and artist are the hit). */
@@ -260,22 +257,7 @@ public final class AknigXyz implements SourceParser {
             int found = Integer.parseInt(m.group(1));
             hasMore = found >= SEARCH_COUNT_CAP || Integer.parseInt(m.group(2)) < found;
         }
-        return ProviderPage.of(cards(raw), hasMore, raw.size());
-    }
-
-    private static ArrayList<BookPOJO> cards(Elements cards) {
-        ArrayList<BookPOJO> out = new ArrayList<>();
-        for (Element card : cards) {
-            try {
-                BookPOJO book = card(card);
-                if (book != null && !book.isNull()) {
-                    out.add(book);
-                }
-            } catch (RuntimeException ignored) {
-                // one malformed card is not a page failure
-            }
-        }
-        return out;
+        return ProviderPage.of(Html.cards(raw, AknigXyz::card), hasMore, raw.size());
     }
 
     @Nullable
@@ -291,21 +273,15 @@ public final class AknigXyz implements SourceParser {
         if (img != null) {
             book.setPhoto(img.absUrl("src"));
         }
-        for (Element row : card.select(".main-news-info > div")) {
-            Element a = row.selectFirst("a");
-            String link = a == null ? "" : a.absUrl("href");
-            String label = row.text();
-            if (label.startsWith("Автор")) {
-                book.setAutor(value(row));
-                book.setUrlAutor(link);
-            } else if (label.startsWith("Читает")) {
-                book.setArtist(value(row));
-                book.setUrlArtist(link);
-            } else if (label.startsWith("Жанр")) {
-                book.setGenre(value(row));
-                book.setUrlGenre(link);
-            }
-        }
+        Element author = labelled(card, ROWS, "Автор");
+        book.setAutor(afterLabel(author));
+        book.setUrlAutor(href(author, "a"));
+        Element reader = labelled(card, ROWS, "Читает");
+        book.setArtist(afterLabel(reader));
+        book.setUrlArtist(href(reader, "a"));
+        Element genre = labelled(card, ROWS, "Жанр");
+        book.setGenre(afterLabel(genre));
+        book.setUrlGenre(href(genre, "a"));
         Element series = card.selectFirst(".main-news-ck a");
         if (series != null) {
             book.setSeries(series.text().trim());
@@ -320,14 +296,7 @@ public final class AknigXyz implements SourceParser {
 
     /** The highest page number in the pager; 0 without one. */
     private static int lastPage(Document doc) {
-        int last = 0;
-        for (Element item : doc.select(".navigation-center a, .navigation-center span")) {
-            String number = item.text().trim();
-            if (number.matches("\\d+")) {
-                last = Math.max(last, Integer.parseInt(number));
-            }
-        }
-        return last;
+        return Html.lastPage(doc.select(".navigation-center a, .navigation-center span"));
     }
 
     // ---------------------------------------------------------------- genres
@@ -356,18 +325,18 @@ public final class AknigXyz implements SourceParser {
         // the app's (desktop) UA gets this layout, a phone the .mflf one; comments carry an empty full-news-author
         Element author = doc.selectFirst(".full-news-author:has(a)");
         if (author != null) {
-            description.setAutor(value(author));
-            description.setAutorUrl(href(author));
+            description.setAutor(afterLabel(author));
+            description.setAutorUrl(href(author, "a"));
         }
         Element reader = doc.selectFirst(".full-news-wread");
         if (reader != null) {
-            description.setArtist(value(reader));
-            description.setArtistUrl(href(reader));
+            description.setArtist(afterLabel(reader));
+            description.setArtistUrl(href(reader, "a"));
         }
         Element genre = doc.selectFirst(".full-news-category");
         if (genre != null) {
-            description.setGenre(value(genre));
-            description.setGenreUrl(href(genre));
+            description.setGenre(afterLabel(genre));
+            description.setGenreUrl(href(genre, "a"));
         }
         Element series = doc.selectFirst(".full-news-ckl a");
         if (series != null) {
@@ -473,18 +442,6 @@ public final class AknigXyz implements SourceParser {
         }
     }
 
-    /** The text after a row's "Label:", e.g. both authors of "Автор: A, B". */
-    private static String value(Element row) {
-        String text = row.text();
-        int colon = text.indexOf(':');
-        return (colon == -1 ? text : text.substring(colon + 1)).trim();
-    }
-
-    private static String href(Element row) {
-        Element a = row.selectFirst("a");
-        return a == null ? "" : a.absUrl("href");
-    }
-
     /** The H:MM:SS of the "Длительность:" stat; "" when absent. */
     private static String duration(Elements stats) {
         for (Element stat : stats) {
@@ -493,16 +450,5 @@ public final class AknigXyz implements SourceParser {
             }
         }
         return "";
-    }
-
-    /** The number next to an icon ({@code <div><i class="fi-rr-comment"></i>3</div>}). */
-    private static String iconText(Element scope, String icon) {
-        Element i = scope.selectFirst(icon);
-        return i == null || i.parent() == null ? "" : i.parent().text().trim();
-    }
-
-    private static String text(Element scope, String query) {
-        Element element = scope.selectFirst(query);
-        return element == null ? "" : element.text().trim();
     }
 }

@@ -25,20 +25,19 @@ import java.util.List;
 /** A site that implements only the required methods has no optional feature, and its other-source lookup is its book search. */
 public class SourceParserDefaultsTest {
 
-    /** The smallest site: seven methods. */
+    /** The smallest site: six methods; its search page is a listing ({@link SourceParser#searchResults}). */
     private static final class Minimal implements SourceParser {
-        @Override public ProviderPage<BookPOJO> listing(Document page, String url, int pageNo) { return ProviderPage.empty(); }
-        @Override public String pageUrl(String url, int page) { return url + "?p=" + page; }
-        @Override public ProviderPage<GenrePOJO> genres(Document page, String url, int pageNo) { return ProviderPage.empty(); }
-        @Override public String searchUrl(SearchUrls.Category category, String query, int page) {
-            return category == SearchUrls.Category.BOOKS ? "https://site.test/search?q=" + SearchUrls.enc(query) + "&p=" + page : null;
-        }
-        @Override public ProviderPage<BookPOJO> searchResults(Document page, int pageNo) {
+        @Override public ProviderPage<BookPOJO> listing(Document page, String url, int pageNo) {
             BookPOJO book = new BookPOJO();
             book.setUrl("https://site.test/book/1");
             book.setName(page.title());
             book.setAutor("Автор");
             return ProviderPage.of(Collections.singletonList(book), false);
+        }
+        @Override public String pageUrl(String url, int page) { return url + "?p=" + page; }
+        @Override public ProviderPage<GenrePOJO> genres(Document page, String url, int pageNo) { return ProviderPage.empty(); }
+        @Override public String searchUrl(SearchUrls.Category category, String query, int page) {
+            return category == SearchUrls.Category.BOOKS ? "https://site.test/search?q=" + SearchUrls.enc(query) + "&p=" + page : null;
         }
         @Override public DescriptionPOJO description(Document page, String bookUrl) { return new DescriptionPOJO(); }
         @Override public ArrayList<AudioPOJO> tracks(Document page, String base) { throw new IllegalStateException("no player"); }

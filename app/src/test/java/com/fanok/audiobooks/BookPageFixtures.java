@@ -1,9 +1,12 @@
 package com.fanok.audiobooks;
 
+import com.fanok.audiobooks.net.JsonPage;
+
 import java.io.IOException;
 import java.io.InputStream;
 import java.lang.reflect.Proxy;
 import java.net.URL;
+import java.util.Scanner;
 
 import org.jsoup.Connection;
 import org.jsoup.Jsoup;
@@ -39,6 +42,16 @@ public final class BookPageFixtures {
                 throw new IOException("missing fixture " + path);
             }
             return Jsoup.parse(in, null, baseUrl);
+        }
+    }
+
+    /** A JSON fixture as the page {@code SiteHttp.getJson(location)} returns, for a JSON site's parse methods. */
+    public static JsonPage json(String path, String location) throws IOException {
+        try (InputStream in = BookPageFixtures.class.getResourceAsStream("/fixtures/" + path)) {
+            if (in == null) {
+                throw new IOException("missing fixture " + path);
+            }
+            return JsonPage.parse(location, new Scanner(in, "UTF-8").useDelimiter("\\A").next());
         }
     }
 

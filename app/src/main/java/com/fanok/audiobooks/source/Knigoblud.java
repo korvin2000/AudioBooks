@@ -430,7 +430,7 @@ public final class Knigoblud implements SourceParser {
 
     /** The {@code KB.playerInit} playlist. */
     public static ArrayList<AudioPOJO> parseTracks(Document doc, String bookUrl) {
-        return Players.xsPlaylist(Players.object(Players.playerScript(doc, "KB.playerInit(", '{')), bookUrl,
+        return Players.xsPlaylist(Json.object(Players.playerScript(doc, "KB.playerInit(", '{')), bookUrl,
                 text(doc.selectFirst("h1")), "knigoblud player");
     }
 

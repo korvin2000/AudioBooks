@@ -7,10 +7,10 @@ import static com.fanok.audiobooks.source.Html.lastPage;
 import static com.fanok.audiobooks.source.Html.ownPath;
 import static com.fanok.audiobooks.source.Html.rows;
 import static com.fanok.audiobooks.source.Html.text;
-import static com.fanok.audiobooks.source.Players.array;
+import static com.fanok.audiobooks.source.Json.array;
+import static com.fanok.audiobooks.source.Json.seconds;
+import static com.fanok.audiobooks.source.Json.string;
 import static com.fanok.audiobooks.source.Players.playerScript;
-import static com.fanok.audiobooks.source.Players.seconds;
-import static com.fanok.audiobooks.source.Players.string;
 
 import android.util.Log;
 

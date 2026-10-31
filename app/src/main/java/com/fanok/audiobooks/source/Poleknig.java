@@ -123,11 +123,6 @@ public final class Poleknig implements SourceParser {
     }
 
     @Override
-    public BookPOJO book(Document page, String bookUrl) {
-        return parseBook(page, bookUrl);
-    }
-
-    @Override
     public ArrayList<AudioPOJO> tracks(Document page, String base) throws IOException {
         return Players.loadPlayerjs(page, base, text(page.selectFirst("h1")));
     }
@@ -153,7 +148,8 @@ public final class Poleknig implements SourceParser {
 
     /** Index, rankings, genres and search results. */
     public static ProviderPage<BookPOJO> parseListing(Document doc, int page) {
-        ArrayList<BookPOJO> result = Html.cards(doc.select("div.book-item"), book -> {
+        Elements raw = doc.select("div.book-item");
+        ArrayList<BookPOJO> result = Html.cards(raw, book -> {
             BookPOJO bookPOJO = new BookPOJO();
             Element img = book.selectFirst("img");
             if (img != null) {
@@ -224,7 +220,8 @@ public final class Poleknig implements SourceParser {
             return bookPOJO;
         });
         // a paged list links its next page; a one-page list (popular, novelties) has no pager
-        return ProviderPage.of(result, !result.isEmpty() && doc.selectFirst(".pagination a[rel=next]") != null);
+        return ProviderPage.of(result, !raw.isEmpty() && doc.selectFirst(".pagination a[rel=next]") != null,
+                raw.size());
     }
 
     public static DescriptionPOJO parseDescription(Document document) {
@@ -280,74 +277,6 @@ public final class Poleknig implements SourceParser {
             descriptionPOJO.setDescription(desc.first().text());
         }
         return descriptionPOJO;
-    }
-
-    /** A book opened by its link. */
-    public static BookPOJO parseBook(Document document, String url) {
-        BookPOJO bookPOJO = new BookPOJO();
-
-        bookPOJO.setUrl(url);
-
-        Elements titleElement = document.select("h1[itemprop=name]");
-        if (titleElement.size() > 0) {
-            bookPOJO.setName(titleElement.first().text().trim());
-        }
-
-        Elements img = document.select("img[src*=/covers/]");
-        if (img.size() > 0) {
-            bookPOJO.setPhoto(img.first().absUrl("src"));
-        }
-
-        Elements authorEl = document.select("h2.book-author > a");
-        if (authorEl.size() > 0) {
-            bookPOJO.setAutor(authorEl.first().text());
-            String href = authorEl.first().absUrl("href");
-            if (!href.isEmpty()) {
-                bookPOJO.setUrlAutor(href);
-            }
-        }
-
-        Elements genreBlocks = document.select("div.book-genres > div > a");
-        if (genreBlocks.size() > 0) {
-            bookPOJO.setGenre(genreBlocks.first().text());
-            String href = genreBlocks.first().absUrl("href");
-            if (!href.isEmpty()) {
-                bookPOJO.setUrlGenre(href);
-            }
-        }
-
-        Elements readerEl = document.select("div.book-reader > div > a");
-        if (readerEl.size() > 0) {
-            bookPOJO.setArtist(readerEl.first().text());
-            String href = readerEl.first().absUrl("href");
-            if (!href.isEmpty()) {
-                bookPOJO.setUrlArtist(href);
-            }
-        }
-
-        Elements seriesEl = document.select("a[href*=/series/]");
-        if (seriesEl.isEmpty()) {
-            seriesEl = document.select("div.book-series > div > a");
-        }
-        if (seriesEl.size() > 0) {
-            bookPOJO.setSeries(seriesEl.first().text());
-            String href = seriesEl.first().absUrl("href");
-            if (!href.isEmpty()) {
-                bookPOJO.setUrlSeries(href);
-            }
-        }
-
-        Elements durationEl = document.select("div.book-duration > div");
-        if (durationEl.size() > 0) {
-            bookPOJO.setTime(durationEl.first().text());
-        }
-
-        Elements desc = document.select("div#description[itemprop=description]");
-        if (desc.size() > 0) {
-            bookPOJO.setDesc(desc.first().text());
-        }
-
-        return bookPOJO;
     }
 
     /** The books of a {@code /series/<id>} page, in the site's order. */

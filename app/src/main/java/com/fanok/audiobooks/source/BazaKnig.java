@@ -12,12 +12,12 @@ import static com.fanok.audiobooks.source.Html.imgSrc;
 import static com.fanok.audiobooks.source.Html.lastPage;
 import static com.fanok.audiobooks.source.Html.rows;
 import static com.fanok.audiobooks.source.Html.text;
-import static com.fanok.audiobooks.source.Players.array;
-import static com.fanok.audiobooks.source.Players.arrayOf;
+import static com.fanok.audiobooks.source.Json.array;
+import static com.fanok.audiobooks.source.Json.arrayOf;
+import static com.fanok.audiobooks.source.Json.object;
+import static com.fanok.audiobooks.source.Json.seconds;
+import static com.fanok.audiobooks.source.Json.string;
 import static com.fanok.audiobooks.source.Players.decodeBase64;
-import static com.fanok.audiobooks.source.Players.object;
-import static com.fanok.audiobooks.source.Players.seconds;
-import static com.fanok.audiobooks.source.Players.string;
 import static com.fanok.audiobooks.source.Players.stringLiteral;
 
 import android.util.Log;

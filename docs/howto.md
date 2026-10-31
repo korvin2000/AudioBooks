@@ -65,33 +65,50 @@ Java sources are under `app/src/main/java/com/fanok/audiobooks/`.
 A site is one row in `search/Provider.java` and one adapter, `source/<Site>.java implements SourceParser`. Everything
 else — catalog and search screens, the Order and filter menus, the multi-site search, "on other sites", the book page,
 player, downloads, parental control, Referer and proxy routing — works through that interface and never branches on a
-site. `source/Poleknig.java` (plain HTML, Playerjs) and `source/AknigXyz.java` (DataLife Engine, POSTed sorts) are
-short complete examples.
+site. `source/Uknig.java` (plain HTML, Playerjs by URL) and `source/AknigXyz.java` (DataLife Engine, POSTed sorts)
+were written on this contract and are the examples to start from.
+
+**First release of a site:** catalog with real paging, book search, the genre list, the book page (description and
+chapters) and the sorts the server really offers. People indexes and search, series, comments, recommendations, other
+narrations and periods come later, one at a time with their own fixtures, only where the site has them; their defaults
+hide them meanwhile.
 
 1. **Fixtures.** Save the pages the adapter reads under `app/src/test/resources/fixtures/<site>/`: listing page 1 and
    a later page, a search with results and one without, the genre list, a book page, and the playlist (HTML, JSON or
    the XHR answer). Tests never contact real sites.
-2. **Adapter.** Seven methods are required: `listing`, `pageUrl`, `genres`, `searchUrl`, `searchResults`,
-   `description`, `tracks`. Keep parsing in pure static functions (`parseListing(Document, int)`, ...) that the tests
-   call on the fixtures. Every other method has a default meaning "the site has no such feature", and the UI hides
-   the feature.
+2. **Adapter.** Six methods are required: `listing`, `pageUrl`, `genres`, `searchUrl`, `description`, `tracks`.
+   Keep parsing in pure static functions (`parseListing(Document, int)`, ...) that the tests call on the fixtures.
+   Every other method has a default meaning "the site has no such feature", and the UI hides the feature. Two defaults
+   are real implementations, override them only when the site differs: `searchResults` parses the search page as a
+   listing, and `book()` (a deep-linked book's card) is made of `description`; never write a second parser of the book
+   page for it, add only a field the card has and the page lacks (AknigXyz's rating).
 3. **Register.** Add the `Provider` row: server, title, `prefValue`, `prefKey`, a new unique `sourceId` (never reuse or
-   renumber one: users' settings store it), the drawer URLs (`null` for a section the site lacks) and `new <Site>()`.
-   Existing users get the new site inactive, at the end of their list (`search/Sources`); the user switches it on.
-   Add the host to the deep-link intent filter in `AndroidManifest.xml`; a site that moved gets its old hosts in
-   `Url.canonical`.
-4. **Test.** An adapter test on the fixtures (cards, next page, search, sort URLs, description, chapters), then
-   `./gradlew :app:testDebugUnitTest`; finally a short live check on a device: catalog, search, a book, playback, a
-   download.
+   renumber one: users' settings store it), the download folder (a new CamelCase name; never rename one: saved books
+   are found by it), the drawer URLs (`null` for a section the site lacks) and `new <Site>()`. Keep the site's
+   `SERVER`, `INDEX`, `GENRES`, ... as constants of its adapter. Existing users get the new site inactive, at the end
+   of their list (`search/Sources`); the user switches it on. Add the host to the deep-link intent filter in
+   `AndroidManifest.xml`; a site that moved gets its old hosts in `Url.HOST_ALIASES`. Add the book-page fixture to
+   `BookPageFixtures.BOOK_PAGES`.
+4. **Test.** `source/SourceContractTest` already checks every row without fixtures: the deep-link host, page 2 and
+   every Order item on the site's host, a sorted listing keeping its menu, period round trips, the book search, every host of
+   the site on its own proxy route, timeout and folder. The site's own test asserts what its fixtures show (cards, next page and last page, search,
+   description, chapters, sort URLs); a JSON site loads its fixtures with `BookPageFixtures.json`. Then
+   `./gradlew :app:testDebugUnitTest`. `source/LiveDumpTest` is an opt-in check of the real site, never run in CI:
+   `LIVE_DUMP_DIR=<dir> LIVE_DUMP_SITES=<ROW> ./gradlew :app:testDebugUnitTest --tests '*LiveDumpTest'` writes what
+   every feature yields (listings, sorts, periods, genres, people, search, book page, chapters, comments) to
+   `<dir>/out/<ROW>.txt`, parsing saved copies of the pages, so two runs on different code can be diffed. Finally a
+   short live check on a device: catalog, search, a book, playback, a download.
 
-What the shared toolkit already covers:
+What the shared toolkit already covers; all of it is optional: a site whose markup, DLE template or protocol
+differs writes its own lines or overrides the default, never a branch in the shared helper:
 
 | The site has | Use |
 |---|---|
-| Book cards, genre rows, a pager | `Html.cards`, `Html.rows`, `Html.each` (one broken item is skipped, never the page), `Html.lastPage`, `Html.text`, `Html.href`, `Html.imgSrc` |
-| A JSON API | `fetch` returns `SiteHttp.getJson(url)` (a `JsonPage`); the parse methods read `JsonPage.of(page)`. The body decides, not the Content-Type; an HTML anti-bot page answered with 200 is an error, not "no books" |
+| Book cards, genre rows, a pager | `Html.cards`, `Html.rows`, `Html.each` (one broken item is skipped and logged, never the page), `Html.lastPage`, `Html.text`, `Html.href` (both take a missing scope), `Html.imgSrc` |
+| "Автор: ..." label rows, icon counters | `Html.labelled(scope, rowsCss, "Автор")` with `Html.afterLabel(row)` and `Html.href(row, "a")`; `Html.iconText` |
+| A JSON API | `fetch` returns `SiteHttp.getJson(url)` (a `JsonPage`); the parse methods read `JsonPage.of(page)` with `Json.string`, `Json.arrayOf`, `Json.seconds`; fixtures are `JsonPage.parse(url, text)`. The body decides, not the Content-Type; an HTML anti-bot page answered with 200 is an error, not "no books" |
 | A POST form, extra headers or cookies | override `fetch`; `SiteHttp.postForm`, `SiteHttp.connect(...)` with `SiteHttp.execute` and `SiteHttp.parse` |
-| DataLife Engine | `Dle`: sort forms (`Dle.Order`, `Dle.MENU`, `Dle.fetch`), `/page/N/` paging, search URL, news ids |
+| DataLife Engine | `Dle`: sort forms (`Dle.Order`, `Dle.MENU`, `Dle.sorted(listing, order, key)` POSTed by `Dle.fetch`, the genre key from `Dle.categoryId(page)`), `/page/N/` paging, search URL, news ids. Which listings go out with an explicit sort (so the session's last sort does not leak into a plain one) is the adapter's policy, see AknigXyz and AudioknigiFun |
 | A player in a page script | `Players.playerScript` with `Players.Chapters`; XSPlayer `Players.xsPlaylist`; Playerjs `Players.loadPlayerjs` or `inlinePlayerjs` (folders, mirrors, obfuscated URLs) |
 | A playlist fetched by XHR | `SiteHttp.body(SiteHttp.connect(url).referrer(bookUrl).header(...))` |
 | Sorts | `sorts(url)` returns the Order menu as data (`Sort.menu`, `Sort.submenu`); `sortUrl(Sort, url)` the listing. A new kind of sort is one row in `source/Sort.java` (menu id, title, subtitle label, back-stack tag) |

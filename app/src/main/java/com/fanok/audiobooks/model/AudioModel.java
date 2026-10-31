@@ -14,7 +14,6 @@ import io.reactivex.Observable;
 import java.io.IOException;
 import java.net.URL;
 import java.util.ArrayList;
-import java.util.regex.Pattern;
 import org.jetbrains.annotations.NotNull;
 import org.jsoup.nodes.Document;
 
@@ -31,8 +30,6 @@ public class AudioModel implements AudioModelInterfece {
     interface PageSource {
         Document get(String url) throws IOException;
     }
-
-    private static final Pattern PLAYERJS_FILE = Pattern.compile("[\"']?\\bfile[\"']?\\s*:\\s*");
 
     Context mContext;
 

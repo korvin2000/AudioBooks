@@ -828,27 +828,11 @@ public class DownloadStorageHelper {
         }
     }
 
-    /** The book's site folder below the download folder, by {@link Provider#ofUrl}: every host alias of a site. */
+    /** The book's site folder below the download folder ({@link Provider#folder}), by {@link Provider#ofUrl}: every host alias of a site. */
     @NonNull
     public static String getSourceName(@Nullable String bookUrl) {
         Provider provider = bookUrl == null || bookUrl.isEmpty() ? null : Provider.ofUrl(bookUrl);
-        if (provider == null) return "Audiobooks";
-        switch (provider) {
-            case AKNIGA: return "Akniga";
-            case KNIGAVUHE: return "KnigaVUhe";
-            case IZIBUK: return "Izibuk";
-            case ABMP3: return "AudioBookMP3";
-            case BAZA_KNIG: return "BazaKnig";
-            case KNIGOBLUD: return "Knigoblud";
-            case AUDIOBOO: return "Audioboo";
-            case OTRUB: return "Otrub";
-            case POLEKNIG: return "Poleknig";
-            case UKNIG: return "Uknig";
-            case AUDIOKNIGI_FUN: return "AudioknigiFun";
-            case AKNIG_XYZ: return "AknigXyz";
-            case AUDIOKNIGA_LIFE: return "AudioknigaLife";
-            default: return "Audiobooks";
-        }
+        return provider == null ? "Audiobooks" : provider.folder;
     }
 
     @NonNull
