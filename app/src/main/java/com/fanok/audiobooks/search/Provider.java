@@ -18,7 +18,6 @@ import com.fanok.audiobooks.source.SourceParser;
 import com.fanok.audiobooks.source.Uknig;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 
 /**
@@ -156,9 +155,9 @@ public enum Provider {
         return null;
     }
 
-    /** Every provider, the one selected in the settings first: the order a multi-site search starts them in. */
+    /** The active providers ({@link Sources}), the one selected in the settings first: a multi-site search's order. */
     public static List<Provider> selectedFirst() {
-        List<Provider> all = new ArrayList<>(Arrays.asList(values()));
+        List<Provider> all = new ArrayList<>(Sources.active());
         Provider selected = current();
         if (selected != null && all.remove(selected)) {
             all.add(0, selected);

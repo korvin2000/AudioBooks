@@ -2,6 +2,7 @@ package com.fanok.audiobooks.interface_pacatge.books;
 
 
 import androidx.annotation.NonNull;
+import androidx.annotation.StringRes;
 import androidx.fragment.app.Fragment;
 
 import com.arellomobile.mvp.MvpView;
@@ -74,5 +75,13 @@ public interface BooksView extends MvpView {
 
     @StateStrategyType(SkipStrategy.class)
     void showDurationPicker(@NonNull ListingFilters.Duration current);
+
+    /**
+     * Offers another route to the site whose listing failed; the action opens the proxy settings or tells the
+     * presenter it was accepted, any other dismissal declines it.
+     */
+    @StateStrategyType(OneExecutionStateStrategy.class)
+    void showRouteOffer(@StringRes int message, @NonNull String site, @StringRes int action,
+            boolean openProxySettings);
 
 }

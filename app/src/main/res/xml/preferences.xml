@@ -153,6 +153,13 @@
         android:summary="@string/settings_sources_summary"
         android:title="@string/settings_sources">
 
+        <!-- SourcesDialogFragment: the order and the active ones (search.Sources), the route of each, availability -->
+        <Preference
+            android:icon="@drawable/ic_check_sources"
+            android:key="sources_dialog"
+            android:persistent="false"
+            android:title="@string/sources_entry" />
+
         <ListPreference
             android:defaultValue="@string/abook_value"
             android:dialogTitle="@string/sorce_books"
@@ -175,21 +182,6 @@
             android:key="pref_proxy"
             android:persistent="false"
             android:title="@string/proxy_title" />
-
-        <!-- filled from Provider; stored inverted as AppProxy.PREF_DIRECT, so a new site takes the proxy -->
-        <MultiSelectListPreference
-            android:icon="@drawable/ic_web"
-            android:key="pref_proxy_sources"
-            android:persistent="false"
-            android:title="@string/proxy_sources_title" />
-
-        <!-- search.SourceProbe: every site's first catalog page through its current route -->
-        <Preference
-            android:icon="@drawable/ic_check_sources"
-            android:key="pref_check_sources"
-            android:persistent="false"
-            android:summary="@string/check_sources_summary"
-            android:title="@string/check_sources_title" />
 
         <Preference
             android:icon="@drawable/ic_cookie"

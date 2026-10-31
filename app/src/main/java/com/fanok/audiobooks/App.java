@@ -199,6 +199,8 @@ public class App extends Application {
     @Override
     public void onCreate() {
         super.onCreate();
+        // the user's sources first: the proxy is verified against one of them, the selected source must be active
+        com.fanok.audiobooks.search.Sources.load(PreferenceManager.getDefaultSharedPreferences(this));
         //before any HTTP client exists: OkHttp captures the default ProxySelector when it is built
         AppProxy.install(this);
         if (BuildConfig.DEBUG) {

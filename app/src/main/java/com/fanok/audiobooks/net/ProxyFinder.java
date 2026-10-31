@@ -12,6 +12,7 @@ import com.fanok.audiobooks.App;
 import com.fanok.audiobooks.Consts;
 import com.fanok.audiobooks.Url;
 import com.fanok.audiobooks.search.Provider;
+import com.fanok.audiobooks.search.Sources;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
@@ -644,7 +645,7 @@ public final class ProxyFinder {
 
     /**
      * The home page of the site the proxy has to reach: the catalog source selected in the settings, unless it goes
-     * direct ({@link AppProxy#PREF_DIRECT}); then the first source that takes the proxy.
+     * direct ({@link AppProxy#PREF_DIRECT}); then the first source that takes the proxy, in the user's order.
      */
     @NonNull
     static String targetOf(@NonNull SharedPreferences prefs) {
@@ -668,7 +669,7 @@ public final class ProxyFinder {
             }
         }
         if (!direct.isEmpty()) {
-            for (Provider provider : Provider.values()) {
+            for (Provider provider : Sources.all()) { // the user's order: an active source first
                 if (!direct.contains(provider.prefValue)) {
                     return provider.server + "/";
                 }

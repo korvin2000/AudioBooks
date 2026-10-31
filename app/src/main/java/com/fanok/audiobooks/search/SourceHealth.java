@@ -8,23 +8,26 @@ import android.net.NetworkCapabilities;
 import android.util.Log;
 
 import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 import androidx.preference.PreferenceManager;
 
+import io.reactivex.Observable;
 import io.reactivex.Single;
 import io.reactivex.schedulers.Schedulers;
 
-import java.util.Arrays;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.EnumMap;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
 /**
- * The last availability check of every site ({@link SourceProbe}), kept in the preferences: run by hand from the
- * settings, or by itself at most once a day, some time after the app starts and only on an unmetered network, so it
+ * The last availability check of every active site ({@link SourceProbe}), kept in the preferences: run by hand from the
+ * sources dialog, or by itself at most once a day, some time after the app starts and only on an unmetered network, so it
  * never competes with the user's first pages or costs mobile data.
  */
 public final class SourceHealth {
@@ -40,14 +43,64 @@ public final class SourceHealth {
     private SourceHealth() {
     }
 
-    /** Checks every site through its current route and keeps the results. */
+    /** Checks every active site ({@link Sources}) through its current route and keeps the results. */
     @NonNull
     public static Single<List<SourceProbe.Result>> check(@NonNull SharedPreferences prefs, int parallel) {
-        return SourceProbe.probeAll(Arrays.asList(Provider.values()), parallel, Schedulers.io())
-                .doOnSuccess(results -> prefs.edit()
-                        .putStringSet(PREF_RESULTS, encode(results))
-                        .putLong(PREF_CHECKED_AT, System.currentTimeMillis())
-                        .apply());
+        return check(prefs, Sources.active(), parallel).toList();
+    }
+
+    /**
+     * Checks {@code providers} through their current routes, each result kept as it comes in the order of
+     * {@code providers}; a check that covers every active site is also the time of the last check.
+     */
+    @NonNull
+    public static Observable<SourceProbe.Result> check(@NonNull SharedPreferences prefs,
+            @NonNull List<Provider> providers, int parallel) {
+        List<Provider> sites = new ArrayList<>(providers);
+        boolean all = sites.containsAll(Sources.active());
+        Observable<SourceProbe.Result> each = Observable.defer(() -> {
+            Map<Provider, Integer> mine = startChecks(sites);
+            return SourceProbe.probeEach(sites, parallel, Schedulers.io())
+                    .doOnNext(result -> keep(prefs, result, mine.get(result.provider)));
+        });
+        return all ? each.doOnComplete(() -> prefs.edit().putLong(PREF_CHECKED_AT, System.currentTimeMillis()).apply())
+                : each;
+    }
+
+    /** The latest check of each site: an older one that ends later (a route changed meanwhile) is not kept. */
+    private static final Map<Provider, Integer> CHECKS = new EnumMap<>(Provider.class);
+
+    /** Numbers a new check of each of {@code sites}; returns their numbers. */
+    private static synchronized Map<Provider, Integer> startChecks(@NonNull List<Provider> sites) {
+        Map<Provider, Integer> mine = new EnumMap<>(Provider.class);
+        for (Provider site : sites) {
+            Integer last = CHECKS.get(site);
+            int next = last == null ? 1 : last + 1;
+            CHECKS.put(site, next);
+            mine.put(site, next);
+        }
+        return mine;
+    }
+
+    /**
+     * Replaces the kept result of {@code result}'s site, unless a newer check of the site started since {@code check};
+     * results of several sites arrive on several threads.
+     */
+    private static synchronized void keep(@NonNull SharedPreferences prefs, @NonNull SourceProbe.Result result,
+            @Nullable Integer check) {
+        if (check == null || !check.equals(CHECKS.get(result.provider))) {
+            return;
+        }
+        Set<String> entries = new HashSet<>(prefs.getStringSet(PREF_RESULTS, Collections.<String>emptySet()));
+        String prefix = result.provider.prefValue + "=";
+        Iterator<String> it = entries.iterator();
+        while (it.hasNext()) {
+            if (it.next().startsWith(prefix)) {
+                it.remove();
+            }
+        }
+        entries.add(encode(result));
+        prefs.edit().putStringSet(PREF_RESULTS, entries).apply();
     }
 
     /** Starts the automatic check when the last one is a day old and the network is unmetered; never fails. */
@@ -63,9 +116,9 @@ public final class SourceHealth {
                 .subscribe(results -> { }, e -> Log.w("SourceHealth", "Automatic source check failed", e));
     }
 
-    /** The status of each site at the last check; a site never checked is absent. */
+    /** The kept result of each site (no message); a site never checked is absent. */
     @NonNull
-    public static Map<Provider, ProviderPage.Status> last(@NonNull SharedPreferences prefs) {
+    public static Map<Provider, SourceProbe.Result> last(@NonNull SharedPreferences prefs) {
         return decode(prefs.getStringSet(PREF_RESULTS, Collections.<String>emptySet()));
     }
 
@@ -79,36 +132,46 @@ public final class SourceHealth {
         return now - lastAt >= DAY_MS || now < lastAt;
     }
 
-    /** Pure: one {@code prefValue=STATUS} entry per site. */
+    /** Pure: one {@code prefValue=STATUS=millis} entry per site. */
     @NonNull
     static Set<String> encode(@NonNull List<SourceProbe.Result> results) {
         Set<String> entries = new HashSet<>();
         for (SourceProbe.Result result : results) {
-            entries.add(result.provider.prefValue + "=" + result.status.name());
+            entries.add(encode(result));
         }
         return entries;
     }
 
-    /** Pure: {@link #encode} read back; an entry of an unknown site or status is skipped. */
     @NonNull
-    static Map<Provider, ProviderPage.Status> decode(@NonNull Set<String> entries) {
-        Map<Provider, ProviderPage.Status> statuses = new EnumMap<>(Provider.class);
+    private static String encode(@NonNull SourceProbe.Result result) {
+        return result.provider.prefValue + "=" + result.status.name() + "=" + result.millis;
+    }
+
+    /**
+     * Pure: {@link #encode} read back; an entry of an unknown site or status is skipped, one without the time (an
+     * older version's) has 0.
+     */
+    @NonNull
+    static Map<Provider, SourceProbe.Result> decode(@NonNull Set<String> entries) {
+        Map<Provider, SourceProbe.Result> results = new EnumMap<>(Provider.class);
         for (String entry : entries) {
-            int eq = entry.indexOf('=');
-            if (eq < 0) {
+            String[] parts = entry.split("=");
+            if (parts.length < 2) {
                 continue;
             }
             for (Provider provider : Provider.values()) {
-                if (provider.prefValue.equals(entry.substring(0, eq))) {
+                if (provider.prefValue.equals(parts[0])) {
                     try {
-                        statuses.put(provider, ProviderPage.Status.valueOf(entry.substring(eq + 1)));
+                        long millis = parts.length > 2 ? Long.parseLong(parts[2]) : 0;
+                        results.put(provider, new SourceProbe.Result(provider,
+                                ProviderPage.Status.valueOf(parts[1]), millis, null));
                     } catch (IllegalArgumentException ignored) {
                         // a status of an older version: unknown now
                     }
                 }
             }
         }
-        return statuses;
+        return results;
     }
 
     private static boolean unmetered(@NonNull Context context) {

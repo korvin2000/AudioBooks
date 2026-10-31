@@ -9,6 +9,7 @@ import androidx.annotation.NonNull;
 import androidx.recyclerview.widget.RecyclerView;
 import com.fanok.audiobooks.R;
 import com.fanok.audiobooks.search.Provider;
+import com.fanok.audiobooks.search.Sources;
 import java.util.ArrayList;
 
 /** @noinspection ClassEscapesDefinedScope*/
@@ -71,7 +72,7 @@ public class FilterAdapter extends RecyclerView.Adapter<FilterAdapter.MyHolder> 
     public FilterAdapter(SharedPreferences preferences) {
         mData = new ArrayList<>();
         mData.add(-1);
-        for (Provider provider : Provider.values()) {
+        for (Provider provider : Sources.active()) {
             if (preferences.getBoolean(provider.prefKey, true)) {
                 mData.add(provider.sourceId);
             }

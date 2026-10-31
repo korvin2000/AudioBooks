@@ -15,22 +15,25 @@ public class SourceHealthTest {
 
     @Test
     public void resultsAreKeptPerSiteAndReadBack() {
-        Map<Provider, ProviderPage.Status> back = SourceHealth.decode(SourceHealth.encode(Arrays.asList(
+        Map<Provider, SourceProbe.Result> back = SourceHealth.decode(SourceHealth.encode(Arrays.asList(
                 new SourceProbe.Result(Provider.AKNIGA, ProviderPage.Status.OK, 800, null),
                 new SourceProbe.Result(Provider.AUDIOBOO, ProviderPage.Status.BLOCKED, 300, "challenge"),
                 new SourceProbe.Result(Provider.UKNIG, ProviderPage.Status.TIMEOUT, 15_000, "no answer"))));
         assertEquals(3, back.size());
-        assertEquals(ProviderPage.Status.OK, back.get(Provider.AKNIGA));
-        assertEquals(ProviderPage.Status.BLOCKED, back.get(Provider.AUDIOBOO));
-        assertEquals(ProviderPage.Status.TIMEOUT, back.get(Provider.UKNIG));
+        assertEquals(ProviderPage.Status.OK, back.get(Provider.AKNIGA).status);
+        assertEquals(800, back.get(Provider.AKNIGA).millis);
+        assertEquals(ProviderPage.Status.BLOCKED, back.get(Provider.AUDIOBOO).status);
+        assertEquals(ProviderPage.Status.TIMEOUT, back.get(Provider.UKNIG).status);
+        assertEquals(15_000, back.get(Provider.UKNIG).millis);
     }
 
     @Test
     public void anUnknownSiteOrStatusIsSkipped() {
-        Map<Provider, ProviderPage.Status> back = SourceHealth.decode(new HashSet<>(Arrays.asList(
-                "abook=OK", "gone_site=OK", "uknig=SOMETHING_NEW", "garbage")));
-        assertEquals(1, back.size());
-        assertEquals(ProviderPage.Status.OK, back.get(Provider.AKNIGA));
+        Map<Provider, SourceProbe.Result> back = SourceHealth.decode(new HashSet<>(Arrays.asList(
+                "abook=OK", "gone_site=OK=10", "uknig=SOMETHING_NEW=10", "izibuc=OK=fast", "garbage")));
+        assertEquals("an older version's entry has no time", 1, back.size());
+        assertEquals(ProviderPage.Status.OK, back.get(Provider.AKNIGA).status);
+        assertEquals(0, back.get(Provider.AKNIGA).millis);
     }
 
     @Test

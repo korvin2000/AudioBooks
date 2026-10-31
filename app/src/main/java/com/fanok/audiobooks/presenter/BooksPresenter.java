@@ -27,6 +27,8 @@ import com.fanok.audiobooks.model.AutorsModel;
 import com.fanok.audiobooks.model.BooksDBModel;
 import com.fanok.audiobooks.model.BooksModel;
 import com.fanok.audiobooks.model.GenreModel;
+import com.fanok.audiobooks.net.AppProxy;
+import com.fanok.audiobooks.net.RouteOffer;
 import com.fanok.audiobooks.pojo.BookPOJO;
 import com.fanok.audiobooks.pojo.GenrePOJO;
 import com.fanok.audiobooks.policy.DefaultCover;
@@ -36,6 +38,7 @@ import com.fanok.audiobooks.search.GenreSort;
 import com.fanok.audiobooks.search.ListingCursor;
 import com.fanok.audiobooks.search.ListingFilters;
 import com.fanok.audiobooks.search.Provider;
+import com.fanok.audiobooks.search.Sources;
 import com.fanok.audiobooks.source.Sort;
 import com.fanok.audiobooks.search.ProviderPage;
 import com.fanok.audiobooks.search.SearchUrls;
@@ -613,6 +616,8 @@ public class BooksPresenter extends MvpPresenter<BooksView> implements
             return;
         }
         isLoading = true;
+        int request = ++mRequest;
+        mRequestDirect = mProvider != null && AppProxy.isDirect(mProvider);
         String url = pageUrl(page);
         if (mModelId == Consts.MODEL_BOOKS) {
             mDisposables.add(mModelBook.getBooks(url, page)
@@ -620,7 +625,7 @@ public class BooksPresenter extends MvpPresenter<BooksView> implements
                     .observeOn(AndroidSchedulers.mainThread())
                     .subscribe(result -> {
                                 ListingCursor<BookPOJO> cursor = mBookCursor;
-                                onPage(page, result, cursor, () -> {
+                                onPage(request, page, result, cursor, () -> {
                                     if (page <= 1) {
                                         mHuntBaseShown = 0; // page 1 replaced the list the hunt counted from
                                     }
@@ -634,15 +639,15 @@ public class BooksPresenter extends MvpPresenter<BooksView> implements
                                 showFilterBar();
                             },
                             e -> {
-                                onPage(page, ProviderPage.<BookPOJO>failed(e), mBookCursor, null);
+                                onPage(request, page, ProviderPage.<BookPOJO>failed(e), mBookCursor, null);
                                 showFilterBar();
                             }));
         } else {
             mDisposables.add(mModelGenre.getBooks(url, page)
                     .subscribeOn(Schedulers.io())
                     .observeOn(AndroidSchedulers.mainThread())
-                    .subscribe(result -> onPage(page, result, mGenreCursor, this::showGenres),
-                            e -> onPage(page, ProviderPage.<GenrePOJO>failed(e), mGenreCursor, null)));
+                    .subscribe(result -> onPage(request, page, result, mGenreCursor, this::showGenres),
+                            e -> onPage(request, page, ProviderPage.<GenrePOJO>failed(e), mGenreCursor, null)));
         }
     }
 
@@ -650,15 +655,23 @@ public class BooksPresenter extends MvpPresenter<BooksView> implements
      * Applies one page: a failure (of a refresh too) keeps cursor and list and re-asks the same page next
      * time; a success moves the cursor, page 1 replacing the list and its dedupe set ({@link ListingCursor}).
      */
-    private <T> void onPage(int page, ProviderPage<T> result, ListingCursor<T> cursor, Runnable show) {
+    private <T> void onPage(int request, int page, ProviderPage<T> result, ListingCursor<T> cursor, Runnable show) {
         try {
+            RouteAttempt tried = takeRetry(request);
             if (result.isFailure()) {
-                if (result.status == ProviderPage.Status.BLOCKED) {
-                    getViewState().showToast(CookesExeption.messageFor(mUrl));
-                } else {
-                    getViewState().showToast(R.string.error_load_data);
+                if (tried != null) {
+                    routeFailed(tried, result);
+                } else if (mRoute != null && mRoute.deferred) {
+                    return; // the accepted offer retries below, on the other route
+                } else if (!offerRoute(result)) {
+                    showFailure(result);
                 }
                 return;
+            }
+            mRoute = null; // the site answers: an unanswered offer is moot
+            if (tried != null) {
+                getViewState().showToast(mContext.getString(
+                        tried.wasDirect ? R.string.route_works_proxy : R.string.route_works_direct, mProvider.title));
             }
             cursor.apply(page, result);
             show.run();
@@ -670,6 +683,151 @@ public class BooksPresenter extends MvpPresenter<BooksView> implements
             isRefreshing = false;
             getViewState().showProgres(false);
             getViewState().showRefreshing(false);
+            RouteAttempt deferred = mRoute;
+            if (deferred != null && deferred.deferred && request == mRequest) {
+                mRoute = null;
+                if (result.isFailure()) {
+                    switchAndRetry(deferred);
+                }
+            }
+        }
+    }
+
+    /**
+     * True for a section root (catalog, genres, authors, readers) of a site that is no longer active: opened from the
+     * source menu before the site was switched off. A listing reached from a book of such a site is not a root.
+     */
+    public boolean isInactiveSourceRoot() {
+        if (mProvider == null || Sources.isActive(mProvider)) {
+            return false;
+        }
+        for (String root : new String[]{mProvider.index, mProvider.sections, mProvider.authors, mProvider.performers}) {
+            if (root != null && Url.canonical(root).equals(mUrl)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private void showFailure(ProviderPage<?> result) {
+        if (result.status == ProviderPage.Status.BLOCKED) {
+            getViewState().showToast(CookesExeption.messageFor(mUrl));
+        } else {
+            getViewState().showToast(R.string.error_load_data);
+        }
+    }
+
+    // ---------------------------------------------------------------- route offer
+
+    /**
+     * A route offer for the listing's site: whether the failed page was a refresh, the site's route then, and the
+     * retry's request once accepted (0 while the offer is unanswered).
+     */
+    private static final class RouteAttempt {
+        final boolean refresh;
+        final boolean wasDirect;
+        int request;
+        /** Accepted while another page was loading: that page decides (an answer drops the offer). */
+        boolean deferred;
+
+        RouteAttempt(boolean refresh, boolean wasDirect) {
+            this.refresh = refresh;
+            this.wasDirect = wasDirect;
+        }
+    }
+
+    /** Numbers the page requests, so a retry's result is told apart from a newer request's. */
+    private int mRequest;
+    /** The route of the site when the latest request went out: a failure is offered the other route only. */
+    private boolean mRequestDirect;
+    private RouteAttempt mRoute;
+
+    /** The accepted attempt whose retry this result answers; a newer request replaced any other, kept as it is. */
+    private RouteAttempt takeRetry(int request) {
+        RouteAttempt retry = mRoute;
+        if (retry == null || retry.request == 0) {
+            return null;
+        }
+        mRoute = null;
+        return retry.request == request ? retry : null;
+    }
+
+    /**
+     * A site that fails while the device is online: offers its other route once, in place of the error toast. A
+     * blocked site with the proxy off keeps the cookie hint: a challenge, not a route, is the likelier cause.
+     */
+    private boolean offerRoute(ProviderPage<?> result) {
+        if (mProvider == null || !Consts.isNetworkAvailable(mContext)) {
+            return false;
+        }
+        boolean wasDirect = AppProxy.isDirect(mProvider);
+        if (wasDirect != mRequestDirect) {
+            return false; // the route changed while the page was loading: the failure says nothing of the new one
+        }
+        RouteOffer.Kind kind = RouteOffer.of(AppProxy.MODE_OFF.equals(AppProxy.mode()), wasDirect,
+                AppProxy.proxyUsable());
+        if (kind == RouteOffer.Kind.NONE || kind == RouteOffer.Kind.ENABLE_PROXY
+                && result.status == ProviderPage.Status.BLOCKED || !RouteOffer.claim(mProvider)) {
+            return false;
+        }
+        if (kind == RouteOffer.Kind.ENABLE_PROXY) {
+            getViewState().showRouteOffer(R.string.route_offer_enable, mProvider.title,
+                    R.string.route_offer_enable_action, true);
+        } else {
+            boolean toProxy = kind == RouteOffer.Kind.TO_PROXY;
+            mRoute = new RouteAttempt(isRefreshing, wasDirect);
+            getViewState().showRouteOffer(toProxy ? R.string.route_offer_proxy : R.string.route_offer_direct,
+                    mProvider.title, toProxy ? R.string.route_offer_proxy_action : R.string.route_offer_direct_action,
+                    false);
+        }
+        return true;
+    }
+
+    /** Moves the site to its other route and asks the failed page again the way it was asked: one try only. */
+    public void onRouteOfferAccepted() {
+        RouteAttempt offer = mRoute;
+        if (offer == null || offer.request != 0 || mProvider == null) {
+            return;
+        }
+        if (isLoading) {
+            offer.deferred = true; // the page on its way decides (onPage)
+            return;
+        }
+        mRoute = null;
+        switchAndRetry(offer);
+    }
+
+    /** The site's other route, and the failed page asked again on it: the offer's one try. */
+    private void switchAndRetry(RouteAttempt offer) {
+        AppProxy.setDirect(getDefaultSharedPreferences(mContext), mProvider, !offer.wasDirect);
+        int before = mRequest;
+        if (offer.refresh) {
+            onRefresh();
+        } else {
+            loadBoks();
+        }
+        if (mRequest != before) {
+            offer.request = mRequest;
+            mRoute = offer;
+        }
+    }
+
+    /** A declined offer is not made again for the site in this process ({@link RouteOffer#claim}). */
+    public void onRouteOfferDismissed() {
+        if (mRoute != null && mRoute.request == 0 && !mRoute.deferred) {
+            mRoute = null;
+        }
+    }
+
+    /** Neither route answers: back to the user's route, unless the user changed it meanwhile. */
+    private void routeFailed(RouteAttempt tried, ProviderPage<?> result) {
+        if (AppProxy.isDirect(mProvider) != tried.wasDirect) {
+            AppProxy.setDirect(getDefaultSharedPreferences(mContext), mProvider, tried.wasDirect);
+        }
+        if (result.status == ProviderPage.Status.BLOCKED) {
+            getViewState().showToast(CookesExeption.messageFor(mUrl)); // the cookie hint is what can help
+        } else {
+            getViewState().showToast(mContext.getString(R.string.route_none, mProvider.title));
         }
     }
 

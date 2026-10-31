@@ -9,6 +9,7 @@ import androidx.annotation.Nullable;
 import com.fanok.audiobooks.App;
 import com.fanok.audiobooks.Consts;
 import com.fanok.audiobooks.search.Provider;
+import com.fanok.audiobooks.search.Sources;
 
 import java.io.IOException;
 import java.net.Authenticator;
@@ -54,6 +55,8 @@ public final class AppProxy {
     private static volatile Set<String> direct = Collections.emptySet();
     /** Strong reference: SharedPreferences keeps its listeners weakly. */
     private static SharedPreferences.OnSharedPreferenceChangeListener listener;
+    /** The platform's selector, which ours defers to for anything it does not route. */
+    private static ProxySelector system;
     /** The catalog site setting: the automatic proxy must reach the selected site. */
     private static final String PREF_SOURCE = "sorce_books";
 
@@ -73,6 +76,11 @@ public final class AppProxy {
 
     /** Call once, before the first HTTP client is built (OkHttp captures the default selector at construction). */
     public static void install(@NonNull Context context) {
+        if (listener != null) {
+            // once per process. The read also keeps the field: R8 removed it while it was only written, and the
+            // listener, held by SharedPreferences weakly, went with the first GC (route changes stopped applying)
+            return;
+        }
         SharedPreferences prefs = prefs(context);
         mode = readMode(prefs);
         direct = readDirect(prefs);
@@ -85,13 +93,14 @@ public final class AppProxy {
                 direct = readDirect(p);
                 // a pooled connection keeps the route it was opened with
                 App.evictConnections();
+                installSelector();
                 ProxyFinder f = finder;
                 String selected = selectedSource(p);
                 if (MODE_AUTO.equals(mode) && f != null
                         && !ProxyFinder.targetOf(selected, before).equals(ProxyFinder.targetOf(selected, direct))) {
                     f.recheckCurrent(); // the proxy is now checked against another site
                 }
-            } else if (PREF_SOURCE.equals(key) && MODE_AUTO.equals(mode)) {
+            } else if ((PREF_SOURCE.equals(key) || Sources.PREF.equals(key)) && MODE_AUTO.equals(mode)) {
                 // the proxy in use is checked against the new site; one it rejects is replaced
                 ProxyFinder f = finder;
                 if (f != null) {
@@ -100,15 +109,26 @@ public final class AppProxy {
             }
         };
         prefs.registerOnSharedPreferenceChangeListener(listener);
-        List<Proxy> builtin = Collections.singletonList(proxy());
-        ProxySelector.setDefault(new Selector(ProxySelector.getDefault(),
-                () -> route(mode, configured(), builtin, AppProxy::autoProxies), AppProxy::proxied,
-                AppProxy::onConnectFailed));
+        system = ProxySelector.getDefault();
+        installSelector();
         Authenticator.setDefault(new ProxyOnlyAuthenticator(Consts.PROXY_HOST, Consts.PROXY_PORT,
                 Consts.PROXY_USER, Consts.PROXY_PASSWORD));
         if (MODE_AUTO.equals(mode)) {
             finder.recheckCurrent();
         }
+    }
+
+    /**
+     * Installs a new instance of our selector. The shared OkHttp client keeps the one it was built with, which reads
+     * the same state; site pages (HttpURLConnection) take the current default for each connection, and their pool
+     * reuses a connection only for the selector it was opened with, so a new instance after a change of route keeps a
+     * page from going out on a pooled connection of the old route.
+     */
+    private static void installSelector() {
+        List<Proxy> builtin = Collections.singletonList(proxy());
+        ProxySelector.setDefault(new Selector(system,
+                () -> route(mode, configured(), builtin, AppProxy::autoProxies), AppProxy::proxied,
+                AppProxy::onConnectFailed));
     }
 
     /** Stores and applies a mode; the automatic mode starts a search when no proxy is verified yet. */
@@ -127,6 +147,7 @@ public final class AppProxy {
         if (!value.equals(before)) {
             // a pooled connection of the old route (direct or another proxy) must not carry the next request
             App.evictConnections();
+            installSelector();
         }
         ProxyFinder f = finder;
         if (MODE_AUTO.equals(value) && f != null) {
@@ -175,16 +196,43 @@ public final class AppProxy {
         }
     }
 
-    /** Pure: the {@link #PREF_DIRECT} set when the user ticks {@code proxied} (prefValues) in the site list. */
-    @NonNull
-    public static Set<String> directExcept(@NonNull Set<?> proxied) {
-        Set<String> direct = new java.util.HashSet<>();
-        for (Provider provider : Provider.values()) {
-            if (!proxied.contains(provider.prefValue)) {
-                direct.add(provider.prefValue);
+    /** Stores whether {@code provider} goes direct; the listener applies it. */
+    public static void setDirect(@NonNull SharedPreferences prefs, @NonNull Provider provider, boolean goesDirect) {
+        Set<String> now = new HashSet<>(readDirect(prefs)); // nothing stored reads as an immutable empty set
+        if (goesDirect ? now.add(provider.prefValue) : now.remove(provider.prefValue)) {
+            prefs.edit().putStringSet(PREF_DIRECT, now).apply();
+        }
+    }
+
+    /** Every source direct, or every source through the proxy: one write, so one change of route. */
+    public static void setAllDirect(@NonNull SharedPreferences prefs, boolean goDirect) {
+        Set<String> now = new HashSet<>();
+        if (goDirect) {
+            for (Provider provider : Provider.values()) {
+                now.add(provider.prefValue);
             }
         }
-        return direct;
+        prefs.edit().putStringSet(PREF_DIRECT, now).apply();
+    }
+
+    /** True when the user set {@code provider} to go direct; otherwise it takes the proxy when the mode has one. */
+    public static boolean isDirect(@NonNull Provider provider) {
+        return direct.contains(provider.prefValue);
+    }
+
+    /**
+     * True when the mode's proxy can carry a request now: the built-in proxy of a build that has it, or a verified
+     * public proxy in the automatic mode. Otherwise "through the proxy" is in fact direct.
+     */
+    public static boolean proxyUsable() {
+        switch (mode) {
+            case MODE_BUILTIN:
+                return configured();
+            case MODE_AUTO:
+                return !autoProxies().isEmpty();
+            default:
+                return false;
+        }
     }
 
     /** The stored {@link #PREF_DIRECT} set; a wrongly typed value means none. */

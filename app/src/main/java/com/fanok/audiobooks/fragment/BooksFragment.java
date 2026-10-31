@@ -65,9 +65,11 @@ import com.fanok.audiobooks.search.GenreSort;
 import com.fanok.audiobooks.search.ListingFilters;
 import com.fanok.audiobooks.search.ListingFilters.Duration;
 import com.fanok.audiobooks.search.Provider;
+import com.fanok.audiobooks.search.Sources;
 import com.fanok.audiobooks.source.Sort;
 import com.google.android.material.navigation.NavigationView;
 import com.google.android.material.slider.RangeSlider;
+import com.google.android.material.snackbar.Snackbar;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
@@ -384,6 +386,10 @@ public class BooksFragment extends MvpAppCompatFragment implements BooksView {
 
     @Override
     public void onDestroyView() {
+        if (mRouteOffer != null) {
+            mRouteOffer.dismiss(); // it would outlive the screen on the activity's layout
+            mRouteOffer = null;
+        }
         if (mAddapterBooks != null) {
             mAddapterBooks.close();
         }
@@ -487,6 +493,41 @@ public class BooksFragment extends MvpAppCompatFragment implements BooksView {
     @Override
     public void showToast(String message) {
         Toast.makeText(this.getContext(), message, Toast.LENGTH_LONG).show();
+    }
+
+    /** Long enough to read the site's name and decide. */
+    private static final int ROUTE_OFFER_MS = 8000;
+    private Snackbar mRouteOffer;
+
+    @Override
+    public void showRouteOffer(int message, @NonNull String site, int action, boolean openProxySettings) {
+        if (binding == null) {
+            getPresenter().onRouteOfferDismissed();
+            return;
+        }
+        mRouteOffer = Snackbar.make(binding.getRoot(), getString(message, site), ROUTE_OFFER_MS)
+                .setAction(action, v -> {
+                    if (!isAdded()) {
+                        return;
+                    }
+                    if (openProxySettings) {
+                        new ProxyDialogFragment().show(getChildFragmentManager(), ProxyDialogFragment.TAG);
+                    } else {
+                        getPresenter().onRouteOfferAccepted();
+                    }
+                })
+                .addCallback(new Snackbar.Callback() {
+                    @Override
+                    public void onDismissed(Snackbar bar, int event) {
+                        if (mRouteOffer == bar) {
+                            mRouteOffer = null;
+                        }
+                        if (event != DISMISS_EVENT_ACTION) {
+                            getPresenter().onRouteOfferDismissed();
+                        }
+                    }
+                });
+        mRouteOffer.show();
     }
 
     @Override
@@ -644,14 +685,14 @@ public class BooksFragment extends MvpAppCompatFragment implements BooksView {
         return itemId < SOURCE_ITEM_BASE ? null : Provider.ofSource(itemId - SOURCE_ITEM_BASE);
     }
 
-    /** The "source" submenu: one checkable item per {@link Provider}, in its order; the xml leaves it empty. */
+    /** The "source" submenu: one checkable item per active source ({@link Sources}), in the user's order. */
     private static void fillSourceMenu(@NonNull Menu menu) {
         MenuItem source = menu.findItem(R.id.source);
         SubMenu sub = source == null ? null : source.getSubMenu();
         if (sub == null) {
             return;
         }
-        for (Provider provider : Provider.values()) {
+        for (Provider provider : Sources.active()) {
             sub.add(R.id.source_group, SOURCE_ITEM_BASE + provider.sourceId, Menu.NONE, provider.title);
         }
         sub.setGroupCheckable(R.id.source_group, true, true);
@@ -870,6 +911,11 @@ public class BooksFragment extends MvpAppCompatFragment implements BooksView {
     @Override
     public void onResume() {
         super.onResume();
+        if (getPresenter().isInactiveSourceRoot()) {
+            // its site was switched off (in the settings, maybe opened from a book): the app opens on the selected one
+            recreate();
+            return;
+        }
         long parentalVersion = ParentalControl.version(requireContext());
         if (parentalVersion != mParentalVersion && mAddapterBooks != null) {
             mAddapterBooks.refreshItem();

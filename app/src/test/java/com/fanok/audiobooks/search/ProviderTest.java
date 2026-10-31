@@ -57,8 +57,8 @@ public class ProviderTest {
         Consts.setSOURCE(Provider.UKNIG.prefValue);
         try {
             assertSame(Provider.UKNIG, Provider.selectedFirst().get(0));
-            assertEquals(Provider.values().length, Provider.selectedFirst().size());
-            assertEquals(Provider.values().length, new HashSet<>(Provider.selectedFirst()).size());
+            assertEquals("the active sources", Sources.activeCount(), Provider.selectedFirst().size());
+            assertEquals(Sources.activeCount(), new HashSet<>(Provider.selectedFirst()).size());
         } finally {
             if (before != null) {
                 Consts.setSOURCE(before.prefValue);

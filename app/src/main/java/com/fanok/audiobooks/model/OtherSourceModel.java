@@ -7,6 +7,7 @@ import com.fanok.audiobooks.Url;
 import com.fanok.audiobooks.pojo.BookPOJO;
 import com.fanok.audiobooks.pojo.OtherArtistPOJO;
 import com.fanok.audiobooks.search.Provider;
+import com.fanok.audiobooks.search.Sources;
 import io.reactivex.Observable;
 import io.reactivex.Scheduler;
 import io.reactivex.Single;
@@ -81,7 +82,7 @@ public class OtherSourceModel implements
         }
         String url = Url.canonical(bookPOJO.getUrl());
         List<Single<ArrayList<OtherArtistPOJO>>> lookups = new ArrayList<>();
-        for (Provider site : Provider.values()) {
+        for (Provider site : Sources.active()) {
             if (!Url.isHost(url, site.server)) {
                 lookups.add(Single.<ArrayList<OtherArtistPOJO>>create(emitter -> {
                     try {

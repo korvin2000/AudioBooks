@@ -39,7 +39,8 @@ public final class SourceProbe {
         @Nullable
         public final String message;
 
-        Result(@NonNull Provider provider, @NonNull ProviderPage.Status status, long millis, @Nullable String message) {
+        public Result(@NonNull Provider provider, @NonNull ProviderPage.Status status, long millis,
+                @Nullable String message) {
             this.provider = provider;
             this.status = status;
             this.millis = millis;
@@ -103,6 +104,19 @@ public final class SourceProbe {
     @NonNull
     static Single<List<Result>> probeAll(@NonNull List<Provider> providers, int parallel, @NonNull Scheduler io,
             @NonNull Loader loader, long timeoutSeconds) {
+        return probeEach(providers, parallel, io, loader, timeoutSeconds).toList();
+    }
+
+    /** {@link #probeAll}, each result as soon as its turn in the order of {@code providers} comes. */
+    @NonNull
+    public static Observable<Result> probeEach(@NonNull List<Provider> providers, int parallel,
+            @NonNull Scheduler io) {
+        return probeEach(providers, parallel, io, SourceProbe::firstPage, TIMEOUT_SECONDS);
+    }
+
+    @NonNull
+    static Observable<Result> probeEach(@NonNull List<Provider> providers, int parallel, @NonNull Scheduler io,
+            @NonNull Loader loader, long timeoutSeconds) {
         return Observable.fromIterable(providers)
                 .concatMapEager(provider -> Single.fromCallable(() -> probe(provider, loader, System::nanoTime))
                         .subscribeOn(io)
@@ -111,7 +125,6 @@ public final class SourceProbe {
                                 Single.just(new Result(provider, ProviderPage.Status.TIMEOUT,
                                         TimeUnit.SECONDS.toMillis(timeoutSeconds),
                                         "no answer in " + timeoutSeconds + " s")))
-                        .toObservable(), parallel, 1)
-                .toList();
+                        .toObservable(), parallel, 1);
     }
 }

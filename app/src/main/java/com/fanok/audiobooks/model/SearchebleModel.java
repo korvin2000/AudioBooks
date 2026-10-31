@@ -11,6 +11,7 @@ import com.fanok.audiobooks.pojo.GenrePOJO;
 import com.fanok.audiobooks.pojo.SearcheblPOJO;
 import com.fanok.audiobooks.pojo.SearchebleArrayPOJO;
 import com.fanok.audiobooks.search.Provider;
+import com.fanok.audiobooks.search.Sources;
 import com.fanok.audiobooks.search.SearchUrls;
 import io.reactivex.Observable;
 import io.reactivex.Single;
@@ -31,11 +32,11 @@ public class SearchebleModel implements SearchableModel {
     @Override
     public Observable<SearcheblPOJO> chips(SharedPreferences preferences, String query) {
         List<Single<SearcheblPOJO>> sources = new ArrayList<>();
-        if (preferences.getBoolean(Provider.KNIGAVUHE.prefKey, true)) {
+        if (Sources.isActive(Provider.KNIGAVUHE) && preferences.getBoolean(Provider.KNIGAVUHE.prefKey, true)) {
             sources.add(Single.fromCallable(() -> getSearcheblPOJO(
                     SearchUrls.url(Provider.KNIGAVUHE, SearchUrls.Category.BOOKS, query, 1))));
         }
-        if (preferences.getBoolean(Provider.ABMP3.prefKey, true)) {
+        if (Sources.isActive(Provider.ABMP3) && preferences.getBoolean(Provider.ABMP3.prefKey, true)) {
             sources.add(Single.fromCallable(() -> abmp3Authors(query)));
         }
         List<Observable<SearcheblPOJO>> bounded = new ArrayList<>();

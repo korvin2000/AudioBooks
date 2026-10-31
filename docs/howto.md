@@ -77,6 +77,7 @@ short complete examples.
    the feature.
 3. **Register.** Add the `Provider` row: server, title, `prefValue`, `prefKey`, a new unique `sourceId` (never reuse or
    renumber one: users' settings store it), the drawer URLs (`null` for a section the site lacks) and `new <Site>()`.
+   Existing users get the new site inactive, at the end of their list (`search/Sources`); the user switches it on.
    Add the host to the deep-link intent filter in `AndroidManifest.xml`; a site that moved gets its old hosts in
    `Url.canonical`.
 4. **Test.** An adapter test on the fixtures (cards, next page, search, sort URLs, description, chapters), then
@@ -327,15 +328,24 @@ adb exec-out run-as com.fanok.books tar -cf - databases shared_prefs files > app
 - `net/AppProxy` installs a process-wide `ProxySelector` in `App.onCreate`, before any HTTP client is created, so pages, audio, downloads, and covers all follow the switch. Toggling it takes effect immediately; with the switch off, the system proxy settings apply.
 - The server and credentials are `PROXY_HOST`, `PROXY_PORT`, `PROXY_USER`, and `PROXY_PASSWORD` in `Consts.java`. An empty `PROXY_HOST` disables the feature. The credentials are given only to that proxy host and port, never to a site that asks for authentication.
 - OkHttp lets the proxy resolve host names, so audio and downloads also work where DNS is filtered.
-- **Settings → Сайты через прокси** (`pref_proxy_sources`) chooses which sites use the proxy; the others go direct,
-  which is faster where only some sites are blocked. The selector picks the route per host: a site's server, its
-  subdomains and its `SourceParser.hosts()` follow the site's choice; any other host (a CDN several sites share) follows
-  the proxy mode. The choice is stored inverted, as the set of direct sites (`AppProxy.PREF_DIRECT`), so a newly added
-  site uses the proxy until the user says otherwise. Changing it drops pooled connections; the automatic mode then
-  verifies its proxy against a site that uses it.
+- **Settings → Источники и сеть → Управление источниками** (`fragment/SourcesDialogFragment`) is one dialog for the
+  sources: their order (drag a row by its handle, or the row's menu on TV and with TalkBack), the active ones (above
+  the divider, 1–13, `search/Sources`), the route of each site (direct or through the proxy; the header sets all at
+  once) and their availability. Only active sources exist for the source menu, the source setting, the searches and
+  "on other sites"; links, the library and the routes still know every site (`Provider.ofUrl` and friends). The order
+  and the active ones are one preference, `pref_sources` (`"abook,izibuc|otrub"`, active before `|`); a site added
+  later is not in it and starts inactive. Switching the selected source off selects the first active one.
+- The route is chosen per host: a site's server, its subdomains and its `SourceParser.hosts()` follow the site's
+  choice; any other host (a CDN several sites share) follows the proxy mode. The choice is stored inverted, as the set
+  of direct sites (`AppProxy.PREF_DIRECT`), so a new site uses the proxy until the user says otherwise. Changing it
+  drops pooled connections and installs a new `ProxySelector` instance (the platform `HttpURLConnection` pool of site
+  pages keys its connections by the selector); the automatic mode then verifies its proxy against a site that uses it.
+- When a listing of a site fails, the catalog offers once per site while the app runs (`net/RouteOffer`) to try the
+  other route; when that fails too the old route is restored. With the proxy off it offers the proxy settings.
 - `SourceProbe.probe(provider)` checks whether a site works from here (its first catalog page through its own adapter,
-  request and route; `OK` only when books are listed) and `SourceProbe.probeAll` checks several in parallel. It is the
-  building block for an availability screen and for choosing per-site routes; no screen calls it yet.
+  request and route; `OK` only when books are listed); `SourceHealth` keeps each site's last result and time. The
+  dialog checks on its refresh button and after a change of one site; the automatic check runs at most daily on an
+  unmetered network, active sites only.
 - The WebView on the cookie screen does not use the proxy.
 - `app/src/main/assets/*.ovpn` are OpenVPN profiles left over from an earlier VPN feature (removed upstream together with its `vpnLib` module); no code reads them.
 

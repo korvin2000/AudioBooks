@@ -204,20 +204,18 @@ public class AppProxyTest {
         assertTrue(AppProxy.normalize(null).equals(AppProxy.MODE_OFF));
     }
 
-    /** The settings list ticks the sites that use the proxy; the unticked ones are stored as direct. */
+    /** The sources dialog stores one site's route, or every site's in one write. */
     @Test
-    public void theSiteListStoresTheUntickedSitesAsDirect() {
-        Set<String> direct = AppProxy.directExcept(
-                new HashSet<>(Arrays.asList(Provider.AKNIGA.prefValue, Provider.UKNIG.prefValue)));
-        assertEquals(Provider.values().length - 2, direct.size());
-        assertFalse(direct.contains(Provider.AKNIGA.prefValue));
-        assertTrue(direct.contains(Provider.IZIBUK.prefValue));
-        assertTrue(AppProxy.isProxied(Provider.AKNIGA, direct));
-        assertFalse(AppProxy.isProxied(Provider.IZIBUK, direct));
-        Set<String> all = new HashSet<>();
-        for (Provider provider : Provider.values()) {
-            all.add(provider.prefValue);
-        }
-        assertTrue("every site ticked: none direct", AppProxy.directExcept(all).isEmpty());
+    public void theRouteOfASiteOrOfEverySiteIsStored() {
+        FakePrefs prefs = new FakePrefs();
+        AppProxy.setDirect(prefs, Provider.AKNIGA, true);
+        AppProxy.setDirect(prefs, Provider.UKNIG, true);
+        AppProxy.setDirect(prefs, Provider.UKNIG, false);
+        assertEquals(Collections.singleton(Provider.AKNIGA.prefValue), AppProxy.readDirect(prefs));
+        AppProxy.setAllDirect(prefs, true);
+        assertEquals(Provider.values().length, AppProxy.readDirect(prefs).size());
+        assertFalse(AppProxy.isProxied(Provider.IZIBUK, AppProxy.readDirect(prefs)));
+        AppProxy.setAllDirect(prefs, false);
+        assertTrue("all through the proxy: none direct", AppProxy.readDirect(prefs).isEmpty());
     }
 }

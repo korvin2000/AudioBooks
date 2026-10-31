@@ -9,7 +9,7 @@ import java.util.Map;
 import java.util.Set;
 
 /** In-memory SharedPreferences for JVM tests; a wrongly typed read throws ClassCastException like the real one. */
-final class FakePrefs implements SharedPreferences {
+public final class FakePrefs implements SharedPreferences {
 
     private static final Object REMOVED = new Object();
     private final Map<String, Object> values = new HashMap<>();
