@@ -2,6 +2,7 @@ package com.fanok.audiobooks.search;
 
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertSame;
 import static org.junit.Assert.assertThrows;
@@ -11,6 +12,9 @@ import com.fanok.audiobooks.Consts;
 
 import org.junit.Test;
 
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.EnumSet;
 import java.util.HashSet;
 import java.util.Set;
 
@@ -102,6 +106,34 @@ public class ProviderTest {
             assertSame(p.name(), p, Provider.require(p.server + "/some/book/"));
             Consts.setSOURCE(p.prefValue);
             assertSame(p.name(), p, Provider.current());
+        }
+    }
+
+    /** Golosom and Biblus carry Knigoblud's catalog, Golosknig akniga's; every other site is unique. */
+    @Test
+    public void mirrorsAreTheOtherSitesWithTheSameCatalog() {
+        assertEquals(Arrays.asList(Provider.BIBLUS, Provider.GOLOSOM), Provider.KNIGOBLUD.mirrors());
+        assertEquals(Arrays.asList(Provider.KNIGOBLUD, Provider.GOLOSOM), Provider.BIBLUS.mirrors());
+        assertEquals(Arrays.asList(Provider.KNIGOBLUD, Provider.BIBLUS), Provider.GOLOSOM.mirrors());
+        assertEquals(Collections.singletonList(Provider.GOLOSKNIG), Provider.AKNIGA.mirrors());
+        assertEquals(Collections.singletonList(Provider.AKNIGA), Provider.GOLOSKNIG.mirrors());
+        assertSame(Provider.KNIGOBLUD, Provider.GOLOSOM.original());
+        assertSame(Provider.KNIGOBLUD, Provider.KNIGOBLUD.original());
+        assertTrue("two mirrors of one original", Provider.GOLOSOM.isMirrorOf(Provider.BIBLUS));
+        assertFalse("a site is no mirror of itself", Provider.GOLOSOM.isMirrorOf(Provider.GOLOSOM));
+        assertFalse(Provider.GOLOSOM.isMirrorOf(Provider.GOLOSKNIG));
+        assertFalse(Provider.GOLOSOM.isMirrorOf(null));
+        Set<Provider> mirrored = EnumSet.of(Provider.KNIGOBLUD, Provider.BIBLUS, Provider.GOLOSOM, Provider.AKNIGA,
+                Provider.GOLOSKNIG);
+        for (Provider p : Provider.values()) {
+            assertEquals(p.name(), mirrored.contains(p), p.hasMirrors());
+            if (!mirrored.contains(p)) {
+                assertSame(p.name(), p, p.original());
+                assertTrue(p.name(), p.mirrors().isEmpty());
+            }
+            for (Provider mirror : p.mirrors()) {
+                assertTrue("symmetric: " + p + " / " + mirror, mirror.isMirrorOf(p));
+            }
         }
     }
 

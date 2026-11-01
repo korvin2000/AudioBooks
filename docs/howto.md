@@ -85,7 +85,9 @@ hide them meanwhile.
    page for it, add only a field the card has and the page lacks (AknigXyz's rating).
 3. **Register.** Add the `Provider` row: server, title, `prefValue`, `prefKey`, a new unique `sourceId` (never reuse or
    renumber one: users' settings store it), the download folder (a new CamelCase name; never rename one: saved books
-   are found by it), the drawer URLs (`null` for a section the site lacks) and `new <Site>()`. Keep the site's
+   are found by it), the drawer URLs (`null` for a section the site lacks) and `new <Site>()`; a mirror (another
+   site with the same catalog) also names the row it mirrors, declared above it (`Provider.mirrors()`,
+   `original()`, `isMirrorOf`). Keep the site's
    `SERVER`, `INDEX`, `GENRES`, ... as constants of its adapter. Existing users get the new site inactive, at the end
    of their list (`search/Sources`); the user switches it on. Add the host to the deep-link intent filter in
    `AndroidManifest.xml`; a site that moved gets its old hosts in `Url.HOST_ALIASES`. Add the book-page fixture to

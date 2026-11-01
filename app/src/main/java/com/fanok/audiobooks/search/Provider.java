@@ -71,7 +71,7 @@ public enum Provider {
             "AudioknigaOne", AudioknigaOne.INDEX, AudioknigaOne.GENRES, AudioknigaOne.AUTHORS, AudioknigaOne.READERS,
             new AudioknigaOne()),
     BIBLUS(Biblus.SERVER, "Библус", "biblus", "search_biblus", 16, "Biblus",
-            Biblus.INDEX, Biblus.GENRES, null, null, new Biblus()),
+            Biblus.INDEX, Biblus.GENRES, null, null, new Biblus(), KNIGOBLUD),
     AUDIOKNIGA_ONLINE(AudioknigaOnline.SERVER, "Audiokniga-online", "audiokniga_online", "search_audiokniga_online",
             17, "AudioknigaOnline", AudioknigaOnline.INDEX, AudioknigaOnline.GENRES, null, null,
             new AudioknigaOnline()),
@@ -83,9 +83,9 @@ public enum Provider {
     BOOKISH(Bookish.SERVER, "Bookish", "bookish", "search_bookish", 20, "Bookish",
             Bookish.INDEX, Bookish.GENRES, null, null, new Bookish()),
     GOLOSKNIG(Golosknig.SERVER, "Golosknig", "golosknig", "search_golosknig", 21, "Golosknig",
-            Golosknig.INDEX, Golosknig.GENRES, Golosknig.AUTHORS, Golosknig.READERS, new Golosknig()),
+            Golosknig.INDEX, Golosknig.GENRES, Golosknig.AUTHORS, Golosknig.READERS, new Golosknig(), AKNIGA),
     GOLOSOM(Golosom.SERVER, "Голосом", "golosom", "search_golosom", 22, "Golosom",
-            Golosom.INDEX, Golosom.GENRES, null, null, new Golosom());
+            Golosom.INDEX, Golosom.GENRES, null, null, new Golosom(), KNIGOBLUD);
 
     /** {@code https://host} without a trailing slash. */
     public final String server;
@@ -106,9 +106,18 @@ public enum Provider {
     public final String performers;
     /** The site's code; never null. Must not touch {@code Provider} while it initialises. */
     public final SourceParser parser;
+    /** The row this site mirrors, declared above it (the compiler rejects a later one, so no cycle); null for none. */
+    private final Provider mirrorOf;
 
     Provider(String server, String title, String prefValue, String prefKey, int sourceId, String folder,
             String index, String sections, String authors, String performers, SourceParser parser) {
+        this(server, title, prefValue, prefKey, sourceId, folder, index, sections, authors, performers, parser, null);
+    }
+
+    /** A mirror of {@code mirrorOf}: another site, with its own host and adapter, that carries the same catalog. */
+    Provider(String server, String title, String prefValue, String prefKey, int sourceId, String folder,
+            String index, String sections, String authors, String performers, SourceParser parser,
+            Provider mirrorOf) {
         this.server = server;
         this.title = title;
         this.prefValue = prefValue;
@@ -120,6 +129,36 @@ public enum Provider {
         this.authors = authors;
         this.performers = performers;
         this.parser = java.util.Objects.requireNonNull(parser);
+        this.mirrorOf = mirrorOf;
+    }
+
+    /**
+     * The original of the site's catalog: the row it mirrors (followed to the row that mirrors none), or the site
+     * itself. Sites with the same original are mirrors of each other.
+     */
+    public Provider original() {
+        return mirrorOf == null ? this : mirrorOf.original();
+    }
+
+    /** True when {@code other} is another site with this site's catalog: the original or a mirror of it. */
+    public boolean isMirrorOf(Provider other) {
+        return other != null && other != this && other.original() == original();
+    }
+
+    /** The other sites with this site's catalog, in registry order; empty for a unique site. */
+    public List<Provider> mirrors() {
+        List<Provider> mirrors = new ArrayList<>();
+        for (Provider p : values()) {
+            if (isMirrorOf(p)) {
+                mirrors.add(p);
+            }
+        }
+        return mirrors;
+    }
+
+    /** False for a unique site: no other site in the app carries its catalog. */
+    public boolean hasMirrors() {
+        return !mirrors().isEmpty();
     }
 
     /**
