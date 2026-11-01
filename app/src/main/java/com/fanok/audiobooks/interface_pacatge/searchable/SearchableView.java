@@ -11,6 +11,7 @@ import com.arellomobile.mvp.viewstate.strategy.StateStrategyType;
 import com.fanok.audiobooks.pojo.BookPOJO;
 import com.fanok.audiobooks.pojo.GenrePOJO;
 import com.fanok.audiobooks.pojo.SearcheblPOJO;
+import com.fanok.audiobooks.search.SearchUi;
 
 import java.util.ArrayList;
 
@@ -22,8 +23,17 @@ public interface SearchableView extends MvpView {
     @StateStrategyType(AddToEndSingleStrategy.class)
     void setLayoutManager(int count);
 
+    /** The book search's whole screen: chips, progress, summary, rows and why it is empty. */
     @StateStrategyType(AddToEndSingleStrategy.class)
-    void showDataBooks(ArrayList<BookPOJO> books);
+    void showState(SearchUi.State state);
+
+    /** Puts {@code query} into the search field without submitting it (a restored search). */
+    @StateStrategyType(AddToEndSingleStrategy.class)
+    void showQuery(String query);
+
+    /** The recordings and sites of one work, to choose from; {@code urls} match {@code labels}. */
+    @StateStrategyType(OneExecutionStateStrategy.class)
+    void showNarrations(String title, ArrayList<String> labels, ArrayList<String> urls);
 
     @StateStrategyType(AddToEndSingleStrategy.class)
     void showDataGenres(ArrayList<GenrePOJO> genres);
@@ -39,9 +49,6 @@ public interface SearchableView extends MvpView {
 
     @StateStrategyType(AddToEndSingleStrategy.class)
     void showProgres(boolean b);
-
-    @StateStrategyType(AddToEndSingleStrategy.class)
-    void showProgresTop(boolean b);
 
     @StateStrategyType(SkipStrategy.class)
     void returnResult(String url, String name, int modelId, String tag);

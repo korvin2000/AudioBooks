@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- One source on the search screen; SearchableActivity sets its text, icon, fill and stroke from the source's state. -->
+<com.google.android.material.chip.Chip xmlns:android="http://schemas.android.com/apk/res/android"
+    style="@style/Widget.App.SourceChip"
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content" />

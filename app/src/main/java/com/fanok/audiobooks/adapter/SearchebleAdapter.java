@@ -63,6 +63,11 @@ public class SearchebleAdapter extends RecyclerView.Adapter<SearchebleAdapter.My
         }
     }
 
+    /** The entry shown at {@code position}, or null when the position is no longer in the list. */
+    public SearchebleArrayPOJO getItem(int position) {
+        return mModel == null || position < 0 || position >= mModel.size() ? null : mModel.get(position);
+    }
+
     public interface OnListItemSelectedInterface {
         void onItemSelected(View view, int position);
     }
@@ -76,7 +81,10 @@ public class SearchebleAdapter extends RecyclerView.Adapter<SearchebleAdapter.My
 
             mTextView = itemView.findViewById(R.id.textView);
             itemView.setOnClickListener(view -> {
-                if (mListener != null) mListener.onItemSelected(view, getBindingAdapterPosition());
+                int position = getBindingAdapterPosition();
+                if (mListener != null && position != RecyclerView.NO_POSITION) {
+                    mListener.onItemSelected(view, position);
+                }
             });
         }
 

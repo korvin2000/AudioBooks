@@ -288,6 +288,24 @@
         <item name="android:paddingEnd">4dp</item>
     </style>
 
+    <!-- A source chip on the search screen: its state is the icon and a faint fill, the selection a stroke. -->
+    <style name="Widget.App.SourceChip" parent="Widget.MaterialComponents.Chip.Action">
+        <item name="android:checkable">false</item>
+        <item name="android:focusable">true</item>
+        <item name="android:textSize">13sp</item>
+        <item name="android:textColor">?attr/colorPrimaryText</item>
+        <item name="chipMinHeight">32dp</item>
+        <item name="chipBackgroundColor">@android:color/transparent</item>
+        <item name="chipStrokeColor">?attr/subTextColor</item>
+        <item name="chipStrokeWidth">1dp</item>
+        <item name="chipIconSize">16dp</item>
+        <item name="chipStartPadding">8dp</item>
+        <item name="iconStartPadding">0dp</item>
+        <item name="iconEndPadding">0dp</item>
+        <item name="textStartPadding">6dp</item>
+        <item name="textEndPadding">6dp</item>
+    </style>
+
     <!-- The active-filter chip above a book listing: 28dp high, no 48dp touch inset. -->
     <style name="Widget.App.FilterChip" parent="Widget.MaterialComponents.Chip.Entry">
         <item name="android:checkable">false</item>

@@ -38,6 +38,11 @@ public class GenreListAddapter extends RecyclerView.Adapter<GenreListAddapter.My
         }
     }
 
+    /** The entry shown at {@code position}, or null when the position is no longer in the list. */
+    public GenrePOJO getItem(int position) {
+        return mModel == null || position < 0 || position >= mModel.size() ? null : mModel.get(position);
+    }
+
     @NonNull
     @Override
     public MyHolder onCreateViewHolder(@NonNull ViewGroup viewGroup, int i) {

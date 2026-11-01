@@ -8,6 +8,9 @@
 -keep class com.fanok.audiobooks.model.** { *; }
 -keep class com.fanok.audiobooks.presenter.** { *; }
 -keep class com.fanok.audiobooks.interface_pacatge.** { *; }
+# the last search, read back with Gson
+-keep class com.fanok.audiobooks.search.SearchSnapshot { *; }
+-keep class com.fanok.audiobooks.search.SearchSnapshot$* { *; }
 
 # Media3 & ExoPlayer
 -keep class androidx.media3.** { *; }
