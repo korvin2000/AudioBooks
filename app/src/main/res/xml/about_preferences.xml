@@ -152,5 +152,12 @@
         android:key="open_telegram"
         android:title="@string/open_telegram" />
 
+    <!-- CC BY 4.0 attribution of the IP-to-region table (assets/region, tools/region/build_ip_regions.py) -->
+    <Preference
+        android:icon="@drawable/ic_web"
+        android:key="open_dbip"
+        android:summary="@string/dbip_summary"
+        android:title="@string/dbip" />
+
 
 </PreferenceScreen>

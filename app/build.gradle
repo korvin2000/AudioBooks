@@ -21,6 +21,11 @@ android {
         }
     }
 
+    // the IP region table (assets/region) is read in place through AssetManager.openFd: stored in the APK, not deflated
+    androidResources {
+        noCompress += ['bin']
+    }
+
     buildFeatures {
         viewBinding true
         buildConfig true

@@ -48,3 +48,6 @@ google-services.json
 book-sources/
 info/screenshots/
 info/
+
+# DB-IP downloads of tools/region/build_ip_regions.py
+tools/region/*.csv.gz

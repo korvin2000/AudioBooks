@@ -51,6 +51,7 @@ import com.fanok.audiobooks.pojo.BookPOJO;
 import com.fanok.audiobooks.pojo.StorageUtil;
 import com.fanok.audiobooks.presenter.MainPresenter;
 import com.fanok.audiobooks.service.MediaPlayerService;
+import com.fanok.audiobooks.region.AppRegion;
 import com.fanok.audiobooks.update.Updater;
 import com.google.android.material.navigation.NavigationView;
 
@@ -339,6 +340,7 @@ public class MainActivity extends MvpAppCompatActivity
 
         setContentView(R.layout.activity_main);
         Updater.start(this); // once per process: a check in a few seconds, then every 1.5 h
+        AppRegion.start(this); // once per process: the region of the connection, in a few seconds
 
         preferences = getSharedPreferences("FIRST", Context.MODE_PRIVATE);
 

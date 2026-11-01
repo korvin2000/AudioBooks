@@ -154,6 +154,11 @@ public class AboutFragment extends PreferenceFragmentCompat {
             return true;
         });
 
+        preferenceClickListner("open_dbip", preference -> {
+            openInBrowser("https://db-ip.com");
+            return true;
+        });
+
         preferenceClickListner("open_telegram", preference -> {
             // the Telegram app when one is installed (tg: is its own scheme), otherwise the group's page in a browser
             try {
