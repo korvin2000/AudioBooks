@@ -430,8 +430,27 @@ public final class SearchGrouper {
                 out.add(new Narration(new TreeSet<>(readerOf.get(e.getKey())), editionOf.get(e.getKey()), cluster));
             }
         }
+        Collections.sort(out, NARRATIONS);
         return out;
     }
+
+    /**
+     * Recordings as the listener chooses among them: a known reader before "reader unknown", then the one on most
+     * sites, then the one with most cards, then by reader and edition; ties keep the order of the keys (stable sort).
+     */
+    static final Comparator<Narration> NARRATIONS = new Comparator<Narration>() {
+        @Override
+        public int compare(Narration a, Narration b) {
+            int c = Boolean.compare(a.reader.isEmpty(), b.reader.isEmpty());
+            if (c == 0) {
+                c = Integer.compare(b.catalogs(), a.catalogs());
+            }
+            if (c == 0) {
+                c = Integer.compare(b.offers.size(), a.offers.size());
+            }
+            return c;
+        }
+    };
 
     private static List<List<Offer>> byLength(List<Offer> offers) {
         List<Offer> known = new ArrayList<>();

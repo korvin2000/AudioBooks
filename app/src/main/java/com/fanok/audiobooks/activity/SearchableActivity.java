@@ -60,13 +60,13 @@ import com.fanok.audiobooks.search.SearchMatcher;
 import com.fanok.audiobooks.search.SearchOrder;
 import com.fanok.audiobooks.search.SearchRequest;
 import com.fanok.audiobooks.search.SearchUi;
+import com.fanok.audiobooks.search.TextNorm;
 import com.google.android.material.chip.Chip;
 import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 import java.util.ArrayList;
 import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -468,6 +468,9 @@ public class SearchableActivity extends MvpAppCompatActivity implements Searchab
                         MySuggestionProvider.AUTHORITY, MySuggestionProvider.MODE);
                 suggestions.saveRecentQuery(query, null);
                 binding.searchView.setQuery(query, false);
+                // a query from outside (voice, another screen) is already submitted: the keyboard would only cover
+                // the results; clearFocus also cancels the pending show of the expanded search view
+                binding.searchView.clearFocus();
                 mPresenter.setQuery(query);
                 mPresenter.loadBoks();
             }
@@ -550,12 +553,16 @@ public class SearchableActivity extends MvpAppCompatActivity implements Searchab
             return;
         }
         boolean first = mState == null;
+        boolean otherView = !first && otherView(mState.input, state.input);
         mState = state;
         showChips(state);
         showProgress(state);
         showSummary(state);
         showRows(state);
         updateMenu();
+        if (otherView) {
+            binding.list.scrollToPosition(0); // another tab, scope, order or search: its top, not the old offset
+        }
         if (first && !state.rows.isEmpty()) {
             binding.searchView.clearFocus(); // restored results: the keyboard would cover them (W24)
         }
@@ -876,7 +883,7 @@ public class SearchableActivity extends MvpAppCompatActivity implements Searchab
                 }
             }
             aliases.put(row.key, urls);
-            d.setArtist(readers(g));
+            d.setArtist(readers(g, mState == null ? SearchOrder.Sort.RELEVANCE : mState.input.sort));
             int sites = g.catalogs();
             if (sites > 1) {
                 labels.put(row.key, getResources().getQuantityString(R.plurals.search_sites, sites, sites));
@@ -887,16 +894,33 @@ public class SearchableActivity extends MvpAppCompatActivity implements Searchab
         return d;
     }
 
-    /** The readers of a group's recordings: two names, then "+N". */
-    private static String readers(Group g) {
-        Set<String> names = new LinkedHashSet<>();
+    /** The listener changed what the list shows (not only what arrived): a new search, tab, scope, order or grouping. */
+    private static boolean otherView(SearchUi.Input before, SearchUi.Input after) {
+        return before.generation != after.generation || before.tab != after.tab || before.sort != after.sort
+                || before.grouped != after.grouped || !before.request.equals(after.request);
+    }
+
+    /**
+     * The readers of a group's recordings: two names, then "+N"; ordered by reader, the one the group is filed under
+     * comes first (sites spell a name "Имя Фамилия" or "Фамилия Имя").
+     */
+    private static String readers(Group g, SearchOrder.Sort sort) {
+        List<String> candidates = new ArrayList<>();
+        String first = sort == SearchOrder.Sort.READER ? SearchOrder.firstReader(g) : null;
+        if (first != null) {
+            candidates.add(first);
+        }
         for (Narration n : g.narrations) {
-            String r = n.best.book.getArtist();
-            if (r != null && !r.trim().isEmpty()) {
-                names.add(r.trim());
+            candidates.add(n.best.book.getArtist());
+        }
+        // one name once, however it is spelled: "Симаков Алексей" and "Алексей Симаков" are one reader
+        Set<String> people = new java.util.HashSet<>();
+        List<String> list = new ArrayList<>();
+        for (String r : candidates) {
+            if (r != null && !r.trim().isEmpty() && people.add(TextNorm.person(r).words.toString())) {
+                list.add(r.trim());
             }
         }
-        List<String> list = new ArrayList<>(names);
         if (list.size() <= 2) {
             return join(list, ", ");
         }

@@ -100,6 +100,20 @@ public class SearchGrouperTest {
                 offer(Provider.IZIBUK, "Оно", "Стивен Кинг Хилл", null, null)), Collections.<String>emptySet(), false).size());
     }
 
+    /** The choice of recordings: a known reader before "reader unknown", the one on most sites first. */
+    @Test
+    public void recordingsOnMostSitesComeFirstAndUnknownReadersLast() {
+        Group g = only(group(Arrays.asList(
+                offer(Provider.SLUSHAT_KNIGI, "Мастер и Маргарита", "Булгаков Михаил", null, "16:53:00"),
+                offer(Provider.KNIGAVUHE, "Мастер и Маргарита", "Булгаков Михаил", "Козий Николай", "17:05:00"),
+                offer(Provider.AKNIGA, "Мастер и Маргарита", "Булгаков Михаил", "Абдуллаев Джахангир", "18:19:00"),
+                offer(Provider.IZIBUK, "Мастер и Маргарита", "Булгаков Михаил", "Абдуллаев Джахангир", "18:19:00"))));
+        assertEquals(3, g.narrations.size());
+        assertEquals(new TreeSet<>(Arrays.asList("абдуллаев", "джахангир")), g.narrations.get(0).reader);
+        assertEquals(new TreeSet<>(Arrays.asList("козий", "николай")), g.narrations.get(1).reader);
+        assertTrue(g.narrations.get(2).reader.isEmpty());
+    }
+
     @Test
     public void romanVolumesStayApart() {
         assertEquals(2, SearchGrouper.roman("ii"));

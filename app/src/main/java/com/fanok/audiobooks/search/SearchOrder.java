@@ -137,7 +137,7 @@ public final class SearchOrder {
     }
 
     /** The first reader of the group by the alphabet: the one the "by reader" order files it under. */
-    static String firstReader(Group g) {
+    public static String firstReader(Group g) {
         String first = null;
         for (Offer o : g.offers) {
             String r = o.book.getArtist();
