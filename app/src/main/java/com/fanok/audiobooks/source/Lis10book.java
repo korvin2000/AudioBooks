@@ -19,6 +19,7 @@ import com.fanok.audiobooks.pojo.SubComentsPOJO;
 import com.fanok.audiobooks.search.ListingFilters;
 import com.fanok.audiobooks.search.ProviderPage;
 import com.fanok.audiobooks.search.SearchUrls;
+import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 
@@ -45,6 +46,9 @@ import org.jsoup.nodes.Document;
  * <li>books {@code /api/books?audio=full} ({@code audio=full} leaves out the books only premium donors hear),
  * {@code &genre=<slug>}, {@code &q=<words>} (a substring of the title only): {@code {items, total, page, limit}},
  * paged with {@code page=N}, 24 cards ({@code limit} takes up to 48).</li>
+ * <li>the header's suggestions {@code /api/search?q=<words>&limit=L} match any author and title words, best first:
+ * {@code {query, items, total}}, a card being {@code slug, title, authorName, hasCover, coverPath}; at most 24 in one
+ * page ({@code page} ignored, {@code total} a fake 1000), premium-only books among them ({@code audio} ignored).</li>
  * <li>sorts {@code sort=popular} (views), {@code rating} (livelib), {@code duration} (longest first), else newest; the
  * same on an author {@code /api/authors/<slug>} and a reader {@code /api/narrators/<slug>} (cards under
  * {@code books}). No periods. {@code dur=short|medium|long}: under 3 h, 3 to 10 h, 10 h and more.</li>
@@ -65,9 +69,13 @@ public final class Lis10book implements SourceParser {
     public static final String GENRES = SERVER + "/api/genres";
     public static final String AUTHORS = SERVER + "/api/authors";
     public static final String READERS = SERVER + "/api/narrators";
+    /** The header's suggestions: what a book search that finds nothing shows ({@link #fetch}). */
+    public static final String SUGGESTIONS = SERVER + "/api/search?q=";
 
     /** The most cards a page of the books API holds: the other-source lookup reads one page. */
     static final int MAX_LIMIT = 48;
+    /** The most suggestions the site gives. */
+    static final int SUGGESTIONS_LIMIT = 24;
     /** Comments asked for at once. */
     static final int COMMENTS_PAGE = 50;
     /** Bound of the comment pages read for one book. */
@@ -87,13 +95,24 @@ public final class Lis10book implements SourceParser {
 
     /**
      * A book page is its record with its similar books added ({@link #withSimilar}), which the description shows
-     * without them when that second request fails; any other URL is an API call.
+     * without them when that second request fails; any other URL is an API call. The first page of a book search
+     * that finds nothing is the header's suggestions for its words instead ({@link #suggested}): the search takes
+     * the words as one phrase of the title, so an author with the title finds nothing, the suggestions find the book.
      */
     @Override
     public Document fetch(String url) throws IOException {
         Matcher book = BOOK.matcher(url);
         if (!book.find()) {
-            return SiteHttp.getJson(url);
+            JsonPage page = SiteHttp.getJson(url);
+            String suggestions = suggestionsUrl(url, page);
+            if (suggestions == null) {
+                return page;
+            }
+            try {
+                return suggested(SiteHttp.getJson(suggestions));
+            } catch (IOException | RuntimeException noSuggestions) {
+                return page;
+            }
         }
         String record = SERVER + "/api/books/" + book.group(1);
         JsonPage page = SiteHttp.getJson(record);
@@ -274,6 +293,21 @@ public final class Lis10book implements SourceParser {
         return slug.isEmpty() ? "" : SERVER + "/api/" + kind + "/" + slug + "?audio=full";
     }
 
+    /**
+     * The header's suggestions for the words of {@code url}, the first page of the book search as {@link #searchUrl}
+     * builds it, when its {@code page} found nothing; null for any other URL (a later page, the other-source lookup's
+     * search, a listing) or a page with cards.
+     */
+    String suggestionsUrl(String url, Document page) {
+        HttpUrl parsed = HttpUrl.parse(url);
+        String words = parsed == null ? null : parsed.queryParameter("q");
+        if (words == null || !url.equals(searchUrl(SearchUrls.Category.BOOKS, words, 1))
+                || arrayOf(object(page), "items").size() > 0) {
+            return null;
+        }
+        return SUGGESTIONS + SearchUrls.enc(words) + "&limit=" + SUGGESTIONS_LIMIT;
+    }
+
     /** {@code /api/books} (not a search), an author's or a reader's books. */
     private static boolean sortable(String url) {
         HttpUrl parsed = HttpUrl.parse(url);
@@ -329,6 +363,48 @@ public final class Lis10book implements SourceParser {
         JsonElement books = root.get("books");
         JsonObject list = books != null && books.isJsonObject() ? books.getAsJsonObject() : root;
         return ProviderPage.of(cards(objects(list, "items")), hasMore(list), arrayOf(list, "items").size());
+    }
+
+    /**
+     * The header's suggestions as the only page of a search: those whose title and author hold every word asked for
+     * (the site fills its list with anything close), each card's {@code authorName} as its author (without a link),
+     * the fake total replaced by the number of cards. Their cards have no readers and no durations.
+     */
+    static JsonPage suggested(JsonPage suggestions) {
+        JsonObject root = object(suggestions);
+        String asked = HttpUrl.get(suggestions.location()).queryParameter("q");
+        JsonArray kept = new JsonArray();
+        for (JsonObject item : objects(root, "items")) {
+            String card = folded(string(item, "title") + " " + string(item, "authorName"));
+            if (holdsAll(card, asked == null ? "" : asked)) {
+                JsonObject author = new JsonObject();
+                author.addProperty("name", string(item, "authorName"));
+                JsonArray authors = new JsonArray();
+                authors.add(author);
+                item.add("authors", authors);
+                kept.add(item);
+            }
+        }
+        root.add("items", kept);
+        root.addProperty("page", 1);
+        root.addProperty("limit", kept.size());
+        root.addProperty("total", kept.size());
+        return suggestions;
+    }
+
+    /** True when {@code text} (folded) holds each word of {@code query}. */
+    private static boolean holdsAll(String text, String query) {
+        for (String word : folded(query).split("[^\\p{L}\\p{N}]+")) {
+            if (!text.contains(word)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /** Lower case with ё as е: how the words asked for and those of a card compare. */
+    private static String folded(String s) {
+        return s.toLowerCase(Locale.ROOT).replace('ё', 'е');
     }
 
     /** Page times page size below the total: the {@code totalPages} of the people indexes is wrong. */

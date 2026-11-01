@@ -188,6 +188,60 @@ public class Lis10bookTest {
                 SITE.searchUrl(SearchUrls.Category.BOOKS, "Мастер и Маргарита", 1));
     }
 
+    /** Only the first page of the book search falls back on the suggestions, and only when it finds nothing. */
+    @Test
+    public void suggestionsUrl() throws IOException {
+        String words = "булгаков собачье сердце";
+        String first = SITE.searchUrl(SearchUrls.Category.BOOKS, words, 1);
+        JsonPage none = json("search-none.json", first);
+        assertEquals(Lis10book.SUGGESTIONS + SearchUrls.enc(words) + "&limit=24", SITE.suggestionsUrl(first, none));
+        String master = SITE.searchUrl(SearchUrls.Category.BOOKS, "Мастер и Маргарита", 1);
+        assertEquals(Lis10book.SUGGESTIONS + "%D0%9C%D0%B0%D1%81%D1%82%D0%B5%D1%80+%D0%B8+%D0%9C%D0%B0%D1%80"
+                + "%D0%B3%D0%B0%D1%80%D0%B8%D1%82%D0%B0&limit=24", SITE.suggestionsUrl(master, none));
+        String mag = SITE.searchUrl(SearchUrls.Category.BOOKS, "маг", 1);
+        assertNull("found something", SITE.suggestionsUrl(mag, json("search-mag-p1.json", mag)));
+        assertNull(SITE.suggestionsUrl(SITE.searchUrl(SearchUrls.Category.BOOKS, words, 2), none));
+        assertNull("the other-source lookup", SITE.suggestionsUrl(SITE.otherSourceSearchUrl(words, 1), none));
+        assertNull(SITE.suggestionsUrl(SITE.searchUrl(SearchUrls.Category.AUTHORS, words, 1), none));
+        assertNull(SITE.suggestionsUrl(Lis10book.INDEX, none));
+        assertNull(SITE.suggestionsUrl(GENRE, none));
+    }
+
+    /** "булгаков собачье сердце" finds nothing as a phrase of the title; the header's suggestions find the book. */
+    @Test
+    public void suggestionsWhenTheSearchFindsNothing() throws IOException {
+        String url = Lis10book.SUGGESTIONS + SearchUrls.enc("булгаков собачье сердце") + "&limit=24";
+        ProviderPage<BookPOJO> page = SITE.searchResults(Lis10book.suggested(json("search-suggest.json", url)), 1);
+        assertEquals(ProviderPage.Status.OK, page.status);
+        assertEquals("of 24, those with all three words", 16, page.items.size());
+        assertFalse("one page, whatever the total says", page.hasMore);
+        BookPOJO first = page.items.get(0);
+        assertEquals(S + "/audio/sobache-serdcze-7/", first.getUrl());
+        assertEquals("Собачье сердце", first.getName());
+        assertEquals("Михаил Булгаков", first.getAutor());
+        assertNull("no author link", first.getUrlAutor());
+        assertEquals(S + "/wp-content/uploads/2023/10/465250_cover.jpg", first.getPhoto());
+        assertNull("no reader", first.getArtist());
+        assertEquals("", first.getTime());
+        assertEquals("Михаил Афанасьевич Булгаков", page.items.get(9).getAutor());
+        assertEquals("Собачье сердце. Театральный роман", page.items.get(10).getName());
+        assertEquals(S + "/audio/sobache-serdcze-13/", page.items.get(15).getUrl());
+
+        // the same answer filtered for other words: letter case aside, every word in the title or the author
+        String eggs = Lis10book.SUGGESTIONS + SearchUrls.enc("Булгаков РОКОВЫЕ") + "&limit=24";
+        ProviderPage<BookPOJO> one = SITE.searchResults(Lis10book.suggested(json("search-suggest.json", eggs)), 1);
+        assertEquals(1, one.items.size());
+        assertEquals(S + "/audio/rokovye-yajcza-7/", one.items.get(0).getUrl());
+        String missing = Lis10book.SUGGESTIONS + SearchUrls.enc("булгаков белая гвардия") + "&limit=24";
+        assertEquals("nothing close enough is not found", ProviderPage.Status.EMPTY,
+                SITE.searchResults(Lis10book.suggested(json("search-suggest.json", missing)), 1).status);
+
+        ProviderPage<BookPOJO> none = SITE.searchResults(Lis10book.suggested(
+                json("search-suggest-none.json", Lis10book.SUGGESTIONS + "zzzxqw&limit=24")), 1);
+        assertEquals(ProviderPage.Status.EMPTY, none.status);
+        assertFalse(none.hasMore);
+    }
+
     /** The site searches titles only: "on other sites" asks for the title, 48 cards at once. */
     @Test
     public void otherSourceSearchByTitle() throws IOException {
