@@ -50,7 +50,7 @@
             android:nextFocusUp="@+id/searchView"
             android:paddingStart="@dimen/margin_small"
             android:paddingEnd="@dimen/margin_small"
-            app:chipSpacingHorizontal="6dp"
+            app:chipSpacingHorizontal="2dp"
             app:singleLine="true" />
     </HorizontalScrollView>
 

@@ -7,24 +7,31 @@ import android.app.SearchManager;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
-import android.content.res.ColorStateList;
 import android.content.res.Configuration;
 import android.content.res.Resources;
 import android.graphics.Color;
 import android.graphics.Typeface;
+import android.graphics.drawable.ColorDrawable;
+import android.graphics.drawable.Drawable;
+import android.graphics.drawable.LayerDrawable;
 import android.os.Bundle;
 import android.provider.MediaStore;
 import android.provider.SearchRecentSuggestions;
+import android.text.SpannableString;
+import android.text.Spanned;
 import android.text.format.DateFormat;
 import android.text.format.DateUtils;
+import android.text.style.RelativeSizeSpan;
 import android.util.Log;
 import android.util.TypedValue;
+import android.view.Gravity;
 import android.view.KeyEvent;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
 import android.widget.ImageButton;
 import android.widget.PopupMenu;
+import android.widget.TextView;
 import android.widget.Toast;
 import androidx.annotation.NonNull;
 import androidx.appcompat.widget.Toolbar;
@@ -61,7 +68,6 @@ import com.fanok.audiobooks.search.SearchOrder;
 import com.fanok.audiobooks.search.SearchRequest;
 import com.fanok.audiobooks.search.SearchUi;
 import com.fanok.audiobooks.search.TextNorm;
-import com.google.android.material.chip.Chip;
 import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 import java.util.ArrayList;
 import java.util.EnumSet;
@@ -79,8 +85,10 @@ public class SearchableActivity extends MvpAppCompatActivity implements Searchab
 
     /** The submitted query, kept for a screen recreated after its process died (the presenter is new then). */
     private static final String STATE_QUERY = "query";
-    /** Fill of a chip in its state's colour, faint enough for the text in every theme (16 %). */
-    private static final int FILL_ALPHA = 41;
+    /** Fill of a source tile in its state's colour, faint enough for the text in every theme (22 %). */
+    private static final int FILL_ALPHA = 56;
+    /** A source tile's second line while it searches, and after a timeout, stop or error. */
+    private static final String RUNNING_MARK = "\u2026", FAILED_MARK = "\u2013";
     private static final SearchRequest.Field[] SCOPE_FIELDS = {SearchRequest.Field.TITLE, SearchRequest.Field.AUTHOR,
             SearchRequest.Field.READER, SearchRequest.Field.SERIES};
     private static final int[] SCOPE_NAMES = {R.string.search_scope_title, R.string.search_scope_author,
@@ -119,9 +127,9 @@ public class SearchableActivity extends MvpAppCompatActivity implements Searchab
     private SearchUi.State mState;
 
     /** The source chips after "All", in the order of the sources. */
-    private final LinkedHashMap<Provider, Chip> mChips = new LinkedHashMap<>();
+    private final LinkedHashMap<Provider, TextView> mChips = new LinkedHashMap<>();
 
-    private Chip mAllChip;
+    private TextView mAllChip;
 
     private Menu mMenu;
 
@@ -594,7 +602,7 @@ public class SearchableActivity extends MvpAppCompatActivity implements Searchab
             mAllChip.setOnClickListener(v -> mPresenter.setFilter(-1));
             binding.sources.addView(mAllChip);
             for (Provider p : order) {
-                Chip chip = newChip();
+                TextView chip = newChip();
                 chip.setOnClickListener(v -> mPresenter.setFilter(p.sourceId));
                 chip.setOnLongClickListener(v -> {
                     mPresenter.retrySource(p);
@@ -606,105 +614,102 @@ public class SearchableActivity extends MvpAppCompatActivity implements Searchab
         }
         bindAllChip(state);
         for (SearchUi.Chip c : state.chips) {
-            Chip chip = mChips.get(c.source);
+            TextView chip = mChips.get(c.source);
             if (chip != null) {
                 bindChip(chip, c);
             }
         }
     }
 
-    private Chip newChip() {
-        return (Chip) getLayoutInflater().inflate(R.layout.search_source_chip, binding.sources, false);
+    private TextView newChip() {
+        return (TextView) getLayoutInflater().inflate(R.layout.search_source_chip, binding.sources, false);
     }
 
-    private void bindChip(Chip chip, SearchUi.Chip c) {
+    private void bindChip(TextView chip, SearchUi.Chip c) {
         String name = c.source.title;
-        String text = name;
+        String count;
         String description;
-        int icon = 0;
-        int color = 0;
+        int color;
         switch (c.kind) {
             case FOUND:
-                text = name + " " + c.count + (c.hasMore ? "+" : "");
+                count = c.count + (c.hasMore ? "+" : "");
                 description = c.hasMore ? getString(R.string.search_chip_found_more, name, c.count)
                         : getString(R.string.search_chip_found, name, c.count);
-                icon = R.drawable.ic_check;
                 color = ContextCompat.getColor(this, R.color.source_up);
                 break;
             case EMPTY:
-                text = name + " 0";
+                count = "0";
                 description = getString(R.string.search_chip_empty, name);
+                color = Color.TRANSPARENT;
                 break;
             case RUNNING:
+                count = RUNNING_MARK;
                 description = getString(R.string.search_chip_running, name);
-                icon = R.drawable.ic_clock;
+                color = attrColor(R.attr.subTextColor);
                 break;
             case TIMEOUT:
             case STOPPED:
+                count = FAILED_MARK;
                 description = getString(R.string.search_chip_failed, name, statusName(c.kind));
-                icon = R.drawable.ic_clock;
                 color = ContextCompat.getColor(this, R.color.source_partial);
                 break;
-            case BLOCKED:
-                description = getString(R.string.search_chip_failed, name, statusName(c.kind));
-                icon = R.drawable.ic_lock;
-                color = ContextCompat.getColor(this, R.color.source_down);
-                break;
             default:
+                count = FAILED_MARK;
                 description = getString(R.string.search_chip_failed, name, statusName(c.kind));
-                icon = R.drawable.ic_error;
                 color = ContextCompat.getColor(this, R.color.source_down);
                 break;
         }
-        paint(chip, text, description, icon, color, c.selected, c.kind == SearchUi.ChipKind.EMPTY);
+        paint(chip, name, count, description, color, c.selected, c.kind == SearchUi.ChipKind.EMPTY);
     }
 
     private void bindAllChip(SearchUi.State state) {
-        String text = getString(R.string.all) + (state.allCount > 0 ? " " + state.allCount : "");
-        int icon = 0;
-        int color = 0;
+        String name = getString(R.string.all);
+        String count = state.allCount > 0 ? String.valueOf(state.allCount) : RUNNING_MARK;
+        int color;
         switch (state.pass) {
             case RUNNING:
-                icon = R.drawable.ic_clock;
+                color = attrColor(R.attr.subTextColor);
                 break;
             case DONE:
-                icon = R.drawable.ic_check;
                 color = ContextCompat.getColor(this, R.color.source_up);
                 break;
             case PARTIAL:
-                icon = R.drawable.ic_error;
                 color = ContextCompat.getColor(this, R.color.source_partial);
                 break;
             case FAILED:
-                icon = R.drawable.ic_error;
                 color = ContextCompat.getColor(this, R.color.source_down);
                 break;
             default:
+                color = Color.TRANSPARENT;
                 break;
         }
-        paint(mAllChip, text, text, icon, color, state.tab == null, false);
+        String description = name + (state.allCount > 0 ? " " + state.allCount : "");
+        paint(mAllChip, name, count, description, color, state.tab == null, false);
     }
 
-    /** State: icon, faint fill and dimming; selection: a stroke in the link colour and bold text, never a fill. */
-    private void paint(Chip chip, String text, String description, int icon, int color, boolean selected,
+    /**
+     * A flat square tile, name over a smaller count. State: the fill colour (running grey, found green, timeout
+     * amber, error red, empty none and dimmed); selection: a 2dp underline in the link colour and bold text.
+     */
+    private void paint(TextView chip, String name, String count, String description, int color, boolean selected,
             boolean dim) {
+        SpannableString text = new SpannableString(name + "\n" + count);
+        text.setSpan(new RelativeSizeSpan(0.8f), name.length() + 1, text.length(),
+                Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
         chip.setText(text);
         chip.setContentDescription(description);
         chip.setSelected(selected);
-        if (icon != 0) {
-            chip.setChipIconResource(icon);
-            chip.setChipIconTint(ColorStateList.valueOf(color != 0 ? color : attrColor(R.attr.subTextColor)));
-            chip.setChipIconVisible(true);
-        } else {
-            chip.setChipIconVisible(false);
+        Drawable fill = new ColorDrawable(Color.alpha(color) == 0 ? Color.TRANSPARENT
+                : ColorUtils.setAlphaComponent(color, FILL_ALPHA));
+        if (selected) {
+            LayerDrawable layers = new LayerDrawable(
+                    new Drawable[]{fill, new ColorDrawable(attrColor(R.attr.hrefColor))});
+            layers.setLayerGravity(1, Gravity.BOTTOM | Gravity.FILL_HORIZONTAL);
+            layers.setLayerHeight(1, Math.round(TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, 2,
+                    getResources().getDisplayMetrics())));
+            fill = layers;
         }
-        chip.setChipBackgroundColor(ColorStateList.valueOf(color != 0
-                ? ColorUtils.setAlphaComponent(color, FILL_ALPHA) : Color.TRANSPARENT));
-        int stroke = selected ? attrColor(R.attr.hrefColor)
-                : ColorUtils.setAlphaComponent(attrColor(R.attr.subTextColor), 90);
-        chip.setChipStrokeColor(ColorStateList.valueOf(stroke));
-        chip.setChipStrokeWidth(TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, selected ? 2 : 1,
-                getResources().getDisplayMetrics()));
+        chip.setBackground(fill);
         chip.setTypeface(null, selected ? Typeface.BOLD : Typeface.NORMAL);
         chip.setAlpha(dim ? 0.6f : 1f);
     }

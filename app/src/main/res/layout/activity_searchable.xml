@@ -32,7 +32,7 @@
 
     </com.google.android.material.appbar.AppBarLayout>
 
-    <!-- one chip per source: its state (icon, faint fill, count) and the selected tab (stroke) -->
+    <!-- one flat tile per source: its state (fill colour), count (second line) and the selected tab (underline) -->
     <HorizontalScrollView
         android:id="@+id/sourcesScroll"
         android:layout_width="match_parent"
@@ -45,7 +45,7 @@
             android:layout_height="wrap_content"
             android:paddingStart="@dimen/margin_small"
             android:paddingEnd="@dimen/margin_small"
-            app:chipSpacingHorizontal="6dp"
+            app:chipSpacingHorizontal="2dp"
             app:singleLine="true" />
     </HorizontalScrollView>
 

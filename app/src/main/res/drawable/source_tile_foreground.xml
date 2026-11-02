@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- A source tile's foreground: the touch ripple, and a 2dp outline while it has D-pad focus (TV). -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:drawable="?attr/selectableItemBackground" />
+    <item>
+        <selector>
+            <item android:state_focused="true">
+                <shape android:shape="rectangle">
+                    <stroke
+                        android:width="2dp"
+                        android:color="?attr/colorPrimaryText" />
+                </shape>
+            </item>
+        </selector>
+    </item>
+</layer-list>
