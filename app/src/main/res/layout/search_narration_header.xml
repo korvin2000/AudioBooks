@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- One recording in the choice of recordings: its number, reader, and length · edition · sites. Not a touch target:
+     the sites under it are. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:gravity="center_vertical"
+    android:orientation="horizontal"
+    android:paddingStart="24dp"
+    android:paddingTop="12dp"
+    android:paddingEnd="24dp"
+    android:paddingBottom="4dp"
+    tools:viewBindingIgnore="true">
+
+    <TextView
+        android:id="@+id/narrationNumber"
+        android:layout_width="28dp"
+        android:layout_height="28dp"
+        android:fontFeatureSettings="tnum"
+        android:gravity="center"
+        android:importantForAccessibility="no"
+        android:textSize="14sp"
+        android:textStyle="bold"
+        tools:text="1" />
+
+    <LinearLayout
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="12dp"
+        android:layout_weight="1"
+        android:orientation="vertical">
+
+        <TextView
+            android:id="@+id/narrationReader"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:ellipsize="end"
+            android:maxLines="2"
+            android:textColor="?attr/colorPrimaryText"
+            android:textSize="16sp"
+            android:textStyle="bold"
+            tools:text="Андрей Васенев" />
+
+        <TextView
+            android:id="@+id/narrationFacts"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:textColor="?attr/subTextColor"
+            android:textSize="13sp"
+            tools:text="11 ч. 59 мин. · полная версия · 3 сайта" />
+    </LinearLayout>
+</LinearLayout>

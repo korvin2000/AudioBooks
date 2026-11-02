@@ -128,8 +128,12 @@ public class FavoriteFragment extends MvpAppCompatFragment implements FavoriteVi
     private final ActivityResultLauncher<Intent> searchActivityLauncher = registerForActivityResult(
             new ActivityResultContracts.StartActivityForResult(),
             result -> {
-                if (result.getResultCode() == Activity.RESULT_OK) {
-                    Log.d(TAG, "onCreate: searchActivityLauncher");
+                Intent data = result.getData();
+                String url = data == null ? null : data.getStringExtra("url");
+                if (result.getResultCode() == Activity.RESULT_OK && url != null) {
+                    // an author, series or collection chosen in the search opens as its listing
+                    String tag = data.getStringExtra("tag");
+                    mPresenter.openListing(url, data.getStringExtra("name"), tag == null ? "searchebleBooks" : tag);
                 }
             });
 
@@ -556,7 +560,7 @@ public class FavoriteFragment extends MvpAppCompatFragment implements FavoriteVi
 
         open.setOnClickListener(view1 -> {
             dialog.dismiss();
-            showBooksActivity(book);
+            mPresenter.open(book);
         });
 
         remove.setOnClickListener(view1 -> {

@@ -27,7 +27,8 @@ import org.jsoup.select.Elements;
 /** Author and series chips above the search results: every source independent, none blocks the others. */
 public class SearchebleModel implements SearchableModel {
 
-    private static final long TIMEOUT_SECONDS = 10;
+    /** As long as a site's book search may take: Книга в ухе needs two requests (its search, then all authors). */
+    private static final long TIMEOUT_SECONDS = 20;
 
     @Override
     public Observable<SearcheblPOJO> chips(SharedPreferences preferences, String query) {

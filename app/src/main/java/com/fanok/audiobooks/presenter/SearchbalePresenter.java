@@ -23,11 +23,13 @@ import com.fanok.audiobooks.model.AutorsModel;
 import com.fanok.audiobooks.model.BooksDBModel;
 import com.fanok.audiobooks.model.BooksModel;
 import com.fanok.audiobooks.model.SearchebleModel;
+import com.fanok.audiobooks.net.SiteHttp;
 import com.fanok.audiobooks.pojo.BookPOJO;
 import com.fanok.audiobooks.pojo.GenrePOJO;
 import com.fanok.audiobooks.pojo.SearcheblPOJO;
 import com.fanok.audiobooks.pojo.SearchebleArrayPOJO;
 import com.fanok.audiobooks.policy.DefaultCover;
+import com.fanok.audiobooks.search.Genre;
 import com.fanok.audiobooks.search.GenrePicks;
 import com.fanok.audiobooks.search.Provider;
 import com.fanok.audiobooks.search.ProviderPage;
@@ -39,9 +41,12 @@ import com.fanok.audiobooks.search.SearchSession;
 import com.fanok.audiobooks.search.SearchSnapshot;
 import com.fanok.audiobooks.search.SearchUi;
 import com.fanok.audiobooks.search.SearchUrls;
+import com.fanok.audiobooks.search.SourceHealth;
+import com.fanok.audiobooks.search.SourceProbe;
 import com.google.android.material.bottomsheet.BottomSheetDialog;
 import com.squareup.picasso.Picasso;
 import io.reactivex.BackpressureStrategy;
+import io.reactivex.Completable;
 import io.reactivex.Maybe;
 import io.reactivex.Single;
 import io.reactivex.android.schedulers.AndroidSchedulers;
@@ -82,6 +87,9 @@ public class SearchbalePresenter extends MvpPresenter<SearchableView> implements
     private static final String PREF_SORT = "search_sort";
     private static final String PREF_GROUPED = "search_grouped";
     private static final String PREF_SCOPE = "search_scope";
+    private static final String PREF_GENRES = "search_genres";
+    /** Each source's last live search answer: "NAME:1:millis" (1: a failure with nothing found, 0: anything else). */
+    private static final String PREF_ANSWERS = "search_answers";
 
     private final int mModelId;
     private final Context mContext;
@@ -93,14 +101,16 @@ public class SearchbalePresenter extends MvpPresenter<SearchableView> implements
     private SearchableModel mSearchableModel;
     private SearchSession<BookPOJO> mSession;
     private Disposable mChips;
+    /** The sites' own author and series lists for the query; the plates add the found cards' ones. */
     private SearcheblPOJO mSearcheblPOJO;
-    private SearcheblPOJO mSearcheblPOJOFilter;
     private int filter = -1;
     private final ArrayList<Offer> mOffers = new ArrayList<>();
     private final HashMap<String, Offer> mOfferByUrl = new HashMap<>();
     private final HashMap<Provider, Integer> mArrived = new HashMap<>();
     private List<Provider> mSources = Collections.emptyList();
     private Set<SearchRequest.Field> mScope = EnumSet.noneOf(SearchRequest.Field.class);
+    /** The genres to keep; empty: every genre. Kept across searches, like the scope. */
+    private Set<Genre> mGenres = EnumSet.noneOf(Genre.class);
     private SearchRequest mRequest = SearchRequest.anywhere("");
     private SearchOrder.Sort mSort = SearchOrder.Sort.RELEVANCE;
     private boolean mGrouped = true;
@@ -113,6 +123,12 @@ public class SearchbalePresenter extends MvpPresenter<SearchableView> implements
     private final PublishSubject<SearchUi.Input> mReduce = PublishSubject.create();
     private Disposable mReducing;
     private SearchSnapshot.Store mStore;
+    /** Slow by nature (a longer page limit than the default): marked from the start. */
+    private EnumSet<Provider> mSlow = EnumSet.noneOf(Provider.class);
+    /** Silent the last time: asked, never waited for, until the listener retries one. */
+    private EnumSet<Provider> mSilent = EnumSet.noneOf(Provider.class);
+    /** Recomputes the screen when the clock alone changes it (a slow mark, the end of a wait). */
+    private Disposable mTick;
 
     // MODEL_AUTOR / MODEL_ARTIST: one source, the current one
     private AutorsModel mModelGenre;
@@ -141,6 +157,7 @@ public class SearchbalePresenter extends MvpPresenter<SearchableView> implements
                 mSort = sortOf(mPreferences.getString(PREF_SORT, null));
                 mGrouped = mPreferences.getBoolean(PREF_GROUPED, true);
                 mScope = scopeOf(mPreferences.getString(PREF_SCOPE, ""));
+                mGenres = namesOf(Genre.class, mPreferences.getString(PREF_GENRES, ""));
                 // one reduce at a time, always of the newest facts: inputs that came during a reduce are dropped
                 mReducing = mReduce.toFlowable(BackpressureStrategy.LATEST)
                         .throttleLatest(REDUCE_MS, TimeUnit.MILLISECONDS, Schedulers.computation(), true)
@@ -185,19 +202,21 @@ public class SearchbalePresenter extends MvpPresenter<SearchableView> implements
     /** Selects the source tab (-1: "All"); the screen follows from the state, without a request. */
     public void setFilter(int filter) {
         this.filter = filter;
-        filterAutorsAndSeries();
         publish();
     }
 
     /** Where the words must be found; empty: anywhere. The loaded cards are only scored again: no request (§5.3). */
     public void setScope(Set<SearchRequest.Field> scope) {
         mScope = scope.isEmpty() ? EnumSet.noneOf(SearchRequest.Field.class) : EnumSet.copyOf(scope);
-        StringBuilder stored = new StringBuilder();
-        for (SearchRequest.Field f : mScope) {
-            stored.append(stored.length() == 0 ? "" : ",").append(f.name());
-        }
-        mPreferences.edit().putString(PREF_SCOPE, stored.toString()).apply();
+        mPreferences.edit().putString(PREF_SCOPE, joinNames(mScope)).apply();
         mRequest = new SearchRequest(mRequest.text, mScope);
+        publish();
+    }
+
+    /** The genres to keep ("Чужой" in science fiction only); empty: every genre. The loaded cards only: no request. */
+    public void setGenres(Set<Genre> genres) {
+        mGenres = genres.isEmpty() ? EnumSet.noneOf(Genre.class) : EnumSet.copyOf(genres);
+        mPreferences.edit().putString(PREF_GENRES, joinNames(mGenres)).apply();
         publish();
     }
 
@@ -220,6 +239,9 @@ public class SearchbalePresenter extends MvpPresenter<SearchableView> implements
             if (mReducing != null) {
                 mReducing.dispose();
             }
+            if (mTick != null) {
+                mTick.dispose();
+            }
         }
         if (mSession != null) {
             mSession.dispose();
@@ -238,32 +260,6 @@ public class SearchbalePresenter extends MvpPresenter<SearchableView> implements
     public void detachView(SearchableView view) {
         super.detachView(view);
         save();
-    }
-
-    @Override
-    public void filterAutorsAndSeries() {
-        Provider provider = Provider.ofSource(filter);
-        if (provider == null) {
-            mSearcheblPOJOFilter = null;
-            getViewState().showSeriesAndAutors(mSearcheblPOJO);
-            return;
-        }
-        mSearcheblPOJOFilter = new SearcheblPOJO();
-        ArrayList<SearchebleArrayPOJO> autorsList = new ArrayList<>();
-        ArrayList<SearchebleArrayPOJO> seriesList = new ArrayList<>();
-        for (SearchebleArrayPOJO arrayPOJO : mSearcheblPOJO.getAutorsList()) {
-            if (Url.isHost(arrayPOJO.getUrl(), provider.server)) {
-                autorsList.add(arrayPOJO);
-            }
-        }
-        for (SearchebleArrayPOJO arrayPOJO : mSearcheblPOJO.getSeriesList()) {
-            if (Url.isHost(arrayPOJO.getUrl(), provider.server)) {
-                seriesList.add(arrayPOJO);
-            }
-        }
-        mSearcheblPOJOFilter.setAutorsList(autorsList);
-        mSearcheblPOJOFilter.setSeriesList(seriesList);
-        getViewState().showSeriesAndAutors(mSearcheblPOJOFilter);
     }
 
     @Override
@@ -295,56 +291,39 @@ public class SearchbalePresenter extends MvpPresenter<SearchableView> implements
             // a row of the previous state, while the new one is computed: only a card it still knows opens
             Offer o = mModelId == Consts.MODEL_BOOKS ? mOfferByUrl.get(book.getUrl()) : null;
             if (o != null) {
-                getViewState().startBookActivity(o.book);
+                open(o.book);
             } else if (mModelId != Consts.MODEL_BOOKS) {
                 getViewState().startBookActivity(book);
             }
             return;
         }
         if (row.group == null || row.group.offers.size() == 1) {
-            getViewState().startBookActivity(row.offer.book);
+            open(row.offer.book);
             return;
         }
         List<Narration> narrations = row.group.narrations;
         if (narrations.size() == 1 && narrations.get(0).catalogs() == 1) {
-            getViewState().startBookActivity(narrations.get(0).best.book);
+            open(narrations.get(0).best.book);
             return;
         }
-        ArrayList<String> labels = new ArrayList<>();
-        ArrayList<String> urls = new ArrayList<>();
-        for (Narration n : narrations) {
-            for (Offer o : n.offers) {
-                labels.add(offerLabel(o));
-                urls.add(o.url());
-            }
-        }
-        getViewState().showNarrations(row.offer.book.getName(), labels, urls);
-    }
-
-    /** One card in the choice of recordings: reader · length · site · edition. */
-    private String offerLabel(Offer o) {
-        StringBuilder s = new StringBuilder();
-        String reader = o.book.getArtist();
-        s.append(reader == null || reader.trim().isEmpty() ? mContext.getString(R.string.search_reader_unknown)
-                : reader.trim());
-        String time = Consts.formatTimeDisplay(o.book.getTime());
-        if (!time.isEmpty()) {
-            s.append(" · ").append(time);
-        }
-        if (o.source != null) {
-            s.append(" · ").append(o.source.title);
-        }
-        if (!o.card.edition.isEmpty()) {
-            s.append(" · ").append(o.card.edition);
-        }
-        return s.toString();
+        getViewState().showNarrations(row.offer.book.getName(), narrations);
     }
 
     /** The listener chose a card of a group. */
     public void openOffer(String url) {
         Offer o = mOfferByUrl.get(url);
         if (o != null) {
-            getViewState().startBookActivity(o.book);
+            open(o.book);
+        }
+    }
+
+    /** A book opens its page; a site's collection ("Подборка", a list of books) opens as that site's listing. */
+    private void open(BookPOJO book) {
+        Provider p = Provider.ofUrl(book.getUrl());
+        if (p != null && p.parser.opensAsListing(book.getUrl())) {
+            getViewState().returnResult(book.getUrl(), book.getName(), Consts.MODEL_BOOKS, "collectionBooks");
+        } else {
+            getViewState().startBookActivity(book);
         }
     }
 
@@ -440,8 +419,12 @@ public class SearchbalePresenter extends MvpPresenter<SearchableView> implements
         publish();
     }
 
-    /** A failed source asks again for its page; a stopped one loads it; a source that answered is left alone. */
+    /**
+     * A failed source asks again for its page; a stopped one loads it; a source that answered is left alone. The
+     * listener asked for it: the pass waits for it, even when it was silent the last time.
+     */
     private void retry(Provider p) {
+        mSilent.remove(p);
         if (mSession == null || mSession.retry(p.name())) {
             return;
         }
@@ -498,6 +481,7 @@ public class SearchbalePresenter extends MvpPresenter<SearchableView> implements
 
             @Override
             public void onSourceState(SearchSession.State state) {
+                recordAnswer(state);
                 publish();
             }
         });
@@ -521,9 +505,85 @@ public class SearchbalePresenter extends MvpPresenter<SearchableView> implements
             }
         }
         mSources = sources;
+        classify(sources);
         mSession = booksSession(sources);
         mSession.search(q);
         publish();
+    }
+
+    /** Which of {@code sources} are slow by nature, and which were silent the last time. */
+    private void classify(List<Provider> sources) {
+        mSlow = EnumSet.noneOf(Provider.class);
+        for (Provider p : sources) {
+            if (p.parser.timeoutMs() > SiteHttp.TIMEOUT_MS) {
+                mSlow.add(p); // Bookish, Audioboo, Аудиокниги.fun
+            }
+        }
+        mSilent = silent(sources);
+    }
+
+    /**
+     * The sources silent the last time: their last live search answer was a failure with nothing found, or a check of
+     * the sites made after that answer failed them; whichever is newer decides.
+     */
+    private EnumSet<Provider> silent(List<Provider> sources) {
+        Map<String, long[]> answers = answers(mPreferences.getString(PREF_ANSWERS, ""));
+        Map<Provider, SourceProbe.Result> checks = SourceHealth.last(mPreferences);
+        EnumSet<Provider> out = EnumSet.noneOf(Provider.class);
+        for (Provider p : sources) {
+            long[] answer = answers.get(p.name());
+            SourceProbe.Result check = checks.get(p);
+            boolean silent = check != null && (answer == null || check.at > answer[1]) ? isFailure(check.status)
+                    : answer != null && answer[0] == 1;
+            if (silent) {
+                out.add(p);
+            }
+        }
+        return out;
+    }
+
+    private static boolean isFailure(ProviderPage.Status status) {
+        return status == ProviderPage.Status.ERROR || status == ProviderPage.Status.TIMEOUT
+                || status == ProviderPage.Status.BLOCKED;
+    }
+
+    /**
+     * A source answered a live load (never a restored one): its answer is kept, with its own time, for the next search
+     * ({@link #silent}); one that answers is waited for again in this one too.
+     */
+    private void recordAnswer(SearchSession.State st) {
+        if (st.running || st.status == null) {
+            return;
+        }
+        boolean failed = st.count == 0 && st.isFailure();
+        Provider p = providerOf(st.name);
+        if (p != null && !failed) {
+            mSilent.remove(p);
+        }
+        Map<String, long[]> answers = answers(mPreferences.getString(PREF_ANSWERS, ""));
+        answers.put(st.name, new long[]{failed ? 1 : 0, System.currentTimeMillis()});
+        StringBuilder stored = new StringBuilder();
+        for (Map.Entry<String, long[]> e : answers.entrySet()) {
+            stored.append(stored.length() == 0 ? "" : ",").append(e.getKey()).append(':').append(e.getValue()[0])
+                    .append(':').append(e.getValue()[1]);
+        }
+        mPreferences.edit().putString(PREF_ANSWERS, stored.toString()).apply();
+    }
+
+    /** {@link #PREF_ANSWERS} read: name → {failed (1 or 0), millis}; a broken entry is skipped. */
+    static Map<String, long[]> answers(String stored) {
+        Map<String, long[]> out = new LinkedHashMap<>();
+        for (String entry : stored == null ? new String[0] : stored.split(",")) {
+            String[] parts = entry.trim().split(":");
+            if (parts.length == 3) {
+                try {
+                    out.put(parts[0], new long[]{Long.parseLong(parts[1]), Long.parseLong(parts[2])});
+                } catch (NumberFormatException ignored) {
+                    // not ours: skipped
+                }
+            }
+        }
+        return out;
     }
 
     /** Shows a saved search as it was left, with no request; its sources can go on from their saved pages. */
@@ -569,6 +629,7 @@ public class SearchbalePresenter extends MvpPresenter<SearchableView> implements
             }
         }
         mSources = sources;
+        classify(sources); // its next pages are marked and waited for as in a live search
         mSession = booksSession(sources);
         mSession.restore(s.text, books, statuses, cursors, counts, queries, caseRetried);
         arrived(mSession.items());
@@ -585,7 +646,6 @@ public class SearchbalePresenter extends MvpPresenter<SearchableView> implements
             mChips = null;
         }
         mSearcheblPOJO = s.people != null ? s.people : new SearcheblPOJO();
-        filterAutorsAndSeries();
         getViewState().showQuery(s.text);
         publish();
     }
@@ -624,6 +684,7 @@ public class SearchbalePresenter extends MvpPresenter<SearchableView> implements
         }
         SearchUi.Input in = new SearchUi.Input();
         in.request = mRequest;
+        in.genres = mGenres;
         in.offers = new ArrayList<>(mOffers);
         in.sources = mSources;
         Map<String, SearchSession.State> states = new LinkedHashMap<>();
@@ -639,6 +700,10 @@ public class SearchbalePresenter extends MvpPresenter<SearchableView> implements
         in.searched = mSearched;
         in.restoredAt = mRestoredAt;
         in.generation = mGeneration;
+        in.people = mSearcheblPOJO;
+        in.nowMs = System.currentTimeMillis(); // the clock of SearchSession.State#startedAt (the main scheduler's)
+        in.slow = EnumSet.copyOf(mSlow);
+        in.silent = EnumSet.copyOf(mSilent);
         Set<String> shown = new HashSet<>();
         if (mState != null) {
             for (SearchUi.Row r : mState.rows) {
@@ -655,6 +720,15 @@ public class SearchbalePresenter extends MvpPresenter<SearchableView> implements
         }
         mState = state;
         getViewState().showState(state);
+        if (mTick != null) {
+            mTick.dispose();
+            mTick = null;
+        }
+        if (state.nextChangeAt > 0) {
+            long delay = Math.max(0, state.nextChangeAt - System.currentTimeMillis()) + 20;
+            mTick = Completable.timer(delay, TimeUnit.MILLISECONDS, AndroidSchedulers.mainThread())
+                    .subscribe(this::publish);
+        }
     }
 
     /** Saves the current search for the next visit (§8). */
@@ -722,15 +796,28 @@ public class SearchbalePresenter extends MvpPresenter<SearchableView> implements
     }
 
     static Set<SearchRequest.Field> scopeOf(String stored) {
-        Set<SearchRequest.Field> out = EnumSet.noneOf(SearchRequest.Field.class);
+        return namesOf(SearchRequest.Field.class, stored);
+    }
+
+    /** The constants named in {@code stored} ("A,B"); an empty or unknown name (of a later version) is skipped. */
+    static <E extends Enum<E>> Set<E> namesOf(Class<E> type, String stored) {
+        Set<E> out = EnumSet.noneOf(type);
         for (String part : stored == null ? new String[0] : stored.split(",")) {
             try {
-                out.add(SearchRequest.Field.valueOf(part.trim()));
+                out.add(Enum.valueOf(type, part.trim()));
             } catch (IllegalArgumentException ignored) {
-                // empty, or a field of a later version
+                // empty, or a name of a later version
             }
         }
         return out;
+    }
+
+    private static String joinNames(Set<? extends Enum<?>> names) {
+        StringBuilder stored = new StringBuilder();
+        for (Enum<?> e : names) {
+            stored.append(stored.length() == 0 ? "" : ",").append(e.name());
+        }
+        return stored.toString();
     }
 
     private static String join(List<String> parts) {
@@ -791,13 +878,11 @@ public class SearchbalePresenter extends MvpPresenter<SearchableView> implements
             mChips.dispose();
         }
         mSearcheblPOJO = new SearcheblPOJO();
-        mSearcheblPOJOFilter = null;
-        getViewState().showSeriesAndAutors(mSearcheblPOJO);
         mChips = mSearchableModel.chips(mPreferences, q)
                 .observeOn(AndroidSchedulers.mainThread())
                 .subscribe(pojo -> {
                     mSearcheblPOJO = mSearcheblPOJO.concat(mSearcheblPOJO, pojo);
-                    filterAutorsAndSeries();
+                    publish();
                 }, e -> Log.w(TAG, "author and series chips", e));
     }
 
@@ -877,7 +962,7 @@ public class SearchbalePresenter extends MvpPresenter<SearchableView> implements
 
         open.setOnClickListener(view1 -> {
             dialog.dismiss();
-            getViewState().startBookActivity(bookPOJO);
+            open(bookPOJO);
         });
 
         add.setOnClickListener(view1 -> {

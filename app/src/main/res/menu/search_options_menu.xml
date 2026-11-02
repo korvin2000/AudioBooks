@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- The search screen's toolbar: where to look (scope), the order, and the grouping of the same book. -->
+<!-- The search screen's toolbar: where to look (scope); the overflow holds the order (a submenu of the sorts, filled
+     by the screen), the genres, the grouping of the same book, the match score and the refresh. -->
 <menu xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto">
     <item
@@ -9,9 +10,14 @@
         app:showAsAction="always" />
     <item
         android:id="@+id/search_sort"
-        android:icon="@drawable/ic_sort"
         android:title="@string/search_sort"
-        app:showAsAction="always" />
+        app:showAsAction="never">
+        <menu />
+    </item>
+    <item
+        android:id="@+id/search_genres"
+        android:title="@string/search_genres"
+        app:showAsAction="never" />
     <item
         android:id="@+id/search_group"
         android:checkable="true"
