@@ -1,5 +1,10 @@
 package com.fanok.audiobooks.search;
 
+import android.content.Context;
+
+import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
+
 import com.fanok.audiobooks.Consts;
 import com.fanok.audiobooks.Url;
 import com.fanok.audiobooks.source.Abmp3;
@@ -47,15 +52,15 @@ public enum Provider {
     BAZA_KNIG(Url.SERVER_BAZA_KNIG, "База Книг", "baza_knig", "search_baza_knig", Consts.SOURCE_BAZA_KNIG,
             "BazaKnig", Url.INDEX_BAZA_KNIG, Url.SECTIONS_BAZA_KNIG, null, null, new BazaKnig()),
     KNIGOBLUD(Url.SERVER_KNIGOBLUD, "Книгоблуд", "knigoblud", "search_knigoblud", Consts.SOURCE_KNIGOBLUD,
-            "Knigoblud", Url.INDEX_KNIGOBLUD, Url.SECTIONS_KNIGOBLUD, null, null, new Knigoblud()),
+            "Knigoblud", Url.INDEX_KNIGOBLUD, Url.SECTIONS_KNIGOBLUD, null, null, new Knigoblud(), IZIBUK),
     AUDIOBOO(Url.SERVER_AUDIOBOO, "Audioboo", "audioboo", "search_audioboo", Consts.SOURCE_AUDIOBOO, "Audioboo",
             Url.INDEX_AUDIOBOO, Url.INDEX_AUDIOBOO, Url.INDEX_AUDIOBOO, Url.INDEX_AUDIOBOO, new Audioboo()),
     OTRUB(Url.SERVER_OTRUB, "Отрубин", "otrub", "search_otrub", Consts.SOURCE_OTRUB, "Otrub",
-            Url.INDEX_OTRUB, Url.SECTIONS_OTRUB, null, null, new Otrub()),
+            Url.INDEX_OTRUB, Url.SECTIONS_OTRUB, null, null, new Otrub(), IZIBUK),
     POLEKNIG(Url.SERVER_POLEKNIG, "Полекниг", "poleknig", "search_poleknig", Consts.SOURCE_POLEKNIG, "Poleknig",
             Url.INDEX_POLEKNIG, Url.SECTIONS_POLEKNIG, null, null, new Poleknig()),
     UKNIG(Uknig.SERVER, "уКниг", "uknig", "search_uknig", 9, "Uknig",
-            Uknig.INDEX, Uknig.GENRES, Uknig.AUTHORS, Uknig.READERS, new Uknig()),
+            Uknig.INDEX, Uknig.GENRES, Uknig.AUTHORS, Uknig.READERS, new Uknig(), POLEKNIG),
     AUDIOKNIGI_FUN(AudioknigiFun.SERVER, "Аудиокниги.fun", "audioknigi_fun", "search_audioknigi_fun", 10,
             "AudioknigiFun", AudioknigiFun.INDEX, AudioknigiFun.GENRES, AudioknigiFun.AUTHORS,
             AudioknigiFun.READERS, new AudioknigiFun()),
@@ -159,6 +164,12 @@ public enum Provider {
     /** False for a unique site: no other site in the app carries its catalog. */
     public boolean hasMirrors() {
         return !mirrors().isEmpty();
+    }
+
+    /** What the app tells the user about the site ({@link SourceInfo}); null when its facts are missing. */
+    @Nullable
+    public SourceInfo info(@NonNull Context context) {
+        return SourceInfo.of(context, this);
     }
 
     /**

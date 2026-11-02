@@ -44,16 +44,22 @@ import com.arellomobile.mvp.presenter.InjectPresenter;
 import com.arellomobile.mvp.presenter.ProvidePresenter;
 import com.fanok.audiobooks.AppThemes;
 import com.fanok.audiobooks.BuildConfig;
+import com.fanok.audiobooks.Consts;
 import com.fanok.audiobooks.R;
 import com.fanok.audiobooks.fragment.BooksFragment;
+import com.fanok.audiobooks.fragment.FavoriteFragment;
+import com.fanok.audiobooks.fragment.SettingsFragment;
 import com.fanok.audiobooks.interface_pacatge.main.MainView;
 import com.fanok.audiobooks.pojo.BookPOJO;
 import com.fanok.audiobooks.pojo.StorageUtil;
 import com.fanok.audiobooks.presenter.MainPresenter;
 import com.fanok.audiobooks.service.MediaPlayerService;
 import com.fanok.audiobooks.region.AppRegion;
+import com.fanok.audiobooks.search.Provider;
+import com.fanok.audiobooks.search.SourceSnapshot;
 import com.fanok.audiobooks.update.Updater;
 import com.google.android.material.navigation.NavigationView;
+import com.google.android.material.snackbar.Snackbar;
 
 import java.util.ArrayList;
 import java.util.Objects;
@@ -65,6 +71,19 @@ public class MainActivity extends MvpAppCompatActivity
     private static final String TAG = "MainActivity";
     private static final String EXSTRA_FRAGMENT = "startFragment";
     private static final String EXSTRA_URL = "url";
+    /** Sent by the source screens ({@link #startSourcesSettings}, {@link #startCatalog}): what to open on arrival. */
+    private static final String EXTRA_SOURCES = "sources";
+    private static final String SOURCES_SETTINGS = "settings";
+    private static final String SOURCES_CATALOG = "catalog";
+    private static final String SOURCES_LIBRARY = "library";
+    /** With {@link #SOURCES_LIBRARY}: the list ({@code Consts.TABLE_*}) and the {@code sourceId} it is narrowed to. */
+    private static final String EXTRA_TABLE = "sourcesTable";
+    private static final String EXTRA_SOURCE_ID = "sourcesSourceId";
+    /** The setup before and after a change of the catalog source ({@link SourceSnapshot#encode}) and what changed. */
+    private static final String EXTRA_UNDO = "sourcesUndo";
+    private static final String EXTRA_UNDO_AFTER = "sourcesUndoAfter";
+    private static final String EXTRA_UNDO_TEXT = "sourcesUndoText";
+    private static final int SNACKBAR_MS = 6000;
     private static boolean closeApp = false;
     /** True on a fresh creation only: a restored activity keeps its fragments and has had its first-launch dialogs. */
     private boolean freshStart = false;
@@ -86,6 +105,8 @@ public class MainActivity extends MvpAppCompatActivity
     }
 
     private NavigationView navigationView;
+    /** A request of the source screens, handled once the activity is resumed (fragments can be shown). */
+    private Intent pendingSources;
     private final DialogQueue dialogs = new DialogQueue();
     private boolean updateQueued;
     private Runnable permissionDone;
@@ -132,6 +153,129 @@ public class MainActivity extends MvpAppCompatActivity
         return mTextViewArrayList;
     }
 
+    /** Settings → "Источники и сеть" with the sources dialog open, from a screen above this one. */
+    public static void startSourcesSettings(@NonNull Context context) {
+        context.startActivity(sourcesIntent(context, SOURCES_SETTINGS));
+    }
+
+    /**
+     * The catalog source's "Аудиокниги", from a screen above this one, after the source changed; {@code undo} and
+     * {@code after} (the setup before and after it, {@link SourceSnapshot#encode}) and {@code text} make the snackbar
+     * that offers to put the change back.
+     */
+    public static void startCatalog(@NonNull Context context, @Nullable String undo, @Nullable String after,
+            @Nullable String text) {
+        context.startActivity(sourcesIntent(context, SOURCES_CATALOG).putExtra(EXTRA_UNDO, undo)
+                .putExtra(EXTRA_UNDO_AFTER, after).putExtra(EXTRA_UNDO_TEXT, text));
+    }
+
+    /**
+     * The favorites, the history or the downloads ({@code Consts.TABLE_*}) narrowed to {@code provider}, from its card
+     * on a screen of its own: the main screen, as the card's other links open it; Back follows its own screens.
+     */
+    public static void startLibrary(@NonNull Context context, @NonNull Provider provider, int table) {
+        context.startActivity(sourcesIntent(context, SOURCES_LIBRARY).putExtra(EXTRA_TABLE, table)
+                .putExtra(EXTRA_SOURCE_ID, provider.sourceId));
+    }
+
+    @NonNull
+    private static Intent sourcesIntent(@NonNull Context context, @NonNull String what) {
+        return new Intent(context, MainActivity.class).putExtra(EXTRA_SOURCES, what)
+                .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
+    }
+
+    @Override
+    protected void onNewIntent(Intent intent) {
+        super.onNewIntent(intent);
+        setIntent(intent);
+        if (intent.hasExtra(EXTRA_SOURCES)) {
+            pendingSources = intent;
+        }
+    }
+
+    /** A request of the source screens, once: the extras leave the intent, so a recreation does not repeat it. */
+    private void handleSources(@NonNull Intent intent) {
+        String what = intent.getStringExtra(EXTRA_SOURCES);
+        String undo = intent.getStringExtra(EXTRA_UNDO);
+        String after = intent.getStringExtra(EXTRA_UNDO_AFTER);
+        String text = intent.getStringExtra(EXTRA_UNDO_TEXT);
+        Provider library = Provider.ofSource(intent.getIntExtra(EXTRA_SOURCE_ID, -1));
+        int table = intent.getIntExtra(EXTRA_TABLE, Consts.TABLE_FAVORITE);
+        intent.removeExtra(EXTRA_SOURCES);
+        intent.removeExtra(EXTRA_UNDO);
+        intent.removeExtra(EXTRA_UNDO_AFTER);
+        intent.removeExtra(EXTRA_UNDO_TEXT);
+        intent.removeExtra(EXTRA_SOURCE_ID);
+        intent.removeExtra(EXTRA_TABLE);
+        if (SOURCES_SETTINGS.equals(what)) {
+            showSourcesSettings();
+        } else if (SOURCES_CATALOG.equals(what)) {
+            openCatalog(SourceSnapshot.decode(undo), SourceSnapshot.decode(after), text);
+        } else if (SOURCES_LIBRARY.equals(what) && library != null) {
+            showLibrary(library, table);
+        }
+    }
+
+    /**
+     * The favorites, the history or the downloads ({@code Consts.TABLE_*}) narrowed to {@code provider}, above the
+     * screen on top; Back returns to it. A tag of each list and site, so another one is never taken for it.
+     */
+    public void showLibrary(@NonNull Provider provider, int table) {
+        showFragment(FavoriteFragment.newInstance(table, provider), "library:" + table + ":" + provider.name());
+    }
+
+    /** Settings → "Источники и сеть" with the sources dialog open; Back returns here. */
+    public void showSourcesSettings() {
+        showFragment(SettingsFragment.withSourcesDialog(), "settingsSources");
+    }
+
+    /**
+     * Opens the catalog source's "Аудиокниги" after the source screens changed it; with {@code before}, {@code after}
+     * and {@code text} a snackbar says what changed and its "Отменить" restores {@code before} and opens that catalog
+     * again, unless the setup is no longer {@code after} (changed since: kept, and said so).
+     */
+    public void openCatalog(@Nullable SourceSnapshot before, @Nullable SourceSnapshot after, @Nullable String text) {
+        mPresenter.onItemSelected(R.id.nav_audiobooks);
+        View anchor = findViewById(R.id.container);
+        if (before == null || after == null || text == null || anchor == null) {
+            return;
+        }
+        Snackbar.make(anchor, text, SNACKBAR_MS)
+                .setAction(R.string.sources_undo, v -> {
+                    if (before.restoreIf(PreferenceManager.getDefaultSharedPreferences(this), after)) {
+                        mPresenter.onItemSelected(R.id.nav_audiobooks);
+                    } else {
+                        Toast.makeText(this, R.string.sources_undo_stale, Toast.LENGTH_SHORT).show();
+                    }
+                })
+                .show();
+    }
+
+    /** Marks the permanent drawer's entry {@code layoutId} (a tablet in landscape) as the section on screen. */
+    public void highlightNav(int layoutId) {
+        if (mTextViewArrayList == null) {
+            return;
+        }
+        TypedValue selected = new TypedValue();
+        getTheme().resolveAttribute(R.attr.mySelectableItemBackground, selected, true);
+        TypedValue plain = new TypedValue();
+        getTheme().resolveAttribute(android.R.attr.selectableItemBackground, plain, true);
+        for (TextView view : mTextViewArrayList) {
+            view.setBackgroundResource(view.getId() == layoutId ? selected.resourceId : plain.resourceId);
+        }
+    }
+
+    /** The "Источники" entry names the catalog source, as it is when the drawer starts to open. */
+    private void updateSourcesEntry() {
+        Provider catalog = Provider.current();
+        MenuItem item = navigationView == null ? null : navigationView.getMenu().findItem(R.id.nav_sources);
+        View action = item == null ? null : item.getActionView();
+        TextView badge = action == null ? null : action.findViewById(R.id.navSourcesCatalog);
+        if (badge != null) {
+            badge.setText(catalog == null ? null : catalog.title);
+        }
+    }
+
     @Override
     protected void onStart() {
         super.onStart();
@@ -152,6 +296,9 @@ public class MainActivity extends MvpAppCompatActivity
             mPresenter.startFragment(fragment,
                     intent.getBooleanExtra("notificationClick", false));
         }
+        if (intent.hasExtra(EXTRA_SOURCES)) {
+            pendingSources = intent; // above the start screen, so Back leads to it
+        }
 
         // one decision at a time, each with its reason (UI-18); parental control is in the settings, not asked here
         if (!preferences.getBoolean("first", false)) {
@@ -171,6 +318,12 @@ public class MainActivity extends MvpAppCompatActivity
     protected void onResume() {
         super.onResume();
         updateNowPlayingEntry();
+        updateSourcesEntry();
+        if (pendingSources != null) {
+            Intent sources = pendingSources;
+            pendingSources = null;
+            handleSources(sources);
+        }
         Updater.setListener(this::offerUpdate);
         offerUpdate();
     }
@@ -361,6 +514,7 @@ public class MainActivity extends MvpAppCompatActivity
                     // the entry shows the player as it is when the drawer starts to open
                     if (newState != DrawerLayout.STATE_IDLE && !drawer.isDrawerOpen(GravityCompat.START)) {
                         updateNowPlayingEntry();
+                        updateSourcesEntry();
                     }
                 }
             });

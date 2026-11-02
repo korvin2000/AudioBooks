@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- A section of the source list in the user's order: «АКТИВНЫЕ 13 из 13 · лимит» with the 13-cell meter, or
+     «НЕАКТИВНЫЕ 10» with what that means. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:paddingStart="16dp"
+    android:paddingTop="16dp"
+    android:paddingEnd="16dp"
+    android:paddingBottom="6dp"
+    tools:viewBindingIgnore="true">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center_vertical"
+        android:orientation="horizontal">
+
+        <TextView
+            android:id="@+id/sourcesHeaderLabel"
+            style="@style/Widget.App.Sources.Section"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            tools:text="@string/sources_section_active" />
+
+        <TextView
+            android:id="@+id/sourcesHeaderCount"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:fontFeatureSettings="tnum"
+            android:textColor="?attr/colorPrimaryText"
+            android:textSize="13sp"
+            android:textStyle="bold"
+            tools:text="13 из 13" />
+
+        <TextView
+            android:id="@+id/sourcesHeaderLimit"
+            style="@style/Widget.App.Sources.Badge"
+            android:text="@string/sources_section_limit"
+            android:textColor="@color/sources_warn" />
+    </LinearLayout>
+
+    <com.fanok.audiobooks.fragment.SourceSegmentsView
+        android:id="@+id/sourcesHeaderMeter"
+        android:layout_width="match_parent"
+        android:layout_height="6dp"
+        android:layout_marginTop="8dp" />
+
+    <TextView
+        android:id="@+id/sourcesHeaderNote"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="2dp"
+        android:text="@string/sources_section_inactive_note"
+        android:textColor="@color/sources_text_secondary"
+        android:textSize="12sp" />
+</LinearLayout>

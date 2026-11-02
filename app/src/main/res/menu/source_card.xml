@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- A source card's toolbar on its own screen (activity.SourceActivity): the site in the browser; check it now; the
+     sources dialog. -->
+<menu xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+    <item
+        android:id="@+id/sourceMenuSite"
+        android:icon="@drawable/ic_source_open"
+        android:title="@string/sources_open_site"
+        app:showAsAction="always" />
+    <item
+        android:id="@+id/sourceMenuCheck"
+        android:title="@string/sources_check"
+        app:showAsAction="never" />
+    <item
+        android:id="@+id/sourceMenuManage"
+        android:title="@string/sources_entry"
+        app:showAsAction="never" />
+</menu>

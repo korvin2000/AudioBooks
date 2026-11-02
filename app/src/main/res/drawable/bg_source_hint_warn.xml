@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- A warning under a setting of the source card (the region needs the proxy): amber. -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <solid android:color="@color/sources_warn_box" />
+    <corners android:radius="10dp" />
+</shape>

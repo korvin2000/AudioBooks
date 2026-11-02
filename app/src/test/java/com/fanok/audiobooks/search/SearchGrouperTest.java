@@ -53,7 +53,7 @@ public class SearchGrouperTest {
                 offer(Provider.KNIGAVUHE, "Мастер и Маргарита", "Булгаков Михаил", "Козий Николай", "17:05:00"));
         Group g = only(group(offers));
         assertEquals(6, g.offers.size());
-        assertEquals("Книгоблуд, Библус и Голосом are one catalog", 4, g.catalogs());
+        assertEquals("ИзиБук, Книгоблуд, Библус и Голосом are one catalog", 3, g.catalogs());
         assertEquals("Клюквин, Клюквин (полная версия), Козий", 3, g.narrations.size());
         Narration kluk = g.narrations.get(0);
         assertEquals(new TreeSet<>(Arrays.asList("александр", "клюквин")), kluk.reader);

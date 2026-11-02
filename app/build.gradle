@@ -56,6 +56,8 @@ android {
         targetSdkVersion 34
         versionCode 103
         versionName "8.0"
+        // the app speaks Russian only: the libraries' other translations would be dead weight in every APK
+        resourceConfigurations += ['ru']
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         sourceSets {
             androidTest.assets.srcDirs += files("$projectDir/schemas".toString())

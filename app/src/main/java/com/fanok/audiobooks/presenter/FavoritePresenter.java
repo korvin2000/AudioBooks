@@ -22,6 +22,8 @@ import com.fanok.audiobooks.model.BooksDBModel;
 import com.fanok.audiobooks.model.FavoriteModel;
 import com.fanok.audiobooks.pojo.BookPOJO;
 import com.fanok.audiobooks.search.GenrePicks;
+import com.fanok.audiobooks.search.Provider;
+import com.fanok.audiobooks.search.SourceLibrary;
 import com.fanok.audiobooks.util.DownloadStorageHelper;
 import io.reactivex.android.schedulers.AndroidSchedulers;
 import io.reactivex.disposables.CompositeDisposable;
@@ -29,6 +31,7 @@ import io.reactivex.schedulers.Schedulers;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Callable;
@@ -58,6 +61,10 @@ public class FavoritePresenter
 
     private final ArrayList<BookPOJO> filterSearch;
 
+    /** The collection last given to the list: every row action resolves its position there. */
+    @Nullable
+    private ArrayList<BookPOJO> shown;
+
     private final int table;
 
     private boolean isLoading = false;
@@ -72,18 +79,33 @@ public class FavoritePresenter
 
     private boolean isFilterSaved;
 
+    /** The site the list is narrowed to (the source filter), or null. */
+    @Nullable
+    private Provider source;
+
+    /** The source filter's last offer: each value shown, with its site. */
+    private final Map<String, Provider> sourceChoices = new HashMap<>();
+
     /** The book hidden by the last swipe, until the undo offer ends. */
     @Nullable
     private BookPOJO pendingRemoval;
     private int pendingRemovalIndex;
+    /** The hidden book was in {@link #flter}: the undo puts it back there too. */
+    private boolean pendingRemovalFiltered;
 
     private final CompositeDisposable disposables = new CompositeDisposable();
 
 
     public FavoritePresenter(int table) {
+        this(table, null);
+    }
+
+    /** The list {@code table}, narrowed to {@code source} from the start (a source card's counter). */
+    public FavoritePresenter(int table, @Nullable Provider source) {
         filterSearch = new ArrayList<>();
         firstOpen = true;
         this.table = table;
+        this.source = source;
     }
 
 
@@ -108,7 +130,6 @@ public class FavoritePresenter
         getViewState().showError(false);
         getViewState().showProgres(true);
         isLoading = true;
-        filterSearch.clear();
         disposables.add(mFavoriteModel.getBooks(table)
                 .subscribeOn(Schedulers.io())
                 .observeOn(AndroidSchedulers.mainThread())
@@ -123,6 +144,9 @@ public class FavoritePresenter
     }
 
     private void onBooksLoaded() {
+        if (source != null) {
+            flter = null; // the site's books as they are now, new ones included (bySource)
+        }
         if (flter != null) {
             ArrayList<BookPOJO> newFilter = new ArrayList<>();
             for (BookPOJO bookPOJO : books) {
@@ -142,7 +166,7 @@ public class FavoritePresenter
             String sort = pref.getString("pref_sort_favorite", mContext.getString(R.string.sort_value_date));
             if (mContext.getString(R.string.sort_value_saved).equals(sort) && table != Consts.TABLE_SAVED) {
                 // the "saved" order needs the download state of every book: one worker pass, then sort
-                sortBySavedState(books, () -> finishLoad(books));
+                sortBySavedState(books, () -> finishLoad(bySource()));
                 return;
             }
             if (!mContext.getString(R.string.sort_value_date).equals(sort)) {
@@ -150,11 +174,21 @@ public class FavoritePresenter
             }
         }
         firstOpen = false;
-        finishLoad(books);
+        finishLoad(bySource());
+    }
+
+    /** The loaded books, or only those of {@link #source} (the source filter), its title the subtitle. */
+    private ArrayList<BookPOJO> bySource() {
+        if (source == null) {
+            return books;
+        }
+        flter = SourceLibrary.only(books, BookPOJO::getUrl, source);
+        getViewState().setSubTitle(source.title);
+        return flter;
     }
 
     private void finishLoad(ArrayList<BookPOJO> list) {
-        getViewState().showData(list);
+        show(list);
         getViewState().showProgres(false);
         getViewState().updateFilter();
         isLoading = false;
@@ -192,9 +226,15 @@ public class FavoritePresenter
         super.onDestroy();
     }
 
+    /** Gives {@code list} to the list on screen; the row actions resolve against it ({@link #bookAt}). */
+    private void show(@NonNull ArrayList<BookPOJO> list) {
+        shown = list;
+        getViewState().showData(list);
+    }
+
     @Nullable
     private BookPOJO bookAt(int position) {
-        List<BookPOJO> list = filterSearch.isEmpty() ? books : filterSearch;
+        List<BookPOJO> list = shown;
         if (list == null || position < 0 || position >= list.size()) {
             return null;
         }
@@ -261,13 +301,15 @@ public class FavoritePresenter
         commitRemove();
         pendingRemoval = book;
         pendingRemovalIndex = books.indexOf(book);
+        pendingRemovalFiltered = flter != null && flter.contains(book);
         books.remove(book);
         if (flter != null) {
             flter.remove(book);
         }
         filterSearch.remove(book);
-        getViewState().showData(filterSearch.isEmpty() && mQuery.isEmpty()
-                ? (flter == null ? books : flter) : filterSearch);
+        ArrayList<BookPOJO> list = shown == null ? books : shown;
+        list.remove(book);
+        show(list);
         getViewState().showUndoRemove(book);
     }
 
@@ -278,10 +320,15 @@ public class FavoritePresenter
             return;
         }
         pendingRemoval = null;
+        // back into the whole list; the filter is made again from it, in its order (flter follows books)
         int index = Math.min(Math.max(pendingRemovalIndex, 0), books.size());
         books.add(index, book);
         if (flter != null) {
-            flter.add(Math.min(index, flter.size()), book);
+            List<BookPOJO> members = new ArrayList<>(flter);
+            if (pendingRemovalFiltered) {
+                members.add(book);
+            }
+            flter = SourceLibrary.among(books, members);
         }
         onSearch(mQuery);
     }
@@ -336,6 +383,7 @@ public class FavoritePresenter
         books = new ArrayList<>();
         flter = null;
         isFilterSaved = false;
+        source = null;
         getViewState().setSubTitle("");
         getViewState().showProgres(false);
         onSearch(mQuery);
@@ -381,7 +429,7 @@ public class FavoritePresenter
                 }
             }
         }
-        getViewState().showData(filterSearch);
+        show(filterSearch);
     }
 
     @Override
@@ -392,6 +440,8 @@ public class FavoritePresenter
         if (id == R.id.genre_filter || id == R.id.autor_filter ||
                 id == R.id.artist_filter || id == R.id.series_filter) {
             loadFilterValues(id);
+        } else if (id == R.id.source_filter) {
+            offerSources();
         } else if (id == R.id.date) {
             loadBooks();
         } else if (id == R.id.saved_filter) {
@@ -407,6 +457,7 @@ public class FavoritePresenter
                     }
                     flter = saved;
                     isFilterSaved = true;
+                    source = null;
                     getViewState().setSubTitle(mContext.getString(R.string.menu_saved));
                     onSearch(mQuery);
                 });
@@ -414,19 +465,25 @@ public class FavoritePresenter
                 getViewState().setSubTitle("");
                 flter = null;
                 isFilterSaved = false;
+                source = null;
                 onSearch(mQuery);
             }
         } else if (id == R.id.saved) {
-            ArrayList<BookPOJO> target = flter == null ? books : flter;
-            sortBySavedState(target, () -> onSearch(mQuery));
+            sortBySavedState(books, () -> {
+                reorderFilter();
+                onSearch(mQuery);
+            });
         } else {
-            Comparator<BookPOJO> comparator = getComparator(id);
-            if (flter == null) {
-                books.sort(comparator);
-            } else {
-                flter.sort(comparator);
-            }
+            books.sort(getComparator(id));
+            reorderFilter();
             onSearch(mQuery);
+        }
+    }
+
+    /** A sort orders the whole list; the filter keeps its books in that order, so an undo can make it again. */
+    private void reorderFilter() {
+        if (flter != null) {
+            flter = SourceLibrary.among(books, flter);
         }
     }
 
@@ -464,6 +521,27 @@ public class FavoritePresenter
         return state == null ? NOT_SAVED : state;
     }
 
+    /** The sites of the listed books, each with its number of books there, most first. */
+    private void offerSources() {
+        if (mContext == null) {
+            return;
+        }
+        List<String> urls = new ArrayList<>();
+        for (BookPOJO book : books) {
+            urls.add(book.getUrl());
+        }
+        sourceChoices.clear();
+        ArrayList<String> values = new ArrayList<>();
+        for (Map.Entry<Provider, Integer> site : SourceLibrary.sites(urls).entrySet()) {
+            String value = mContext.getString(R.string.sources_filter_value, site.getKey().title, site.getValue());
+            sourceChoices.put(value, site.getKey());
+            values.add(value);
+        }
+        if (!values.isEmpty()) {
+            getViewState().showFilterValues(R.id.source_filter, values);
+        }
+    }
+
     private void loadFilterValues(final int id) {
         final Callable<ArrayList<String>> query;
         if (id == R.id.genre_filter) {
@@ -493,9 +571,18 @@ public class FavoritePresenter
         if (value == null) {
             getViewState().setSubTitle("");
             flter = null;
+            source = null;
             onSearch(mQuery);
             return;
         }
+        if (filterId == R.id.source_filter) {
+            source = sourceChoices.get(value);
+            flter = null;
+            bySource();
+            onSearch(mQuery);
+            return;
+        }
+        source = null;
         getViewState().setSubTitle(value);
         ArrayList<BookPOJO> filter = new ArrayList<>();
         for (BookPOJO book : books) {

@@ -15,7 +15,6 @@ import android.content.Intent;
 import android.content.res.Configuration;
 import android.os.Bundle;
 import android.util.Log;
-import android.util.TypedValue;
 import android.view.KeyEvent;
 import android.view.LayoutInflater;
 import android.view.Menu;
@@ -24,7 +23,6 @@ import android.view.MenuItem;
 import android.view.SubMenu;
 import android.view.View;
 import android.view.ViewGroup;
-import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.activity.result.ActivityResultLauncher;
@@ -52,6 +50,7 @@ import com.fanok.audiobooks.Url;
 import com.fanok.audiobooks.activity.BookActivity;
 import com.fanok.audiobooks.activity.MainActivity;
 import com.fanok.audiobooks.activity.SearchableActivity;
+import com.fanok.audiobooks.activity.SourceActivity;
 import com.fanok.audiobooks.adapter.BooksListAddapter;
 import com.fanok.audiobooks.adapter.GenreListAddapter;
 import com.fanok.audiobooks.databinding.DialogDurationFilterBinding;
@@ -228,6 +227,13 @@ public class BooksFragment extends MvpAppCompatFragment implements BooksView {
                     fillOrderMenu(menu, provider.parser.sorts(listing));
                 }
                 fillSourceMenu(menu);
+                MenuItem about = menu.findItem(R.id.source_about);
+                if (about != null) {
+                    about.setVisible(provider != null);
+                    if (provider != null) {
+                        about.setTitle(getString(R.string.sources_about_listing, provider.title));
+                    }
+                }
 
                 if (modelID != Consts.MODEL_BOOKS || mUrl.contains("reader") || mUrl.contains("author")
                         || mUrl.contains("genre") || mUrl.contains("serie") || mUrl.contains("performer")
@@ -279,6 +285,11 @@ public class BooksFragment extends MvpAppCompatFragment implements BooksView {
                 if (item.getGroupId() == R.id.genre_sort_group) {
                     item.setChecked(true);
                     getPresenter().onGenreSortSelected(GenreSort.values()[item.getItemId() - GENRE_SORT_ITEM_BASE]);
+                } else if (item.getItemId() == R.id.source_about) {
+                    Provider site = Provider.ofUrl(mUrl);
+                    if (site != null) {
+                        SourceActivity.start(requireContext(), site);
+                    }
                 } else if (!onFilterItemSelected(item)) {
                     getPresenter().onOptionItemSelected(item.getItemId());
                 }
@@ -936,37 +947,33 @@ public class BooksFragment extends MvpAppCompatFragment implements BooksView {
         MainActivity activity = (MainActivity) getActivity();
         if (activity != null) {
             NavigationView navigationView = activity.getNavigationView();
-            ArrayList<TextView> mTextViewArrayList = activity.getTextViewArrayList();
-            final TypedValue SelectedValue = new TypedValue();
-            activity.getTheme().resolveAttribute(R.attr.mySelectableItemBackground, SelectedValue,
-                    true);
             switch (modelID) {
                 case MODEL_BOOKS:
                     if (navigationView != null) {
                         navigationView.setCheckedItem(R.id.nav_audiobooks);
-                    } else if (mTextViewArrayList != null && !mTextViewArrayList.isEmpty()) {
-                        mTextViewArrayList.get(0).setBackgroundResource(SelectedValue.resourceId);
+                    } else {
+                        activity.highlightNav(R.id.layout_nav_audiobooks);
                     }
                     break;
                 case MODEL_GENRE:
                     if (navigationView != null) {
                         navigationView.setCheckedItem(R.id.nav_genre);
-                    } else if (mTextViewArrayList != null && mTextViewArrayList.size() > 1) {
-                        mTextViewArrayList.get(1).setBackgroundResource(SelectedValue.resourceId);
+                    } else {
+                        activity.highlightNav(R.id.layout_nav_genre);
                     }
                     break;
                 case MODEL_AUTOR:
                     if (navigationView != null) {
                         navigationView.setCheckedItem(R.id.nav_autor);
-                    } else if (mTextViewArrayList != null && mTextViewArrayList.size() > 2) {
-                        mTextViewArrayList.get(2).setBackgroundResource(SelectedValue.resourceId);
+                    } else {
+                        activity.highlightNav(R.id.layout_nav_autor);
                     }
                     break;
                 case MODEL_ARTIST:
                     if (navigationView != null) {
                         navigationView.setCheckedItem(R.id.nav_artist);
-                    } else if (mTextViewArrayList != null && mTextViewArrayList.size() > 3) {
-                        mTextViewArrayList.get(3).setBackgroundResource(SelectedValue.resourceId);
+                    } else {
+                        activity.highlightNav(R.id.layout_nav_artist);
                     }
                     break;
             }

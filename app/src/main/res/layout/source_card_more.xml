@@ -1,0 +1,121 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The rest of a source card: what the app can do with the site (only what its code tells), where the site works
+     without a proxy (the user's region marked), and the related sites, each opening its card. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:paddingStart="16dp"
+    android:paddingEnd="16dp"
+    tools:viewBindingIgnore="true">
+
+    <TextView
+        style="@style/Widget.App.Sources.Title"
+        android:accessibilityHeading="true"
+        android:text="@string/sources_features_title"
+        tools:ignore="UnusedAttribute" />
+
+    <com.google.android.material.chip.ChipGroup
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        app:chipSpacingHorizontal="8dp"
+        app:chipSpacingVertical="4dp">
+
+        <com.google.android.material.chip.Chip
+            android:id="@+id/sourceFeatureGenres"
+            style="@style/Widget.App.Sources.FeatureChip"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/menu_genre" />
+
+        <com.google.android.material.chip.Chip
+            android:id="@+id/sourceFeatureAuthors"
+            style="@style/Widget.App.Sources.FeatureChip"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/menu_autor" />
+
+        <com.google.android.material.chip.Chip
+            android:id="@+id/sourceFeaturePerformers"
+            style="@style/Widget.App.Sources.FeatureChip"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/menu_artist" />
+
+        <com.google.android.material.chip.Chip
+            android:id="@+id/sourceFeatureReaders"
+            style="@style/Widget.App.Sources.FeatureChip"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/sources_feature_readers" />
+    </com.google.android.material.chip.ChipGroup>
+
+    <TextView
+        android:id="@+id/sourceSorts"
+        style="@style/Widget.App.Sources.Line"
+        android:textColor="@color/sources_text_secondary"
+        android:textSize="13sp"
+        android:visibility="gone"
+        tools:text="Сортировки: новое, популярное, рейтинг" />
+
+    <TextView
+        style="@style/Widget.App.Sources.Title"
+        android:accessibilityHeading="true"
+        android:text="@string/sources_availability_title"
+        tools:ignore="UnusedAttribute" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal">
+
+        <include
+            android:id="@+id/sourceRegionRussia"
+            layout="@layout/item_source_region"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1" />
+
+        <include
+            android:id="@+id/sourceRegionUkraine"
+            layout="@layout/item_source_region"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="8dp"
+            android:layout_weight="1" />
+
+        <include
+            android:id="@+id/sourceRegionWest"
+            layout="@layout/item_source_region"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="8dp"
+            android:layout_weight="1" />
+    </LinearLayout>
+
+    <TextView
+        android:id="@+id/sourceRegionsNote"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="6dp"
+        android:textColor="@color/sources_text_secondary"
+        android:textSize="12sp"
+        android:visibility="gone"
+        tools:text="По данным на ноябрь 2026" />
+
+    <TextView
+        android:id="@+id/sourceRelatedTitle"
+        style="@style/Widget.App.Sources.Title"
+        android:accessibilityHeading="true"
+        android:text="@string/sources_related_title"
+        android:visibility="gone"
+        tools:ignore="UnusedAttribute" />
+
+    <LinearLayout
+        android:id="@+id/sourceRelated"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical" />
+</LinearLayout>

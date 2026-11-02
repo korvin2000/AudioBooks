@@ -96,7 +96,7 @@ public class SearchUiTest {
         assertEquals(2, all.rows.size());
         assertEquals("the match first", "Мастер и Маргарита", all.rows.get(0).offer.book.getName());
         assertEquals(3, all.rows.get(0).group.offers.size());
-        assertEquals("Книгоблуд and Библус are one catalog", 3, all.sites);
+        assertEquals("ИзиБук, Книгоблуд and Библус are one catalog", 2, all.sites);
         assertEquals(2, all.allCount);
         assertNotNull(all.row(all.rows.get(0).key));
 

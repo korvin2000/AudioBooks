@@ -11,6 +11,8 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.preference.PreferenceManager;
 
+import com.fanok.audiobooks.net.AppProxy;
+
 import io.reactivex.Observable;
 import io.reactivex.Single;
 import io.reactivex.schedulers.Schedulers;
@@ -32,8 +34,9 @@ import java.util.concurrent.TimeUnit;
  */
 public final class SourceHealth {
 
-    static final String PREF_RESULTS = "source_health";
-    static final String PREF_CHECKED_AT = "source_health_at";
+    /** The kept results ({@link #last}); the source screens watch it. */
+    public static final String PREF_RESULTS = "source_health";
+    public static final String PREF_CHECKED_AT = "source_health_at";
     static final long DAY_MS = TimeUnit.DAYS.toMillis(1);
     /** The automatic check waits this long after the start: the user's own pages come first. */
     static final long START_DELAY_SECONDS = 30;
@@ -51,7 +54,8 @@ public final class SourceHealth {
 
     /**
      * Checks {@code providers} through their current routes, each result kept as it comes in the order of
-     * {@code providers}; a check that covers every active site is also the time of the last check.
+     * {@code providers}; a check that covers every active site is also the time of the last check. Each result carries
+     * the route its site had when the check started, not the one it has when the result comes.
      */
     @NonNull
     public static Observable<SourceProbe.Result> check(@NonNull SharedPreferences prefs,
@@ -60,7 +64,12 @@ public final class SourceHealth {
         boolean all = sites.containsAll(Sources.active());
         Observable<SourceProbe.Result> each = Observable.defer(() -> {
             Map<Provider, Integer> mine = startChecks(sites);
+            Map<Provider, Boolean> routes = new EnumMap<>(Provider.class);
+            for (Provider site : sites) {
+                routes.put(site, viaProxy(site));
+            }
             return SourceProbe.probeEach(sites, parallel, Schedulers.io())
+                    .map(result -> result.stamped(System.currentTimeMillis(), routes.get(result.provider)))
                     .doOnNext(result -> keep(prefs, result, mine.get(result.provider)));
         });
         return all ? each.doOnComplete(() -> prefs.edit().putLong(PREF_CHECKED_AT, System.currentTimeMillis()).apply())
@@ -132,7 +141,12 @@ public final class SourceHealth {
         return now - lastAt >= DAY_MS || now < lastAt;
     }
 
-    /** Pure: one {@code prefValue=STATUS=millis} entry per site. */
+    /** True when {@code provider}'s requests take the proxy now: set so, and the mode has a proxy that carries them. */
+    public static boolean viaProxy(@NonNull Provider provider) {
+        return !AppProxy.isDirect(provider) && AppProxy.proxyUsable();
+    }
+
+    /** Pure: one {@code prefValue=STATUS=millis=at=p|d} entry per site (at and route when known). */
     @NonNull
     static Set<String> encode(@NonNull List<SourceProbe.Result> results) {
         Set<String> entries = new HashSet<>();
@@ -144,12 +158,13 @@ public final class SourceHealth {
 
     @NonNull
     private static String encode(@NonNull SourceProbe.Result result) {
-        return result.provider.prefValue + "=" + result.status.name() + "=" + result.millis;
+        String entry = result.provider.prefValue + "=" + result.status.name() + "=" + result.millis;
+        return result.proxied == null ? entry : entry + "=" + result.at + "=" + (result.proxied ? "p" : "d");
     }
 
     /**
-     * Pure: {@link #encode} read back; an entry of an unknown site or status is skipped, one without the time (an
-     * older version's) has 0.
+     * Pure: {@link #encode} read back; an entry of an unknown site or status is skipped, one of an older version has
+     * 0 for the times it lacks and no route.
      */
     @NonNull
     static Map<Provider, SourceProbe.Result> decode(@NonNull Set<String> entries) {
@@ -163,8 +178,10 @@ public final class SourceHealth {
                 if (provider.prefValue.equals(parts[0])) {
                     try {
                         long millis = parts.length > 2 ? Long.parseLong(parts[2]) : 0;
+                        long at = parts.length > 4 ? Long.parseLong(parts[3]) : 0;
+                        Boolean proxied = parts.length > 4 ? (Boolean) "p".equals(parts[4]) : null;
                         results.put(provider, new SourceProbe.Result(provider,
-                                ProviderPage.Status.valueOf(parts[1]), millis, null));
+                                ProviderPage.Status.valueOf(parts[1]), millis, null, at, proxied));
                     } catch (IllegalArgumentException ignored) {
                         // a status of an older version: unknown now
                     }

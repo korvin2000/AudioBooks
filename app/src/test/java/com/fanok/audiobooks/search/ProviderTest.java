@@ -109,22 +109,33 @@ public class ProviderTest {
         }
     }
 
-    /** Golosom and Biblus carry Knigoblud's catalog, Golosknig akniga's; every other site is unique. */
+    /**
+     * Knigoblud, Otrubin, Biblus and Golosom carry Izibuk's catalog (one server, one markup, the same new books), uKnig
+     * Poleknig's, Golosknig akniga's; every other site is unique.
+     */
     @Test
     public void mirrorsAreTheOtherSitesWithTheSameCatalog() {
-        assertEquals(Arrays.asList(Provider.BIBLUS, Provider.GOLOSOM), Provider.KNIGOBLUD.mirrors());
-        assertEquals(Arrays.asList(Provider.KNIGOBLUD, Provider.GOLOSOM), Provider.BIBLUS.mirrors());
-        assertEquals(Arrays.asList(Provider.KNIGOBLUD, Provider.BIBLUS), Provider.GOLOSOM.mirrors());
+        assertEquals(Arrays.asList(Provider.IZIBUK, Provider.OTRUB, Provider.BIBLUS, Provider.GOLOSOM),
+                Provider.KNIGOBLUD.mirrors());
+        assertEquals(Arrays.asList(Provider.IZIBUK, Provider.KNIGOBLUD, Provider.OTRUB, Provider.GOLOSOM),
+                Provider.BIBLUS.mirrors());
+        assertEquals(Arrays.asList(Provider.IZIBUK, Provider.KNIGOBLUD, Provider.OTRUB, Provider.BIBLUS),
+                Provider.GOLOSOM.mirrors());
         assertEquals(Collections.singletonList(Provider.GOLOSKNIG), Provider.AKNIGA.mirrors());
         assertEquals(Collections.singletonList(Provider.AKNIGA), Provider.GOLOSKNIG.mirrors());
-        assertSame(Provider.KNIGOBLUD, Provider.GOLOSOM.original());
-        assertSame(Provider.KNIGOBLUD, Provider.KNIGOBLUD.original());
+        assertEquals(Collections.singletonList(Provider.UKNIG), Provider.POLEKNIG.mirrors());
+        assertEquals(Collections.singletonList(Provider.POLEKNIG), Provider.UKNIG.mirrors());
+        assertSame(Provider.IZIBUK, Provider.GOLOSOM.original());
+        assertSame(Provider.IZIBUK, Provider.KNIGOBLUD.original());
+        assertSame(Provider.IZIBUK, Provider.IZIBUK.original());
+        assertSame(Provider.POLEKNIG, Provider.UKNIG.original());
         assertTrue("two mirrors of one original", Provider.GOLOSOM.isMirrorOf(Provider.BIBLUS));
         assertFalse("a site is no mirror of itself", Provider.GOLOSOM.isMirrorOf(Provider.GOLOSOM));
         assertFalse(Provider.GOLOSOM.isMirrorOf(Provider.GOLOSKNIG));
+        assertFalse(Provider.UKNIG.isMirrorOf(Provider.KNIGOBLUD));
         assertFalse(Provider.GOLOSOM.isMirrorOf(null));
-        Set<Provider> mirrored = EnumSet.of(Provider.KNIGOBLUD, Provider.BIBLUS, Provider.GOLOSOM, Provider.AKNIGA,
-                Provider.GOLOSKNIG);
+        Set<Provider> mirrored = EnumSet.of(Provider.IZIBUK, Provider.KNIGOBLUD, Provider.OTRUB, Provider.BIBLUS,
+                Provider.GOLOSOM, Provider.AKNIGA, Provider.GOLOSKNIG, Provider.POLEKNIG, Provider.UKNIG);
         for (Provider p : Provider.values()) {
             assertEquals(p.name(), mirrored.contains(p), p.hasMirrors());
             if (!mirrored.contains(p)) {

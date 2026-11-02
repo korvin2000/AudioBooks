@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- A source card (fragment.SourceCardFragment) on a phone: the head with its facts and actions, «Ваши настройки»
+     right under them so the first screen holds both, then what the site is. layout-sw600dp-land: two columns. -->
+<androidx.core.widget.NestedScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="?attr/backgraundColor"
+    android:fillViewport="true"
+    android:theme="@style/ThemeOverlay.App.Sources"
+    tools:viewBindingIgnore="true">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:paddingBottom="24dp">
+
+        <include layout="@layout/source_card_head" />
+
+        <include layout="@layout/source_card_settings" />
+
+        <!-- phase B: «В вашей библиотеке» (the site's books in the favorites, the history, the downloads) -->
+        <FrameLayout
+            android:id="@+id/sourceLibrarySlot"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:visibility="gone" />
+
+        <include layout="@layout/source_card_about" />
+
+        <include layout="@layout/source_card_more" />
+
+        <TextView
+            android:id="@+id/sourceFooter"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="16dp"
+            android:layout_marginTop="20dp"
+            android:layout_marginEnd="16dp"
+            android:textColor="@color/sources_text_secondary"
+            android:textSize="12sp"
+            tools:text="Сведения о сайте на ноябрь 2026. Число книг — оценка." />
+    </LinearLayout>
+</androidx.core.widget.NestedScrollView>

@@ -28,6 +28,20 @@ public class SourceHealthTest {
     }
 
     @Test
+    public void theTimeAndRouteOfEachCheckAreKept() {
+        Map<Provider, SourceProbe.Result> back = SourceHealth.decode(SourceHealth.encode(Arrays.asList(
+                new SourceProbe.Result(Provider.AKNIGA, ProviderPage.Status.OK, 800, null).stamped(1_700_000L, true),
+                new SourceProbe.Result(Provider.UKNIG, ProviderPage.Status.OK, 500, null).stamped(1_800_000L, false),
+                new SourceProbe.Result(Provider.OTRUB, ProviderPage.Status.OK, 900, null))));
+        assertEquals(1_700_000L, back.get(Provider.AKNIGA).at);
+        assertEquals(Boolean.TRUE, back.get(Provider.AKNIGA).proxied);
+        assertEquals(Boolean.FALSE, back.get(Provider.UKNIG).proxied);
+        assertEquals("unknown", 0, back.get(Provider.OTRUB).at);
+        assertEquals(null, back.get(Provider.OTRUB).proxied);
+        assertEquals(900, back.get(Provider.OTRUB).millis);
+    }
+
+    @Test
     public void anUnknownSiteOrStatusIsSkipped() {
         Map<Provider, SourceProbe.Result> back = SourceHealth.decode(new HashSet<>(Arrays.asList(
                 "abook=OK", "gone_site=OK=10", "uknig=SOMETHING_NEW=10", "izibuc=OK=fast", "garbage")));

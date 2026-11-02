@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The top of the source list: the user's region, the proxy (opens its settings), the last check (checks again),
+     then the view's sort. Shared by the phone and the tablet layout of fragment_sources. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    tools:viewBindingIgnore="true">
+
+    <!-- wraps on a narrow screen: a cut chip ("Проверено 1 дн") read worse than a second line -->
+    <com.google.android.material.chip.ChipGroup
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:paddingStart="12dp"
+        android:paddingTop="4dp"
+        android:paddingEnd="12dp"
+        app:chipSpacingHorizontal="8dp"
+        app:chipSpacingVertical="0dp">
+
+        <com.google.android.material.chip.Chip
+            android:id="@+id/sourcesRegion"
+            style="@style/Widget.App.Sources.InfoChip"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:clickable="false"
+            android:focusable="false"
+            app:chipIcon="@drawable/ic_source_marker" />
+
+        <com.google.android.material.chip.Chip
+            android:id="@+id/sourcesProxy"
+            style="@style/Widget.App.Sources.InfoChip"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            app:chipIcon="@drawable/ic_shield_check" />
+
+        <com.google.android.material.chip.Chip
+            android:id="@+id/sourcesChecked"
+            style="@style/Widget.App.Sources.InfoChip"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            app:chipIcon="@drawable/ic_refresh" />
+    </com.google.android.material.chip.ChipGroup>
+
+    <com.google.android.material.button.MaterialButtonToggleGroup
+        android:id="@+id/sourcesOrder"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="16dp"
+        android:layout_marginEnd="16dp"
+        app:selectionRequired="true"
+        app:singleSelection="true">
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/sourcesOrderUser"
+            style="@style/Widget.App.Sources.Toggle"
+            android:text="@string/sources_order_user" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/sourcesOrderBooks"
+            style="@style/Widget.App.Sources.Toggle"
+            android:text="@string/sources_order_books" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/sourcesOrderResponse"
+            style="@style/Widget.App.Sources.Toggle"
+            android:text="@string/sources_order_response" />
+    </com.google.android.material.button.MaterialButtonToggleGroup>
+</LinearLayout>

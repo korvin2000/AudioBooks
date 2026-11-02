@@ -1,0 +1,225 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- «Ваши настройки» of a source card: on or off with the 13-cell meter, the place in the order (− / + and the
+     position sheet), the route with its note, the way to the sources dialog. Each row is one touch target. -->
+<com.google.android.material.card.MaterialCardView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    style="@style/Widget.App.Sources.Card"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_marginStart="12dp"
+    android:layout_marginTop="12dp"
+    android:layout_marginEnd="12dp"
+    tools:viewBindingIgnore="true">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:paddingTop="8dp"
+        android:paddingBottom="6dp">
+
+        <TextView
+            style="@style/Widget.App.Sources.Section"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:accessibilityHeading="true"
+            android:paddingStart="16dp"
+            android:paddingTop="4dp"
+            android:paddingEnd="16dp"
+            android:paddingBottom="2dp"
+            android:text="@string/sources_settings_title"
+            tools:ignore="UnusedAttribute" />
+
+        <LinearLayout
+            android:id="@+id/sourceActiveRow"
+            style="@style/Widget.App.Sources.Row">
+
+            <ImageView
+                style="@style/Widget.App.Sources.RowIcon"
+                app:srcCompat="@drawable/ic_source_power"
+                tools:ignore="ContentDescription" />
+
+            <LinearLayout style="@style/Widget.App.Sources.RowText">
+
+                <TextView
+                    style="@style/Widget.App.Sources.RowTitle"
+                    android:text="@string/sources_active_title" />
+
+                <TextView
+                    android:id="@+id/sourceActiveSummary"
+                    style="@style/Widget.App.Sources.RowSummary"
+                    tools:text="Участвует в поиске и каталоге · 1-й из 13 активных" />
+            </LinearLayout>
+
+            <com.google.android.material.switchmaterial.SwitchMaterial
+                android:id="@+id/sourceActiveSwitch"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:saveEnabled="false"
+                android:contentDescription="@string/sources_active_title" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:paddingStart="56dp"
+            android:paddingEnd="16dp"
+            android:paddingBottom="10dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal">
+
+                <TextView
+                    android:id="@+id/sourceMeterCount"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:importantForAccessibility="no"
+                    android:textColor="@color/sources_text_secondary"
+                    android:textSize="12sp"
+                    tools:text="Активных 13 из 13" />
+
+                <TextView
+                    android:id="@+id/sourceMeterFree"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:textColor="@color/sources_text_secondary"
+                    android:textSize="12sp"
+                    tools:text="лимит" />
+            </LinearLayout>
+
+            <com.fanok.audiobooks.fragment.SourceSegmentsView
+                android:id="@+id/sourceMeter"
+                android:layout_width="match_parent"
+                android:layout_height="8dp"
+                android:layout_marginTop="4dp" />
+        </LinearLayout>
+
+        <View style="@style/Widget.App.Sources.Divider" />
+
+        <LinearLayout
+            android:id="@+id/sourcePositionRow"
+            style="@style/Widget.App.Sources.Row"
+            android:paddingEnd="4dp">
+
+            <ImageView
+                style="@style/Widget.App.Sources.RowIcon"
+                app:srcCompat="@drawable/ic_source_swap"
+                tools:ignore="ContentDescription" />
+
+            <LinearLayout style="@style/Widget.App.Sources.RowText">
+
+                <TextView
+                    style="@style/Widget.App.Sources.RowTitle"
+                    android:text="@string/sources_position_title" />
+
+                <TextView
+                    android:id="@+id/sourcePositionSummary"
+                    style="@style/Widget.App.Sources.RowSummary"
+                    tools:text="№ 2 из 23" />
+            </LinearLayout>
+
+            <ImageButton
+                android:id="@+id/sourcePositionUp"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:padding="12dp"
+                android:scaleType="centerInside"
+                app:srcCompat="@drawable/ic_source_minus"
+                app:tint="@color/sources_accent"
+                tools:ignore="ContentDescription" />
+
+            <ImageButton
+                android:id="@+id/sourcePositionDown"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:padding="12dp"
+                android:scaleType="centerInside"
+                app:srcCompat="@drawable/ic_source_plus"
+                app:tint="@color/sources_accent"
+                tools:ignore="ContentDescription" />
+        </LinearLayout>
+
+        <View style="@style/Widget.App.Sources.Divider" />
+
+        <LinearLayout
+            android:id="@+id/sourceProxyRow"
+            style="@style/Widget.App.Sources.Row">
+
+            <ImageView
+                style="@style/Widget.App.Sources.RowIcon"
+                app:srcCompat="@drawable/ic_shield_check"
+                tools:ignore="ContentDescription" />
+
+            <LinearLayout style="@style/Widget.App.Sources.RowText">
+
+                <TextView
+                    style="@style/Widget.App.Sources.RowTitle"
+                    android:text="@string/sources_proxy_title" />
+
+                <TextView
+                    android:id="@+id/sourceProxySummary"
+                    style="@style/Widget.App.Sources.RowSummary"
+                    tools:text="@string/sources_proxy_on" />
+            </LinearLayout>
+
+            <com.google.android.material.switchmaterial.SwitchMaterial
+                android:id="@+id/sourceProxySwitch"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:saveEnabled="false"
+                android:contentDescription="@string/sources_proxy_title" />
+        </LinearLayout>
+
+        <TextView
+            android:id="@+id/sourceProxyHint"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="56dp"
+            android:layout_marginEnd="16dp"
+            android:layout_marginBottom="8dp"
+            android:background="@drawable/bg_source_hint"
+            android:drawablePadding="8dp"
+            android:lineSpacingExtra="2dp"
+            android:padding="10dp"
+            android:textColor="?attr/colorPrimaryText"
+            android:textColorLink="@color/sources_link"
+            android:textSize="13sp"
+            android:visibility="gone"
+            tools:text="@string/sources_proxy_off_hint" />
+
+        <View style="@style/Widget.App.Sources.Divider" />
+
+        <LinearLayout
+            android:id="@+id/sourceManageRow"
+            style="@style/Widget.App.Sources.Row">
+
+            <ImageView
+                style="@style/Widget.App.Sources.RowIcon"
+                app:srcCompat="@drawable/ic_source_tune"
+                tools:ignore="ContentDescription" />
+
+            <LinearLayout style="@style/Widget.App.Sources.RowText">
+
+                <TextView
+                    style="@style/Widget.App.Sources.RowTitle"
+                    android:text="@string/sources_entry" />
+
+                <TextView
+                    style="@style/Widget.App.Sources.RowSummary"
+                    android:text="@string/sources_manage_summary" />
+            </LinearLayout>
+
+            <ImageView
+                style="@style/Widget.App.Sources.RowIcon"
+                app:srcCompat="@drawable/ic_source_chevron"
+                tools:ignore="ContentDescription" />
+        </LinearLayout>
+    </LinearLayout>
+</com.google.android.material.card.MaterialCardView>

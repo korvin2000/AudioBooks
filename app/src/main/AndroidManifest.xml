@@ -111,6 +111,12 @@
             android:configChanges="locale|uiMode"
             android:label="@string/title_activity_parental_control"
             android:theme="@style/AppTheme.SwipeOnClose" />
+        <activity
+            android:name=".activity.SourceActivity"
+            android:configChanges="locale|uiMode"
+            android:exported="false"
+            android:label="@string/menu_sources"
+            android:theme="@style/AppTheme.SwipeOnClose" />
 
         <meta-data
             android:name="com.google.android.gms.car.application"

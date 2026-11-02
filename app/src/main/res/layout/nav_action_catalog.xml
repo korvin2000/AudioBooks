@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The end of the drawer's «Источники» entry: the catalog source's title (MainActivity.updateSourcesEntry), so the
+     drawer shows where the four sections above come from. The menu inflates an action layout without a parent, so the
+     root's layout attributes are lost: the frame fills the entry and centres the badge. -->
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="wrap_content"
+    android:layout_height="match_parent"
+    tools:viewBindingIgnore="true">
+
+    <TextView
+        android:id="@+id/navSourcesCatalog"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center_vertical"
+        android:background="@drawable/bg_source_badge"
+        android:ellipsize="end"
+        android:maxWidth="120dp"
+        android:maxLines="1"
+        android:paddingStart="8dp"
+        android:paddingTop="2dp"
+        android:paddingEnd="8dp"
+        android:paddingBottom="2dp"
+        android:textColor="?attr/colorPrimaryText"
+        android:textSize="12sp"
+        tools:text="Akniga" />
+</FrameLayout>

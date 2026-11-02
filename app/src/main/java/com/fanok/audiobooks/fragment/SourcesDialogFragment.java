@@ -36,6 +36,7 @@ import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.fanok.audiobooks.R;
+import com.fanok.audiobooks.activity.SourceActivity;
 import com.fanok.audiobooks.net.AppProxy;
 import com.fanok.audiobooks.search.Provider;
 import com.fanok.audiobooks.search.SourceHealth;
@@ -68,14 +69,10 @@ public class SourcesDialogFragment extends DialogFragment {
 
     private static final int TYPE_SOURCE = 0;
     private static final int TYPE_DIVIDER = 1;
-    /** Fixed, not the theme's: they must read on the light, the dark and the black background alike. */
-    static final int COLOR_UP = 0xFF4CAF50;
-    static final int COLOR_DOWN = 0xFFE53935;
-    /** The status of a site never checked, or of an inactive one. */
-    static final String UNKNOWN = "—";
     private static final int MENU_UP = 1;
     private static final int MENU_DOWN = 2;
     private static final int MENU_TOGGLE = 3;
+    private static final int MENU_ABOUT = 4;
     /** Sites checked at once by the refresh button. */
     private static final int PARALLEL = 4;
     /** A rebind payload: the row changes in place, without the item animator's cross-fade. */
@@ -85,6 +82,10 @@ public class SourcesDialogFragment extends DialogFragment {
     private static final int ROW_DP = 36;
     private SharedPreferences prefs;
     private final List<Object> rows = new ArrayList<>();
+    /** The live order and count the rows were last built from or saved as ({@link #sync}, {@link #save}). */
+    private List<Object> base = Collections.emptyList();
+    /** A row is being dragged: the rows wait for the drop before they follow the live state. */
+    private boolean dragging;
     private final Map<Provider, SourceProbe.Result> results = new EnumMap<>(Provider.class);
     private final Set<Provider> checking = EnumSet.noneOf(Provider.class);
     /** Grows at each check of a site, so a result of an earlier check (before a later change of route) is dropped. */
@@ -98,6 +99,15 @@ public class SourcesDialogFragment extends DialogFragment {
     private View refreshProgress;
     /** Checks under way; the refresh button is a spinner while there is one. */
     private int running;
+    private final Runnable sync = this::sync;
+    /** A field: SharedPreferences holds its listeners weakly. */
+    private final SharedPreferences.OnSharedPreferenceChangeListener listener = (p, key) -> {
+        if (hint != null && SourceTexts.watched(key)) {
+            // once for a burst of changes, and after every listener of this one ran (AppProxy reads its routes there)
+            hint.removeCallbacks(sync);
+            hint.post(sync);
+        }
+    };
 
     @NonNull
     @Override
@@ -107,6 +117,7 @@ public class SourcesDialogFragment extends DialogFragment {
         // rebuilt on every (re)creation: the fragment outlives its dialog across a rotation
         rows.clear();
         rows.addAll(Rows.of(Sources.all(), Sources.activeCount()));
+        base = new ArrayList<>(rows);
         results.clear();
         results.putAll(SourceHealth.last(prefs));
         checking.clear();
@@ -142,6 +153,49 @@ public class SourcesDialogFragment extends DialogFragment {
                 .setView(view)
                 .setPositiveButton(R.string.proxy_close, null)
                 .create();
+    }
+
+    @Override
+    public void onStart() {
+        super.onStart();
+        prefs.registerOnSharedPreferenceChangeListener(listener);
+    }
+
+    @Override
+    public void onResume() {
+        super.onResume();
+        sync(); // a change made while the dialog was hidden (a site's card opened from its menu)
+    }
+
+    @Override
+    public void onStop() {
+        prefs.unregisterOnSharedPreferenceChangeListener(listener);
+        if (hint != null) {
+            hint.removeCallbacks(sync);
+        }
+        super.onStop();
+    }
+
+    /**
+     * The rows and the results as they are live now, after a change made elsewhere (a card, the source list); not
+     * during a drag, whose drop finds the change ({@link #save}).
+     */
+    private void sync() {
+        if (hint == null || dragging) {
+            return;
+        }
+        List<Object> live = Rows.of(Sources.all(), Sources.activeCount());
+        if (!live.equals(base)) {
+            rows.clear();
+            rows.addAll(live);
+            base = live;
+            adapter.notifyDataSetChanged();
+        }
+        results.clear();
+        results.putAll(SourceHealth.last(prefs));
+        adapter.notifyItemRangeChanged(0, rows.size(), REBIND);
+        renderHint();
+        renderCheckedAt();
     }
 
     @Override
@@ -277,13 +331,19 @@ public class SourcesDialogFragment extends DialogFragment {
 
     /**
      * After a completed change (a drop, the stepper, the menu): stores the order and the count when they changed,
-     * and checks a site that was not active before ({@code activeBefore}) and has no kept result yet.
+     * and checks a site that was not active before ({@code activeBefore}) and has no kept result yet. When the live
+     * order changed elsewhere since the rows were built, the rows are stale: they follow it, nothing is stored.
      */
     private void save(@NonNull List<Provider> activeBefore) {
+        if (!Rows.of(Sources.all(), Sources.activeCount()).equals(base)) {
+            sync();
+            return;
+        }
         List<Provider> active = Rows.active(rows);
         if (!Rows.providers(rows).equals(Sources.all()) || active.size() != Sources.activeCount()) {
             Sources.save(prefs, Rows.providers(rows), active.size());
         }
+        base = Rows.of(Sources.all(), Sources.activeCount());
         List<Provider> missing = new ArrayList<>();
         for (Provider provider : active) {
             if (!activeBefore.contains(provider) && !results.containsKey(provider) && !checking.contains(provider)) {
@@ -304,7 +364,7 @@ public class SourcesDialogFragment extends DialogFragment {
         save(before);
     }
 
-    /** The row menu (the D-pad and TalkBack path): a step up or down, and across the divider. */
+    /** The row menu (the D-pad and TalkBack path): the site's card, a step up or down, and across the divider. */
     private void showMenu(@NonNull SourceHolder holder) {
         int position = holder.getBindingAdapterPosition();
         if (position == RecyclerView.NO_POSITION) {
@@ -312,6 +372,7 @@ public class SourcesDialogFragment extends DialogFragment {
         }
         int divider = Rows.divider(rows);
         PopupMenu menu = new PopupMenu(holder.itemView.getContext(), holder.itemView);
+        menu.getMenu().add(0, MENU_ABOUT, 0, R.string.sources_about_title);
         if (position != 0 && position != divider + 1) {
             menu.getMenu().add(0, MENU_UP, 0, R.string.sources_move_up);
         }
@@ -321,7 +382,14 @@ public class SourcesDialogFragment extends DialogFragment {
         menu.getMenu().add(0, MENU_TOGGLE, 0,
                 position < divider ? R.string.sources_deactivate : R.string.sources_activate);
         menu.setOnMenuItemClickListener(item -> {
-            act(holder.getBindingAdapterPosition(), item.getItemId());
+            int at = holder.getBindingAdapterPosition();
+            if (item.getItemId() == MENU_ABOUT) {
+                if (at != RecyclerView.NO_POSITION) {
+                    SourceActivity.start(requireContext(), (Provider) rows.get(at));
+                }
+                return true;
+            }
+            act(at, item.getItemId());
             return true;
         });
         menu.show();
@@ -342,31 +410,6 @@ public class SourcesDialogFragment extends DialogFragment {
         List<Provider> before = Rows.active(rows);
         move(position, to);
         save(before);
-    }
-
-    /** Pure: the status column: the time of a site that answers, the kind of failure, "—" when unknown. */
-    @NonNull
-    static String statusText(@NonNull Context context, @Nullable SourceProbe.Result result) {
-        if (result == null) {
-            return UNKNOWN;
-        }
-        switch (result.status) {
-            case OK: // an older version kept no time
-                return result.millis > 0 ? context.getString(R.string.sources_seconds, result.millis / 1000f) : UNKNOWN;
-            case EMPTY:
-                return context.getString(R.string.sources_status_empty);
-            case BLOCKED:
-                return context.getString(R.string.sources_status_blocked);
-            case TIMEOUT:
-                return context.getString(R.string.sources_status_timeout);
-            default:
-                return context.getString(R.string.sources_status_error);
-        }
-    }
-
-    /** Pure: the color of a result; 0 (none) when unknown. */
-    static int statusColor(@Nullable SourceProbe.Result result) {
-        return result == null ? 0 : result.isUp() ? COLOR_UP : COLOR_DOWN;
     }
 
     private static void enable(@NonNull View view, boolean enabled) {
@@ -494,9 +537,9 @@ public class SourcesDialogFragment extends DialogFragment {
             Context context = holder.itemView.getContext();
             SourceProbe.Result result = active ? results.get(provider) : null;
             boolean busy = checking.contains(provider);
-            int color = busy ? 0 : statusColor(result);
+            int color = busy ? 0 : SourceTexts.statusColor(result);
             holder.title.setText(provider.title);
-            holder.status.setText(statusText(context, result));
+            holder.status.setText(SourceTexts.statusText(context, result));
             holder.status.setVisibility(busy ? View.INVISIBLE : View.VISIBLE);
             holder.progress.setVisibility(busy ? View.VISIBLE : View.GONE);
             holder.stripe.setBackgroundColor(color != 0 ? color
@@ -602,6 +645,7 @@ public class SourcesDialogFragment extends DialogFragment {
         public void onSelectedChanged(@Nullable RecyclerView.ViewHolder holder, int actionState) {
             super.onSelectedChanged(holder, actionState);
             if (actionState == ItemTouchHelper.ACTION_STATE_DRAG) {
+                dragging = true;
                 activeBefore = Rows.active(rows);
             }
         }
@@ -609,6 +653,7 @@ public class SourcesDialogFragment extends DialogFragment {
         @Override
         public void clearView(@NonNull RecyclerView recyclerView, @NonNull RecyclerView.ViewHolder holder) {
             super.clearView(recyclerView, holder);
+            dragging = false;
             // the drop: one write for the whole drag. A release during a layout pass (the dragged view detached)
             // cannot notify the adapter, so it waits for the pass to end.
             List<Provider> before = activeBefore;

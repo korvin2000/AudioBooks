@@ -58,6 +58,7 @@ import com.fanok.audiobooks.pojo.BookPOJO;
 import com.fanok.audiobooks.policy.DefaultCover;
 import com.fanok.audiobooks.policy.ParentalControl;
 import com.fanok.audiobooks.presenter.FavoritePresenter;
+import com.fanok.audiobooks.search.Provider;
 import com.google.android.material.bottomsheet.BottomSheetDialog;
 import com.google.android.material.navigation.NavigationView;
 import com.google.android.material.snackbar.BaseTransientBottomBar;
@@ -72,6 +73,8 @@ public class FavoriteFragment extends MvpAppCompatFragment implements FavoriteVi
     private static final String TAG = "FavoriteFragment";
     private static final String ARG_TITLE = "title";
     private static final String ARG_TABLE = "table";
+    /** The {@code sourceId} of the site the list opens narrowed to (a source card's counter). */
+    private static final String ARG_SOURCE = "source";
     /** Seconds before "Yes" of the clear-all question can be pressed. */
     private static final int CLEAR_CONFIRM_DELAY_S = 3;
 
@@ -98,6 +101,14 @@ public class FavoriteFragment extends MvpAppCompatFragment implements FavoriteVi
         args.putInt(ARG_TITLE, title);
         args.putInt(ARG_TABLE, table);
         fragment.setArguments(args);
+        return fragment;
+    }
+
+    /** The favorites, the history or the downloads ({@code table}) narrowed to {@code source} (a source card's counter). */
+    public static FavoriteFragment newInstance(int table, @NonNull Provider source) {
+        FavoriteFragment fragment = newInstance(table == TABLE_HISTORY ? R.string.menu_history
+                : table == TABLE_SAVED ? R.string.menu_saved : R.string.menu_favorite, table);
+        fragment.requireArguments().putInt(ARG_SOURCE, source.sourceId);
         return fragment;
     }
 
@@ -193,6 +204,17 @@ public class FavoriteFragment extends MvpAppCompatFragment implements FavoriteVi
                 }
 
                 setColorPrimeriTextInIconItemMenu(menu.findItem(R.id.app_bar_search), requireContext());
+
+                if (table == TABLE_HISTORY) {
+                    // the source filter only: a source card opens the history narrowed to its site
+                    MenuItem filter = menu.findItem(R.id.filter);
+                    filter.setVisible(true);
+                    setColorPrimeriTextInIconItemMenu(filter, requireContext());
+                    for (int id : new int[]{R.id.genre_filter, R.id.autor_filter, R.id.artist_filter,
+                            R.id.series_filter, R.id.saved_filter}) {
+                        menu.findItem(id).setVisible(false);
+                    }
+                }
 
                 if (table == TABLE_FAVORITE || table == TABLE_HISTORY) {
                     MenuItem clear = menu.findItem(R.id.clear_list);
@@ -583,30 +605,26 @@ public class FavoriteFragment extends MvpAppCompatFragment implements FavoriteVi
         MainActivity activity = (MainActivity) getActivity();
         if (activity != null) {
             NavigationView navigationView = activity.getNavigationView();
-            ArrayList<TextView> mTextViewArrayList = activity.getTextViewArrayList();
-            final TypedValue SelectedValue = new TypedValue();
-            activity.getTheme().resolveAttribute(R.attr.mySelectableItemBackground, SelectedValue,
-                    true);
             switch (table) {
                 case TABLE_FAVORITE:
                     if (navigationView != null) {
                         navigationView.setCheckedItem(R.id.nav_favorite);
-                    } else if (mTextViewArrayList != null && mTextViewArrayList.size() > 4) {
-                        mTextViewArrayList.get(4).setBackgroundResource(SelectedValue.resourceId);
+                    } else {
+                        activity.highlightNav(R.id.layout_nav_favorite);
                     }
                     break;
                 case TABLE_HISTORY:
                     if (navigationView != null) {
                         navigationView.setCheckedItem(R.id.nav_history);
-                    } else if (mTextViewArrayList != null && mTextViewArrayList.size() > 5) {
-                        mTextViewArrayList.get(5).setBackgroundResource(SelectedValue.resourceId);
+                    } else {
+                        activity.highlightNav(R.id.layout_nav_history);
                     }
                     break;
                 case TABLE_SAVED:
                     if (navigationView != null) {
                         navigationView.setCheckedItem(R.id.nav_saved);
-                    } else if (mTextViewArrayList != null && mTextViewArrayList.size() > 6) {
-                        mTextViewArrayList.get(6).setBackgroundResource(SelectedValue.resourceId);
+                    } else {
+                        activity.highlightNav(R.id.layout_nav_saved);
                     }
                     break;
             }
@@ -628,10 +646,12 @@ public class FavoriteFragment extends MvpAppCompatFragment implements FavoriteVi
     @ProvidePresenter
     FavoritePresenter provide() {
         Bundle arg = getArguments();
+        Provider source = null;
         if (arg != null) {
             table = arg.getInt(ARG_TABLE, 0);
+            source = Provider.ofSource(arg.getInt(ARG_SOURCE, -1));
         }
-        return new FavoritePresenter(table);
+        return new FavoritePresenter(table, source);
     }
 
     @Override

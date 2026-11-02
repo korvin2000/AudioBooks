@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- "Источники" on a tablet in landscape: the list on the left, the card of the site tapped in the pane on the right
+     (master–detail, SourcesFragment.twoPane). -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="?attr/backgraundColor"
+    android:orientation="horizontal"
+    android:theme="@style/ThemeOverlay.App.Sources"
+    tools:viewBindingIgnore="true">
+
+    <LinearLayout
+        android:layout_width="360dp"
+        android:layout_height="match_parent"
+        android:orientation="vertical">
+
+        <include layout="@layout/sources_list_top" />
+
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/sourcesList"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1"
+            android:clipToPadding="false"
+            android:paddingBottom="16dp" />
+    </LinearLayout>
+
+    <View
+        android:layout_width="1dp"
+        android:layout_height="match_parent"
+        android:background="@color/sources_line" />
+
+    <FrameLayout
+        android:id="@+id/sourceDetail"
+        android:layout_width="0dp"
+        android:layout_height="match_parent"
+        android:layout_weight="1" />
+</LinearLayout>

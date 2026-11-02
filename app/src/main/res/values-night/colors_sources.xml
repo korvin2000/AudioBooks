@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The source screens in the dark and the black theme (both night, AppThemes.applyNightMode). -->
+<resources>
+    <color name="sources_accent">#42A5F5</color>
+    <color name="sources_on_accent">#000000</color>
+    <color name="sources_link">#42A5F5</color>
+    <color name="sources_text_primary">#FFFFFF</color>
+    <color name="sources_text_secondary">#B3FFFFFF</color>
+    <color name="sources_ok">#81C784</color>
+    <color name="sources_warn">#FFB74D</color>
+    <color name="sources_bad">#EF9A9A</color>
+    <color name="sources_track">#33FFFFFF</color>
+    <color name="sources_line">#1FFFFFFF</color>
+    <color name="sources_chip">#1AFFFFFF</color>
+    <color name="sources_info_box">#2442A5F5</color>
+    <color name="sources_warn_box">#29FFB300</color>
+    <color name="sources_selected">#2942A5F5</color>
+</resources>

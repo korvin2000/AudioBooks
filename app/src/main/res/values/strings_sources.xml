@@ -1,0 +1,187 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The source screens: the drawer entry, the list, the card, the position sheet (the sources dialog's own strings,
+     sources_* without a screen's prefix, stay in strings.xml and are shared). -->
+<resources>
+    <string name="menu_sources">Источники</string>
+
+    <!-- shared: words of the facts and the live state (fragment.SourceTexts) -->
+    <string name="sources_route_proxy">через прокси</string>
+    <string name="sources_route_direct">напрямую</string>
+    <string name="sources_route_needed">напрямую, а в вашем регионе нужен прокси</string>
+    <string name="sources_books_thousands">≈ %1$s тыс.</string>
+    <string name="sources_books_units">≈ %1$s</string>
+    <string name="sources_books_many">%1$s книг</string>
+    <plurals name="sources_books_count">
+        <item quantity="one">%1$s книга</item>
+        <item quantity="few">%1$s книги</item>
+        <item quantity="many">%1$s книг</item>
+        <item quantity="other">%1$s книги</item>
+    </plurals>
+    <!-- just now, then minutes, hours, days (SourceTexts.ago) -->
+    <string-array name="sources_ago">
+        <item>только что</item>
+        <item>%1$d мин назад</item>
+        <item>%1$d ч назад</item>
+        <item>%1$d дн. назад</item>
+    </string-array>
+    <!-- "на ноябрь 2026" -->
+    <string-array name="sources_months">
+        <item>январь</item>
+        <item>февраль</item>
+        <item>март</item>
+        <item>апрель</item>
+        <item>май</item>
+        <item>июнь</item>
+        <item>июль</item>
+        <item>август</item>
+        <item>сентябрь</item>
+        <item>октябрь</item>
+        <item>ноябрь</item>
+        <item>декабрь</item>
+    </string-array>
+    <string name="sources_behind">за %1$s</string>
+    <string name="sources_region_russia">Россия</string>
+    <string name="sources_region_ukraine">Украина</string>
+    <string name="sources_region_west">Запад</string>
+    <string name="sources_region_other">другой регион</string>
+    <string name="sources_region_unknown">Регион не определён</string>
+    <string name="sources_region_mine">ваш регион</string>
+    <string name="sources_checking">Проверяем…</string>
+    <string name="sources_inactive">неактивен</string>
+    <string name="sources_badge_catalog">каталог</string>
+    <string name="sources_badge_new">новый</string>
+
+    <!-- the snackbar after a change, with its undo (fragment.SourceActions) -->
+    <string name="sources_undo">Отменить</string>
+    <string name="sources_undo_stale">Настройки уже изменились</string>
+    <string name="sources_done_on">«%1$s» включён</string>
+    <string name="sources_done_off">«%1$s» выключен</string>
+    <string name="sources_done_moved">«%1$s» теперь № %2$d</string>
+    <string name="sources_done_now_active">, стал активным</string>
+    <string name="sources_done_now_inactive">, стал неактивным</string>
+    <string name="sources_done_proxy">«%1$s»: через прокси</string>
+    <string name="sources_done_direct">«%1$s»: напрямую</string>
+    <string name="sources_done_catalog">Источник каталога — %1$s</string>
+    <string name="sources_became_active">«%1$s» стал активным</string>
+    <string name="sources_became_inactive">«%1$s» стал неактивным</string>
+
+    <!-- the list -->
+    <string name="sources_list_subtitle">Каталог: %1$s</string>
+    <string name="sources_chip_proxy_on">Прокси вкл · %1$d через прокси</string>
+    <string name="sources_chip_proxy_off">Прокси выключен</string>
+    <string name="sources_chip_checked">Проверено %1$s</string>
+    <string name="sources_chip_never">Не проверялись</string>
+    <string name="sources_order_user">Порядок</string>
+    <string name="sources_order_books">Книги</string>
+    <string name="sources_order_response">Отклик</string>
+    <string name="sources_section_active">Активные</string>
+    <string name="sources_section_inactive">Неактивные</string>
+    <string name="sources_section_count">%1$d из %2$d</string>
+    <string name="sources_section_limit">лимит</string>
+    <string name="sources_section_inactive_note">Не участвуют в поиске и не могут быть каталогом</string>
+    <string name="sources_position_short">№ %1$d</string>
+    <string name="sources_menu_proxy">Через прокси</string>
+    <string name="sources_menu_direct">Напрямую</string>
+
+    <!-- the card: header and facts -->
+    <string name="sources_cover">Главная страница сайта %1$s</string>
+    <string name="sources_as_of">на %1$s</string>
+    <string name="sources_fact_server">Сервер: %1$s</string>
+    <string name="sources_fact_server_unknown">Сервер: нет данных</string>
+    <string name="sources_fact_since">Работает с %1$s г.</string>
+    <string name="sources_fact_since_unknown">Год запуска: нет данных</string>
+    <string name="sources_fact_response">Отклик %1$s</string>
+    <string name="sources_fact_never">Отклик не проверялся</string>
+    <string name="sources_check_now">Проверить сейчас</string>
+    <string name="sources_vpn_ok">Без VPN · %1$s</string>
+    <string name="sources_vpn_needed">Нужен прокси · %1$s</string>
+    <string name="sources_vpn_unknown">Нет данных о блокировках</string>
+    <string name="sources_fact_updates">Новинки: %1$s</string>
+    <string name="sources_fact_mirror">Зеркало:</string>
+    <string name="sources_fact_mirrors">Зеркала:</string>
+    <string name="sources_open_catalog">Открыть каталог</string>
+    <string name="sources_enable_and_open">Включить и открыть</string>
+    <string name="sources_site">Сайт</string>
+    <string name="sources_open_site">Открыть сайт</string>
+    <string name="sources_check">Проверить доступность</string>
+
+    <!-- the card: "Ваши настройки" -->
+    <string name="sources_settings_title">Ваши настройки</string>
+    <string name="sources_active_title">Активен</string>
+    <string name="sources_active_on">Участвует в поиске и каталоге · %1$d-й из %2$d активных</string>
+    <string name="sources_active_only">Единственный активный источник — выключить нельзя</string>
+    <string name="sources_active_off">Не участвует в поиске. Включённый встанет %1$d-м — последним активным</string>
+    <string name="sources_active_limit">Лимит %1$d из %1$d. Включённый встанет %1$d-м, а «%2$s» уйдёт в неактивные</string>
+    <string name="sources_meter_count">Активных %1$d из %2$d</string>
+    <string name="sources_meter_free">свободно %1$d</string>
+    <string name="sources_position_title">Место в списке</string>
+    <string name="sources_position_value">№ %1$d из %2$d</string>
+    <string name="sources_position_up">Выше, на № %1$d</string>
+    <string name="sources_position_down">Ниже, на № %1$d</string>
+    <string name="sources_proxy_title">Через прокси</string>
+    <string name="sources_proxy_on">Страницы, аудио и обложки идут через прокси приложения</string>
+    <string name="sources_proxy_direct">Напрямую, без прокси</string>
+    <string name="sources_proxy_idle">Включено, но прокси выключен в настройках</string>
+    <string name="sources_proxy_off_hint">Прокси выключен в настройках, поэтому маршрут этого сайта сейчас не действует.</string>
+    <string name="sources_proxy_enable">Включить прокси</string>
+    <string name="sources_proxy_needed_hint">Из региона «%1$s» сайт отдаёт блок или фрагменты — нужен прокси.</string>
+    <string name="sources_proxy_needed_action">Включить</string>
+    <string name="sources_manage_summary">Настройки → Источники и сеть</string>
+
+    <!-- the card: what the site is -->
+    <string name="sources_about_title">О сайте</string>
+    <string name="sources_fragments_no">Книги выложены целиком</string>
+    <string name="sources_fragments_some">Часть книг — только ознакомительные фрагменты</string>
+    <string name="sources_fragments_yes">Многие книги — только фрагменты</string>
+    <string name="sources_takedowns_yes">Книги снимают по требованию правообладателей</string>
+    <string name="sources_takedowns_no">Книги по жалобам не снимают</string>
+    <string name="sources_plus_minus_title">Плюсы и минусы</string>
+    <string name="sources_features_title">Возможности в приложении</string>
+    <string name="sources_feature_readers">Другие озвучки</string>
+    <string name="sources_feature_missing">%1$s: нет</string>
+    <string name="sources_sorts">Сортировки: %1$s</string>
+    <string name="sources_availability_title">Доступность</string>
+    <string name="sources_availability_ok">без VPN</string>
+    <string name="sources_availability_proxy">нужен прокси</string>
+    <string name="sources_availability_unknown">нет данных</string>
+    <string name="sources_availability_note">По данным на %1$s</string>
+    <string name="sources_related_title">Родственные сайты</string>
+    <string name="sources_related_mirror">тот же каталог</string>
+    <string name="sources_related_same_new">те же новинки</string>
+    <string name="sources_related_active">№ %1$d · активен</string>
+    <string name="sources_related_inactive">№ %1$d · неактивен</string>
+    <string name="sources_footer">Сведения о сайте на %1$s. Число книг — оценка.</string>
+    <string name="sources_footer_plain">Число книг — оценка.</string>
+
+    <!-- the position sheet -->
+    <string name="sources_sheet_subtitle">«%1$s» сейчас № %2$d · активных %3$d из %4$d</string>
+    <string name="sources_sheet_value">№ %1$d</string>
+    <string name="sources_sheet_of">из %1$d</string>
+    <string name="sources_sheet_range">№ %1$d–%2$d</string>
+    <string name="sources_sheet_strip">Место %1$d из %2$d, активных %3$d</string>
+    <string name="sources_sheet_first">Первым</string>
+    <string name="sources_sheet_last_active">Последним активным</string>
+    <string name="sources_sheet_changes">Что изменится</string>
+    <string name="sources_sheet_none">Сдвиньте ползунок или выберите место: здесь появится, кто сдвинется и кто перейдёт через черту активных.</string>
+    <string name="sources_sheet_me">«%1$s»: № %2$d → № %3$d</string>
+    <string name="sources_sheet_me_on">" — станет активным"</string>
+    <string name="sources_sheet_me_off">" — станет неактивным"</string>
+    <string name="sources_sheet_up_one">%1$s (%2$s) поднимется на одно место</string>
+    <string name="sources_sheet_up">%1$s (%2$s) поднимутся на одно место</string>
+    <string name="sources_sheet_down_one">%1$s (%2$s) опустится на одно место</string>
+    <string name="sources_sheet_down">%1$s (%2$s) опустятся на одно место</string>
+    <string name="sources_sheet_flip_on">«%1$s» станет активным (№ %2$d → № %3$d)</string>
+    <string name="sources_sheet_flip_off">«%1$s» станет неактивным (№ %2$d → № %3$d)</string>
+    <string name="sources_names_more">%1$s, %2$s и ещё %3$d</string>
+    <string name="sources_sheet_move">Переместить</string>
+
+    <!-- the card from the rest of the app: the catalog's source menu, the book page, the user's library -->
+    <string name="sources_about_listing">Об источнике «%1$s»</string>
+    <string name="sources_book_site">Сайт книги: %1$s. Открыть карточку сайта</string>
+    <string name="sources_library_title">В вашей библиотеке</string>
+    <string name="sources_library_favorites">Избранное %1$d</string>
+    <string name="sources_library_history">История %1$d</string>
+    <string name="sources_library_saved">Загружено %1$d</string>
+    <!-- a site in the source filter of the favorites, the history, the downloads: its title and its books there -->
+    <string name="sources_filter_value">%1$s · %2$d</string>
+</resources>
