@@ -1,18 +1,17 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- An author or series plate on the search screen (SearchebleAdapter): the source tiles' height, text and gap. -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="wrap_content"
     android:layout_height="wrap_content"
     xmlns:tools="http://schemas.android.com/tools"
+    android:layout_marginEnd="@dimen/search_gap"
+    android:foreground="@drawable/source_tile_foreground"
     android:orientation="horizontal"
     tools:viewBindingIgnore="true">
 
     <TextView
         android:id="@+id/textView"
+        style="@style/Widget.App.SearchPlate"
         android:layout_width="wrap_content"
-        android:maxWidth="150dp"
-        android:layout_height="wrap_content"
-        android:layout_margin="@dimen/text_margin_book_description"
-        android:background="?attr/backgroundItem"
-        android:textColor="?attr/colorPrimaryText"
-        android:textSize="@dimen/titleSize" />
+        android:layout_height="wrap_content" />
 </LinearLayout>

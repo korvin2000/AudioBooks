@@ -293,17 +293,43 @@
     <style name="Widget.App.SourceChip" parent="android:Widget.TextView">
         <item name="android:focusable">true</item>
         <item name="android:clickable">true</item>
-        <item name="android:minHeight">36dp</item>
-        <item name="android:paddingStart">6dp</item>
-        <item name="android:paddingEnd">6dp</item>
+        <item name="android:minHeight">@dimen/search_tile_height</item>
+        <item name="android:paddingStart">@dimen/search_space</item>
+        <item name="android:paddingEnd">@dimen/search_space</item>
         <item name="android:paddingTop">2dp</item>
         <item name="android:paddingBottom">3dp</item>
         <item name="android:gravity">center</item>
         <item name="android:maxLines">2</item>
         <item name="android:includeFontPadding">false</item>
-        <item name="android:textSize">13sp</item>
+        <item name="android:textSize">@dimen/search_text_size</item>
         <item name="android:textColor">?attr/colorPrimaryText</item>
         <item name="android:foreground">@drawable/source_tile_foreground</item>
+    </style>
+
+    <!-- An author or series plate under the source tiles (simple_row): a tile's twin with a neutral fill. Its
+         row (layout/simple_row.xml) draws the ripple and the D-pad focus outline, as on a tile. -->
+    <style name="Widget.App.SearchPlate" parent="android:Widget.TextView">
+        <item name="android:minHeight">@dimen/search_tile_height</item>
+        <item name="android:maxWidth">150dp</item>
+        <item name="android:paddingStart">@dimen/search_space</item>
+        <item name="android:paddingEnd">@dimen/search_space</item>
+        <item name="android:paddingTop">2dp</item>
+        <item name="android:paddingBottom">3dp</item>
+        <item name="android:gravity">center</item>
+        <item name="android:maxLines">2</item>
+        <item name="android:ellipsize">end</item>
+        <item name="android:includeFontPadding">false</item>
+        <item name="android:textSize">@dimen/search_text_size</item>
+        <item name="android:textColor">?attr/colorPrimaryText</item>
+        <item name="android:background">?attr/backgroundItem</item>
+    </style>
+
+    <!-- The "34 authors" / "2 series" label at the start of its plate row, centred on the plates' height. -->
+    <style name="Widget.App.SearchLabel" parent="android:Widget.TextView">
+        <item name="android:minWidth">@dimen/search_label_width</item>
+        <item name="android:gravity">start|center_vertical</item>
+        <item name="android:textSize">@dimen/search_text_size</item>
+        <item name="android:textColor">?attr/subTextColor</item>
     </style>
 
     <!-- The active-filter chip above a book listing: 28dp high, no 48dp touch inset. -->

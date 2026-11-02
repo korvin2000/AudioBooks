@@ -40,4 +40,18 @@
     <dimen name="book_toolbar_compact">40dp</dimen>
     <!-- the sleep timer's hour and minute wheels: three rows of 48dp, as the selection lines are apart -->
     <dimen name="sleep_timer_picker_height">144dp</dimen>
+
+    <!-- the search screen's one grid: source tiles, the summary and the author / series plates share these;
+         the screen's side edge is margin_small -->
+    <dimen name="search_text_size">13sp</dimen>
+    <!-- a tile and a plate: up to two lines of search_text_size -->
+    <dimen name="search_tile_height">36dp</dimen>
+    <!-- the summary row and its action button -->
+    <dimen name="search_row_height">32dp</dimen>
+    <!-- between neighbouring tiles, plates and plate rows -->
+    <dimen name="search_gap">2dp</dimen>
+    <!-- inside a tile or a plate at the sides, and from a row's label to its plates -->
+    <dimen name="search_space">6dp</dimen>
+    <!-- the "34 authors" / "2 series" label: the same width, so both plate rows start in one column -->
+    <dimen name="search_label_width">80dp</dimen>
 </resources>
