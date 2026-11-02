@@ -357,4 +357,57 @@ public class SearchUiTest {
         assertEquals(2, s.rows.get(0).group.offers.size());
         assertEquals(0, s.unknown);
     }
+    private void running(Provider p, long startedAt) {
+        states.put(p.name(), new SearchSession.State(p.name(), true, null, 0, false, startedAt));
+    }
+
+    private static boolean slow(SearchUi.State s, Provider p) {
+        for (SearchUi.Chip c : s.chips) {
+            if (c.source == p) {
+                return c.slow;
+            }
+        }
+        throw new AssertionError(p);
+    }
+
+    /**
+     * A source still searching after 8 s is marked slow; after 20 s the pass no longer waits for it, nor ever for one
+     * silent the last time; the state says when the clock alone will change it.
+     */
+    @Test
+    public void thePassWaitsTwentySecondsAndMarksTheSlowOnes() {
+        in.nowMs = 100_000;
+        running(Provider.AKNIGA, 97_000);
+        running(Provider.IZIBUK, 91_000);
+        running(Provider.KNIGOBLUD, 79_000);
+        running(Provider.BIBLUS, 99_000);
+        in.silent = EnumSet.of(Provider.BIBLUS);
+        SearchUi.State s = SearchUi.reduce(in);
+        assertEquals(Pass.RUNNING, s.pass);
+        assertEquals(Arrays.asList(Provider.KNIGOBLUD, Provider.BIBLUS), s.waiting);
+        assertEquals(Arrays.asList(false, true, true, true), Arrays.asList(slow(s, Provider.AKNIGA),
+                slow(s, Provider.IZIBUK), slow(s, Provider.KNIGOBLUD), slow(s, Provider.BIBLUS)));
+        assertEquals("Akniga is marked at 105 s, before ИзиБук's wait ends at 111 s", 105_000, s.nextChangeAt);
+
+        in.slow = EnumSet.of(Provider.AKNIGA);
+        assertTrue("slow by nature: marked at once, still waited for", slow(SearchUi.reduce(in), Provider.AKNIGA));
+        assertEquals(Pass.RUNNING, SearchUi.reduce(in).pass);
+
+        in.nowMs = 125_000;
+        SearchUi.State late = SearchUi.reduce(in);
+        assertEquals(Pass.DONE, late.pass);
+        assertEquals(4, late.waiting.size());
+        assertEquals(Empty.WAITING, late.empty);
+        assertEquals(0, late.nextChangeAt);
+        assertEquals(ChipKind.RUNNING, late.chips.get(0).kind);
+    }
+    /** "Искать дальше" needs an idle source with a next page: one still on its page (in the background) is not it. */
+    @Test
+    public void onlyAnIdleSourceThatFoundSomethingHasMore() {
+        states.put(Provider.AKNIGA.name(), new SearchSession.State(Provider.AKNIGA.name(), true, null, 0, true, 1));
+        in.nowMs = 60_000;
+        assertEquals(false, SearchUi.reduce(in).hasMore);
+        states.put(Provider.AKNIGA.name(), new SearchSession.State(Provider.AKNIGA.name(), false, Status.OK, 3, true));
+        assertTrue(SearchUi.reduce(in).hasMore);
+    }
 }

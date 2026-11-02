@@ -148,6 +148,18 @@ Checks at the end: `:app:testDebugUnitTest` 963 tests, 0 failures (1 pre-existin
   site's longer one of another author ("Тень" → "Тень империи Иванова"), now only when the rest names the card's
   author; link-less cards were not counted; the genre filter split one work into a shown and a "no data" row — the
   genres now judge a whole work (any card with a chosen genre passes it).
+- **Waiting for slow sites** (owner's choice, §4 item 4 below): `SearchSession.State.startedAt` (the main scheduler's
+  clock; the other-case retry keeps the first ask's time). `SearchUi`: a source still searching after `SLOW_MS` 8 s,
+  or slow by nature (`Input.slow`: parser `timeoutMs` above the default — Bookish, Audioboo, Аудиокниги.fun), or
+  silent the last time (`Input.silent`) gets an hourglass (`Chip.slow`); the pass waits at most `WAIT_MS` 20 s for a
+  source and never for a silent one — they go on in the background (`State.waiting`, "ждём ещё: …",
+  `Empty.WAITING`), their cards join when they come. `State.nextChangeAt` + a presenter timer recompute the screen
+  when only the clock changes it. Silent = the source's last live answer (pref `search_answers`, "NAME:1:millis",
+  written on every answer by `recordAnswer`, never from a restored search) was a failure with nothing found, unless
+  a newer `SourceHealth` check says otherwise; a retry by the listener, or an answer, waits for it again. "Искать
+  дальше" needs an idle source with a next page (`State.hasMore`). Checked on the emulator: a silent Audioknigi.pro
+  showed ⏳, the pass ended at ~3 s with "ждём ещё", the retry waited for it. Per-request and per-page limits are
+  unchanged; real cancellation (T09) is still open.
 - Known limit: a search started by voice (`MediaPlayerService`, no caller) closes on an author/series/collection
   tap without opening it (as before for plates and the long-press menu).
 - Not the app's fault: on 2 Nov Audioboo answered Cloudflare 522 (origin down) and `audioknigi.fun` did not resolve.
@@ -171,8 +183,7 @@ Checks at the end: `:app:testDebugUnitTest` 963 tests, 0 failures (1 pre-existin
 3. **Ranking tuning**: for a one-word surname query ("кинг") title matches (weight 1.0) beat the author's books
    (0.95); consider boosting AUTHOR when the query is a single person-like word, or tie-breaking by number of
    catalogs. Keep the corpus tests (appendix B) green.
-4. **"Slow" marker and time limits** (§7.6): `Input.nowMs` + expected time per source + presenter timer
-   (8 s "долго отвечает", 20 s "stop waiting"); later an absolute pass limit.
+4. ~~"Slow" marker and time limits~~ (done in §2.6 as a soft limit: no absolute pass limit, nothing is cut off).
 5. **RATE_LIMITED + Retry-After** (W36): `ProviderPage.httpStatus/retryAfterSeconds`, one `SiteHttp.throwForStatus`
    for `parse` and `json`; catalog code in `BooksPresenter` compares with BLOCKED (do not offer proxy on 429);
    `SourcesDialogFragment` status text.

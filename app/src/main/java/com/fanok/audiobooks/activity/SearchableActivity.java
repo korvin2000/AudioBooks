@@ -101,6 +101,8 @@ public class SearchableActivity extends MvpAppCompatActivity implements Searchab
     private static final int FILL_ALPHA = 56;
     /** A source tile's second line while it searches, and after a timeout, stop or error. */
     private static final String RUNNING_MARK = "\u2026", FAILED_MARK = "\u2013";
+    /** A source tile's second line while it searches long ("долго отвечает"): an hourglass. */
+    private static final String SLOW_MARK = "\u23F3";
     private static final SearchRequest.Field[] SCOPE_FIELDS = {SearchRequest.Field.TITLE, SearchRequest.Field.AUTHOR,
             SearchRequest.Field.READER, SearchRequest.Field.SERIES};
     private static final int[] SCOPE_NAMES = {R.string.search_scope_title, R.string.search_scope_author,
@@ -853,8 +855,8 @@ public class SearchableActivity extends MvpAppCompatActivity implements Searchab
                 color = Color.TRANSPARENT;
                 break;
             case RUNNING:
-                count = RUNNING_MARK;
-                description = getString(R.string.search_chip_running, name);
+                count = c.slow ? SLOW_MARK : RUNNING_MARK;
+                description = getString(c.slow ? R.string.search_chip_slow : R.string.search_chip_running, name);
                 color = attrColor(R.attr.subTextColor);
                 break;
             case TIMEOUT:
@@ -980,6 +982,10 @@ public class SearchableActivity extends MvpAppCompatActivity implements Searchab
                 break;
             default:
                 break;
+        }
+        if (!state.waiting.isEmpty() && state.pass != SearchUi.Pass.RUNNING) {
+            // the pass no longer waits for them: their cards join when they come
+            parts.add(getString(R.string.search_summary_waiting, names(state.waiting)));
         }
         if (!state.failed.isEmpty() && state.pass != SearchUi.Pass.FAILED) {
             parts.add(getString(R.string.search_summary_failed, names(state.failed)));
@@ -1168,6 +1174,8 @@ public class SearchableActivity extends MvpAppCompatActivity implements Searchab
                 return getString(R.string.search_empty_nothing, query);
             case NOTHING_SOME_FAILED:
                 return getString(R.string.search_empty_nothing_failed, names(state.failed));
+            case WAITING:
+                return getString(R.string.search_empty_waiting, names(state.waiting));
             case ALL_FAILED:
                 return getString(R.string.search_empty_all_failed);
             case SCOPE_HID_ALL:

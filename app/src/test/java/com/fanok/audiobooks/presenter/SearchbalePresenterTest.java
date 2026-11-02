@@ -29,4 +29,12 @@ public class SearchbalePresenterTest {
         assertTrue(SearchbalePresenter.scopeOf("").isEmpty());
         assertTrue(SearchbalePresenter.scopeOf(null).isEmpty());
     }
+    @Test
+    public void storedAnswersReadBackAndBrokenOnesAreSkipped() {
+        java.util.Map<String, long[]> a = SearchbalePresenter.answers("AKNIGA:1:5, BAD,IZIBUK:0:7,X:y:1");
+        assertEquals(2, a.size());
+        assertEquals(1, a.get("AKNIGA")[0]);
+        assertEquals(7, a.get("IZIBUK")[1]);
+        assertTrue(SearchbalePresenter.answers(null).isEmpty());
+    }
 }

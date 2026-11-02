@@ -34,8 +34,16 @@ public final class SearchUi {
     public enum Pass { IDLE, RUNNING, DONE, PARTIAL, FAILED, NO_SOURCES }
 
     /** Why the list is empty; NONE when it is not. */
-    public enum Empty { NONE, START, NO_SOURCES, SEARCHING, NOTHING, NOTHING_SOME_FAILED, ALL_FAILED, SCOPE_HID_ALL,
-        TAB_SEARCHING, TAB_NOTHING, TAB_FAILED }
+    public enum Empty { NONE, START, NO_SOURCES, SEARCHING, WAITING, NOTHING, NOTHING_SOME_FAILED, ALL_FAILED,
+        SCOPE_HID_ALL, TAB_SEARCHING, TAB_NOTHING, TAB_FAILED }
+
+    /** A source still searching after this long is marked "долго отвечает". */
+    public static final long SLOW_MS = 8_000;
+    /**
+     * The pass waits this long for a source, then counts as done: the source goes on in the background, up to its own
+     * limit, and its cards join when they come ({@link State#waiting}).
+     */
+    public static final long WAIT_MS = 20_000;
 
     public static final class Chip {
         public final Provider source;
@@ -44,13 +52,16 @@ public final class SearchUi {
         public final int count;
         public final boolean hasMore;
         public final boolean selected;
+        /** Still searching, and slow: for {@link #SLOW_MS} or more, or slow by nature, or silent the last time. */
+        public final boolean slow;
 
-        Chip(Provider source, ChipKind kind, int count, boolean hasMore, boolean selected) {
+        Chip(Provider source, ChipKind kind, int count, boolean hasMore, boolean selected, boolean slow) {
             this.source = source;
             this.kind = kind;
             this.count = count;
             this.hasMore = hasMore;
             this.selected = selected;
+            this.slow = slow;
         }
     }
 
@@ -104,6 +115,12 @@ public final class SearchUi {
         public int generation;
         /** The sites' own author and series lists for the query (Книга в ухе, ABMP3), of every site. */
         public SearcheblPOJO people = new SearcheblPOJO();
+        /** Now, on the clock of {@link SearchSession.State#startedAt}. */
+        public long nowMs;
+        /** Sources slow by nature: "долго отвечает" from the start (the pass still waits for them). */
+        public Set<Provider> slow = Collections.emptySet();
+        /** Sources silent the last time: asked, marked slow, never waited for. */
+        public Set<Provider> silent = Collections.emptySet();
     }
 
     public static final class State {
@@ -125,16 +142,20 @@ public final class SearchUi {
         public final Empty empty;
         /** The selected tab's chip; null for "All". */
         public final Chip tab;
-        /** Some source has a next page. */
+        /** An idle source that found something has a next page: "Искать дальше" can load it. */
         public final boolean hasMore;
         /** What this state was computed from. */
         public final Input input;
         /** The author and series plates of the selected tab ({@link SearchPlates}). */
         public final SearcheblPOJO plates;
+        /** Sources still searching that the pass no longer waits for, in the listener's order of sources. */
+        public final List<Provider> waiting;
+        /** When this state changes by the clock alone (a mark, the end of a wait), on the input's clock; 0: never. */
+        public final long nextChangeAt;
 
         State(List<Chip> chips, int allCount, Pass pass, int answered, int planned, List<Provider> failed, int sites,
                 List<Row> rows, int hiddenByScope, int unknown, Empty empty, Chip tab, boolean hasMore, Input input,
-                SearcheblPOJO plates) {
+                SearcheblPOJO plates, List<Provider> waiting, long nextChangeAt) {
             this.chips = chips;
             this.allCount = allCount;
             this.pass = pass;
@@ -150,6 +171,8 @@ public final class SearchUi {
             this.hasMore = hasMore;
             this.input = input;
             this.plates = plates;
+            this.waiting = waiting;
+            this.nextChangeAt = nextChangeAt;
         }
 
         /** The row opened with {@code key}, or null. */
@@ -214,10 +237,26 @@ public final class SearchUi {
         boolean running = false;
         boolean more = false;
         Chip tab = null;
+        List<Provider> waiting = new ArrayList<>();
+        long next = Long.MAX_VALUE;
         for (Provider p : in.sources) {
             SearchSession.State s = in.states.get(p.name());
             ChipKind kind = kind(s);
-            running |= kind == ChipKind.RUNNING;
+            boolean slow = false;
+            if (kind == ChipKind.RUNNING) {
+                // the pass waits for a source up to WAIT_MS, not for a silent one; slow ones are marked
+                long elapsed = s.startedAt > 0 ? Math.max(0, in.nowMs - s.startedAt) : 0;
+                boolean silent = in.silent.contains(p);
+                slow = silent || in.slow.contains(p) || elapsed >= SLOW_MS;
+                if (!silent && elapsed < WAIT_MS) {
+                    running = true;
+                    if (s.startedAt > 0) {
+                        next = Math.min(next, s.startedAt + (slow ? WAIT_MS : SLOW_MS));
+                    }
+                } else {
+                    waiting.add(p);
+                }
+            }
             if (s != null && s.status != null && !s.running) {
                 answered++;
             }
@@ -225,8 +264,8 @@ public final class SearchUi {
                     || kind == ChipKind.STOPPED) {
                 failed.add(p);
             }
-            Chip chip = new Chip(p, kind, s == null ? 0 : s.count, s != null && s.hasMore, p == in.tab);
-            more |= chip.hasMore;
+            Chip chip = new Chip(p, kind, s == null ? 0 : s.count, s != null && s.hasMore, p == in.tab, slow);
+            more |= chip.hasMore && kind == ChipKind.FOUND; // a busy one is still on its page
             if (p == in.tab) {
                 tab = chip;
             }
@@ -249,8 +288,9 @@ public final class SearchUi {
         }
         return new State(Collections.unmodifiableList(chips), allRows.size(), pass, answered, in.sources.size(),
                 Collections.unmodifiableList(failed), catalogs.size(), Collections.unmodifiableList(rows), hidden,
-                unknownRows, empty(in, rows, pass, tab, hidden), tab, more, in,
-                SearchPlates.of(in.offers, in.request, in.people, in.tab));
+                unknownRows, empty(in, rows, pass, tab, hidden, !waiting.isEmpty()), tab, more, in,
+                SearchPlates.of(in.offers, in.request, in.people, in.tab), Collections.unmodifiableList(waiting),
+                next == Long.MAX_VALUE ? 0 : next);
     }
 
     private static boolean lacksScope(Offer o, Set<Field> scope) {
@@ -352,7 +392,7 @@ public final class SearchUi {
         }
     }
 
-    private static Empty empty(Input in, List<Row> rows, Pass pass, Chip tab, int hidden) {
+    private static Empty empty(Input in, List<Row> rows, Pass pass, Chip tab, int hidden, boolean waiting) {
         if (!rows.isEmpty()) {
             return Empty.NONE;
         }
@@ -377,6 +417,9 @@ public final class SearchUi {
         }
         if (hidden > 0 && pass != Pass.RUNNING) {
             return Empty.SCOPE_HID_ALL;
+        }
+        if (waiting && pass != Pass.RUNNING) {
+            return Empty.WAITING; // nothing yet, but the slow ones may still bring something
         }
         switch (pass) {
             case RUNNING:

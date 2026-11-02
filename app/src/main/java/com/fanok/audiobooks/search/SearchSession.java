@@ -8,6 +8,7 @@ import io.reactivex.functions.Function;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -63,13 +64,23 @@ public final class SearchSession<T> {
         public final int count;
         /** It has a next page to load. */
         public final boolean hasMore;
+        /**
+         * When the page it is loading was asked for (the main scheduler's clock, millis); a retry in the other letter
+         * case goes on from the first ask. 0 when it is not loading, or unknown.
+         */
+        public final long startedAt;
 
         State(String name, boolean running, ProviderPage.Status status, int count, boolean hasMore) {
+            this(name, running, status, count, hasMore, 0);
+        }
+
+        State(String name, boolean running, ProviderPage.Status status, int count, boolean hasMore, long startedAt) {
             this.name = name;
             this.running = running;
             this.status = status;
             this.count = count;
             this.hasMore = hasMore;
+            this.startedAt = startedAt;
         }
 
         public boolean isFailure() {
@@ -113,6 +124,7 @@ public final class SearchSession<T> {
     private final LinkedHashMap<Source<T>, ProviderPage.Status> statuses = new LinkedHashMap<>();
     private final LinkedHashSet<Source<T>> failed = new LinkedHashSet<>();
     private final HashSet<Source<T>> loading = new HashSet<>();
+    private final HashMap<Source<T>, Long> startedAt = new HashMap<>();
     private final HashSet<Source<T>> caseTried = new HashSet<>();
     private final LinkedHashMap<Source<T>, Integer> counts = new LinkedHashMap<>();
     private int generation;
@@ -236,8 +248,10 @@ public final class SearchSession<T> {
 
     private State state(Source<T> s) {
         Integer count = counts.get(s);
-        return new State(s.name(), loading.contains(s), statuses.get(s), count == null ? 0 : count,
-                nextPage.containsKey(s) && !failed.contains(s));
+        Long started = startedAt.get(s);
+        boolean busy = loading.contains(s);
+        return new State(s.name(), busy, statuses.get(s), count == null ? 0 : count,
+                nextPage.containsKey(s) && !failed.contains(s), busy && started != null ? started : 0);
     }
 
     public boolean hasMore() {
@@ -364,6 +378,11 @@ public final class SearchSession<T> {
     }
 
     private void run(List<Source<T>> batch) {
+        run(batch, null);
+    }
+
+    /** Loads the cursor page of every source of {@code batch}; {@code since}: the time their wait started, else now. */
+    private void run(List<Source<T>> batch, Long since) {
         final int gen = generation;
         if (batch.isEmpty()) {
             listener.onFinished(items(), failed.size());
@@ -377,6 +396,7 @@ public final class SearchSession<T> {
             final int page = cursor == null ? 1 : cursor;
             final String q = queryOf.get(s) == null ? query : queryOf.get(s);
             loading.add(s);
+            startedAt.put(s, since != null ? since : main.now(TimeUnit.MILLISECONDS));
             calls.add(Single.defer(() -> s.load(q, page))
                     .subscribeOn(io)
                     .timeout(Math.max(timeoutSeconds, s.timeoutSeconds()), TimeUnit.SECONDS, io)
@@ -453,7 +473,8 @@ public final class SearchSession<T> {
                 && caseTried.add(s)) {
             queryOf.put(s, variant);
             nextPage.put(s, 1);
-            run(Collections.singletonList(s));
+            // one search of the site, in two letter cases: its wait goes on from the first ask
+            run(Collections.singletonList(s), startedAt.get(s));
             return;
         }
         listener.onSourceState(state(s));

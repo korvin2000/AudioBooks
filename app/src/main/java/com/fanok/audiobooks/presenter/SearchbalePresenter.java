@@ -23,6 +23,7 @@ import com.fanok.audiobooks.model.AutorsModel;
 import com.fanok.audiobooks.model.BooksDBModel;
 import com.fanok.audiobooks.model.BooksModel;
 import com.fanok.audiobooks.model.SearchebleModel;
+import com.fanok.audiobooks.net.SiteHttp;
 import com.fanok.audiobooks.pojo.BookPOJO;
 import com.fanok.audiobooks.pojo.GenrePOJO;
 import com.fanok.audiobooks.pojo.SearcheblPOJO;
@@ -40,9 +41,12 @@ import com.fanok.audiobooks.search.SearchSession;
 import com.fanok.audiobooks.search.SearchSnapshot;
 import com.fanok.audiobooks.search.SearchUi;
 import com.fanok.audiobooks.search.SearchUrls;
+import com.fanok.audiobooks.search.SourceHealth;
+import com.fanok.audiobooks.search.SourceProbe;
 import com.google.android.material.bottomsheet.BottomSheetDialog;
 import com.squareup.picasso.Picasso;
 import io.reactivex.BackpressureStrategy;
+import io.reactivex.Completable;
 import io.reactivex.Maybe;
 import io.reactivex.Single;
 import io.reactivex.android.schedulers.AndroidSchedulers;
@@ -84,6 +88,8 @@ public class SearchbalePresenter extends MvpPresenter<SearchableView> implements
     private static final String PREF_GROUPED = "search_grouped";
     private static final String PREF_SCOPE = "search_scope";
     private static final String PREF_GENRES = "search_genres";
+    /** Each source's last live search answer: "NAME:1:millis" (1: a failure with nothing found, 0: anything else). */
+    private static final String PREF_ANSWERS = "search_answers";
 
     private final int mModelId;
     private final Context mContext;
@@ -117,6 +123,12 @@ public class SearchbalePresenter extends MvpPresenter<SearchableView> implements
     private final PublishSubject<SearchUi.Input> mReduce = PublishSubject.create();
     private Disposable mReducing;
     private SearchSnapshot.Store mStore;
+    /** Slow by nature (a longer page limit than the default): marked from the start. */
+    private EnumSet<Provider> mSlow = EnumSet.noneOf(Provider.class);
+    /** Silent the last time: asked, never waited for, until the listener retries one. */
+    private EnumSet<Provider> mSilent = EnumSet.noneOf(Provider.class);
+    /** Recomputes the screen when the clock alone changes it (a slow mark, the end of a wait). */
+    private Disposable mTick;
 
     // MODEL_AUTOR / MODEL_ARTIST: one source, the current one
     private AutorsModel mModelGenre;
@@ -226,6 +238,9 @@ public class SearchbalePresenter extends MvpPresenter<SearchableView> implements
             save();
             if (mReducing != null) {
                 mReducing.dispose();
+            }
+            if (mTick != null) {
+                mTick.dispose();
             }
         }
         if (mSession != null) {
@@ -404,8 +419,12 @@ public class SearchbalePresenter extends MvpPresenter<SearchableView> implements
         publish();
     }
 
-    /** A failed source asks again for its page; a stopped one loads it; a source that answered is left alone. */
+    /**
+     * A failed source asks again for its page; a stopped one loads it; a source that answered is left alone. The
+     * listener asked for it: the pass waits for it, even when it was silent the last time.
+     */
     private void retry(Provider p) {
+        mSilent.remove(p);
         if (mSession == null || mSession.retry(p.name())) {
             return;
         }
@@ -462,6 +481,7 @@ public class SearchbalePresenter extends MvpPresenter<SearchableView> implements
 
             @Override
             public void onSourceState(SearchSession.State state) {
+                recordAnswer(state);
                 publish();
             }
         });
@@ -485,9 +505,85 @@ public class SearchbalePresenter extends MvpPresenter<SearchableView> implements
             }
         }
         mSources = sources;
+        classify(sources);
         mSession = booksSession(sources);
         mSession.search(q);
         publish();
+    }
+
+    /** Which of {@code sources} are slow by nature, and which were silent the last time. */
+    private void classify(List<Provider> sources) {
+        mSlow = EnumSet.noneOf(Provider.class);
+        for (Provider p : sources) {
+            if (p.parser.timeoutMs() > SiteHttp.TIMEOUT_MS) {
+                mSlow.add(p); // Bookish, Audioboo, Аудиокниги.fun
+            }
+        }
+        mSilent = silent(sources);
+    }
+
+    /**
+     * The sources silent the last time: their last live search answer was a failure with nothing found, or a check of
+     * the sites made after that answer failed them; whichever is newer decides.
+     */
+    private EnumSet<Provider> silent(List<Provider> sources) {
+        Map<String, long[]> answers = answers(mPreferences.getString(PREF_ANSWERS, ""));
+        Map<Provider, SourceProbe.Result> checks = SourceHealth.last(mPreferences);
+        EnumSet<Provider> out = EnumSet.noneOf(Provider.class);
+        for (Provider p : sources) {
+            long[] answer = answers.get(p.name());
+            SourceProbe.Result check = checks.get(p);
+            boolean silent = check != null && (answer == null || check.at > answer[1]) ? isFailure(check.status)
+                    : answer != null && answer[0] == 1;
+            if (silent) {
+                out.add(p);
+            }
+        }
+        return out;
+    }
+
+    private static boolean isFailure(ProviderPage.Status status) {
+        return status == ProviderPage.Status.ERROR || status == ProviderPage.Status.TIMEOUT
+                || status == ProviderPage.Status.BLOCKED;
+    }
+
+    /**
+     * A source answered a live load (never a restored one): its answer is kept, with its own time, for the next search
+     * ({@link #silent}); one that answers is waited for again in this one too.
+     */
+    private void recordAnswer(SearchSession.State st) {
+        if (st.running || st.status == null) {
+            return;
+        }
+        boolean failed = st.count == 0 && st.isFailure();
+        Provider p = providerOf(st.name);
+        if (p != null && !failed) {
+            mSilent.remove(p);
+        }
+        Map<String, long[]> answers = answers(mPreferences.getString(PREF_ANSWERS, ""));
+        answers.put(st.name, new long[]{failed ? 1 : 0, System.currentTimeMillis()});
+        StringBuilder stored = new StringBuilder();
+        for (Map.Entry<String, long[]> e : answers.entrySet()) {
+            stored.append(stored.length() == 0 ? "" : ",").append(e.getKey()).append(':').append(e.getValue()[0])
+                    .append(':').append(e.getValue()[1]);
+        }
+        mPreferences.edit().putString(PREF_ANSWERS, stored.toString()).apply();
+    }
+
+    /** {@link #PREF_ANSWERS} read: name → {failed (1 or 0), millis}; a broken entry is skipped. */
+    static Map<String, long[]> answers(String stored) {
+        Map<String, long[]> out = new LinkedHashMap<>();
+        for (String entry : stored == null ? new String[0] : stored.split(",")) {
+            String[] parts = entry.trim().split(":");
+            if (parts.length == 3) {
+                try {
+                    out.put(parts[0], new long[]{Long.parseLong(parts[1]), Long.parseLong(parts[2])});
+                } catch (NumberFormatException ignored) {
+                    // not ours: skipped
+                }
+            }
+        }
+        return out;
     }
 
     /** Shows a saved search as it was left, with no request; its sources can go on from their saved pages. */
@@ -533,6 +629,7 @@ public class SearchbalePresenter extends MvpPresenter<SearchableView> implements
             }
         }
         mSources = sources;
+        classify(sources); // its next pages are marked and waited for as in a live search
         mSession = booksSession(sources);
         mSession.restore(s.text, books, statuses, cursors, counts, queries, caseRetried);
         arrived(mSession.items());
@@ -604,6 +701,9 @@ public class SearchbalePresenter extends MvpPresenter<SearchableView> implements
         in.restoredAt = mRestoredAt;
         in.generation = mGeneration;
         in.people = mSearcheblPOJO;
+        in.nowMs = System.currentTimeMillis(); // the clock of SearchSession.State#startedAt (the main scheduler's)
+        in.slow = EnumSet.copyOf(mSlow);
+        in.silent = EnumSet.copyOf(mSilent);
         Set<String> shown = new HashSet<>();
         if (mState != null) {
             for (SearchUi.Row r : mState.rows) {
@@ -620,6 +720,15 @@ public class SearchbalePresenter extends MvpPresenter<SearchableView> implements
         }
         mState = state;
         getViewState().showState(state);
+        if (mTick != null) {
+            mTick.dispose();
+            mTick = null;
+        }
+        if (state.nextChangeAt > 0) {
+            long delay = Math.max(0, state.nextChangeAt - System.currentTimeMillis()) + 20;
+            mTick = Completable.timer(delay, TimeUnit.MILLISECONDS, AndroidSchedulers.mainThread())
+                    .subscribe(this::publish);
+        }
     }
 
     /** Saves the current search for the next visit (§8). */

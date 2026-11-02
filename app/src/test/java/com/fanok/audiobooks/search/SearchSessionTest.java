@@ -565,4 +565,27 @@ public class SearchSessionTest {
         scheduler.triggerActions();
         assertEquals("f2", finished.get(1));
     }
+    /** A source's wait starts when its page is asked for, and its retry in the other letter case goes on with it. */
+    @Test
+    public void aSourcesWaitStartsWithItsAskAndGoesOnThroughTheCaseRetry() {
+        SearchSession.Source<String> empty = new SearchSession.Source<String>() {
+            @Override
+            public String name() {
+                return "E";
+            }
+
+            @Override
+            public Single<ProviderPage<String>> load(String query, int pageNo) {
+                return query.equals("Кинг") ? Single.timer(2, TimeUnit.SECONDS, scheduler)
+                        .map(t -> ProviderPage.<String>empty()) : Single.<ProviderPage<String>>never();
+            }
+        };
+        scheduler.advanceTimeBy(5, TimeUnit.SECONDS);
+        SearchSession<String> s = session(Arrays.asList(empty));
+        s.search("Кинг");
+        assertEquals(5_000, s.states().get(0).startedAt);
+        scheduler.advanceTimeBy(3, TimeUnit.SECONDS); // empty after 2 s: "кинг" goes out
+        assertTrue(s.states().get(0).running);
+        assertEquals(5_000, s.states().get(0).startedAt);
+    }
 }
