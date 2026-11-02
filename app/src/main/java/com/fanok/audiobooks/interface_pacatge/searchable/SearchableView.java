@@ -11,9 +11,11 @@ import com.arellomobile.mvp.viewstate.strategy.StateStrategyType;
 import com.fanok.audiobooks.pojo.BookPOJO;
 import com.fanok.audiobooks.pojo.GenrePOJO;
 import com.fanok.audiobooks.pojo.SearcheblPOJO;
+import com.fanok.audiobooks.search.SearchGrouper;
 import com.fanok.audiobooks.search.SearchUi;
 
 import java.util.ArrayList;
+import java.util.List;
 
 public interface SearchableView extends MvpView {
 
@@ -31,9 +33,9 @@ public interface SearchableView extends MvpView {
     @StateStrategyType(AddToEndSingleStrategy.class)
     void showQuery(String query);
 
-    /** The recordings and sites of one work, to choose from; {@code urls} match {@code labels}. */
+    /** The recordings of one work and the sites of each, to choose from. */
     @StateStrategyType(OneExecutionStateStrategy.class)
-    void showNarrations(String title, ArrayList<String> labels, ArrayList<String> urls);
+    void showNarrations(String title, List<SearchGrouper.Narration> narrations);
 
     @StateStrategyType(AddToEndSingleStrategy.class)
     void showDataGenres(ArrayList<GenrePOJO> genres);

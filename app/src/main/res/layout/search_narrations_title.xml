@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The title of the choice of recordings: the work, and how many recordings on how many sites. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:paddingStart="24dp"
+    android:paddingTop="20dp"
+    android:paddingEnd="24dp"
+    android:paddingBottom="8dp"
+    tools:viewBindingIgnore="true">
+
+    <TextView
+        android:id="@+id/narrationsTitle"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:ellipsize="end"
+        android:maxLines="3"
+        android:textColor="?attr/colorPrimaryText"
+        android:textSize="20sp"
+        tools:text="Яд для живых" />
+
+    <TextView
+        android:id="@+id/narrationsSubtitle"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="2dp"
+        android:textColor="?attr/subTextColor"
+        android:textSize="14sp"
+        tools:text="2 озвучки на 4 сайтах" />
+</LinearLayout>

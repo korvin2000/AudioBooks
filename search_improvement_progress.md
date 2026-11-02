@@ -116,6 +116,45 @@ Checks at the end: `:app:testDebugUnitTest` 963 tests, 0 failures (1 pre-existin
 - Branch `feature/search-compact-block` (pending): summary row 32 dp, author/series labels inline before their plates,
   plates styled like tiles (13 sp, 36 dp, 2 dp gaps), new dimens `search_*` (shared `titleSize` etc. untouched).
 
+### 2.6 Second session (2 November 2026, afternoon) — uncommitted on `master` until the owner asks
+- **Author/series plates from every site** (`search/SearchPlates`, called from `SearchUi.reduce`, `State.plates`):
+  the plates used to come only from Книга в ухе (authors + series, two requests in a 10 s budget) and ABMP3
+  (authors) — with Книга в ухе off or slow there were no series at all. Now the sites' own lists (`Input.people`)
+  are merged with the authors (one person per card) and series of the loaded cards whose field *alone* holds the
+  query (`Offer.holds`, a scoped `SearchMatcher` run cached per request). One plate per person however spelled
+  (`TextNorm.person(..).words`) and per series key; Книга в ухе's series names carry the author ("Кингсбридж Кена
+  Фоллетта"), so a found series whose key is a prefix of a site's one merges into it. Most cards first; under a
+  tab only that site's plates. Duplicates of Книга в ухе and ABMP3 ("Стивен Кинг" / "Кинг Стивен") now merge, so
+  the count can be lower than before.
+- **Source tabs sorted** (`SearchUi.CHIPS`): most found first, then searching, then 0, then the silent ones
+  (timeout, error, blocked, stopped); ties keep the user's order. The activity moves the chip views (never re-makes
+  them), restores a focused chip and scrolls a moved selected tab back into sight.
+- **Choice of recordings** redesigned: custom title (work + "N озвучек на M сайтах"), numbered recording headers
+  (reader, length · edition · sites), site rows with the site icon (asset `icon.webp`, letter until drawn), the
+  card's own length, inset dividers between sites, full ones between recordings, a "Закрыть" button.
+- **Sort in the overflow** as a submenu ("Порядок: по соответствию"); the toolbar keeps only the funnel.
+- **Collections ("Подборки")**: akniga's search returns `/collection/...` cards; opening one as a book failed with
+  "no playable chapters". `Offer.listing` (`parser.opensAsListing`) cards never group, show the note "подборка",
+  and open as the site's listing (`returnResult(.., "collectionBooks")`); `FavoritePresenter` got the same guard.
+- **Genre filter** (§4 item 2 below, done): overflow "Жанры: …" → multi-choice of `Genre.values()`; a card whose
+  genres (`Offer.genres = Genre.allOf(..)`) miss the chosen ones is hidden, one without a known genre is kept last
+  as "нет данных для фильтра"; pref `search_genres`; "Искать везде" clears the scope and the genres.
+- **An unscrolled list stays at its top** (`showRows`): with DiffUtil a better card that arrived later went above the
+  first visible row and stayed hidden (the live "Кинг" search opened on "Мисс Кинг", the collection "Летние
+  приключения" was off-screen). A list the listener scrolled keeps its place.
+- Книга в ухе's author/series request budget 10 → 20 s (`SearchebleModel`, two requests).
+- Codex review (gpt-6.1-sol) found and we fixed: favourites' long-press "Open" and the favourites' search result
+  ignored listings; initials dropped from person keys ("Л. Толстой" = "А. Толстой"); a found series merged into a
+  site's longer one of another author ("Тень" → "Тень империи Иванова"), now only when the rest names the card's
+  author; link-less cards were not counted; the genre filter split one work into a shown and a "no data" row — the
+  genres now judge a whole work (any card with a chosen genre passes it).
+- Known limit: a search started by voice (`MediaPlayerService`, no caller) closes on an author/series/collection
+  tap without opening it (as before for plates and the long-press menu).
+- Not the app's fault: on 2 Nov Audioboo answered Cloudflare 522 (origin down) and `audioknigi.fun` did not resolve.
+- Checked: 1009 unit tests; release APK `test-apk/app-release-search-plates-v3.apk` on the emulator (tabs order, 20
+  authors + 4 series for "Кинг", 11 series for "пикник на обочине", sort submenu, genres, the recordings dialog with
+  15 recordings, the collection and a series plate opening their listings).
+
 ## 3. Decisions that deviate from the spec (and why)
 - Ranking + grouping shipped together with stage 0–2 (spec §14 p.10 split them into releases): the owner asked for
   them now; "Как пришло" and "Группировать" in the menu restore the old view.
@@ -127,10 +166,8 @@ Checks at the end: `:app:testDebugUnitTest` 963 tests, 0 failures (1 pre-existin
 - Snapshot written with plain Java (tmp + rename), not `AtomicFile` — JVM-testable.
 
 ## 4. Remaining work (prioritized)
-1. **Merge `feature/search-compact-block`** after the owner approves the screenshot.
-2. **Genre filter** (owner asked: "Чужой" only in "Фантастика и фэнтези"): add a genre section to the scope dialog;
-   filter loaded cards with `Genre.allOf(book.getGenre())` (≈30 unified genres, already used by parental control);
-   cards without a genre → "no data" section. No network.
+1. ~~Merge `feature/search-compact-block`~~ (merged, `de62053`).
+2. ~~Genre filter~~ (done in §2.6).
 3. **Ranking tuning**: for a one-word surname query ("кинг") title matches (weight 1.0) beat the author's books
    (0.95); consider boosting AUTHOR when the query is a single person-like word, or tie-breaking by number of
    catalogs. Keep the corpus tests (appendix B) green.

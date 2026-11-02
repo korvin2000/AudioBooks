@@ -13,6 +13,7 @@ import android.graphics.Color;
 import android.graphics.Typeface;
 import android.graphics.drawable.ColorDrawable;
 import android.graphics.drawable.Drawable;
+import android.graphics.drawable.GradientDrawable;
 import android.graphics.drawable.LayerDrawable;
 import android.os.Bundle;
 import android.provider.MediaStore;
@@ -25,14 +26,19 @@ import android.util.Log;
 import android.util.TypedValue;
 import android.view.Gravity;
 import android.view.KeyEvent;
+import android.view.LayoutInflater;
 import android.view.Menu;
 import android.view.MenuItem;
+import android.view.SubMenu;
 import android.view.View;
 import android.widget.ImageButton;
-import android.widget.PopupMenu;
+import android.widget.ImageView;
+import android.widget.LinearLayout;
+import android.widget.ScrollView;
 import android.widget.TextView;
 import android.widget.Toast;
 import androidx.annotation.NonNull;
+import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.widget.Toolbar;
 import androidx.core.content.ContextCompat;
 import androidx.core.graphics.ColorUtils;
@@ -43,6 +49,7 @@ import androidx.recyclerview.widget.RecyclerView;
 import com.arellomobile.mvp.MvpAppCompatActivity;
 import com.arellomobile.mvp.presenter.InjectPresenter;
 import com.arellomobile.mvp.presenter.ProvidePresenter;
+import com.bumptech.glide.Glide;
 import com.fanok.audiobooks.Consts;
 import com.fanok.audiobooks.GridSpacingItemDecoration;
 import com.fanok.audiobooks.MySuggestionProvider;
@@ -52,6 +59,7 @@ import com.fanok.audiobooks.adapter.BooksListAddapter;
 import com.fanok.audiobooks.adapter.GenreListAddapter;
 import com.fanok.audiobooks.adapter.SearchebleAdapter;
 import com.fanok.audiobooks.databinding.ActivitySearchableBinding;
+import com.fanok.audiobooks.fragment.SourceTexts;
 import com.fanok.audiobooks.interface_pacatge.searchable.SearchableView;
 import com.fanok.audiobooks.pojo.BookPOJO;
 import com.fanok.audiobooks.pojo.GenrePOJO;
@@ -59,13 +67,16 @@ import com.fanok.audiobooks.pojo.SearcheblPOJO;
 import com.fanok.audiobooks.pojo.SearchebleArrayPOJO;
 import com.fanok.audiobooks.policy.ParentalControl;
 import com.fanok.audiobooks.presenter.SearchbalePresenter;
+import com.fanok.audiobooks.search.Genre;
 import com.fanok.audiobooks.search.Provider;
 import com.fanok.audiobooks.search.SearchGrouper.Group;
 import com.fanok.audiobooks.search.SearchGrouper.Narration;
+import com.fanok.audiobooks.search.SearchGrouper.Offer;
 import com.fanok.audiobooks.search.SearchMatcher;
 import com.fanok.audiobooks.search.SearchOrder;
 import com.fanok.audiobooks.search.SearchRequest;
 import com.fanok.audiobooks.search.SearchUi;
+import com.fanok.audiobooks.search.SourceInfo;
 import com.fanok.audiobooks.search.TextNorm;
 import com.fanok.audiobooks.util.RussianDates;
 import com.fanok.audiobooks.util.RussianResources;
@@ -73,7 +84,7 @@ import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 import java.util.ArrayList;
 import java.util.EnumSet;
 import java.util.HashMap;
-import java.util.LinkedHashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -127,8 +138,8 @@ public class SearchableActivity extends MvpAppCompatActivity implements Searchab
     /** The last state drawn, for the menus and the chips' actions. */
     private SearchUi.State mState;
 
-    /** The source chips after "All", in the order of the sources. */
-    private final LinkedHashMap<Provider, TextView> mChips = new LinkedHashMap<>();
+    /** The source chips after "All", by source; the state orders them. */
+    private final Map<Provider, TextView> mChips = new HashMap<>();
 
     private TextView mAllChip;
 
@@ -356,6 +367,13 @@ public class SearchableActivity extends MvpAppCompatActivity implements Searchab
     public boolean onCreateOptionsMenu(Menu menu) {
         if (mModelId == Consts.MODEL_BOOKS) {
             getMenuInflater().inflate(R.menu.search_options_menu, menu);
+            SubMenu sorts = menu.findItem(R.id.search_sort).getSubMenu();
+            if (sorts != null) {
+                for (int i = 0; i < SORTS.length; i++) {
+                    sorts.add(R.id.search_sort, Menu.FIRST + i, i, SORT_NAMES[i]);
+                }
+                sorts.setGroupCheckable(R.id.search_sort, true, true);
+            }
             mMenu = menu;
             updateScoreItem();
             updateMenu();
@@ -368,11 +386,14 @@ public class SearchableActivity extends MvpAppCompatActivity implements Searchab
         int id = item.getItemId();
         if (id == android.R.id.home) {
             finish();
+        } else if (item.getGroupId() == R.id.search_sort) {
+            mPresenter.setSort(SORTS[id - Menu.FIRST]);
+            return true;
         } else if (id == R.id.search_scope) {
             showScopeDialog();
             return true;
-        } else if (id == R.id.search_sort) {
-            showSortMenu();
+        } else if (id == R.id.search_genres) {
+            showGenresDialog();
             return true;
         } else if (id == R.id.search_group) {
             mPresenter.setGrouped(!item.isChecked());
@@ -399,6 +420,24 @@ public class SearchableActivity extends MvpAppCompatActivity implements Searchab
         MenuItem scope = mMenu.findItem(R.id.search_scope);
         if (scope != null) {
             scope.setIcon(mState.input.request.isAnywhere() ? R.drawable.ic_filter : R.drawable.ic_filter_active);
+        }
+        MenuItem sort = mMenu.findItem(R.id.search_sort);
+        for (int i = 0; i < SORTS.length && sort != null; i++) {
+            if (SORTS[i] == mState.input.sort) {
+                // the order is no longer an icon: the overflow says which one is on
+                String name = getString(SORT_NAMES[i]);
+                sort.setTitle(getString(R.string.search_sort_current,
+                        name.substring(0, 1).toLowerCase(java.util.Locale.ROOT) + name.substring(1)));
+                MenuItem chosen = sort.hasSubMenu() ? sort.getSubMenu().findItem(Menu.FIRST + i) : null;
+                if (chosen != null) {
+                    chosen.setChecked(true);
+                }
+            }
+        }
+        MenuItem genres = mMenu.findItem(R.id.search_genres);
+        if (genres != null) {
+            genres.setTitle(getString(R.string.search_genres_current, mState.input.genres.isEmpty()
+                    ? getString(R.string.search_genres_every) : genreNames(mState.input.genres)));
         }
         MenuItem group = mMenu.findItem(R.id.search_group);
         if (group != null) {
@@ -444,19 +483,37 @@ public class SearchableActivity extends MvpAppCompatActivity implements Searchab
                 .show();
     }
 
-    private void showSortMenu() {
-        View anchor = findViewById(R.id.search_sort);
-        PopupMenu menu = new PopupMenu(this, anchor != null ? anchor : binding.summary);
-        SearchOrder.Sort current = mState == null ? SearchOrder.Sort.RELEVANCE : mState.input.sort;
-        for (int i = 0; i < SORTS.length; i++) {
-            menu.getMenu().add(1, i, i, SORT_NAMES[i]).setChecked(SORTS[i] == current);
+    /** Which genres to keep among the found cards; none chosen is every genre. */
+    private void showGenresDialog() {
+        Genre[] all = Genre.values();
+        Set<Genre> current = mState == null ? EnumSet.noneOf(Genre.class) : mState.input.genres;
+        final boolean[] checked = new boolean[all.length];
+        String[] names = new String[all.length];
+        for (int i = 0; i < all.length; i++) {
+            checked[i] = current.contains(all[i]);
+            names[i] = getString(all[i].title);
         }
-        menu.getMenu().setGroupCheckable(1, true, true);
-        menu.setOnMenuItemClickListener(item -> {
-            mPresenter.setSort(SORTS[item.getItemId()]);
-            return true;
-        });
-        menu.show();
+        new MaterialAlertDialogBuilder(this)
+                .setTitle(R.string.search_genres)
+                .setMultiChoiceItems(names, checked, (d, which, isChecked) -> checked[which] = isChecked)
+                .setPositiveButton(R.string.search_scope_done, (d, w) -> {
+                    Set<Genre> chosen = EnumSet.noneOf(Genre.class);
+                    for (int i = 0; i < all.length; i++) {
+                        if (checked[i]) {
+                            chosen.add(all[i]);
+                        }
+                    }
+                    mPresenter.setGenres(chosen);
+                })
+                .setNeutralButton(R.string.search_genres_all,
+                        (d, w) -> mPresenter.setGenres(EnumSet.noneOf(Genre.class)))
+                .show();
+    }
+
+    /** One genre by name, more as "Фантастика и фэнтези +2". */
+    private String genreNames(Set<Genre> genres) {
+        String first = getString(genres.iterator().next().title);
+        return genres.size() == 1 ? first : first + " +" + (genres.size() - 1);
     }
 
     @Override
@@ -568,6 +625,7 @@ public class SearchableActivity extends MvpAppCompatActivity implements Searchab
         showProgress(state);
         showSummary(state);
         showRows(state);
+        showSeriesAndAutors(state.plates);
         updateMenu();
         if (otherView) {
             binding.list.scrollToPosition(0); // another tab, scope, order or search: its top, not the old offset
@@ -582,43 +640,194 @@ public class SearchableActivity extends MvpAppCompatActivity implements Searchab
         binding.searchView.setQuery(query, false);
     }
 
+    /**
+     * The recordings of one work, numbered, each with the sites that carry it; a site opens its card. A full line
+     * parts the recordings, a short one the sites of one recording.
+     */
     @Override
-    public void showNarrations(String title, ArrayList<String> labels, ArrayList<String> urls) {
-        new MaterialAlertDialogBuilder(this)
-                .setTitle(title == null ? getString(R.string.search_narrations_title) : title)
-                .setItems(labels.toArray(new String[0]), (d, which) -> mPresenter.openOffer(urls.get(which)))
+    public void showNarrations(String title, List<Narration> narrations) {
+        LayoutInflater inflater = getLayoutInflater();
+        Resources res = RussianResources.of(this);
+        Set<Provider> catalogs = new HashSet<>();
+        for (Narration n : narrations) {
+            for (Offer o : n.offers) {
+                if (o.source != null) {
+                    catalogs.add(o.source.original()); // mirrors of one catalog count once, as on the row
+                }
+            }
+        }
+        View head = inflater.inflate(R.layout.search_narrations_title, null);
+        ((TextView) head.findViewById(R.id.narrationsTitle)).setText(
+                title == null ? getString(R.string.search_narrations_title) : title);
+        ((TextView) head.findViewById(R.id.narrationsSubtitle)).setText(
+                res.getQuantityString(R.plurals.search_narrations, narrations.size(), narrations.size()) + " "
+                        + res.getQuantityString(R.plurals.search_on_sites, catalogs.size(), catalogs.size()));
+
+        int href = attrColor(R.attr.hrefColor);
+        int line = ColorUtils.setAlphaComponent(attrColor(R.attr.subTextColor), 64);
+        LinearLayout list = new LinearLayout(this);
+        list.setOrientation(LinearLayout.VERTICAL);
+        list.setPadding(0, 0, 0, dp(8));
+        AlertDialog[] dialog = new AlertDialog[1];
+        for (int i = 0; i < narrations.size(); i++) {
+            Narration n = narrations.get(i);
+            if (i > 0) {
+                list.addView(divider(line, dp(24)));
+            }
+            View header = inflater.inflate(R.layout.search_narration_header, list, false);
+            TextView number = header.findViewById(R.id.narrationNumber);
+            number.setText(String.valueOf(i + 1));
+            number.setTextColor(href);
+            GradientDrawable badge = new GradientDrawable();
+            badge.setShape(GradientDrawable.OVAL);
+            badge.setColor(ColorUtils.setAlphaComponent(href, FILL_ALPHA));
+            number.setBackground(badge);
+            String reader = n.best.book.getArtist();
+            reader = reader == null || reader.trim().isEmpty() ? getString(R.string.search_reader_unknown)
+                    : reader.trim();
+            ((TextView) header.findViewById(R.id.narrationReader)).setText(reader);
+            List<String> facts = new ArrayList<>();
+            String time = timeOf(n.offers);
+            if (!time.isEmpty()) {
+                facts.add(time);
+            }
+            if (!n.edition.isEmpty()) {
+                facts.add(n.edition);
+            }
+            if (n.catalogs() > 1) {
+                facts.add(res.getQuantityString(R.plurals.search_sites, n.catalogs(), n.catalogs()));
+            }
+            TextView factsLine = header.findViewById(R.id.narrationFacts);
+            factsLine.setText(join(facts, " · "));
+            factsLine.setVisibility(facts.isEmpty() ? View.GONE : View.VISIBLE);
+            header.setContentDescription(getString(R.string.search_narration_spoken, i + 1, reader)
+                    + (facts.isEmpty() ? "" : ", " + join(facts, ", ")));
+            list.addView(header);
+            for (int j = 0; j < n.offers.size(); j++) {
+                if (j > 0) {
+                    list.addView(divider(line, dp(64))); // under the site names, past the icons
+                }
+                Offer o = n.offers.get(j);
+                View row = siteRow(inflater, list, o, href);
+                row.setOnClickListener(v -> {
+                    dialog[0].dismiss();
+                    mPresenter.openOffer(o.url());
+                });
+                list.addView(row);
+            }
+        }
+        ScrollView scroll = new ScrollView(this);
+        scroll.addView(list);
+        dialog[0] = new MaterialAlertDialogBuilder(this)
+                .setCustomTitle(head)
+                .setView(scroll)
+                .setNegativeButton(R.string.close, null)
                 .show();
     }
 
-    /** "All", then one chip per source in the listener's order, which a status never changes (§9.2). */
-    private void showChips(SearchUi.State state) {
-        List<Provider> order = new ArrayList<>();
-        for (SearchUi.Chip c : state.chips) {
-            order.add(c.source);
+    /** A site of a recording: its icon (its letter until the icon is drawn), name and the card's own length. */
+    private View siteRow(LayoutInflater inflater, LinearLayout parent, Offer o, int href) {
+        View row = inflater.inflate(R.layout.search_narration_site, parent, false);
+        String name = o.source != null ? o.source.title : Url.hostOf(o.url());
+        TextView letter = row.findViewById(R.id.siteLetter);
+        letter.setText(o.source != null ? SourceTexts.letter(o.source) : "");
+        letter.setBackground(SourceTexts.rounded(href, dp(7)));
+        ImageView icon = row.findViewById(R.id.siteIcon);
+        if (o.source != null) {
+            Glide.with(icon).load(SourceInfo.uri(o.source, SourceInfo.ICON)).into(icon);
         }
-        if (mAllChip == null || !order.equals(new ArrayList<>(mChips.keySet()))) {
-            binding.sources.removeAllViews();
-            mChips.clear();
+        ((TextView) row.findViewById(R.id.siteName)).setText(name);
+        String time = Consts.formatTimeDisplay(o.book.getTime());
+        TextView length = row.findViewById(R.id.siteTime);
+        length.setText(time);
+        length.setVisibility(time.isEmpty() ? View.GONE : View.VISIBLE);
+        row.setContentDescription(time.isEmpty() ? name : name + ", " + time);
+        return row;
+    }
+
+    /** The first known length of {@code offers} (the best card first); empty when none says. */
+    private static String timeOf(List<Offer> offers) {
+        for (Offer o : offers) {
+            String time = Consts.formatTimeDisplay(o.book.getTime());
+            if (!time.isEmpty()) {
+                return time;
+            }
+        }
+        return "";
+    }
+
+    /** A 1dp line from {@code start} to 24dp before the end. */
+    private View divider(int color, int start) {
+        View line = new View(this);
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT,
+                Math.max(1, dp(1)));
+        lp.setMarginStart(start);
+        lp.setMarginEnd(dp(24));
+        line.setLayoutParams(lp);
+        line.setBackgroundColor(color);
+        return line;
+    }
+
+    private int dp(int dp) {
+        return Math.round(TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, dp,
+                getResources().getDisplayMetrics()));
+    }
+
+    /**
+     * "All", then one chip per source in the state's order: the most found first, then the searching ones, those
+     * that found nothing, and last the ones that did not answer. The chips are moved, never made again, so a
+     * focused or selected one stays in sight.
+     */
+    private void showChips(SearchUi.State state) {
+        if (mAllChip == null) {
             mAllChip = newChip();
             mAllChip.setOnClickListener(v -> mPresenter.setFilter(-1));
-            binding.sources.addView(mAllChip);
-            for (Provider p : order) {
-                TextView chip = newChip();
+        }
+        List<View> order = new ArrayList<>();
+        order.add(mAllChip);
+        Set<Provider> present = new HashSet<>();
+        for (SearchUi.Chip c : state.chips) {
+            TextView chip = mChips.get(c.source);
+            if (chip == null) {
+                Provider p = c.source;
+                chip = newChip();
                 chip.setOnClickListener(v -> mPresenter.setFilter(p.sourceId));
                 chip.setOnLongClickListener(v -> {
                     mPresenter.retrySource(p);
                     return true;
                 });
                 mChips.put(p, chip);
-                binding.sources.addView(chip);
             }
+            bindChip(chip, c);
+            order.add(chip);
+            present.add(c.source);
         }
+        mChips.keySet().retainAll(present);
         bindAllChip(state);
-        for (SearchUi.Chip c : state.chips) {
-            TextView chip = mChips.get(c.source);
-            if (chip != null) {
-                bindChip(chip, c);
-            }
+        boolean same = binding.sources.getChildCount() == order.size();
+        for (int i = 0; same && i < order.size(); i++) {
+            same = binding.sources.getChildAt(i) == order.get(i);
+        }
+        if (same) {
+            return;
+        }
+        View focused = binding.sources.getFocusedChild();
+        binding.sources.removeAllViews();
+        for (View chip : order) {
+            binding.sources.addView(chip);
+        }
+        if (focused != null) {
+            focused.requestFocus(); // a TV remote keeps its place
+        }
+        View selected = state.tab == null ? null : mChips.get(state.tab.source);
+        if (selected != null) {
+            // a moved tab stays in sight
+            binding.sourcesScroll.post(() -> {
+                int x = binding.sourcesScroll.getScrollX();
+                if (selected.getLeft() < x || selected.getRight() > x + binding.sourcesScroll.getWidth()) {
+                    binding.sourcesScroll.smoothScrollTo(Math.max(0, selected.getLeft() - dp(16)), 0);
+                }
+            });
         }
     }
 
@@ -753,6 +962,9 @@ public class SearchableActivity extends MvpAppCompatActivity implements Searchab
         if (!state.input.request.isAnywhere()) {
             parts.add(getString(R.string.search_summary_scope, scopeNames(state.input.request.scope)));
         }
+        if (!state.input.genres.isEmpty()) {
+            parts.add(getString(R.string.search_summary_genres, genreNames(state.input.genres)));
+        }
         int shown = state.rows.size();
         switch (state.pass) {
             case RUNNING:
@@ -810,6 +1022,7 @@ public class SearchableActivity extends MvpAppCompatActivity implements Searchab
         } else if (state.empty == SearchUi.Empty.TAB_FAILED && state.tab != null) {
             mPresenter.retrySource(state.tab.source);
         } else if (state.empty == SearchUi.Empty.SCOPE_HID_ALL) {
+            mPresenter.setGenres(EnumSet.noneOf(Genre.class));
             mPresenter.setScope(EnumSet.noneOf(SearchRequest.Field.class));
         } else if (!state.failed.isEmpty()) {
             mPresenter.retryFailed();
@@ -834,7 +1047,13 @@ public class SearchableActivity extends MvpAppCompatActivity implements Searchab
         for (SearchUi.Row row : state.rows) {
             books.add(display(row, labels, notes, aliases, score, parental));
         }
+        // a list the listener has not scrolled stays at its top: a better card that arrives goes above the first
+        // one shown, where the list would otherwise keep its place and hide it
+        boolean atTop = !binding.list.canScrollVertically(-1);
         mAddapterBooks.submit(books, labels, notes, aliases);
+        if (atTop) {
+            binding.list.scrollToPosition(0);
+        }
         String empty = emptyText(state);
         binding.booksNotFound.setText(empty);
         binding.booksNotFound.setVisibility(empty == null ? View.GONE : View.VISIBLE);
@@ -859,6 +1078,9 @@ public class SearchableActivity extends MvpAppCompatActivity implements Searchab
                 notes.add(getString(R.string.search_matched_series));
             }
         }
+        if (row.offer.listing) {
+            notes.add(getString(R.string.search_collection)); // a list of books: it opens as the site's listing
+        }
         if (row.unknown) {
             notes.add(getString(R.string.search_no_scope_data));
         } else if (m.tier == SearchMatcher.Tier.E && !m.fields.isEmpty()) {
@@ -882,7 +1104,7 @@ public class SearchableActivity extends MvpAppCompatActivity implements Searchab
         d.setUrl(row.key);
         if (several) {
             List<String> urls = new ArrayList<>();
-            for (com.fanok.audiobooks.search.SearchGrouper.Offer o : g.offers) {
+            for (Offer o : g.offers) {
                 urls.add(o.url());
                 if (!ParentalControl.isAllowed(parental, o.book)) {
                     d.setGenre(o.book.getGenre()); // the group masks as its most restricted book
@@ -903,7 +1125,8 @@ public class SearchableActivity extends MvpAppCompatActivity implements Searchab
     /** The listener changed what the list shows (not only what arrived): a new search, tab, scope, order or grouping. */
     private static boolean otherView(SearchUi.Input before, SearchUi.Input after) {
         return before.generation != after.generation || before.tab != after.tab || before.sort != after.sort
-                || before.grouped != after.grouped || !before.request.equals(after.request);
+                || before.grouped != after.grouped || !before.request.equals(after.request)
+                || !before.genres.equals(after.genres);
     }
 
     /**

@@ -4,10 +4,12 @@ import com.fanok.audiobooks.pojo.BookPOJO;
 import com.fanok.audiobooks.search.SearchMatcher.Card;
 import com.fanok.audiobooks.search.SearchMatcher.Match;
 import com.fanok.audiobooks.search.SearchMatcher.Tier;
+import com.fanok.audiobooks.search.SearchRequest.Field;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.EnumSet;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -49,9 +51,17 @@ public final class SearchGrouper {
         public final int minutes;
         /** Its place in the order of arrival of the whole search. */
         public final int arrival;
+        /** A list of books (a site's collection), not a book: it opens as a listing and never groups. */
+        public final boolean listing;
+        /** The app's genres its site's genre name names; empty when none is known. */
+        public final Set<Genre> genres;
         /** The verdict for the current request; {@link Match#NONE} until {@link #score}. */
         Match match = Match.NONE;
         private SearchRequest scoredFor;
+        /** Whether the author alone, and the series alone, hold the whole query ({@link #holds}). */
+        private boolean authorHolds;
+        private boolean seriesHolds;
+        private SearchRequest heldFor;
 
         public Offer(BookPOJO book, Provider source, int order, int nativeRank) {
             this(book, source, order, nativeRank, 0);
@@ -65,6 +75,8 @@ public final class SearchGrouper {
             this.arrival = arrival;
             this.card = Card.of(book);
             this.minutes = ListingFilters.durationMinutes(book.getTime());
+            this.listing = source != null && book.getUrl() != null && source.parser.opensAsListing(book.getUrl());
+            this.genres = Genre.allOf(book.getGenre());
         }
 
         public String url() {
@@ -82,6 +94,21 @@ public final class SearchGrouper {
                 scoredFor = request;
             }
             return this;
+        }
+
+        /**
+         * Every significant word of {@code request} lies in this card's {@code field} ({@link Field#AUTHOR} or
+         * {@link Field#SERIES}) alone: the card's author or series is one the listener looks for. Cached per request.
+         */
+        boolean holds(Field field, SearchRequest request) {
+            if (!request.equals(heldFor)) {
+                authorHolds = card.has(Field.AUTHOR) && SearchMatcher.score(card,
+                        new SearchRequest(request.text, EnumSet.of(Field.AUTHOR))).covered;
+                seriesHolds = card.has(Field.SERIES) && SearchMatcher.score(card,
+                        new SearchRequest(request.text, EnumSet.of(Field.SERIES))).covered;
+                heldFor = request;
+            }
+            return field == Field.AUTHOR ? authorHolds : field == Field.SERIES && seriesHolds;
         }
 
         /** The catalog the card belongs to: mirrors of one catalog count once. */
@@ -245,7 +272,12 @@ public final class SearchGrouper {
     public static List<Group> group(Collection<Offer> offers, Set<String> shownIds, boolean fuzzy) {
         // 1. equal keys; a TreeMap orders the drafts by key, so every later step is independent of arrival
         TreeMap<String, Draft> byKey = new TreeMap<>();
+        List<Offer> listings = new ArrayList<>();
         for (Offer o : offers) {
+            if (o.listing) {
+                listings.add(o); // a collection of the same name is not a recording of the book
+                continue;
+            }
             String key = o.card.title + '\u0000' + TextNorm.join(new ArrayList<>(TextNorm.words(o.card.authors)));
             Draft d = byKey.get(key);
             if (d == null) {
@@ -300,6 +332,10 @@ public final class SearchGrouper {
             if (!d.merged) {
                 out.add(new Group(idOf(d.offers, shownIds), d.offers, narrations(d.offers)));
             }
+        }
+        for (Offer o : listings) {
+            List<Offer> one = Collections.singletonList(o);
+            out.add(new Group(idOf(one, shownIds), one, narrations(one)));
         }
         return out;
     }

@@ -23,10 +23,27 @@ public class SearchebleAdapter extends RecyclerView.Adapter<SearchebleAdapter.My
         mListener = listener;
     }
 
+    /** Shows {@code newModel}; the same plates again (every search update brings them) leave the row as it is. */
     @SuppressLint("NotifyDataSetChanged")
     public void setItem(ArrayList<SearchebleArrayPOJO> newModel) {
-        mModel = newModel == null ? new ArrayList<>() : new ArrayList<>(newModel);
+        ArrayList<SearchebleArrayPOJO> next = newModel == null ? new ArrayList<>() : new ArrayList<>(newModel);
+        if (mModel != null && same(mModel, next)) {
+            return;
+        }
+        mModel = next;
         notifyDataSetChanged();
+    }
+
+    private static boolean same(ArrayList<SearchebleArrayPOJO> a, ArrayList<SearchebleArrayPOJO> b) {
+        if (a.size() != b.size()) {
+            return false;
+        }
+        for (int i = 0; i < a.size(); i++) {
+            if (!a.get(i).getName().equals(b.get(i).getName()) || !a.get(i).getUrl().equals(b.get(i).getUrl())) {
+                return false;
+            }
+        }
+        return true;
     }
 
 

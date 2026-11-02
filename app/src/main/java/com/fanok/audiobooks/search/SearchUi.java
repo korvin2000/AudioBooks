@@ -1,11 +1,13 @@
 package com.fanok.audiobooks.search;
 
+import com.fanok.audiobooks.pojo.SearcheblPOJO;
 import com.fanok.audiobooks.search.SearchGrouper.Group;
 import com.fanok.audiobooks.search.SearchGrouper.Offer;
 import com.fanok.audiobooks.search.SearchOrder.Sort;
 import com.fanok.audiobooks.search.SearchRequest.Field;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -79,9 +81,11 @@ public final class SearchUi {
     /** The facts the screen is computed from. */
     public static final class Input {
         public SearchRequest request = SearchRequest.anywhere("");
+        /** The genres to keep; empty: every genre. A card whose genre is unknown is kept as "no data". */
+        public Set<Genre> genres = Collections.emptySet();
         /** Every card of the pass, in order of arrival. */
         public List<Offer> offers = Collections.emptyList();
-        /** The planned sources, in the listener's order: the order of the chips. */
+        /** The planned sources, in the listener's order: the order of the chips among equals (see {@link #CHIPS}). */
         public List<Provider> sources = Collections.emptyList();
         /** By source name; a source without one has not started. */
         public Map<String, SearchSession.State> states = Collections.emptyMap();
@@ -98,6 +102,8 @@ public final class SearchUi {
         public long restoredAt;
         /** Tells a late result of a superseded search from the current one. */
         public int generation;
+        /** The sites' own author and series lists for the query (Книга в ухе, ABMP3), of every site. */
+        public SearcheblPOJO people = new SearcheblPOJO();
     }
 
     public static final class State {
@@ -107,14 +113,14 @@ public final class SearchUi {
         public final Pass pass;
         public final int answered;
         public final int planned;
-        /** Sources whose last answer was a failure, in chip order. */
+        /** Sources whose last answer was a failure, in the listener's order of sources. */
         public final List<Provider> failed;
         /** Sites (catalogs) with at least one shown card. */
         public final int sites;
         public final List<Row> rows;
-        /** Cards the scope hid (the ones whose fields it checks and that do not match). */
+        /** Cards the scope or the genres hid (the ones whose fields they check and that do not match). */
         public final int hiddenByScope;
-        /** Rows kept although they lack the scope's fields. */
+        /** Rows kept although they lack the scope's fields or a genre. */
         public final int unknown;
         public final Empty empty;
         /** The selected tab's chip; null for "All". */
@@ -123,9 +129,12 @@ public final class SearchUi {
         public final boolean hasMore;
         /** What this state was computed from. */
         public final Input input;
+        /** The author and series plates of the selected tab ({@link SearchPlates}). */
+        public final SearcheblPOJO plates;
 
         State(List<Chip> chips, int allCount, Pass pass, int answered, int planned, List<Provider> failed, int sites,
-                List<Row> rows, int hiddenByScope, int unknown, Empty empty, Chip tab, boolean hasMore, Input input) {
+                List<Row> rows, int hiddenByScope, int unknown, Empty empty, Chip tab, boolean hasMore, Input input,
+                SearcheblPOJO plates) {
             this.chips = chips;
             this.allCount = allCount;
             this.pass = pass;
@@ -140,6 +149,7 @@ public final class SearchUi {
             this.tab = tab;
             this.hasMore = hasMore;
             this.input = input;
+            this.plates = plates;
         }
 
         /** The row opened with {@code key}, or null. */
@@ -153,11 +163,33 @@ public final class SearchUi {
         }
     }
 
+    /**
+     * The chips after "All": the sources that found the most first, then those still searching, those that found
+     * nothing, and last those that did not answer (timeout, error, blocked, stopped). Stable: equals keep the
+     * listener's order of sources.
+     */
+    static final Comparator<Chip> CHIPS = (a, b) -> rank(a.kind) != rank(b.kind)
+            ? Integer.compare(rank(a.kind), rank(b.kind))
+            : a.kind == ChipKind.FOUND ? Integer.compare(b.count, a.count) : 0;
+
+    private static int rank(ChipKind kind) {
+        switch (kind) {
+            case FOUND:
+                return 0;
+            case RUNNING:
+                return 1;
+            case EMPTY:
+                return 2;
+            default:
+                return 3;
+        }
+    }
+
     private SearchUi() {
     }
 
     public static State reduce(Input in) {
-        // the scope sorts every card into shown, kept as "no data", or hidden
+        // the scope sorts every card into shown, kept as "no data", or hidden; the genres then judge each row
         List<Offer> main = new ArrayList<>();
         List<Offer> unknown = new ArrayList<>();
         int hidden = 0;
@@ -171,8 +203,10 @@ public final class SearchUi {
                 hidden++;
             }
         }
-        List<Row> allRows = rows(main, unknown, in, null);
-        List<Row> rows = in.tab == null ? allRows : rows(main, unknown, in, in.tab);
+        int[] hiddenByGenre = new int[1];
+        List<Row> allRows = rows(main, unknown, in, null, hiddenByGenre);
+        List<Row> rows = in.tab == null ? allRows : rows(main, unknown, in, in.tab, new int[1]);
+        hidden += hiddenByGenre[0];
 
         List<Chip> chips = new ArrayList<>();
         List<Provider> failed = new ArrayList<>();
@@ -198,6 +232,7 @@ public final class SearchUi {
             }
             chips.add(chip);
         }
+        Collections.sort(chips, CHIPS);
         Pass pass = !in.searched ? Pass.IDLE
                 : in.sources.isEmpty() ? Pass.NO_SOURCES
                 : running ? Pass.RUNNING
@@ -214,7 +249,8 @@ public final class SearchUi {
         }
         return new State(Collections.unmodifiableList(chips), allRows.size(), pass, answered, in.sources.size(),
                 Collections.unmodifiableList(failed), catalogs.size(), Collections.unmodifiableList(rows), hidden,
-                unknownRows, empty(in, rows, pass, tab, hidden), tab, more, in);
+                unknownRows, empty(in, rows, pass, tab, hidden), tab, more, in,
+                SearchPlates.of(in.offers, in.request, in.people, in.tab));
     }
 
     private static boolean lacksScope(Offer o, Set<Field> scope) {
@@ -226,26 +262,54 @@ public final class SearchUi {
         return true;
     }
 
-    private static List<Row> rows(List<Offer> main, List<Offer> unknown, Input in, Provider tab) {
+    /** The rows in order: the shown ones, those without a genre for the genre filter, those without the scope's data. */
+    private static List<Row> rows(List<Offer> main, List<Offer> unknown, Input in, Provider tab, int[] hidden) {
         List<Row> out = new ArrayList<>();
-        addRows(out, only(main, tab), in, tab, false);
-        addRows(out, only(unknown, tab), in, tab, true);
+        List<Row> noGenre = new ArrayList<>();
+        List<Row> noScope = new ArrayList<>();
+        addRows(out, noGenre, only(main, tab), in, tab, false, hidden);
+        addRows(noScope, noScope, only(unknown, tab), in, tab, true, hidden);
+        out.addAll(noGenre);
+        out.addAll(noScope);
         return out;
     }
 
-    private static void addRows(List<Row> out, List<Offer> offers, Input in, Provider tab, boolean unknown) {
+    private static void addRows(List<Row> out, List<Row> noGenre, List<Offer> offers, Input in, Provider tab,
+            boolean unknown, int[] hidden) {
         if (tab == null && in.grouped) {
             List<Group> groups = SearchGrouper.group(offers, in.shownIds, in.fuzzy);
             Collections.sort(groups, SearchOrder.groups(in.sort));
             for (Group g : groups) {
-                out.add(new Row(g.representative, g, unknown));
+                addRow(out, noGenre, g.representative, g, g.offers, in.genres, unknown, hidden);
             }
         } else {
             List<Offer> sorted = new ArrayList<>(offers);
             Collections.sort(sorted, SearchOrder.offers(in.sort));
             for (Offer o : sorted) {
-                out.add(new Row(o, null, unknown));
+                addRow(out, noGenre, o, null, Collections.singletonList(o), in.genres, unknown, hidden);
             }
+        }
+    }
+
+    /**
+     * A work passes the genres when one of its cards has a chosen genre, whatever the sites without a genre say;
+     * a work none of whose cards has a genre is kept as "no data"; a work whose genres are all others is hidden.
+     */
+    private static void addRow(List<Row> out, List<Row> noGenre, Offer shown, Group g, List<Offer> cards,
+            Set<Genre> genres, boolean unknown, int[] hidden) {
+        boolean known = false;
+        boolean pass = genres.isEmpty();
+        for (int i = 0; !pass && i < cards.size(); i++) {
+            Set<Genre> own = cards.get(i).genres;
+            known |= !own.isEmpty();
+            pass = !Collections.disjoint(own, genres);
+        }
+        if (pass) {
+            out.add(new Row(shown, g, unknown));
+        } else if (known) {
+            hidden[0] += cards.size();
+        } else {
+            noGenre.add(new Row(shown, g, true));
         }
     }
 

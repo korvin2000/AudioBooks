@@ -245,8 +245,24 @@ public class FavoritePresenter
     public void onBookItemClick(int position) {
         BookPOJO book = bookAt(position);
         if (book != null) {
+            open(book);
+        }
+    }
+
+    /** A book opens its page; a site's collection kept from the search is a list of books: its listing opens. */
+    public void open(@NonNull BookPOJO book) {
+        Provider provider = Provider.ofUrl(book.getUrl());
+        if (provider != null && provider.parser.opensAsListing(book.getUrl())) {
+            openListing(book.getUrl(), book.getName(), "collectionBooks");
+        } else {
             getViewState().showBooksActivity(book);
         }
+    }
+
+    /** A listing chosen elsewhere (an author, series or collection of the search) opens as from the catalog. */
+    public void openListing(@NonNull String url, String title, @NonNull String tag) {
+        getViewState().showFragment(BooksFragment.newInstance(url, R.string.menu_audiobooks, title,
+                Consts.MODEL_BOOKS), tag);
     }
 
     @Override

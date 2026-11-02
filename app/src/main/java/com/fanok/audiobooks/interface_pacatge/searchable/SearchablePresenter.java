@@ -27,6 +27,4 @@ public interface SearchablePresenter {
 
     void onSeriesListItemClick(SearchebleArrayPOJO item);
 
-    void filterAutorsAndSeries();
-
 }
