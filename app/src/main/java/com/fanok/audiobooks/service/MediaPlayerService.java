@@ -209,6 +209,7 @@ public class MediaPlayerService extends MediaBrowserServiceCompat {
             | PlaybackStateCompat.ACTION_FAST_FORWARD
             | PlaybackStateCompat.ACTION_PLAY_FROM_MEDIA_ID
             | PlaybackStateCompat.ACTION_PLAY_FROM_SEARCH
+            | PlaybackStateCompat.ACTION_SET_PLAYBACK_SPEED
             | PlaybackStateCompat.ACTION_STOP;
 
     // Published for in-process readers; written on the main thread only.
@@ -1724,6 +1725,9 @@ public class MediaPlayerService extends MediaBrowserServiceCompat {
         } else {
             position = currentPositionMs();
             builder.setActiveQueueItemId(chapterIndex);
+            Bundle extras = new Bundle();
+            extras.putFloat(SessionExtras.SPEED, player.getPlaybackParameters().speed);
+            builder.setExtras(extras);
             if (isShowingError()) {
                 state = PlaybackStateCompat.STATE_ERROR;
                 builder.setErrorMessage(PlaybackStateCompat.ERROR_CODE_APP_ERROR, getString(errorMessage()));
@@ -1780,7 +1784,12 @@ public class MediaPlayerService extends MediaBrowserServiceCompat {
                 .putString(MediaMetadataCompat.METADATA_KEY_ALBUM, bookName())
                 .putString(MediaMetadataCompat.METADATA_KEY_DISPLAY_SUBTITLE, bookName())
                 .putLong(MediaMetadataCompat.METADATA_KEY_TRACK_NUMBER, chapterIndex + 1)
-                .putLong(MediaMetadataCompat.METADATA_KEY_NUM_TRACKS, chapters.size());
+                .putLong(MediaMetadataCompat.METADATA_KEY_NUM_TRACKS, chapters.size())
+                .putLong(SessionExtras.CHAPTER_INDEX, chapterIndex);
+        String bookKey = SessionExtras.bookKey(bookUrl);
+        if (bookKey != null) {
+            metadata.putString(SessionExtras.BOOK_KEY, bookKey);
+        }
         if (book != null) {
             if (book.getAutor() != null) {
                 metadata.putString(MediaMetadataCompat.METADATA_KEY_ARTIST, book.getAutor());
@@ -2104,6 +2113,15 @@ public class MediaPlayerService extends MediaBrowserServiceCompat {
             @Override
             public void onFastForward() {
                 seekBy(SeekStep.millis(MediaPlayerService.this));
+            }
+
+            /** A controller's speed (a launcher widget) is kept as the book screen keeps its own: for later chapters. */
+            @Override
+            public void onSetPlaybackSpeed(float speed) {
+                float value = PlaybackSettings.clampSpeed(speed);
+                BookPresenter.setSpeedWithoutBroadcast(value);
+                new StorageUtil(MediaPlayerService.this).storeSpeed(value);
+                setSpeed(value);
             }
 
             /** The playback state's custom actions carry the notification action names. */
