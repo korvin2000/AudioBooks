@@ -55,6 +55,13 @@ public class BooksListAddapter extends RecyclerView.Adapter<BooksListAddapter.My
     private final android.os.Handler mainHandler = new android.os.Handler(Looper.getMainLooper());
     private final java.util.Map<String, Integer> progressCache = new java.util.concurrent.ConcurrentHashMap<>();
     private final java.util.Map<String, Integer> downloadCache = new java.util.concurrent.ConcurrentHashMap<>();
+    /** Source captions that replace the site's name, by book URL ("5 сайтов" for a group in the search). */
+    private java.util.Map<String, String> mSourceLabels = java.util.Collections.emptyMap();
+    /** Lines shown in place of the genre, by book URL ("3 озвучки · совпал чтец"); the genre itself stays the book's. */
+    private java.util.Map<String, String> mNotes = java.util.Collections.emptyMap();
+    /** A row that stands for several books (a group in the search): their URLs, whose best marks it shows. */
+    private java.util.Map<String, java.util.List<String>> mAliases = java.util.Collections.emptyMap();
+    private static final Object STATUS_CHANGED = new Object();
     @UnstableApi
     class MyHolder extends RecyclerView.ViewHolder {
 
@@ -111,18 +118,19 @@ public class BooksListAddapter extends RecyclerView.Adapter<BooksListAddapter.My
             mListenedPercent = itemView.findViewById(R.id.listenedPercent);
             mPreferences = mArtist.getContext().getSharedPreferences(PARENTAL_CONTROL_PREFERENCES,
                     MODE_PRIVATE);
+            // a tap while the list is being rebound has no position: ignore it rather than index with -1
             linearLayout.setOnClickListener(view -> {
-                if (mListener != null) {
-                    mListener.onItemSelected(view,
-                            getBindingAdapterPosition());
+                int position = getBindingAdapterPosition();
+                if (mListener != null && position != RecyclerView.NO_POSITION) {
+                    mListener.onItemSelected(view, position);
                 }
             });
 
 
             linearLayout.setOnLongClickListener(view -> {
-                if (mLongListener != null) {
-                    mLongListener.onItemLongSelected(view,
-                            getBindingAdapterPosition());
+                int position = getBindingAdapterPosition();
+                if (mLongListener != null && position != RecyclerView.NO_POSITION) {
+                    mLongListener.onItemLongSelected(view, position);
                 }
                 return true;
             });
@@ -161,8 +169,12 @@ public class BooksListAddapter extends RecyclerView.Adapter<BooksListAddapter.My
                 }
             }
 
+            String label = mSourceLabels.get(book.getUrl());
             Provider provider = Provider.ofUrl(book.getUrl());
-            if (provider != null) {
+            if (label != null) {
+                mSource.setText(label);
+                mSource.setVisibility(View.VISIBLE);
+            } else if (provider != null) {
                 mSource.setText(provider.title);
                 mSource.setVisibility(View.VISIBLE);
             } else {
@@ -177,9 +189,11 @@ public class BooksListAddapter extends RecyclerView.Adapter<BooksListAddapter.My
                 mTitle.setText("");
             }
 
-            if (book.getGenre() != null && !book.getGenre().isEmpty()) {
+            String note = mNotes.get(book.getUrl());
+            String genreLine = note != null ? note : book.getGenre();
+            if (genreLine != null && !genreLine.isEmpty()) {
                 mGenre.setVisibility(View.VISIBLE);
-                mGenre.setText(book.getGenre());
+                mGenre.setText(genreLine);
             } else {
                 mGenre.setVisibility(View.GONE);
             }
@@ -226,7 +240,7 @@ public class BooksListAddapter extends RecyclerView.Adapter<BooksListAddapter.My
             }
 
             if (procent) {
-                Integer pct = progressCache.get(book.getUrl());
+                Integer pct = best(progressCache, book.getUrl());
                 if (pct == null || pct == -1) {
                     setVisible(false);
                 } else {
@@ -240,7 +254,7 @@ public class BooksListAddapter extends RecyclerView.Adapter<BooksListAddapter.My
             }
 
             boolean isImported = book != null && book.getUrl() != null && book.getUrl().contains("/imported/");
-            Integer dlStatus = downloadCache.get(book.getUrl());
+            Integer dlStatus = best(downloadCache, book.getUrl());
             if (isImported || dlStatus == null || dlStatus == 0) {
                 mIsDownload.setVisibility(View.GONE);
             } else if (dlStatus == 1) {
@@ -319,6 +333,11 @@ public class BooksListAddapter extends RecyclerView.Adapter<BooksListAddapter.My
         }
     }
 
+    /** The book shown at {@code position}, or null when the position is no longer in the list. */
+    public BookPOJO getItem(int position) {
+        return mModel == null || position < 0 || position >= mModel.size() ? null : mModel.get(position);
+    }
+
     @UnstableApi
     @Override
     public void onBindViewHolder(@NonNull MyHolder myHolder, int i) {
@@ -359,6 +378,121 @@ public class BooksListAddapter extends RecyclerView.Adapter<BooksListAddapter.My
     @SuppressLint("NotifyDataSetChanged")
     public void refreshItem() {
         notifyDataSetChanged();
+    }
+
+    /**
+     * For a list that changes while results arrive (the search): rows are matched by URL, so only what changed moves
+     * and the rest keeps its place and focus; {@code labels} replace the site's name by URL; progress and download
+     * marks load for books not seen before only.
+     */
+    public void submit(ArrayList<BookPOJO> items, java.util.Map<String, String> labels,
+            java.util.Map<String, String> notes, java.util.Map<String, java.util.List<String>> aliases) {
+        final ArrayList<BookPOJO> before = mModel == null ? new ArrayList<>() : mModel;
+        final ArrayList<BookPOJO> after = new ArrayList<>(items);
+        final java.util.Map<String, String> labelsBefore = mSourceLabels;
+        final java.util.Map<String, String> labelsAfter = labels == null
+                ? java.util.Collections.<String, String>emptyMap() : new java.util.HashMap<>(labels);
+        final java.util.Map<String, String> notesBefore = mNotes;
+        final java.util.Map<String, String> notesAfter = notes == null
+                ? java.util.Collections.<String, String>emptyMap() : new java.util.HashMap<>(notes);
+        androidx.recyclerview.widget.DiffUtil.DiffResult diff = androidx.recyclerview.widget.DiffUtil.calculateDiff(
+                new androidx.recyclerview.widget.DiffUtil.Callback() {
+                    @Override
+                    public int getOldListSize() {
+                        return before.size();
+                    }
+
+                    @Override
+                    public int getNewListSize() {
+                        return after.size();
+                    }
+
+                    @Override
+                    public boolean areItemsTheSame(int o, int n) {
+                        return java.util.Objects.equals(before.get(o).getUrl(), after.get(n).getUrl());
+                    }
+
+                    @Override
+                    public boolean areContentsTheSame(int o, int n) {
+                        BookPOJO a = before.get(o);
+                        BookPOJO b = after.get(n);
+                        return sameCard(a, b) && java.util.Objects.equals(labelsBefore.get(a.getUrl()),
+                                labelsAfter.get(b.getUrl()))
+                                && java.util.Objects.equals(notesBefore.get(a.getUrl()), notesAfter.get(b.getUrl()));
+                    }
+                });
+        mModel = after;
+        mSourceLabels = labelsAfter;
+        mNotes = notesAfter;
+        mAliases = aliases == null ? java.util.Collections.<String, java.util.List<String>>emptyMap()
+                : new java.util.HashMap<>(aliases);
+        diff.dispatchUpdatesTo(this);
+        ArrayList<BookPOJO> unseen = new ArrayList<>();
+        for (String url : statusUrls(after)) {
+            if (!downloadCache.containsKey(url)) {
+                unseen.add(byUrl(url));
+            }
+        }
+        if (!unseen.isEmpty()) {
+            preloadStatuses(unseen);
+        }
+    }
+
+    /** Loads the progress and download marks of every row again (the listener may have listened or downloaded). */
+    public void reloadStatuses() {
+        if (mModel == null || mModel.isEmpty()) {
+            return;
+        }
+        ArrayList<BookPOJO> all = new ArrayList<>();
+        for (String url : statusUrls(mModel)) {
+            all.add(byUrl(url));
+        }
+        preloadStatuses(all);
+    }
+
+    /** The URLs whose marks the rows show: a row's own, or those of the books it stands for. */
+    private java.util.Set<String> statusUrls(java.util.List<BookPOJO> rows) {
+        java.util.Set<String> urls = new java.util.LinkedHashSet<>();
+        for (BookPOJO b : rows) {
+            if (b.getUrl() == null) {
+                continue;
+            }
+            java.util.List<String> alias = mAliases.get(b.getUrl());
+            urls.addAll(alias != null ? alias : java.util.Collections.singletonList(b.getUrl()));
+        }
+        return urls;
+    }
+
+    private static BookPOJO byUrl(String url) {
+        BookPOJO b = new BookPOJO();
+        b.setUrl(url);
+        return b;
+    }
+
+    /** The best mark among the books a row stands for: the most listened, the most downloaded. */
+    private Integer best(java.util.Map<String, Integer> cache, String url) {
+        java.util.List<String> alias = mAliases.get(url);
+        if (alias == null) {
+            return cache.get(url);
+        }
+        Integer best = null;
+        for (String u : alias) {
+            Integer v = cache.get(u);
+            if (v != null && (best == null || v > best)) {
+                best = v;
+            }
+        }
+        return best;
+    }
+
+    private static boolean sameCard(BookPOJO a, BookPOJO b) {
+        return java.util.Objects.equals(a.getName(), b.getName()) && java.util.Objects.equals(a.getAutor(), b.getAutor())
+                && java.util.Objects.equals(a.getArtist(), b.getArtist())
+                && java.util.Objects.equals(a.getTime(), b.getTime())
+                && java.util.Objects.equals(a.getGenre(), b.getGenre())
+                && java.util.Objects.equals(a.getPhoto(), b.getPhoto())
+                && java.util.Objects.equals(a.getSeries(), b.getSeries())
+                && java.util.Objects.equals(a.getReting(), b.getReting()) && a.getComents() == b.getComents();
     }
 
     @OptIn(markerClass = UnstableApi.class)
@@ -489,9 +623,10 @@ public class BooksListAddapter extends RecyclerView.Adapter<BooksListAddapter.My
                 if (audioListModel != null) audioListModel.closeDB();
                 if (audioModel != null) audioModel.closeDB();
             }
+            // a payload rebinds the rows in place: no cross-fade, no lost focus
             mainHandler.post(() -> {
                 if (mModel != null) {
-                    notifyDataSetChanged();
+                    notifyItemRangeChanged(0, mModel.size(), STATUS_CHANGED);
                 }
             });
         });

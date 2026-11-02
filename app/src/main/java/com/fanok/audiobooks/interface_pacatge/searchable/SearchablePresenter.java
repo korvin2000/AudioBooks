@@ -2,7 +2,11 @@ package com.fanok.audiobooks.interface_pacatge.searchable;
 
 import android.view.LayoutInflater;
 import android.view.View;
+import com.fanok.audiobooks.pojo.BookPOJO;
+import com.fanok.audiobooks.pojo.GenrePOJO;
+import com.fanok.audiobooks.pojo.SearchebleArrayPOJO;
 
+/** Clicks carry the item the adapter showed, not a position into a list that may have changed since. */
 public interface SearchablePresenter {
 
     void onDestroy();
@@ -13,17 +17,15 @@ public interface SearchablePresenter {
 
     void retryFailed();
 
-    void onGenreItemClick(View view, int position);
+    void onGenreItemClick(GenrePOJO item);
 
-    void onBookItemClick(View view, int position);
+    void onBookItemClick(BookPOJO book);
 
-    void onBookItemLongClick(View view, int position, LayoutInflater layoutInflater);
+    void onBookItemLongClick(View view, BookPOJO book, LayoutInflater layoutInflater);
 
-    void onAutorsListItemClick(View view, int position);
+    void onAutorsListItemClick(SearchebleArrayPOJO item);
 
-    void onSeriesListItemClick(View view, int position);
-
-    void filterBooks();
+    void onSeriesListItemClick(SearchebleArrayPOJO item);
 
     void filterAutorsAndSeries();
 

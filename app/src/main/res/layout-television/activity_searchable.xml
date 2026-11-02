@@ -1,4 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- The search screen on TV: the ids of layout/activity_searchable.xml, focus moving down by id. -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
@@ -25,110 +26,140 @@
 
             <androidx.appcompat.widget.SearchView
                 android:id="@+id/searchView"
-                android:layout_width="wrap_content"
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_centerHorizontal="true"
-                android:iconifiedByDefault="false"
                 android:focusable="true"
-                android:queryHint="@string/search" />
+                android:iconifiedByDefault="false"
+                android:nextFocusDown="@+id/sources"
+                android:queryHint="@string/search_hint" />
         </androidx.appcompat.widget.Toolbar>
 
     </com.google.android.material.appbar.AppBarLayout>
 
-    <androidx.constraintlayout.widget.ConstraintLayout
+    <HorizontalScrollView
+        android:id="@+id/sourcesScroll"
         android:layout_width="match_parent"
-        android:layout_height="match_parent">
+        android:layout_height="wrap_content"
+        android:scrollbars="none">
 
-        <LinearLayout
-            android:id="@+id/liner"
+        <com.google.android.material.chip.ChipGroup
+            android:id="@+id/sources"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:nextFocusDown="@+id/list"
+            android:nextFocusUp="@+id/searchView"
+            android:paddingStart="@dimen/margin_small"
+            android:paddingEnd="@dimen/margin_small"
+            app:chipSpacingHorizontal="2dp"
+            app:singleLine="true" />
+    </HorizontalScrollView>
+
+    <com.google.android.material.progressindicator.LinearProgressIndicator
+        android:id="@+id/progress"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:importantForAccessibility="no"
+        android:visibility="invisible"
+        app:indicatorColor="?attr/hrefColor"
+        app:trackThickness="2dp" />
+
+    <LinearLayout
+        android:id="@+id/summaryRow"
+        android:visibility="gone"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center_vertical"
+        android:minHeight="36dp"
+        android:orientation="horizontal"
+        android:paddingStart="@dimen/text_margin_book_description"
+        android:paddingEnd="@dimen/margin_small">
+
+        <TextView
+            android:id="@+id/summary"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:maxLines="2"
+            android:ellipsize="end"
+            android:textColor="?attr/subTextColor"
+            android:textSize="13sp"
+            tools:text="Ищем… ответили 7 из 13 · найдено 21" />
+
+        <Button
+            android:id="@+id/action"
+            style="?attr/borderlessButtonStyle"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:focusable="true"
+            android:minHeight="36dp"
+            android:textColor="?attr/hrefColor"
+            android:visibility="gone"
+            tools:text="Повторить (2)" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:id="@+id/topList"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical">
+
+        <TextView
+            android:id="@+id/autors"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="@dimen/text_margin_book_description"
+            android:layout_marginEnd="@dimen/text_margin_book_description"
+            android:textColor="?attr/subTextColor"
+            android:textSize="@dimen/titleSize"
+            android:visibility="gone"
+            tools:text="@string/menu_autor" />
+
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/authorList"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:visibility="gone" />
+
+        <TextView
+            android:id="@+id/series"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="@dimen/text_margin_book_description"
+            android:layout_marginEnd="@dimen/text_margin_book_description"
+            android:textColor="?attr/subTextColor"
+            android:textSize="@dimen/titleSize"
+            android:visibility="gone"
+            tools:text="Серии" />
+
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/seriesList"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:visibility="gone" />
+    </LinearLayout>
+
+    <FrameLayout
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1">
+
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/list"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
-            android:animateLayoutChanges="true"
-            android:orientation="vertical"
-            android:scrollbars="vertical">
-
-            <ProgressBar
-                android:id="@+id/progressBarTop"
-                style="?android:attr/progressBarStyleHorizontal"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:indeterminate="true"
-                android:visibility="invisible" />
-
-            <androidx.recyclerview.widget.RecyclerView
-                android:focusable="true"
-                android:focusableInTouchMode="true"
-                android:id="@+id/filter"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginStart="@dimen/margin_small"
-                android:layout_marginBottom="@dimen/margin_small" />
-
-            <LinearLayout
-                android:id="@+id/topList"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="vertical">
-
-                <TextView
-                    android:id="@+id/autors"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginStart="@dimen/text_margin_book_description"
-                    android:layout_marginEnd="@dimen/text_margin_book_description"
-                    android:textColor="?attr/subTextColor"
-                    android:textSize="@dimen/titleSize"
-                    tools:text="@string/menu_autor" />
-
-                <androidx.recyclerview.widget.RecyclerView
-                    android:id="@+id/authorList"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content" />
-
-                <TextView
-                    android:id="@+id/series"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginStart="@dimen/text_margin_book_description"
-                    android:layout_marginEnd="@dimen/text_margin_book_description"
-                    android:textColor="?attr/subTextColor"
-                    android:textSize="@dimen/titleSize"
-                    tools:text="Серии" />
-
-                <androidx.recyclerview.widget.RecyclerView
-                    android:id="@+id/seriesList"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content" />
-            </LinearLayout>
-
-            <androidx.recyclerview.widget.RecyclerView
-                android:id="@+id/list"
-                android:layout_width="match_parent"
-                android:layout_height="match_parent" />
-
-        </LinearLayout>
+            android:nextFocusUp="@+id/sources" />
 
         <TextView
             android:id="@+id/booksNotFound"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="@string/no_books"
+            android:layout_gravity="center"
+            android:gravity="center"
+            android:padding="@dimen/text_margin_book_description"
             android:textColor="?attr/colorPrimaryText"
             android:textSize="@dimen/titleSize"
             android:visibility="gone"
-            app:layout_constraintBottom_toBottomOf="@+id/liner"
-            app:layout_constraintEnd_toEndOf="parent"
-            app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toTopOf="parent" />
-
-        <include
-            android:id="@+id/progressBarLayout"
-            layout="@layout/progres_bottom"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:visibility="gone"
-            app:layout_constraintBottom_toBottomOf="@+id/liner" />
-    </androidx.constraintlayout.widget.ConstraintLayout>
-
+            tools:text="@string/search_empty_start" />
+    </FrameLayout>
 
 </LinearLayout>

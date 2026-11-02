@@ -350,6 +350,199 @@ public class SearchSessionTest {
         assertEquals("a,b", finished.get(1));
     }
 
+    /** W16: the other letter case goes out as soon as that site answered empty, not after the slowest site. */
+    @Test
+    public void theCaseVariantOfAnEmptySourceDoesNotWaitForTheOthers() {
+        final List<String> asked = new ArrayList<>();
+        SearchSession.Source<String> empty = new SearchSession.Source<String>() {
+            @Override
+            public String name() {
+                return "E";
+            }
+
+            @Override
+            public Single<ProviderPage<String>> load(String query, int pageNo) {
+                asked.add(query);
+                return query.equals("Кинг") ? Single.just(ProviderPage.<String>empty())
+                        : Single.timer(1, TimeUnit.SECONDS, scheduler).map(t -> page(false, "e1"));
+            }
+        };
+        SearchSession<String> s = session(Arrays.asList(empty, source("Slow", 8, page(false, "s1"), scheduler)));
+        s.search("Кинг");
+        scheduler.advanceTimeBy(1, TimeUnit.SECONDS);
+        assertEquals(Arrays.asList("Кинг", "кинг"), asked);
+        assertEquals(Collections.singletonList(Arrays.asList("e1")), published);
+        assertTrue(finished.isEmpty());
+        scheduler.advanceTimeBy(7, TimeUnit.SECONDS);
+        assertEquals(Collections.singletonList("e1,s1"), finished);
+    }
+
+    /** W13: every source reports that it started and how it answered. */
+    @Test
+    public void sourceStatesArePublishedAsTheyStartAndAnswer() {
+        final List<String> states = new ArrayList<>();
+        SearchSession<String> s = new SearchSession<>(Arrays.asList(
+                source("A", 1, page(true, "a1", "a2"), scheduler),
+                source("Z", 0, null, scheduler)), x -> x, scheduler, scheduler, 10,
+                new SearchSession.Listener<String>() {
+                    @Override
+                    public void onItems(List<String> items) {
+                    }
+
+                    @Override
+                    public void onFinished(List<String> items, int failedSources) {
+                    }
+
+                    @Override
+                    public void onSourceState(SearchSession.State st) {
+                        states.add(st.name + (st.running ? ":running" : ":" + st.status + "/" + st.count
+                                + (st.hasMore ? "+" : "")));
+                    }
+                });
+        s.search("x");
+        assertEquals(Arrays.asList("A:running", "Z:running"), states);
+        scheduler.advanceTimeBy(10, TimeUnit.SECONDS);
+        assertEquals(Arrays.asList("A:running", "Z:running", "A:OK/2+", "Z:TIMEOUT/0"), states);
+        assertEquals(2, s.states().size());
+        assertTrue(s.states().get(1).isFailure());
+    }
+
+    /** W15: a site's next page and a retry of one site do not wait for, or touch, the other sites. */
+    @Test
+    public void oneSourceLoadsAndRetriesAlone() {
+        final List<String> requested = new ArrayList<>();
+        final boolean[] fail = {true};
+        SearchSession.Source<String> paged = new SearchSession.Source<String>() {
+            @Override
+            public String name() {
+                return "P";
+            }
+
+            @Override
+            public Single<ProviderPage<String>> load(String query, int pageNo) {
+                requested.add("P" + pageNo);
+                return Single.just(page(pageNo < 3, "p" + pageNo));
+            }
+        };
+        SearchSession.Source<String> flaky = new SearchSession.Source<String>() {
+            @Override
+            public String name() {
+                return "F";
+            }
+
+            @Override
+            public Single<ProviderPage<String>> load(String query, int pageNo) {
+                requested.add("F" + pageNo);
+                return fail[0] ? Single.<ProviderPage<String>>error(new java.io.IOException("down"))
+                        : Single.just(page(false, "f" + pageNo));
+            }
+        };
+        SearchSession<String> s = session(Arrays.asList(paged, flaky,
+                source("Slow", 30, page(true, "s1"), scheduler)));
+        s.search("x");
+        scheduler.triggerActions();
+        assertTrue("the slow site is still loading", s.isRunning());
+        assertTrue(s.loadNext("P"));
+        assertFalse("already loading", s.loadNext("Slow"));
+        assertFalse("failed: retry, not next page", s.loadNext("F"));
+        scheduler.triggerActions();
+        assertEquals(Arrays.asList("P1", "F1", "P2"), requested);
+        fail[0] = false;
+        assertFalse(s.retry("P"));
+        assertTrue(s.retry("F"));
+        scheduler.triggerActions();
+        assertEquals(Arrays.asList("P1", "F1", "P2", "F1"), requested);
+        assertEquals(0, s.failedCount());
+        assertTrue(s.hasMore("P"));
+        assertFalse(s.hasMore("F"));
+    }
+
+    /** A saved search comes back without a request and goes on from its cursors. */
+    @Test
+    public void aRestoredSearchAsksNothingAndContinuesFromItsCursors() {
+        final List<String> requested = new ArrayList<>();
+        SearchSession.Source<String> paged = new SearchSession.Source<String>() {
+            @Override
+            public String name() {
+                return "P";
+            }
+
+            @Override
+            public Single<ProviderPage<String>> load(String query, int pageNo) {
+                requested.add(query + pageNo);
+                return Single.just(page(false, "p" + pageNo));
+            }
+        };
+        SearchSession<String> s = session(Arrays.asList(paged, source("F", 1, page(false, "f"), scheduler)));
+        java.util.Map<String, ProviderPage.Status> statuses = new java.util.HashMap<>();
+        statuses.put("P", ProviderPage.Status.OK);
+        statuses.put("F", ProviderPage.Status.TIMEOUT);
+        java.util.Map<String, Integer> cursors = new java.util.HashMap<>();
+        cursors.put("P", 3);
+        cursors.put("F", 1);
+        java.util.Map<String, Integer> counts = new java.util.HashMap<>();
+        counts.put("P", 2);
+        s.restore("кинг", Arrays.asList("p1", "p2", "p1"), statuses, cursors, counts);
+        scheduler.triggerActions();
+        assertTrue(requested.isEmpty());
+        assertEquals(Arrays.asList("p1", "p2"), s.items());
+        assertEquals(1, s.failedCount());
+        assertEquals(2, s.states().get(0).count);
+        assertTrue(s.retry("F"));
+        assertTrue(s.loadNext("P"));
+        scheduler.advanceTimeBy(1, TimeUnit.SECONDS);
+        assertEquals(Arrays.asList("кинг3"), requested);
+        assertEquals("p1,p2,p3,f", finished.get(0));
+        assertEquals(0, s.failedCount());
+    }
+
+    /** A restored source goes on with its own letter case, and one that never answered may still try the other one. */
+    @Test
+    public void aRestoredSourceKeepsItsOwnQueryAndItsCaseRetry() {
+        final List<String> requested = new ArrayList<>();
+        SearchSession.Source<String> x = new SearchSession.Source<String>() {
+            @Override
+            public String name() {
+                return "X";
+            }
+
+            @Override
+            public Single<ProviderPage<String>> load(String query, int pageNo) {
+                requested.add("X:" + query + pageNo);
+                return Single.just(page(false, "x" + pageNo));
+            }
+        };
+        SearchSession.Source<String> y = new SearchSession.Source<String>() {
+            @Override
+            public String name() {
+                return "Y";
+            }
+
+            @Override
+            public Single<ProviderPage<String>> load(String query, int pageNo) {
+                requested.add("Y:" + query + pageNo);
+                return Single.just(query.equals("кинг") ? ProviderPage.<String>empty() : page(false, "y"));
+            }
+        };
+        SearchSession<String> s = session(Arrays.asList(x, y));
+        java.util.Map<String, ProviderPage.Status> statuses = new java.util.HashMap<>();
+        statuses.put("X", ProviderPage.Status.OK);
+        statuses.put("Y", ProviderPage.Status.TIMEOUT);
+        java.util.Map<String, Integer> cursors = new java.util.HashMap<>();
+        cursors.put("X", 2);
+        cursors.put("Y", 1);
+        java.util.Map<String, String> queries = new java.util.HashMap<>();
+        queries.put("X", "Кинг");
+        s.restore("кинг", Arrays.asList("x1"), statuses, cursors, new java.util.HashMap<String, Integer>(), queries,
+                new java.util.HashSet<>(Arrays.asList("X")));
+        assertTrue(s.loadNext("X"));
+        assertTrue(s.retry("Y"));
+        scheduler.triggerActions();
+        assertEquals(Arrays.asList("X:Кинг2", "Y:кинг1", "Y:Кинг1"), requested);
+        assertEquals("Кинг", s.queries().get("X"));
+        assertTrue(s.caseRetried("Y"));
+    }
+
     @Test
     public void aPageWhoseCardsWereAllFilteredKeepsItsSourceGoing() {
         SearchSession.Source<String> filtered = new SearchSession.Source<String>() {

@@ -288,6 +288,24 @@
         <item name="android:paddingEnd">4dp</item>
     </style>
 
+    <!-- A source tile on the search screen: flat and square, name over count; its state is the fill colour,
+         the selection a 2dp underline (both set in code). -->
+    <style name="Widget.App.SourceChip" parent="android:Widget.TextView">
+        <item name="android:focusable">true</item>
+        <item name="android:clickable">true</item>
+        <item name="android:minHeight">36dp</item>
+        <item name="android:paddingStart">6dp</item>
+        <item name="android:paddingEnd">6dp</item>
+        <item name="android:paddingTop">2dp</item>
+        <item name="android:paddingBottom">3dp</item>
+        <item name="android:gravity">center</item>
+        <item name="android:maxLines">2</item>
+        <item name="android:includeFontPadding">false</item>
+        <item name="android:textSize">13sp</item>
+        <item name="android:textColor">?attr/colorPrimaryText</item>
+        <item name="android:foreground">@drawable/source_tile_foreground</item>
+    </style>
+
     <!-- The active-filter chip above a book listing: 28dp high, no 48dp touch inset. -->
     <style name="Widget.App.FilterChip" parent="Widget.MaterialComponents.Chip.Entry">
         <item name="android:checkable">false</item>

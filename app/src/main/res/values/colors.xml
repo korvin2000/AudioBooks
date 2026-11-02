@@ -27,6 +27,10 @@
     <color name="actionBarTrac">#b3000000</color>
 
     <color name="secondaryColor">#4caf50</color>
+    <!-- source states on the search screen's chips: found, failed, not answered in time / stopped -->
+    <color name="source_up">#4CAF50</color>
+    <color name="source_down">#E53935</color>
+    <color name="source_partial">#FFB300</color>
     <color name="primaryColorEq">#212121</color>
     <color name="primaryLightColorEq">#313131</color>
     <color name="primaryDarkColorEq">#101010</color>

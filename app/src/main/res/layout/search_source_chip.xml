@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- One source on the search screen: a flat two-line tile (name over count). SearchableActivity sets its text,
+     its state fill and the selected tab's underline. -->
+<TextView xmlns:android="http://schemas.android.com/apk/res/android"
+    style="@style/Widget.App.SourceChip"
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content" />

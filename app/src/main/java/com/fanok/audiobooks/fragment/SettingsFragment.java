@@ -375,6 +375,10 @@ public class SettingsFragment extends PreferenceFragmentCompat implements
                                 preference.getContext(),
                                 MySuggestionProvider.AUTHORITY, MySuggestionProvider.MODE);
                         suggestions.clearHistory();
+                        // the saved last search holds the queries too
+                        new com.fanok.audiobooks.search.SearchSnapshot.Store(
+                                com.fanok.audiobooks.presenter.SearchbalePresenter.snapshotDir(
+                                        preference.getContext())).clear();
                     });
             return true;
         });
