@@ -50,7 +50,7 @@
             android:nextFocusUp="@+id/searchView"
             android:paddingStart="@dimen/margin_small"
             android:paddingEnd="@dimen/margin_small"
-            app:chipSpacingHorizontal="2dp"
+            app:chipSpacingHorizontal="@dimen/search_gap"
             app:singleLine="true" />
     </HorizontalScrollView>
 
@@ -69,9 +69,9 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:gravity="center_vertical"
-        android:minHeight="36dp"
+        android:minHeight="@dimen/search_row_height"
         android:orientation="horizontal"
-        android:paddingStart="@dimen/text_margin_book_description"
+        android:paddingStart="@dimen/margin_small"
         android:paddingEnd="@dimen/margin_small">
 
         <TextView
@@ -82,7 +82,7 @@
             android:maxLines="2"
             android:ellipsize="end"
             android:textColor="?attr/subTextColor"
-            android:textSize="13sp"
+            android:textSize="@dimen/search_text_size"
             tools:text="Ищем… ответили 7 из 13 · найдено 21" />
 
         <Button
@@ -91,8 +91,11 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:focusable="true"
-            android:minHeight="36dp"
+            android:minHeight="@dimen/search_row_height"
             android:textColor="?attr/hrefColor"
+            android:textSize="@dimen/search_text_size"
+            app:insetBottom="0dp"
+            app:insetTop="0dp"
             android:visibility="gone"
             tools:text="Повторить (2)" />
     </LinearLayout>
@@ -103,39 +106,61 @@
         android:layout_height="wrap_content"
         android:orientation="vertical">
 
-        <TextView
-            android:id="@+id/autors"
+        <!-- one row per kind, as the tiles: the label, then its plates scrolling sideways; the 2dp gap under a
+             row sits on its views, so a hidden row takes no room -->
+        <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginStart="@dimen/text_margin_book_description"
-            android:layout_marginEnd="@dimen/text_margin_book_description"
-            android:textColor="?attr/subTextColor"
-            android:textSize="@dimen/titleSize"
-            android:visibility="gone"
-            tools:text="@string/menu_autor" />
+            android:orientation="horizontal"
+            android:paddingStart="@dimen/margin_small">
 
-        <androidx.recyclerview.widget.RecyclerView
-            android:id="@+id/authorList"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:visibility="gone" />
+            <TextView
+                android:id="@+id/autors"
+                style="@style/Widget.App.SearchLabel"
+                android:layout_width="wrap_content"
+                android:layout_height="match_parent"
+                android:layout_marginEnd="@dimen/search_space"
+                android:layout_marginBottom="@dimen/search_gap"
+                android:visibility="gone"
+                tools:text="@string/menu_autor" />
 
-        <TextView
-            android:id="@+id/series"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginStart="@dimen/text_margin_book_description"
-            android:layout_marginEnd="@dimen/text_margin_book_description"
-            android:textColor="?attr/subTextColor"
-            android:textSize="@dimen/titleSize"
-            android:visibility="gone"
-            tools:text="Серии" />
+            <androidx.recyclerview.widget.RecyclerView
+                android:id="@+id/authorList"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="@dimen/search_gap"
+                android:layout_weight="1"
+                android:clipToPadding="false"
+                android:paddingEnd="@dimen/margin_small"
+                android:visibility="gone" />
+        </LinearLayout>
 
-        <androidx.recyclerview.widget.RecyclerView
-            android:id="@+id/seriesList"
+        <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:visibility="gone" />
+            android:orientation="horizontal"
+            android:paddingStart="@dimen/margin_small">
+
+            <TextView
+                android:id="@+id/series"
+                style="@style/Widget.App.SearchLabel"
+                android:layout_width="wrap_content"
+                android:layout_height="match_parent"
+                android:layout_marginEnd="@dimen/search_space"
+                android:layout_marginBottom="@dimen/search_gap"
+                android:visibility="gone"
+                tools:text="Серии" />
+
+            <androidx.recyclerview.widget.RecyclerView
+                android:id="@+id/seriesList"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="@dimen/search_gap"
+                android:layout_weight="1"
+                android:clipToPadding="false"
+                android:paddingEnd="@dimen/margin_small"
+                android:visibility="gone" />
+        </LinearLayout>
     </LinearLayout>
 
     <FrameLayout
