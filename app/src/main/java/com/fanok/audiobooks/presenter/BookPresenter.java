@@ -623,7 +623,7 @@ public class BookPresenter extends MvpPresenter<Activity> implements ActivityPre
     }
 
     /** The chapters' lengths in seconds (0 = unknown), in their order. */
-    static int[] secondsOf(@NonNull List<AudioPOJO> chapters) {
+    public static int[] secondsOf(@NonNull List<AudioPOJO> chapters) {
         int[] seconds = new int[chapters.size()];
         for (int i = 0; i < seconds.length; i++) {
             seconds[i] = chapters.get(i).getTime();

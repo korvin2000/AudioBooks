@@ -53,6 +53,7 @@ Java sources are under `app/src/main/java/com/fanok/audiobooks/`.
 | `search/` | `Provider` (the site registry), multi-source search sessions, paged listings, filters, `SourceProbe` (availability check) and `SourceHealth` (its kept results; a daily check on unmetered networks) |
 | `net/` | `SiteHttp` (page and JSON fetching, cookies, challenge detection), `AppProxy` (proxy, per-site route), cookie jar |
 | `service/` | `MediaPlayerService` (playback, media session, notification, sleep timer), `ExoDownloadService`, playback error policies |
+| `widgets/` | Launcher widgets (GENESIS LAUNCHER level 2, `integration.txt` §4): `ExternalWidgetsProvider` serves the book being played to trusted launchers once allowed in Settings → General; `SessionMirror` follows `MediaPlayerService.SessionListener`. Removable with its manifest entries, the setting and `strings_widgets.xml` |
 | `download/`, `util/` | Download tracking, storage and SAF access, deletion, Media3 data sources |
 | `room/` | Room database `audioBooksDB`, DAOs, migrations; exported schemas live in `app/schemas/` |
 | `policy/`, `android_equalizer/` | Parental control, equalizer |
