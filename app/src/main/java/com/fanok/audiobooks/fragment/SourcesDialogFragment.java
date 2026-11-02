@@ -10,7 +10,6 @@ import android.graphics.drawable.GradientDrawable;
 import android.os.Bundle;
 import android.text.SpannableStringBuilder;
 import android.text.Spanned;
-import android.text.format.DateUtils;
 import android.text.method.LinkMovementMethod;
 import android.text.style.ClickableSpan;
 import android.util.DisplayMetrics;
@@ -42,6 +41,7 @@ import com.fanok.audiobooks.search.Provider;
 import com.fanok.audiobooks.search.SourceHealth;
 import com.fanok.audiobooks.search.SourceProbe;
 import com.fanok.audiobooks.search.Sources;
+import com.fanok.audiobooks.util.RussianDates;
 import com.google.android.material.color.MaterialColors;
 
 import io.reactivex.android.schedulers.AndroidSchedulers;
@@ -239,8 +239,7 @@ public class SourcesDialogFragment extends DialogFragment {
         long at = SourceHealth.lastCheckedAt(prefs);
         Context context = checkedAt.getContext();
         checkedAt.setText(at == 0 ? context.getString(R.string.sources_never_checked)
-                : context.getString(R.string.sources_checked_at, DateUtils.formatDateTime(context, at,
-                        DateUtils.FORMAT_SHOW_DATE | DateUtils.FORMAT_SHOW_TIME | DateUtils.FORMAT_ABBREV_MONTH)));
+                : context.getString(R.string.sources_checked_at, RussianDates.dayAndTime(at)));
     }
 
     private void renderRefresh() {

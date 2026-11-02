@@ -19,7 +19,6 @@ import android.provider.MediaStore;
 import android.provider.SearchRecentSuggestions;
 import android.text.SpannableString;
 import android.text.Spanned;
-import android.text.format.DateFormat;
 import android.text.format.DateUtils;
 import android.text.style.RelativeSizeSpan;
 import android.util.Log;
@@ -68,6 +67,7 @@ import com.fanok.audiobooks.search.SearchOrder;
 import com.fanok.audiobooks.search.SearchRequest;
 import com.fanok.audiobooks.search.SearchUi;
 import com.fanok.audiobooks.search.TextNorm;
+import com.fanok.audiobooks.util.RussianDates;
 import com.fanok.audiobooks.util.RussianResources;
 import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 import java.util.ArrayList;
@@ -983,9 +983,8 @@ public class SearchableActivity extends MvpAppCompatActivity implements Searchab
     }
 
     private String when(long at) {
-        java.util.Date date = new java.util.Date(at);
-        String time = DateFormat.getTimeFormat(this).format(date);
-        return DateUtils.isToday(at) ? time : DateFormat.getDateFormat(this).format(date) + " " + time;
+        String time = RussianDates.time(at);
+        return DateUtils.isToday(at) ? time : RussianDates.date(at) + " " + time;
     }
 
     private static String join(List<String> parts, String sep) {
