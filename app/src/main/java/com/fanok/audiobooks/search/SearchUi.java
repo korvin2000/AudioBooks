@@ -8,6 +8,7 @@ import com.fanok.audiobooks.search.SearchRequest.Field;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -25,10 +26,11 @@ import java.util.Set;
 public final class SearchUi {
 
     /**
-     * A source chip: searching, found (with a count), found nothing, did not answer in time, failed, blocked, or
-     * stopped before it answered (by the listener, or a search restored after its process died).
+     * A source chip: searching, found (with a count), found nothing, did not answer in time, failed, blocked, asked to
+     * be asked less often (429), or stopped before it answered (by the listener, or a search restored after its process
+     * died).
      */
-    public enum ChipKind { RUNNING, FOUND, EMPTY, TIMEOUT, ERROR, BLOCKED, STOPPED }
+    public enum ChipKind { RUNNING, FOUND, EMPTY, TIMEOUT, ERROR, BLOCKED, RATE_LIMITED, STOPPED }
 
     /** The pass as a whole: before any search, under way, every source answered, some failed, all failed, no source. */
     public enum Pass { IDLE, RUNNING, DONE, PARTIAL, FAILED, NO_SOURCES }
@@ -227,8 +229,13 @@ public final class SearchUi {
             }
         }
         int[] hiddenByGenre = new int[1];
-        List<Row> allRows = rows(main, unknown, in, null, hiddenByGenre);
-        List<Row> rows = in.tab == null ? allRows : rows(main, unknown, in, in.tab, new int[1]);
+        // the works of "All", grouped once: they decide whether the request names an author, anew from every set of
+        // cards, for "All" and the tabs alike
+        List<Group> works = authorWord(in.request) != null || in.grouped
+                ? SearchGrouper.group(main, in.shownIds, in.fuzzy) : null;
+        String author = works != null && namesAuthor(works, in.request) ? authorWord(in.request) : null;
+        List<Row> allRows = rows(main, unknown, in, null, hiddenByGenre, author, in.grouped ? works : null);
+        List<Row> rows = in.tab == null ? allRows : rows(main, unknown, in, in.tab, new int[1], author, null);
         hidden += hiddenByGenre[0];
 
         List<Chip> chips = new ArrayList<>();
@@ -261,7 +268,7 @@ public final class SearchUi {
                 answered++;
             }
             if (kind == ChipKind.TIMEOUT || kind == ChipKind.ERROR || kind == ChipKind.BLOCKED
-                    || kind == ChipKind.STOPPED) {
+                    || kind == ChipKind.RATE_LIMITED || kind == ChipKind.STOPPED) {
                 failed.add(p);
             }
             Chip chip = new Chip(p, kind, s == null ? 0 : s.count, s != null && s.hasMore, p == in.tab, slow);
@@ -293,6 +300,70 @@ public final class SearchUi {
                 next == Long.MAX_VALUE ? 0 : next);
     }
 
+    /** Fewest works of the author for a request to name one; and from this many catalogs at least. */
+    static final int AUTHOR_WORKS = 3;
+    static final int AUTHOR_CATALOGS = 2;
+
+    /** The one significant word of a request anywhere, a word and not a number; null for any other request. */
+    static String authorWord(SearchRequest request) {
+        if (!request.isAnywhere()) {
+            return null;
+        }
+        String word = null;
+        for (String t : TextNorm.tokens(request.text)) {
+            if (TextNorm.isSignificant(t)) {
+                if (word != null) {
+                    return null; // two words: a whole author name already matches as one (tier A)
+                }
+                word = t;
+            }
+        }
+        return word == null || TextNorm.isNumber(word) ? null : word;
+    }
+
+    /**
+     * The request names an author ("кинг", "булгаков"): its one word ({@link #authorWord}) is a word of the author
+     * itself in most of what was found that covers it — the works counted by the catalogs that carry them, so a
+     * popular title outweighs a name ("гарри": the Harry Potter books before Гарри Гаррисон's) — in at least
+     * {@link #AUTHOR_WORKS} works, from {@link #AUTHOR_CATALOGS} catalogs or more. The works are the groups of
+     * {@code works} ({@link SearchGrouper#group}): spellings, mirrors and recordings of one book count once.
+     */
+    static boolean namesAuthor(List<Group> works, SearchRequest request) {
+        String word = authorWord(request);
+        if (word == null) {
+            return false;
+        }
+        int found = 0;
+        int all = 0;
+        int author = 0;
+        Set<Object> catalogs = new HashSet<>();
+        for (Group g : works) {
+            List<Offer> covered = new ArrayList<>();
+            boolean authors = false;
+            for (Offer o : g.offers) {
+                if (o.match().covered) {
+                    covered.add(o);
+                    authors |= o.authorHas(word);
+                }
+            }
+            if (covered.isEmpty()) {
+                continue;
+            }
+            int sites = SearchGrouper.catalogs(covered);
+            all += sites;
+            if (authors) {
+                found++;
+                author += sites;
+                for (Offer o : covered) {
+                    if (o.authorHas(word)) {
+                        catalogs.add(o.source == null ? o.url() : o.source.original());
+                    }
+                }
+            }
+        }
+        return found >= AUTHOR_WORKS && author * 2 > all && catalogs.size() >= AUTHOR_CATALOGS;
+    }
+
     private static boolean lacksScope(Offer o, Set<Field> scope) {
         for (Field f : scope) {
             if (o.card.has(f)) {
@@ -303,28 +374,31 @@ public final class SearchUi {
     }
 
     /** The rows in order: the shown ones, those without a genre for the genre filter, those without the scope's data. */
-    private static List<Row> rows(List<Offer> main, List<Offer> unknown, Input in, Provider tab, int[] hidden) {
+    /** {@code works}: the groups of {@code main} for "All" when already made, else null. */
+    private static List<Row> rows(List<Offer> main, List<Offer> unknown, Input in, Provider tab, int[] hidden,
+            String author, List<Group> works) {
         List<Row> out = new ArrayList<>();
         List<Row> noGenre = new ArrayList<>();
         List<Row> noScope = new ArrayList<>();
-        addRows(out, noGenre, only(main, tab), in, tab, false, hidden);
-        addRows(noScope, noScope, only(unknown, tab), in, tab, true, hidden);
+        addRows(out, noGenre, only(main, tab), in, tab, false, hidden, author, works);
+        addRows(noScope, noScope, only(unknown, tab), in, tab, true, hidden, author, null);
         out.addAll(noGenre);
         out.addAll(noScope);
         return out;
     }
 
     private static void addRows(List<Row> out, List<Row> noGenre, List<Offer> offers, Input in, Provider tab,
-            boolean unknown, int[] hidden) {
+            boolean unknown, int[] hidden, String author, List<Group> works) {
         if (tab == null && in.grouped) {
-            List<Group> groups = SearchGrouper.group(offers, in.shownIds, in.fuzzy);
-            Collections.sort(groups, SearchOrder.groups(in.sort));
+            List<Group> groups = works != null ? new ArrayList<>(works)
+                    : SearchGrouper.group(offers, in.shownIds, in.fuzzy);
+            Collections.sort(groups, SearchOrder.groups(in.sort, author));
             for (Group g : groups) {
                 addRow(out, noGenre, g.representative, g, g.offers, in.genres, unknown, hidden);
             }
         } else {
             List<Offer> sorted = new ArrayList<>(offers);
-            Collections.sort(sorted, SearchOrder.offers(in.sort));
+            Collections.sort(sorted, SearchOrder.offers(in.sort, author, tab != null));
             for (Offer o : sorted) {
                 addRow(out, noGenre, o, null, Collections.singletonList(o), in.genres, unknown, hidden);
             }
@@ -385,6 +459,8 @@ public final class SearchUi {
                 return ChipKind.TIMEOUT;
             case BLOCKED:
                 return ChipKind.BLOCKED;
+            case RATE_LIMITED:
+                return ChipKind.RATE_LIMITED;
             case ERROR:
                 return ChipKind.ERROR;
             default:
@@ -409,6 +485,7 @@ public final class SearchUi {
                 case TIMEOUT:
                 case ERROR:
                 case BLOCKED:
+                case RATE_LIMITED:
                 case STOPPED:
                     return Empty.TAB_FAILED;
                 default:

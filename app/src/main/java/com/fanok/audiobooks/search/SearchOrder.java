@@ -23,6 +23,16 @@ public final class SearchOrder {
     }
 
     public static Comparator<Group> groups(final Sort sort) {
+        return groups(sort, null);
+    }
+
+    /**
+     * {@code author}: the word of a request that names an author ({@link SearchUi#authorWord}), else null. By
+     * relevance such a request puts first the works titled just so ("Кинг"), then the works whose author has the word
+     * itself, by tier and the number of sites that carry them (the surname says nothing more between them), then the
+     * rest; every other order is as without it.
+     */
+    public static Comparator<Group> groups(final Sort sort, final String author) {
         return new Comparator<Group>() {
             @Override
             public int compare(Group a, Group b) {
@@ -49,7 +59,7 @@ public final class SearchOrder {
                         c = Integer.compare(firstArrival(a), firstArrival(b));
                         break;
                     default:
-                        c = byRelevance(a.representative, b.representative);
+                        c = byRelevance(a, b, author);
                         break;
                 }
                 return c != 0 ? c : a.id.compareTo(b.id);
@@ -59,6 +69,14 @@ public final class SearchOrder {
 
     /** Cards on their own: a site's tab, or the "cards" view of "All". */
     public static Comparator<Offer> offers(final Sort sort) {
+        return offers(sort, null, false);
+    }
+
+    /**
+     * As {@link #groups(Sort, String)} for cards: on a site's tab ({@code siteTab}) the author's cards keep the site's
+     * own order inside their tier.
+     */
+    public static Comparator<Offer> offers(final Sort sort, final String author, final boolean siteTab) {
         return new Comparator<Offer>() {
             @Override
             public int compare(Offer a, Offer b) {
@@ -89,12 +107,51 @@ public final class SearchOrder {
                         c = Integer.compare(a.arrival, b.arrival);
                         break;
                     default:
-                        c = byRelevance(a, b);
+                        c = author == null ? 0 : Integer.compare(bucket(a, author), bucket(b, author));
+                        if (c == 0 && author != null && siteTab && bucket(a, author) == 1) {
+                            c = a.match.tier.compareTo(b.match.tier);
+                            c = c != 0 ? c : Integer.compare(a.nativeRank, b.nativeRank);
+                        }
+                        c = c != 0 ? c : byRelevance(a, b);
                         break;
                 }
                 return c != 0 ? c : a.url().compareTo(b.url());
             }
         };
+    }
+
+    /**
+     * Groups by relevance: with an author's word ({@code author}) its buckets first ({@link #bucket(Group, String)}),
+     * the author's works by tier and the sites that carry them; then tier, score, the sites that carry the work (among
+     * equal matches the one more sites have), and the representatives' own order.
+     */
+    private static int byRelevance(Group a, Group b, String author) {
+        int c = 0;
+        if (author != null) {
+            int bucket = bucket(a, author);
+            c = Integer.compare(bucket, bucket(b, author));
+            if (c == 0 && bucket == 1) {
+                c = a.tier.compareTo(b.tier);
+                c = c != 0 ? c : Integer.compare(b.catalogs(), a.catalogs());
+            }
+        }
+        c = c != 0 ? c : a.tier.compareTo(b.tier);
+        c = c != 0 ? c : Integer.compare(b.score, a.score);
+        c = c != 0 ? c : Integer.compare(b.catalogs(), a.catalogs());
+        return c != 0 ? c : byRelevance(a.representative, b.representative);
+    }
+
+    /** 0: a work titled just as asked; 1: a work whose author has the word itself; 2: any other. */
+    private static int bucket(Group g, String author) {
+        int best = 2;
+        for (Offer o : g.offers) {
+            best = Math.min(best, bucket(o, author));
+        }
+        return best;
+    }
+
+    private static int bucket(Offer o, String author) {
+        return o.titleIs(author) ? 0 : o.authorHas(author) ? 1 : 2;
     }
 
     /** Tier, score, the site's own rank, the listener's order of sources, the title. */

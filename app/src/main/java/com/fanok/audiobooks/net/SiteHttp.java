@@ -25,7 +25,8 @@ import java.util.concurrent.ConcurrentHashMap;
 /**
  * The one way to fetch a provider page: shared defaults (user agent, referrer, timeout, bounded body),
  * a per-host cookie jar, platform TLS validation, and classification of challenge/error pages.
- * Challenge pages (Cloudflare, DDoS-Guard) raise {@link CookesExeption}; other HTTP errors raise
+ * Challenge pages (Cloudflare, DDoS-Guard) raise {@link CookesExeption}; 429 raises {@link RateLimitedException}, and a
+ * host that said when to come back ({@code Retry-After}) is not asked again before then; other HTTP errors raise
  * {@link HttpStatusException}; parsers therefore never see an error page as content.
  */
 public final class SiteHttp {
@@ -37,6 +38,8 @@ public final class SiteHttp {
     /** What a Russian browser sends; a request without it looks like a bot to some anti-bot walls. */
     public static final String ACCEPT_LANGUAGE = "ru-RU,ru;q=0.8,en-US;q=0.5,en;q=0.3";
     private static final Map<String, Map<String, String>> JAR = new ConcurrentHashMap<>();
+    /** Hosts that answered 429 with a {@code Retry-After}: until when (epoch millis) they are not asked. */
+    private static final Map<String, Long> LIMITED_UNTIL = new ConcurrentHashMap<>();
 
     private SiteHttp() {
     }
@@ -157,8 +160,18 @@ public final class SiteHttp {
     }
 
     private static Connection.Response executeOnce(Connection connection) throws IOException {
-        String requestedHost = Url.hostOf(connection.request().url().toString());
+        String url = connection.request().url().toString();
+        String requestedHost = Url.hostOf(url);
+        int wait = limitedFor(requestedHost, System.currentTimeMillis());
+        if (wait > 0) {
+            throw new RateLimitedException(url, wait); // the site asked not to be asked before then
+        }
         Connection.Response response = connection.execute();
+        if (response.statusCode() == RateLimitedException.STATUS) {
+            long answered = System.currentTimeMillis(); // the wait counts from the answer, not from the ask
+            limit(requestedHost, Url.hostOf(response.url().toString()),
+                    RateLimitedException.retryAfterSeconds(response.header("Retry-After"), answered), answered);
+        }
         if (response.statusCode() == 403 || response.statusCode() == 429) {
             // the automatic proxy may be the one refused, by the host that answered (after redirects)
             AppProxy.reportSuspect(Url.hostOf(response.url().toString()));
@@ -201,9 +214,7 @@ public final class SiteHttp {
             parse(response); // a challenge or an HTTP error throws its own exception
             throw new IOException("not JSON: " + url);
         }
-        if (response.statusCode() >= 400) {
-            throw new HttpStatusException("HTTP error fetching URL", response.statusCode(), url);
-        }
+        throwForStatus(response);
         try {
             return new JsonPage(url, JsonParser.parseString(body));
         } catch (JsonParseException e) {
@@ -227,7 +238,49 @@ public final class SiteHttp {
         return false;
     }
 
-    /** Parses a response or throws: a challenge page → {@link CookesExeption}, HTTP ≥ 400 → {@link HttpStatusException}. */
+    /**
+     * The seconds {@code host} asked not to be asked any more ({@code Retry-After} of its last 429), at {@code nowMs};
+     * 0 when it may be asked.
+     */
+    static int limitedFor(String host, long nowMs) {
+        Long until = LIMITED_UNTIL.get(host);
+        if (until == null) {
+            return 0;
+        }
+        if (nowMs >= until) {
+            LIMITED_UNTIL.remove(host, until);
+            return 0;
+        }
+        return (int) ((until - nowMs + 999) / 1000);
+    }
+
+    /**
+     * A 429 of {@code requestedHost} (answered by {@code answeredHost}) asking to wait {@code seconds}; 0: no wait. Of
+     * answers that cross, the longest wait stands.
+     */
+    static void limit(String requestedHost, String answeredHost, int seconds, long nowMs) {
+        if (seconds <= 0) {
+            return;
+        }
+        long until = nowMs + seconds * 1000L;
+        LIMITED_UNTIL.merge(requestedHost, until, Math::max);
+        LIMITED_UNTIL.merge(answeredHost, until, Math::max);
+    }
+
+    /** Throws for an HTTP error: 429 → {@link RateLimitedException} with its wait, other ≥ 400 → {@link HttpStatusException}. */
+    public static void throwForStatus(Connection.Response response) throws HttpStatusException {
+        int code = response.statusCode();
+        String url = response.url().toString();
+        if (code == RateLimitedException.STATUS) {
+            throw new RateLimitedException(url,
+                    RateLimitedException.retryAfterSeconds(response.header("Retry-After"), System.currentTimeMillis()));
+        }
+        if (code >= 400) {
+            throw new HttpStatusException("HTTP error fetching URL", code, url);
+        }
+    }
+
+    /** Parses a response or throws: a challenge page → {@link CookesExeption}, HTTP ≥ 400 → {@link #throwForStatus}. */
     public static Document parse(Connection.Response response) throws IOException {
         return parse(response, MAX_BODY_BYTES);
     }
@@ -239,13 +292,14 @@ public final class SiteHttp {
             // Jsoup silently truncates at maxBodySize; a cut page would parse as "no more items", so refuse it.
             throw new IOException("Response larger than " + maxBytes + " bytes: " + url);
         }
+        if (response.statusCode() == RateLimitedException.STATUS) {
+            throwForStatus(response); // a rate limit, whatever page it comes with: the same request goes through later
+        }
         Document document = response.parse();
         if (isChallenge(response.header("cf-mitigated"), document.title())) {
             throw new CookesExeption(url);
         }
-        if (response.statusCode() >= 400) {
-            throw new HttpStatusException("HTTP error fetching URL", response.statusCode(), url);
-        }
+        throwForStatus(response);
         return document;
     }
 

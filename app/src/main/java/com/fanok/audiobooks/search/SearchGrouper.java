@@ -111,6 +111,21 @@ public final class SearchGrouper {
             return field == Field.AUTHOR ? authorHolds : field == Field.SERIES && seriesHolds;
         }
 
+        /** The card's author has the word {@code word} itself (normalized), not a prefix or a near one. */
+        boolean authorHas(String word) {
+            return card.words.get(Field.AUTHOR.ordinal()).contains(word);
+        }
+
+        /** The card's whole title (also without its edition) is {@code key} (normalized). */
+        boolean titleIs(String key) {
+            return card.equalsWhole(Field.TITLE, key);
+        }
+
+        /** The work the card is of, as far as its own fields tell: title without edition and the authors' words. */
+        String work() {
+            return card.title + '\u0000' + TextNorm.join(new ArrayList<>(TextNorm.words(card.authors)));
+        }
+
         /** The catalog the card belongs to: mirrors of one catalog count once. */
         Provider catalog() {
             return source == null ? null : source.original();
@@ -278,7 +293,7 @@ public final class SearchGrouper {
                 listings.add(o); // a collection of the same name is not a recording of the book
                 continue;
             }
-            String key = o.card.title + '\u0000' + TextNorm.join(new ArrayList<>(TextNorm.words(o.card.authors)));
+            String key = o.work();
             Draft d = byKey.get(key);
             if (d == null) {
                 d = new Draft(o.card.title);

@@ -588,4 +588,54 @@ public class SearchSessionTest {
         assertTrue(s.states().get(0).running);
         assertEquals(5_000, s.states().get(0).startedAt);
     }
+    /** A source that rate-limited for {@code wait} seconds once, then answers {@code after}. */
+    private SearchSession.Source<String> limitedOnce(String name, int wait, ProviderPage<String> after,
+            List<Integer> asked) {
+        return new SearchSession.Source<String>() {
+            @Override
+            public String name() {
+                return name;
+            }
+
+            @Override
+            public Single<ProviderPage<String>> load(String query, int pageNo) {
+                asked.add(pageNo);
+                return asked.size() == 1 ? Single.just(ProviderPage.<String>failed(
+                        new com.fanok.audiobooks.net.RateLimitedException("https://" + name, wait)))
+                        : Single.just(after);
+            }
+        };
+    }
+
+    /** 429 with a short Retry-After: the same page, once, when the wait is over; the source searches meanwhile. */
+    @Test
+    public void aShortRateLimitIsWaitedOutOnce() {
+        List<Integer> asked = new ArrayList<>();
+        SearchSession<String> s = session(Arrays.asList(limitedOnce("L", 3, page(false, "l1"), asked)));
+        s.search("q");
+        scheduler.triggerActions();
+        assertEquals(Arrays.asList(1), asked);
+        assertTrue(s.states().get(0).running);
+        assertTrue(finished.isEmpty());
+        scheduler.advanceTimeBy(3, TimeUnit.SECONDS);
+        assertEquals(Arrays.asList(1, 1), asked);
+        assertEquals(Collections.singletonList("l1"), finished);
+        assertEquals(ProviderPage.Status.OK, s.states().get(0).status);
+    }
+
+    /** A long wait, or a second 429, leaves the page failed for the listener's retry, which waits for it again. */
+    @Test
+    public void aLongRateLimitFailsAtOnceAndARetryMayWaitAgain() {
+        List<Integer> asked = new ArrayList<>();
+        SearchSession<String> s = session(Arrays.asList(limitedOnce("L", 60, page(false, "l1"), asked)));
+        s.search("q");
+        scheduler.triggerActions();
+        assertEquals(ProviderPage.Status.RATE_LIMITED, s.states().get(0).status);
+        assertFalse(s.states().get(0).running);
+        assertEquals(1, finishedFailures);
+        assertTrue(s.retry("L"));
+        scheduler.triggerActions();
+        assertEquals(Arrays.asList(1, 1), asked);
+        assertEquals(ProviderPage.Status.OK, s.states().get(0).status);
+    }
 }

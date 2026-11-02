@@ -9,6 +9,7 @@ import com.fanok.audiobooks.pojo.BookPOJO;
 import com.fanok.audiobooks.pojo.SearcheblPOJO;
 import com.fanok.audiobooks.pojo.SearchebleArrayPOJO;
 import com.fanok.audiobooks.search.ProviderPage.Status;
+import com.fanok.audiobooks.search.SearchGrouper.Group;
 import com.fanok.audiobooks.search.SearchGrouper.Offer;
 import com.fanok.audiobooks.search.SearchOrder.Sort;
 import com.fanok.audiobooks.search.SearchRequest.Field;
@@ -409,5 +410,144 @@ public class SearchUiTest {
         assertEquals(false, SearchUi.reduce(in).hasMore);
         states.put(Provider.AKNIGA.name(), new SearchSession.State(Provider.AKNIGA.name(), false, Status.OK, 3, true));
         assertTrue(SearchUi.reduce(in).hasMore);
+    }
+    @Test
+    public void aRateLimitedSourceIsAFailureToRetry() {
+        state(Provider.AKNIGA, false, Status.RATE_LIMITED, 0);
+        state(Provider.IZIBUK, false, Status.OK, 2);
+        state(Provider.KNIGOBLUD, false, Status.EMPTY, 0);
+        state(Provider.BIBLUS, false, Status.OK, 1);
+        SearchUi.State s = SearchUi.reduce(in);
+        assertEquals(ChipKind.RATE_LIMITED, s.chips.get(s.chips.size() - 1).kind);
+        assertEquals(Arrays.asList(Provider.AKNIGA), s.failed);
+        in.tab = Provider.AKNIGA;
+        assertEquals(Empty.TAB_FAILED, SearchUi.reduce(in).empty);
+    }
+    private static List<Group> works(List<Offer> offers) {
+        return SearchGrouper.group(offers, java.util.Collections.<String>emptySet(), true);
+    }
+
+    private static List<String> rowTitles(SearchUi.State s) {
+        List<String> out = new ArrayList<>();
+        for (SearchUi.Row r : s.rows) {
+            out.add(r.offer.book.getName());
+        }
+        return out;
+    }
+
+    /** "кинг" as most sites answer it: Stephen King's books, other books with the word, a prefix, a series. */
+    private List<Offer> kingCorpus(boolean manyWorks) {
+        List<Offer> o = new ArrayList<>(Arrays.asList(
+                offer(Provider.BIBLUS, "Кинг", "Екатерина Орлова", null),
+                offer(Provider.AKNIGA, "Мисс Кинг", "Сомерсет Моэм", null)));
+        if (manyWorks) {
+            o.addAll(Arrays.asList(offer(Provider.AKNIGA, "Оно", "Стивен Кинг", null),
+                    offer(Provider.KNIGAVUHE, "Оно", "Кинг Стивен", null),
+                    offer(Provider.IZIBUK, "Оно", "Стивен Кинг", null)));
+        }
+        o.addAll(Arrays.asList(offer(Provider.KNIGAVUHE, "Мизери", "Стивен Кинг", null),
+                offer(Provider.AKNIGA, "Мизери", "Кинг Стивен", null),
+                offer(Provider.AKNIGA, "МногоГолосье. Стивен Кинг", "Кинг Стивен", null)));
+        if (manyWorks) {
+            o.add(offer(Provider.IZIBUK, "Сияние", "Кинг Стивен", null));
+        }
+        o.add(offer(Provider.AKNIGA, "Король", "Эмма Кингсли", null));
+        if (manyWorks) {
+            o.add(offer(Provider.IZIBUK, "Кэрри", "Стивен Кинг", null));
+        }
+        return o;
+    }
+
+    /**
+     * A one-word request that names an author: the work titled just so first, then the author's works by the sites
+     * that carry them, then the other works with the word; a prefix ("Кингсли") is no evidence and no promotion.
+     */
+    @Test
+    public void aSurnameBringsTheAuthorsWorksAboveOtherTitlesWithTheWord() {
+        in.request = SearchRequest.anywhere("кинг");
+        in.offers = kingCorpus(true);
+        assertEquals(Arrays.asList("Кинг", "Оно", "Мизери", "МногоГолосье. Стивен Кинг", "Сияние", "Кэрри",
+                "Мисс Кинг", "Король"), rowTitles(SearchUi.reduce(in)));
+
+        // the order does not depend on the order the cards came in
+        List<Offer> reversed = new ArrayList<>(in.offers);
+        java.util.Collections.reverse(reversed);
+        in.offers = reversed;
+        assertEquals("Оно", rowTitles(SearchUi.reduce(in)).get(1));
+
+        // two works of the author: too few to tell; the request is taken as a title word, as before
+        in.offers = kingCorpus(false);
+        assertEquals("Мисс Кинг", rowTitles(SearchUi.reduce(in)).get(1));
+    }
+
+    @Test
+    public void onlyAOneWordRequestAnywhereOfSeveralCatalogsNamesAnAuthor() {
+        List<Offer> king = kingCorpus(true);
+        assertEquals("кинг", SearchUi.authorWord(SearchRequest.anywhere("Кинг")));
+        assertEquals(null, SearchUi.authorWord(SearchRequest.anywhere("стивен кинг")));
+        assertEquals(null, SearchUi.authorWord(SearchRequest.anywhere("1984")));
+        assertEquals(null, SearchUi.authorWord(new SearchRequest("кинг", EnumSet.of(Field.TITLE))));
+        for (Offer o : king) {
+            o.score(SearchRequest.anywhere("кинг"));
+        }
+        assertTrue(SearchUi.namesAuthor(works(king), SearchRequest.anywhere("кинг")));
+        List<Offer> oneSite = new ArrayList<>();
+        for (Offer o : king) {
+            if (o.source == Provider.AKNIGA) {
+                oneSite.add(o);
+            }
+        }
+        assertEquals("one catalog is no evidence", false,
+                SearchUi.namesAuthor(works(oneSite), SearchRequest.anywhere("кинг")));
+
+        // spellings of one author's one book are one work, not three
+        List<Offer> talisman = new ArrayList<>(Arrays.asList(
+                offer(Provider.AKNIGA, "Талисман", "Стивен Кинг", null),
+                offer(Provider.KNIGAVUHE, "Талисман", "Кинг Стивен", null),
+                offer(Provider.IZIBUK, "Талисман", "Стивен Кинг", null),
+                offer(Provider.AKNIGA, "Кинг судьбы", "Иванов Иван", null)));
+        for (Offer o : talisman) {
+            o.score(SearchRequest.anywhere("кинг"));
+        }
+        assertEquals(false, SearchUi.namesAuthor(works(talisman), SearchRequest.anywhere("кинг")));
+    }
+
+    /** A title word that is no surname, and a prefix of one ("гарри" → Гаррисон), keep the plain relevance. */
+    @Test
+    public void aTitleWordStaysATitleWord() {
+        in.request = SearchRequest.anywhere("гарри");
+        in.offers = Arrays.asList(
+                offer(Provider.AKNIGA, "Гарри Поттер и философский камень", "Джоан Роулинг", null),
+                offer(Provider.IZIBUK, "Гарри Поттер и философский камень", "Роулинг Джоан", null),
+                offer(Provider.KNIGAVUHE, "Гарри Поттер и философский камень", "Джоан Роулинг", null),
+                offer(Provider.AKNIGA, "Гарри Поттер и тайная комната", "Джоан Роулинг", null),
+                offer(Provider.KNIGAVUHE, "Гарри Поттер и тайная комната", "Джоан Роулинг", null),
+                offer(Provider.IZIBUK, "Гарри Поттер и тайная комната", "Джоан Роулинг", null),
+                offer(Provider.KNIGAVUHE, "Неукротимая планета", "Гарри Гаррисон", null),
+                offer(Provider.AKNIGA, "Стальная крыса", "Гаррисон Гарри", null),
+                offer(Provider.IZIBUK, "Мир смерти", "Гарри Гаррисон", null));
+        // Гарри Гаррисон has the word itself in three works, each on one site; Harry Potter is on three sites a book
+        List<String> titles = rowTitles(SearchUi.reduce(in));
+        assertEquals(5, titles.size());
+        assertTrue(titles.get(0).startsWith("Гарри Поттер") && titles.get(1).startsWith("Гарри Поттер"));
+        in.request = SearchRequest.anywhere("сияние");
+        in.offers = Arrays.asList(offer(Provider.AKNIGA, "Сияние", "Стивен Кинг", null),
+                offer(Provider.IZIBUK, "Сияние звёзд", "Иванов Иван", null));
+        assertEquals(Arrays.asList("Сияние", "Сияние звёзд"), rowTitles(SearchUi.reduce(in)));
+    }
+
+    /** On a site's tab the author's cards keep the site's own order inside their tier. */
+    @Test
+    public void aSiteTabKeepsTheSitesOrderForTheAuthorsCards() {
+        in.request = SearchRequest.anywhere("кинг");
+        List<Offer> offers = new ArrayList<>(kingCorpus(true));
+        in.offers = offers;
+        in.tab = Provider.AKNIGA;
+        List<String> tab = rowTitles(SearchUi.reduce(in));
+        assertEquals(Arrays.asList("Оно", "Мизери", "МногоГолосье. Стивен Кинг", "Мисс Кинг", "Король"), tab);
+        in.grouped = false;
+        in.tab = null;
+        assertEquals("the cards of All, ungrouped: the title first, then the author's", Arrays.asList("Кинг", "МногоГолосье. Стивен Кинг"),
+                rowTitles(SearchUi.reduce(in)).subList(0, 2));
     }
 }

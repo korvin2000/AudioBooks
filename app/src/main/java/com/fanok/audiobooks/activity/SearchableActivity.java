@@ -860,7 +860,9 @@ public class SearchableActivity extends MvpAppCompatActivity implements Searchab
                 color = attrColor(R.attr.subTextColor);
                 break;
             case TIMEOUT:
+            case RATE_LIMITED:
             case STOPPED:
+                // passing troubles, amber: the same request goes through later
                 count = FAILED_MARK;
                 description = getString(R.string.search_chip_failed, name, statusName(c.kind));
                 color = ContextCompat.getColor(this, R.color.source_partial);
@@ -932,6 +934,8 @@ public class SearchableActivity extends MvpAppCompatActivity implements Searchab
                 return getString(R.string.sources_status_timeout);
             case BLOCKED:
                 return getString(R.string.sources_status_blocked);
+            case RATE_LIMITED:
+                return getString(R.string.sources_status_rate_limited);
             case STOPPED:
                 return getString(R.string.sources_status_stopped);
             default:

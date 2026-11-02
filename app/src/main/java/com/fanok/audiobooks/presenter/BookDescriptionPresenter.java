@@ -8,6 +8,7 @@ import com.arellomobile.mvp.MvpPresenter;
 import com.fanok.audiobooks.App;
 import com.fanok.audiobooks.Consts;
 import com.fanok.audiobooks.CookesExeption;
+import com.fanok.audiobooks.net.RateLimitedException;
 import com.fanok.audiobooks.R;
 import com.fanok.audiobooks.interface_pacatge.book_content.Description;
 import com.fanok.audiobooks.interface_pacatge.book_content.DescriptionModel;
@@ -131,6 +132,9 @@ public class BookDescriptionPresenter extends MvpPresenter<Description> implemen
     static int errorMessage(Throwable e) {
         if (e instanceof CookesExeption) {
             return CookesExeption.messageFor(e.getMessage());
+        }
+        if (e instanceof RateLimitedException) {
+            return R.string.site_rate_limited;
         }
         if (e instanceof IOException) {
             return R.string.error_load_data;

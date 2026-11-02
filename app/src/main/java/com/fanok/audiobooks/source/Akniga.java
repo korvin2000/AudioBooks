@@ -385,7 +385,9 @@ public final class Akniga implements SourceParser {
                 .ignoreContentType(true)
                 .data("security_ls_key", key)
                 .data("sText", query == null ? "" : query);
-        String body = SiteHttp.execute(connection).body();
+        Connection.Response response = SiteHttp.execute(connection);
+        SiteHttp.throwForStatus(response); // a rate limit or an error is no "nobody found"
+        String body = response.body();
         JsonElement json = JsonParser.parseString(body.replaceAll("\\n", ""));
         if (!json.isJsonObject() || !json.getAsJsonObject().has("html")) {
             return Jsoup.parse("");

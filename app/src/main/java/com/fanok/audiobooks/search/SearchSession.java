@@ -84,8 +84,7 @@ public final class SearchSession<T> {
         }
 
         public boolean isFailure() {
-            return status == ProviderPage.Status.ERROR || status == ProviderPage.Status.TIMEOUT
-                    || status == ProviderPage.Status.BLOCKED;
+            return ProviderPage.isFailure(status);
         }
     }
 
@@ -113,6 +112,11 @@ public final class SearchSession<T> {
      * it bounds the fan-out on a phone's network once there are more.
      */
     static final int MAX_PARALLEL = 13;
+    /**
+     * A site that answered 429 asking to wait at most this long is asked again by itself, once a page, when the wait
+     * is over; a longer wait, or none said, leaves the page failed for the listener's retry.
+     */
+    static final int AUTO_RETRY_SECONDS = 10;
     private final Listener<T> listener;
 
     private final CompositeDisposable running = new CompositeDisposable();
@@ -125,6 +129,8 @@ public final class SearchSession<T> {
     private final LinkedHashSet<Source<T>> failed = new LinkedHashSet<>();
     private final HashSet<Source<T>> loading = new HashSet<>();
     private final HashMap<Source<T>, Long> startedAt = new HashMap<>();
+    /** Sources whose rate-limited page was already asked again by itself; an answer of another kind clears it. */
+    private final HashSet<Source<T>> limitRetried = new HashSet<>();
     private final HashSet<Source<T>> caseTried = new HashSet<>();
     private final LinkedHashMap<Source<T>, Integer> counts = new LinkedHashMap<>();
     private int generation;
@@ -154,6 +160,7 @@ public final class SearchSession<T> {
         queryOf.clear();
         loading.clear();
         caseTried.clear();
+        limitRetried.clear();
         counts.clear();
         query = q;
         for (Source<T> s : sources) {
@@ -203,6 +210,7 @@ public final class SearchSession<T> {
             return false;
         }
         failed.removeAll(batch);
+        limitRetried.removeAll(batch);
         run(batch);
         return true;
     }
@@ -214,6 +222,7 @@ public final class SearchSession<T> {
             return false;
         }
         failed.remove(s);
+        limitRetried.remove(s);
         run(Collections.singletonList(s));
         return true;
     }
@@ -305,6 +314,7 @@ public final class SearchSession<T> {
         nextPage.clear();
         queryOf.clear();
         caseTried.clear();
+        limitRetried.clear();
         counts.clear();
         query = q;
         for (T item : saved) {
@@ -332,8 +342,7 @@ public final class SearchSession<T> {
             if (page != null) {
                 nextPage.put(s, page);
             }
-            if (status == ProviderPage.Status.ERROR || status == ProviderPage.Status.TIMEOUT
-                    || status == ProviderPage.Status.BLOCKED) {
+            if (ProviderPage.isFailure(status)) {
                 failed.add(s);
             }
             Integer n = count.get(s.name());
@@ -375,14 +384,18 @@ public final class SearchSession<T> {
         pending = 0;
         loading.clear();
         running.clear();
+        limitRetried.clear(); // a waited-out retry cancelled here was never asked: the next ask may wait again
     }
 
     private void run(List<Source<T>> batch) {
-        run(batch, null);
+        run(batch, null, 0);
     }
 
-    /** Loads the cursor page of every source of {@code batch}; {@code since}: the time their wait started, else now. */
-    private void run(List<Source<T>> batch, Long since) {
+    /**
+     * Loads the cursor page of every source of {@code batch} after {@code delayMs}; {@code since}: the time their wait
+     * started, else now. The page's limit counts from the request, not from the delay.
+     */
+    private void run(List<Source<T>> batch, Long since, long delayMs) {
         final int gen = generation;
         if (batch.isEmpty()) {
             listener.onFinished(items(), failed.size());
@@ -397,9 +410,10 @@ public final class SearchSession<T> {
             final String q = queryOf.get(s) == null ? query : queryOf.get(s);
             loading.add(s);
             startedAt.put(s, since != null ? since : main.now(TimeUnit.MILLISECONDS));
-            calls.add(Single.defer(() -> s.load(q, page))
+            Single<ProviderPage<T>> load = Single.defer(() -> s.load(q, page))
                     .subscribeOn(io)
-                    .timeout(Math.max(timeoutSeconds, s.timeoutSeconds()), TimeUnit.SECONDS, io)
+                    .timeout(Math.max(timeoutSeconds, s.timeoutSeconds()), TimeUnit.SECONDS, io);
+            calls.add((delayMs > 0 ? Single.timer(delayMs, TimeUnit.MILLISECONDS, io).flatMap(t -> load) : load)
                     .onErrorReturn(e -> ProviderPage.<T>failed(e))
                     .map(p -> new Arrival<>(s, page, q, p))
                     .toObservable());
@@ -433,6 +447,15 @@ public final class SearchSession<T> {
         ProviderPage<T> page = a.page;
         pending--;
         loading.remove(s);
+        if (page.status == ProviderPage.Status.RATE_LIMITED) {
+            if (page.retryAfterSeconds > 0 && page.retryAfterSeconds <= AUTO_RETRY_SECONDS && limitRetried.add(s)) {
+                // the site said when: the same page then, once, as part of the same wait (its tile keeps searching)
+                run(Collections.singletonList(s), startedAt.get(s), page.retryAfterSeconds * 1000L);
+                return;
+            }
+        } else {
+            limitRetried.remove(s);
+        }
         statuses.put(s, page.status);
         int contributed = 0;
         boolean added = false;
@@ -474,7 +497,7 @@ public final class SearchSession<T> {
             queryOf.put(s, variant);
             nextPage.put(s, 1);
             // one search of the site, in two letter cases: its wait goes on from the first ask
-            run(Collections.singletonList(s), startedAt.get(s));
+            run(Collections.singletonList(s), startedAt.get(s), 0);
             return;
         }
         listener.onSourceState(state(s));
