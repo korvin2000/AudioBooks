@@ -14,7 +14,7 @@ import androidx.media3.common.util.UnstableApi;
 public final class PlaybackSettings {
 
     public static final float MIN_SPEED = 0.25f;
-    public static final float MAX_SPEED = 4.0f;
+    public static final float MAX_SPEED = 2.5f;
 
     public static final int DEFAULT_BUFFER_SECONDS = 120;
     /** The settings screen accepts at most three digits. */
@@ -24,7 +24,7 @@ public final class PlaybackSettings {
     private PlaybackSettings() {
     }
 
-    /** Playback speed accepted by Media3 and sensible for speech: [0.25, 4.0]; NaN becomes 1. */
+    /** Playback speed accepted by Media3 and sensible for speech: [0.25, 2.5]; NaN becomes 1. */
     public static float clampSpeed(float speed) {
         if (Float.isNaN(speed)) {
             return 1f;

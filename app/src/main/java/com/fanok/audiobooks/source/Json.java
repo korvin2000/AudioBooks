@@ -9,20 +9,53 @@ import com.google.gson.JsonParser;
 /**
  * What every JSON a source reads needs: a player config, an XHR playlist or a JSON API page ({@code JsonPage.of}).
  * Absent or mistyped values read as "" or 0; a document of the wrong shape is an {@link IllegalStateException}, like
- * every other "page is not what the site serves" case. Pure and static.
+ * every other "page is not what the site serves" case. JS-only escapes ({@code \(}, {@code \-} ...) are read as JS
+ * reads them, since players eval their JSON as JS. Pure and static.
  */
 public final class Json {
 
     private Json() {
     }
 
-    /** {@code text} parsed; malformed text is an {@link IllegalStateException}. */
+    /**
+     * {@code text} parsed; malformed text is an {@link IllegalStateException}. Only after the strict parse fails are
+     * JS-only escapes read as JS reads them ({@link #jsEscapes}); a cut document is never "repaired".
+     */
     public static JsonElement parse(String text) {
         try {
             return JsonParser.parseString(text);
         } catch (JsonParseException e) {
+            String js = jsEscapes(text);
+            if (!js.equals(text)) {
+                try {
+                    return JsonParser.parseString(js);
+                } catch (JsonParseException stillBad) {
+                    // not a JS literal either: report the first error
+                }
+            }
             throw new IllegalStateException("malformed JSON", e);
         }
+    }
+
+    /**
+     * Pure: escapes a JS literal has and JSON lacks ({@code \(}, {@code \-} ...) read as JS reads them: the character
+     * itself.
+     */
+    static String jsEscapes(String text) {
+        StringBuilder out = new StringBuilder(text.length());
+        for (int i = 0; i < text.length(); i++) {
+            char c = text.charAt(i);
+            if (c == '\\' && i + 1 < text.length()) {
+                char next = text.charAt(++i);
+                if ("\"\\/bfnrtu'\n".indexOf(next) >= 0) {
+                    out.append(c); // an escape Gson reads: kept whole, so \\( stays a backslash and a '('
+                }
+                out.append(next);
+            } else {
+                out.append(c);
+            }
+        }
+        return out.toString();
     }
 
     public static JsonArray array(String text) {

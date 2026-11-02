@@ -203,9 +203,11 @@
                 <data android:host="baza-knig.ink" />
                 <data android:host="www.knigoblud.club" />
                 <data android:host="knigoblud.club" />
+                <data android:host="mob.knigoblud.club" />
                 <data android:host="audioboo.org" />
                 <data android:host="audioboo.ru" />
                 <data android:host="otrub.in" />
+                <data android:host="m.otrub.in" />
                 <data android:host="poleknig.com" />
                 <data android:host="uknig.com" />
                 <data android:host="audiokniga.life" />
@@ -231,6 +233,14 @@
                 <data android:host="sweetbook.net" />
                 <data android:host="golosom.org" />
                 <data android:host="www.golosom.org" />
+            </intent-filter>
+            <!-- a text shared from another app (Telegram, a browser): its first link to a site of the app opens -->
+            <intent-filter>
+                <action android:name="android.intent.action.SEND" />
+
+                <category android:name="android.intent.category.DEFAULT" />
+
+                <data android:mimeType="text/plain" />
             </intent-filter>
         </activity>
 

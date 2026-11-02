@@ -170,6 +170,10 @@ public class GenreListAddapter extends RecyclerView.Adapter<GenreListAddapter.My
         }
 
         void bindStar(GenrePOJO person) {
+            // the number stands right next to the star; without the star it keeps its margin from the edge
+            ViewGroup.MarginLayoutParams lp = (ViewGroup.MarginLayoutParams) mReting.getLayoutParams();
+            lp.setMarginEnd(mStarKind < 0
+                    ? mReting.getResources().getDimensionPixelSize(R.dimen.text_margin) : 0);
             if (mStarKind < 0) {
                 mStar.setVisibility(View.GONE);
                 return;

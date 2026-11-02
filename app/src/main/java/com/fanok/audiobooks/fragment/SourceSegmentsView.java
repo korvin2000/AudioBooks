@@ -15,8 +15,8 @@ import com.google.android.material.color.MaterialColors;
 
 /**
  * A row of rounded cells, each in its own colour, with an optional line after the first {@code divider} cells and one
- * cell drawn full height while the others are a little shorter: the 13-cell meter of the active sources, and the strip
- * of every source in the position sheet. Decorative: its owner sets the content description.
+ * cell drawn full height while the others are a little shorter: the meter of the active sources (a cell per allowed
+ * one), and the strip of every source in the position sheet. Decorative: its owner sets the content description.
  */
 public class SourceSegmentsView extends View {
 

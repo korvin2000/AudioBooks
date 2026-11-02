@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- What failed when a book's page or chapters did not load (BookDescriptionPresenter.errorMessage). -->
+<resources>
+    <string name="error_site_no_answer">Сайт не ответил вовремя: медленная связь или сайт перегружен. Попробуйте ещё раз</string>
+    <string name="error_site_changed">Страница сайта не такая, как ожидалось: возможно, сайт её изменил. Попробуйте позже или другой источник</string>
+    <string name="error_no_network">Нет сети, а скачанных глав у этой книги нет</string>
+    <string name="error_site_unreachable">Нет связи с сайтом: проверьте интернет или попробуйте позже</string>
+    <!-- the error dialog's link above its technical details (BookActivity.showLoadError) -->
+    <string name="error_report_copy">Скопировать отчёт</string>
+</resources>

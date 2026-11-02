@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Settings > Загрузки: the folder layout of exported books (util.DownloadStorageHelper.PREF_FOLDER_LAYOUT). -->
+<resources>
+    <string name="folder_layout">Папки при сохранении</string>
+    <string name="folder_layout_summary">Стратегия создания папок при сохранении: %s</string>
+</resources>

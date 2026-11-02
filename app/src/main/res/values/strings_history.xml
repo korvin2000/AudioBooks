@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- История: the listening status on the toolbar's switcher (FavoriteFragment, model.HistoryFilter) -->
+    <string name="history_all">Вся история</string>
+    <string name="history_not_started">Не слушал</string>
+    <string name="history_listening">Слушаю</string>
+    <string name="history_finished">Прослушанные</string>
+    <string name="history_switcher_desc">История: %1$s. Выбрать список</string>
+
+    <!-- История: the period of the last opening of the book's page, the calendar icon -->
+    <string name="history_period">Период</string>
+    <string name="history_period_all">За всё время</string>
+    <string name="history_period_year">За год</string>
+    <string name="history_period_month">За месяц</string>
+    <string name="history_period_week">За неделю</string>
+    <string name="history_period_day">За день</string>
+    <!-- the subtitle: a period, then the site the list is narrowed to -->
+    <string name="history_subtitle">%1$s · %2$s</string>
+
+    <!-- «Очистить список» while a status or a period narrows the history -->
+    <string name="history_confirm_clear_shown">Убрать из истории показанные книги?</string>
+</resources>

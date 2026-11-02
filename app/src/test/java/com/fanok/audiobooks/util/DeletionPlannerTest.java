@@ -151,6 +151,12 @@ public class DeletionPlannerTest {
         assertEquals(2, DeletionPlanner.prunableDepth(Arrays.asList(book, reader), Collections.<String>emptyList()));
     }
 
+    @Test
+    public void aFlatBookFolderIsTheOnlyFolderPruned() {
+        assertEquals(1, DeletionPlanner.prunableDepth(Collections.singletonList(ROOT + "/Мастер - Булгаков (Козий)"),
+                ROOTS));
+    }
+
     private static Row row(String urlBook, String urlAudio, String localUri) {
         return new Row(urlBook, urlAudio, localUri);
     }

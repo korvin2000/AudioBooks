@@ -595,6 +595,12 @@ public class SearchableActivity extends MvpAppCompatActivity implements Searchab
             mPresenter.searchPerson(personKindOf(intent), person);
         } else if (binding != null && isSearch(intent)) {
             String query = intent.getStringExtra(SearchManager.QUERY);
+            String link = LoadBook.bookUrlIn(query);
+            if (link != null) {
+                // a pasted book link opens the book; it is not a query to remember
+                startActivity(new Intent(this, LoadBook.class).putExtra("url", link));
+                return;
+            }
             if (query != null) {
                 SearchRecentSuggestions suggestions = new SearchRecentSuggestions(this,
                         MySuggestionProvider.AUTHORITY, MySuggestionProvider.MODE);
@@ -952,7 +958,7 @@ public class SearchableActivity extends MvpAppCompatActivity implements Searchab
     }
 
     private void bindAllChip(SearchUi.State state) {
-        String name = getString(R.string.all);
+        String name = getString(R.string.search_all_sources);
         String count = state.allCount > 0 ? String.valueOf(state.allCount) : RUNNING_MARK;
         int color;
         switch (state.pass) {

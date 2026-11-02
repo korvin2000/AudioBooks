@@ -77,6 +77,30 @@ public class FavoriteModel implements
         });
     }
 
+    /** The status is the same percent the card's ring shows (ListeningProgress), whatever the ring's setting. */
+    @Override
+    public Observable<ArrayList<BookPOJO>> getHistory(int status, long since) {
+        return Observable.fromCallable(() -> {
+            ArrayList<BookPOJO> books = mBooksDBModel.getHistorySince(since);
+            if (status == HistoryFilter.STATUS_ALL) {
+                return books;
+            }
+            AudioDBModel position = new AudioDBModel(mContext);
+            ArrayList<BookPOJO> matching = new ArrayList<>();
+            try {
+                for (BookPOJO book : books) {
+                    int percent = ListeningProgress.of(mAudioListDBModel, position, book.getUrl());
+                    if (HistoryFilter.statusOf(percent) == status) {
+                        matching.add(book);
+                    }
+                }
+            } finally {
+                position.closeDB();
+            }
+            return matching;
+        });
+    }
+
     /** The download state of every book, computed once in one worker pass (DATA-07). */
     @Override
     public Single<Map<String, Integer>> savedStates(@NonNull List<BookPOJO> books) {

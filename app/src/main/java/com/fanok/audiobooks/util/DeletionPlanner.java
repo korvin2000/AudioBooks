@@ -128,7 +128,10 @@ public final class DeletionPlanner {
         return best;
     }
 
-    /** Folders the exporter creates for a book's chapters: source, book and reader. */
+    /**
+     * Folders the exporter creates for a book's chapters: source, book and reader in the nested layout; in the flat
+     * layout the book's one folder, the only one between the root and the file, so only it is pruned.
+     */
     public static final int BOOK_FOLDER_LEVELS = 3;
 
     /**

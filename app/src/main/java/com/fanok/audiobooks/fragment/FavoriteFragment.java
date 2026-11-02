@@ -56,6 +56,7 @@ import com.fanok.audiobooks.adapter.BookSheetPeople;
 import com.fanok.audiobooks.adapter.BooksListAddapter;
 import com.fanok.audiobooks.databinding.FragmentFavoriteBinding;
 import com.fanok.audiobooks.interface_pacatge.favorite.FavoriteView;
+import com.fanok.audiobooks.model.HistoryFilter;
 import com.fanok.audiobooks.pojo.BookPOJO;
 import com.fanok.audiobooks.policy.DefaultCover;
 import com.fanok.audiobooks.policy.ParentalControl;
@@ -97,8 +98,15 @@ public class FavoriteFragment extends MvpAppCompatFragment implements FavoriteVi
 
     private BottomSheetDialog bookMenu;
 
-    /** The whole favorites (not a site's part of them): the toolbar's title is the lists' switcher. */
+    /**
+     * The toolbar's title is a switcher: the lists of the whole favorites (not a site's part of them), or the
+     * listening status of the history.
+     */
     private boolean switcher;
+
+    /** The subtitle the presenter set last (a filter); the history puts its period before it. */
+    @NonNull
+    private String lastSubtitle = "";
 
     public static FavoriteFragment newInstance(int title, int table) {
         FavoriteFragment fragment = new FavoriteFragment();
@@ -223,6 +231,11 @@ public class FavoriteFragment extends MvpAppCompatFragment implements FavoriteVi
                             R.id.series_filter, R.id.saved_filter}) {
                         menu.findItem(id).setVisible(false);
                     }
+                    MenuItem period = menu.findItem(R.id.history_period);
+                    period.setVisible(true);
+                    setColorPrimeriTextInIconItemMenu(period, requireContext());
+                    menu.findItem(HistoryFilter.PERIOD_ITEMS[HistoryFilter.period(requireContext())])
+                            .setChecked(true);
                 }
 
                 if (table == TABLE_FAVORITE || table == TABLE_HISTORY) {
@@ -238,6 +251,19 @@ public class FavoriteFragment extends MvpAppCompatFragment implements FavoriteVi
                     confirmClear();
                     return true;
                 }
+                if (item.getItemId() == R.id.history_period) {
+                    return true; // its submenu opens
+                }
+                int period = HistoryFilter.periodOf(item.getItemId());
+                if (period >= 0) {
+                    item.setChecked(true);
+                    if (period != HistoryFilter.period(requireContext())) {
+                        HistoryFilter.setPeriod(requireContext(), period);
+                        setSubTitle(lastSubtitle);
+                        mPresenter.reloadHistory();
+                    }
+                    return true;
+                }
                 mPresenter.onOptionsItemSelected(item.getItemId());
                 item.setChecked(true);
                 return true;
@@ -247,8 +273,10 @@ public class FavoriteFragment extends MvpAppCompatFragment implements FavoriteVi
         if (titleId != 0) {
             requireActivity().setTitle(titleId);
         }
-        switcher = table == TABLE_FAVORITE && !requireArguments().containsKey(ARG_SOURCE);
-        if (switcher) {
+        switcher = (table == TABLE_FAVORITE && !requireArguments().containsKey(ARG_SOURCE)) || table == TABLE_HISTORY;
+        if (table == TABLE_HISTORY) {
+            installHistorySwitcher();
+        } else if (switcher) {
             FavoritesSwitcher.install(this, FavoritesSwitcher.BOOKS);
         }
         setSubTitle(""); // the previous screen's subtitle; an active filter sets its own on view-state replay
@@ -427,13 +455,49 @@ public class FavoriteFragment extends MvpAppCompatFragment implements FavoriteVi
 
     @Override
     public void setSubTitle(@NotNull String text) {
-        if (switcher && FavoritesSwitcher.setSubtitle(this, text)) {
+        lastSubtitle = text;
+        String shown = table == TABLE_HISTORY ? withPeriod(text) : text;
+        if (switcher && FavoritesSwitcher.setSubtitle(this, shown)) {
             return;
         }
         MainActivity mainActivity = (MainActivity) getActivity();
         if (mainActivity != null) {
-            Objects.requireNonNull(mainActivity.getSupportActionBar()).setSubtitle(text);
+            Objects.requireNonNull(mainActivity.getSupportActionBar()).setSubtitle(shown);
         }
+    }
+
+    /** The history's subtitle: a period other than "За всё время" comes first ("За неделю · <сайт>"). */
+    @NonNull
+    private String withPeriod(@NonNull String text) {
+        Context context = getContext();
+        int period = context == null ? HistoryFilter.PERIOD_ALL : HistoryFilter.period(context);
+        if (period == HistoryFilter.PERIOD_ALL) {
+            return text;
+        }
+        String name = context.getString(HistoryFilter.PERIOD_TITLES[period]);
+        return text.isEmpty() ? name : context.getString(R.string.history_subtitle, name, text);
+    }
+
+    /** The history's title: its listening status ("Слушаю ⌄"), a menu of the four. */
+    private void installHistorySwitcher() {
+        Context context = requireContext();
+        int status = HistoryFilter.status(context);
+        String[] names = new String[HistoryFilter.STATUS_TITLES.length];
+        for (int i = 0; i < names.length; i++) {
+            names[i] = context.getString(HistoryFilter.STATUS_TITLES[i]);
+        }
+        FavoritesSwitcher.install(this, R.drawable.ic_menu_history, names[status],
+                context.getString(R.string.history_switcher_desc, names[status]),
+                (activity, anchor, arrow) -> FavoritesSwitcher.choose(activity, anchor, arrow, names, status,
+                        chosen -> {
+                            if (binding == null || chosen == status) {
+                                return;
+                            }
+                            HistoryFilter.setStatus(context, chosen);
+                            installHistorySwitcher();
+                            setSubTitle(lastSubtitle);
+                            mPresenter.reloadHistory();
+                        }));
     }
 
 
@@ -446,8 +510,10 @@ public class FavoriteFragment extends MvpAppCompatFragment implements FavoriteVi
     }
 
     private void confirmClear() {
-        confirmClear(requireContext(), titleId != 0 ? titleId : R.string.app_name,
-                table == TABLE_HISTORY ? R.string.confirm_clear_history : R.string.confirm_clear_favorite,
+        int message = table != TABLE_HISTORY ? R.string.confirm_clear_favorite
+                : HistoryFilter.active(requireContext()) ? R.string.history_confirm_clear_shown
+                : R.string.confirm_clear_history;
+        confirmClear(requireContext(), titleId != 0 ? titleId : R.string.app_name, message,
                 () -> mPresenter.clearAll());
     }
 

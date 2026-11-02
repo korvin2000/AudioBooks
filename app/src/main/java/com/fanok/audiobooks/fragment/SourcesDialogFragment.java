@@ -403,7 +403,7 @@ public class SourcesDialogFragment extends DialogFragment {
         if (!Rows.canMove(rows, position, to)) {
             Context context = requireContext();
             Toast.makeText(context, position < divider ? context.getString(R.string.sources_min)
-                    : context.getString(R.string.sources_max, Sources.MAX_ACTIVE), Toast.LENGTH_SHORT).show();
+                    : context.getString(R.string.sources_max, Sources.maxActive()), Toast.LENGTH_SHORT).show();
             return;
         }
         List<Provider> before = Rows.active(rows);
@@ -441,7 +441,7 @@ public class SourcesDialogFragment extends DialogFragment {
 
         /** The most sources of {@code total} that can be active. */
         static int limit(int total) {
-            return Math.min(Sources.MAX_ACTIVE, total);
+            return Math.min(Sources.maxActive(), total);
         }
 
         /**
@@ -524,7 +524,7 @@ public class SourcesDialogFragment extends DialogFragment {
         private void bindDivider(@NonNull DividerHolder holder) {
             int active = Rows.divider(rows);
             holder.label.setText(holder.label.getContext().getString(R.string.sources_active, active,
-                    Sources.MAX_ACTIVE));
+                    Sources.maxActive()));
             enable(holder.less, active > 1);
             enable(holder.more, active < Rows.limit(rows.size() - 1));
             holder.less.setOnClickListener(v -> step(-1));

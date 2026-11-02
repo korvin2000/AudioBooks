@@ -18,12 +18,12 @@ public class BookPresenterSpeedTest {
         assertEquals("1,25×", BookPresenter.speedText(1.25f));
         assertEquals("1,05×", BookPresenter.speedText(1.05f));
         assertEquals("0,25×", BookPresenter.speedText(0.25f));
-        assertEquals("4×", BookPresenter.speedText(4f));
+        assertEquals("2,5×", BookPresenter.speedText(2.5f));
     }
 
     @Test
     public void speedTextShowsTheSpeedPlayed() {
-        assertEquals("4×", BookPresenter.speedText(10f));
+        assertEquals("2,5×", BookPresenter.speedText(10f));
         assertEquals("0,25×", BookPresenter.speedText(0.1f));
     }
 
@@ -31,7 +31,7 @@ public class BookPresenterSpeedTest {
     public void theSliderReachesBothEndsOfThePlayersRange() {
         assertEquals(PlaybackSettings.MIN_SPEED, BookPresenter.speedAt(0), 0f);
         int last = BookPresenter.speedStep(PlaybackSettings.MAX_SPEED);
-        assertEquals(75, last);
+        assertEquals(45, last);
         assertEquals(PlaybackSettings.MAX_SPEED, BookPresenter.speedAt(last), 0f);
     }
 

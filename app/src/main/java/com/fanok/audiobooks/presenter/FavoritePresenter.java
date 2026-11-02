@@ -20,11 +20,13 @@ import com.fanok.audiobooks.interface_pacatge.favorite.FavoriteView;
 import com.fanok.audiobooks.model.AudioDBModel;
 import com.fanok.audiobooks.model.BooksDBModel;
 import com.fanok.audiobooks.model.FavoriteModel;
+import com.fanok.audiobooks.model.HistoryFilter;
 import com.fanok.audiobooks.pojo.BookPOJO;
 import com.fanok.audiobooks.search.GenrePicks;
 import com.fanok.audiobooks.search.Provider;
 import com.fanok.audiobooks.search.SourceLibrary;
 import com.fanok.audiobooks.util.DownloadStorageHelper;
+import io.reactivex.Observable;
 import io.reactivex.android.schedulers.AndroidSchedulers;
 import io.reactivex.disposables.CompositeDisposable;
 import io.reactivex.schedulers.Schedulers;
@@ -130,7 +132,11 @@ public class FavoritePresenter
         getViewState().showError(false);
         getViewState().showProgres(true);
         isLoading = true;
-        disposables.add(mFavoriteModel.getBooks(table)
+        Observable<ArrayList<BookPOJO>> load = table == Consts.TABLE_HISTORY && mContext != null
+                ? mFavoriteModel.getHistory(HistoryFilter.status(mContext),
+                        HistoryFilter.since(HistoryFilter.period(mContext), System.currentTimeMillis()))
+                : mFavoriteModel.getBooks(table);
+        disposables.add(load
                 .subscribeOn(Schedulers.io())
                 .observeOn(AndroidSchedulers.mainThread())
                 .subscribe(bookPOJOS -> {
@@ -141,6 +147,13 @@ public class FavoritePresenter
                     getViewState().showProgres(false);
                     getViewState().showError(true);
                 }));
+    }
+
+    /** The history's status or period changed: a load still on its way has the old ones, it gives way. */
+    public void reloadHistory() {
+        disposables.clear();
+        isLoading = false;
+        loadBooks();
     }
 
     private void onBooksLoaded() {
@@ -386,10 +399,17 @@ public class FavoritePresenter
         });
     }
 
-    /** Empties the whole list, rows on the storage worker; the toolbar asked and the user confirmed. */
+    /**
+     * Empties the whole list, rows on the storage worker; the toolbar asked and the user confirmed. The history
+     * narrowed by a status or a period loses only the books shown.
+     */
     @Override
     public void clearAll() {
         if (mContext == null) {
+            return;
+        }
+        if (table == Consts.TABLE_HISTORY && HistoryFilter.active(mContext)) {
+            clearShown();
             return;
         }
         // a load or a filter still on its way would bring the old rows back; the swiped book goes with the rest
@@ -408,6 +428,38 @@ public class FavoritePresenter
             if (mContext != null) {
                 loadBooks();
             }
+        });
+    }
+
+    /** The books on screen leave the history with their listening positions, as a swipe removes one. */
+    private void clearShown() {
+        commitRemove(); // the swiped book goes now; it is no longer in the list
+        final List<BookPOJO> gone = shown == null ? new ArrayList<>() : new ArrayList<>(shown);
+        disposables.clear();
+        isLoading = false;
+        if (books != null) {
+            books.removeAll(gone);
+        }
+        if (flter != null) {
+            flter.removeAll(gone);
+        }
+        getViewState().showProgres(false);
+        onSearch(mQuery);
+        final Context app = mContext.getApplicationContext();
+        DownloadStorageHelper.submit(() -> {
+            BooksDBModel booksDBModel = new BooksDBModel(app);
+            AudioDBModel audioDBModel = new AudioDBModel(app);
+            for (BookPOJO book : gone) {
+                booksDBModel.removeHistory(book);
+                audioDBModel.remove(book.getUrl());
+            }
+            audioDBModel.closeDB();
+            booksDBModel.closeDB();
+            new Handler(Looper.getMainLooper()).post(() -> {
+                if (mContext != null) {
+                    reloadHistory(); // a filter picked meanwhile may have read the books before they went
+                }
+            });
         });
     }
 

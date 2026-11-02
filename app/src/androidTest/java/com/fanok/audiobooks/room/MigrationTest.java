@@ -62,7 +62,7 @@ public class MigrationTest {
         AppDatabase room = openWithRoom();
         try {
             SupportSQLiteDatabase db = room.getOpenHelper().getWritableDatabase();
-            assertEquals(19, db.getVersion());
+            assertEquals(20, db.getVersion());
             assertEquals(2, count(db, "favorite"));
             assertEquals(1, count(db, "history"));
             assertEquals(1, count(db, "saved"));
@@ -140,6 +140,32 @@ public class MigrationTest {
         db.execSQL("INSERT INTO favorite_person (kind, name, person_key, urls, added_at)"
                 + " VALUES (1, 'Стивен Кинг', '[кинг, стивен]|[]', '', 2)");
         assertEquals(2, count(db, "favorite_person"));
+    }
+
+    @Test
+    public void migrate19To20AddsOpenedAt() throws Exception {
+        try (SupportSQLiteDatabase db = helper.createDatabase(DB, 19)) {
+            db.execSQL("INSERT INTO history (name, url_book, coments) VALUES ('Old', 'https://example.com/h1', 0)");
+            db.execSQL("INSERT INTO history (name, url_book, coments) VALUES ('Newer', 'https://example.com/h2', 0)");
+        }
+
+        SupportSQLiteDatabase db = helper.runMigrationsAndValidate(DB, 20, true, AppDatabase.MIGRATION_19_20);
+        assertEquals(2, count(db, "history"));
+        try (Cursor c = db.query("SELECT name, opened_at FROM history ORDER BY id")) {
+            assertTrue(c.moveToNext());
+            assertEquals("Old", c.getString(0));
+            assertEquals(0, c.getLong(1));
+            assertTrue(c.moveToNext());
+            assertEquals("Newer", c.getString(0));
+            assertEquals(0, c.getLong(1));
+        }
+        assertEquals(Boolean.TRUE, indexes(db, "history").get("index_history_url_book"));
+        // a row written without the column (as an old insert would) is undated, not rejected
+        db.execSQL("INSERT INTO history (name, url_book, coments) VALUES ('Third', 'https://example.com/h3', 0)");
+        try (Cursor c = db.query("SELECT opened_at FROM history WHERE url_book = 'https://example.com/h3'")) {
+            assertTrue(c.moveToFirst());
+            assertEquals(0, c.getLong(0));
+        }
     }
 
     private SQLiteDatabase createVersion16() {

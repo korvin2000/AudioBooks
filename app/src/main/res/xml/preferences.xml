@@ -224,6 +224,15 @@
             android:summary="@string/select_folder"
             android:title="@string/pref_download_path" />
 
+        <ListPreference
+            android:defaultValue="nested"
+            android:dialogTitle="@string/folder_layout"
+            android:entries="@array/folder_layout_titles"
+            android:entryValues="@array/folder_layout_values"
+            android:icon="@drawable/ic_folder_tree"
+            android:key="folder_layout"
+            android:title="@string/folder_layout" />
+
         <Preference
             android:icon="@drawable/ic_sd_storage"
             android:key="pref_store_dir"
@@ -351,11 +360,26 @@
             android:key="pref_start_screen"
             android:title="@string/setting_start_menu" />
 
+        <CheckBoxPreference
+            android:defaultValue="false"
+            android:icon="@drawable/ic_autoload_book"
+            android:key="pref_autoload_last_book"
+            android:summary="@string/autoload_last_book_desc"
+            android:title="@string/autoload_last_book" />
+
         <EditTextPreference
             android:defaultValue="120"
             android:icon="@drawable/ic_buffer"
             android:key="bufferSize"
             android:title="@string/buffer_size" />
+
+        <!-- search.Sources.PREF_MAX: the most active sources; entries 3..20 are filled in SettingsFragment -->
+        <ListPreference
+            android:defaultValue="13"
+            android:dialogTitle="@string/sources_max_title"
+            android:icon="@drawable/ic_menu_sources"
+            android:key="pref_sources_max"
+            android:title="@string/sources_max_title" />
 
         <CheckBoxPreference
             android:defaultValue="true"
@@ -366,7 +390,7 @@
 
         <CheckBoxPreference
             android:defaultValue="true"
-            android:icon="@drawable/ic_error"
+            android:icon="@drawable/ic_bug_report"
             android:key="pref_error_reports"
             android:summary="@string/error_reports_desc"
             android:title="@string/error_reports" />

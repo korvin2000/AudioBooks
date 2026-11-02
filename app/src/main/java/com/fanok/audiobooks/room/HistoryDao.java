@@ -24,6 +24,10 @@ public interface HistoryDao {
     @Query("SELECT * FROM history ORDER BY id")
     List<HistoryEntity> getAll();
 
+    /** The books whose page was opened at {@code since} or later (epoch ms), oldest first like {@link #getAll}. */
+    @Query("SELECT * FROM history WHERE opened_at >= :since ORDER BY id")
+    List<HistoryEntity> getSince(long since);
+
     @Query("SELECT * FROM history ORDER BY id DESC LIMIT 1")
     HistoryEntity getLast();
 

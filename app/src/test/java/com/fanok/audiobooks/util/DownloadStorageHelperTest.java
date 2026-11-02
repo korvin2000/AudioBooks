@@ -30,6 +30,30 @@ public class DownloadStorageHelperTest {
     }
 
     @Test
+    public void nestedExportFoldersStayAsTheyWere() {
+        assertEquals("Akniga/Мастер и Маргарита/Козий Владимир", DownloadStorageHelper.exportRelativeDir(
+                "https://akniga.org/x", "Мастер и Маргарита", "Козий Владимир", "Булгаков", false));
+        assertEquals("Akniga/Мастер и Маргарита/Булгаков", DownloadStorageHelper.exportRelativeDir(
+                "https://akniga.org/x", "Мастер и Маргарита", " ", "Булгаков", false));
+        assertEquals("Audiobooks/Гарри Поттер_ Тайная комната_/DefaultVoice", DownloadStorageHelper.exportRelativeDir(
+                "https://example.com/b", "Гарри Поттер: Тайная комната?", null, null, false));
+        assertEquals("Akniga/Unknown/DefaultVoice", DownloadStorageHelper.exportRelativeDir(
+                "https://akniga.org/x", null, "", "", false));
+    }
+
+    @Test
+    public void aFlatExportFolderIsOneSegment() {
+        String flat = DownloadStorageHelper.exportRelativeDir("https://akniga.org/x", "Война/мир: том 1", "Козий",
+                "Толстой", true);
+
+        assertEquals("Войнамир том 1 - Толстой (Козий)", flat);
+        assertFalse(flat.contains("/"));
+        assertEquals(StorageNames.bookFolderName("Мастер и Маргарита", "Булгаков", "Козий Владимир"),
+                DownloadStorageHelper.exportRelativeDir("https://akniga.org/x", "Мастер и Маргарита",
+                        "Козий Владимир", "Булгаков", true));
+    }
+
+    @Test
     public void aPendingDownloadInAnyStateKeepsTheBookRows() {
         for (int state : new int[]{Download.STATE_QUEUED, Download.STATE_DOWNLOADING, Download.STATE_STOPPED,
                 Download.STATE_FAILED, Download.STATE_RESTARTING, Download.STATE_COMPLETED}) {

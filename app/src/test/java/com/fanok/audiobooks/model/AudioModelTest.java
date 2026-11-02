@@ -1,6 +1,7 @@
 package com.fanok.audiobooks.model;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
@@ -14,6 +15,7 @@ import com.fanok.audiobooks.source.Izibuk;
 import com.fanok.audiobooks.source.Knigavuhe;
 import com.fanok.audiobooks.BookRemovedException;
 import com.fanok.audiobooks.CookesExeption;
+import com.fanok.audiobooks.net.RateLimitedException;
 import com.fanok.audiobooks.net.SiteHttp;
 import com.fanok.audiobooks.pojo.AudioPOJO;
 import com.fanok.audiobooks.source.Players;
@@ -25,13 +27,21 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
+import java.io.UncheckedIOException;
 import java.net.InetAddress;
+import java.net.ProtocolException;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.net.SocketException;
+import java.net.SocketTimeoutException;
+import java.net.UnknownHostException;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
+import org.jsoup.HttpStatusException;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
+import org.junit.After;
+import org.junit.Before;
 import org.junit.Test;
 
 /** Chapter parsers against pages captured from the live sites (audioboo: synthetic, see its fixture). */
@@ -47,6 +57,19 @@ public class AudioModelTest {
     private static final String AUDIOBOO = "https://audioboo.org/fantastika/1-sinteticheskaja-kniga.html";
     private static final String OTRUB = "https://otrub.in/khozjain-okov-xv.html";
     private static final String POLEKNIG = "https://poleknig.com/books/269329";
+
+    private long retryPauseMs;
+
+    @Before
+    public void noRetryPause() {
+        retryPauseMs = AudioModel.retryPauseMs;
+        AudioModel.retryPauseMs = 0;
+    }
+
+    @After
+    public void restoreRetryPause() {
+        AudioModel.retryPauseMs = retryPauseMs;
+    }
 
     @Test
     public void knigavuheFixture() throws IOException {
@@ -82,6 +105,17 @@ public class AudioModelTest {
         assertEquals("01_01_01_Glava 1. Nichem ne vydelyayuscheesya zhivotnoe.mp3", chapters.get(0).getName());
         assertEquals("04_21_00_Posleslovie. Zhivotnye, stavshie bogami.mp3", chapters.get(109).getName());
         assertEquals(bookName, chapters.get(109).getBookName());
+        assertHttps(chapters);
+    }
+
+    @Test
+    public void abmp3PlaylistWithJsEscapes() throws IOException {
+        // the live playlist escapes its titles as a JS literal does ("\(01\)"): 'malformed JSON' before (trace 1)
+        List<AudioPOJO> chapters = Players.parsePlayerjsPlaylist(text("abmp3/playlist-escaped.txt"),
+                "https://9giiu0g54k8c.redirectto.cc/s02/images/audiobooks/2/3/1/4/2/23142.pl.txt", "Черный список");
+        assertEquals(28, chapters.size());
+        assertEquals("Черный список_ (01)", chapters.get(0).getName());
+        assertTrue(chapters.get(0).getUrl(), chapters.get(0).getUrl().endsWith("chernyjj-spisok-01.mp3"));
         assertHttps(chapters);
     }
 
@@ -234,6 +268,66 @@ public class AudioModelTest {
                     .assertError(CookesExeption.class);
             thread.join(5000);
         }
+    }
+
+    @Test
+    public void aknigaCollectionHasNoChapters() {
+        // trace 3: a collection opened as a book has neither a bid nor an <audio>, so no chapter at all
+        IllegalStateException e = assertThrows(IllegalStateException.class,
+                () -> AudioModel.load("https://akniga.org/collection/letnie-priklyucheniya/",
+                        url -> Jsoup.parse(text("akniga/collection.html"), url)));
+        assertTrue(e.getMessage(), e.getMessage().contains("no playable chapters in akniga book (0 skipped)"));
+    }
+
+    @Test
+    public void timeoutIsRetriedOnce() {
+        int[] calls = {0};
+        AudioModel.audio(KNIGAVUHE, failing(calls, new SocketTimeoutException("timeout"))).test()
+                .assertValueCount(1)
+                .assertComplete();
+        assertEquals(2, calls[0]);
+        // jsoup's wrapped body-read failure is the same network failure
+        calls[0] = 0;
+        AudioModel.audio(KNIGAVUHE, failing(calls, new UncheckedIOException(new SocketException("reset")))).test()
+                .assertValueCount(1);
+        assertEquals(2, calls[0]);
+    }
+
+    @Test
+    public void twoTimeoutsFail() {
+        int[] calls = {0};
+        AudioModel.audio(KNIGAVUHE, failing(calls, new SocketTimeoutException("timeout"),
+                new SocketTimeoutException("timeout"))).test()
+                .assertNoValues()
+                .assertError(SocketTimeoutException.class);
+        assertEquals(2, calls[0]);
+    }
+
+    @Test
+    public void siteAnswersAreNotRetried() {
+        for (Exception answer : new Exception[]{new HttpStatusException("x", 404, KNIGAVUHE),
+                new RateLimitedException(KNIGAVUHE, 0), new CookesExeption(KNIGAVUHE),
+                new UnknownHostException("knigavuhe.org")}) {
+            int[] calls = {0};
+            AudioModel.audio(KNIGAVUHE, failing(calls, answer)).test().assertError(answer.getClass());
+            assertEquals(answer.toString(), 1, calls[0]);
+        }
+        int[] calls = {0};
+        AudioModel.audio(KNIGAVUHE, url -> {
+            calls[0]++;
+            return Jsoup.parse("<h1>Книга</h1>", url); // the page without a player
+        }).test().assertError(IllegalStateException.class);
+        assertEquals(1, calls[0]);
+    }
+
+    @Test
+    public void transientIsANetworkFailureOnly() {
+        assertTrue(AudioModel.isTransient(new SocketTimeoutException("timeout")));
+        assertTrue(AudioModel.isTransient(new UncheckedIOException(new SocketException("reset"))));
+        assertTrue(AudioModel.isTransient(new ProtocolException("unexpected end of stream")));
+        assertFalse(AudioModel.isTransient(new IOException("not JSON")));
+        assertFalse(AudioModel.isTransient(new UnknownHostException("knigavuhe.org")));
+        assertFalse(AudioModel.isTransient(new HttpStatusException("x", 503, KNIGAVUHE)));
     }
 
     @Test
@@ -468,6 +562,20 @@ public class AudioModelTest {
         assertEquals("https://cdn.example.org/ok/1.mp3",
                 Players.playerjsUrl("#2" + b64.substring(0, 4) + "//_//" + b64.substring(4, 16) + "//_//"
                         + b64.substring(16)));
+    }
+
+    /** Throws {@code failures} in turn, then serves the knigavuhe fixture; {@code calls[0]} counts the fetches. */
+    private static AudioModel.PageSource failing(int[] calls, Exception... failures) {
+        return url -> {
+            int call = calls[0]++;
+            if (call < failures.length) {
+                if (failures[call] instanceof IOException) {
+                    throw (IOException) failures[call];
+                }
+                throw (RuntimeException) failures[call];
+            }
+            return page("knigavuhe", url);
+        };
     }
 
     private static List<AudioPOJO> akniga(String items) throws IOException {

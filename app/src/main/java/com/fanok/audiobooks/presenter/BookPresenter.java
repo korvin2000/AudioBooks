@@ -133,6 +133,10 @@ public class BookPresenter extends MvpPresenter<Activity> implements ActivityPre
 
     private Throwable mLastError = null;
 
+    /** The chapter load and the other-readers lookup under way: a repeated {@link #getAudio} replaces them. */
+    private Disposable mAudioLoad;
+    private Disposable mOtherArtistLoad;
+
     private final ServiceConnection serviceConnection;
 
     //the context the service was bound through; unbinding must use the very same one
@@ -141,6 +145,8 @@ public class BookPresenter extends MvpPresenter<Activity> implements ActivityPre
     private Context mContext;
 
     private boolean error = false;
+    /** Load the book paused even with «Автовоспроизведение» on (set before the view attaches). */
+    private boolean paused;
 
     private SharedPreferences pref;
 
@@ -260,6 +266,10 @@ public class BookPresenter extends MvpPresenter<Activity> implements ActivityPre
         Intent intent = new Intent(Broadcast_SET_SPEED);
         intent.putExtra("speed", PlaybackSettings.clampSpeed(value));
         getViewState().broadcastSend(intent);
+    }
+
+    public void setPaused(boolean paused) {
+        this.paused = paused;
     }
 
     @Override
@@ -397,7 +407,7 @@ public class BookPresenter extends MvpPresenter<Activity> implements ActivityPre
             boolean keepOtherBook = pref.getBoolean("reproductionPref", true) && MediaPlayerService.isPlay();
             if (!keepOtherBook) {
                 //one command; autoplay decides the intent, nothing toggles afterwards
-                playAudio(curentTrack, checkpoint.positionMs, pref.getBoolean("autoPlayPref", false));
+                playAudio(curentTrack, checkpoint.positionMs, !paused && pref.getBoolean("autoPlayPref", false));
             } else {
                 //play now toggles the other book: say once how to switch to this one
                 getViewState().showSwitchBookHint();
@@ -475,7 +485,7 @@ public class BookPresenter extends MvpPresenter<Activity> implements ActivityPre
 
         linearLayout.addView(seek);
 
-        popDialog.setIcon(R.drawable.ic_play_speed);
+        popDialog.setIcon(R.drawable.ic_speedometer);
         popDialog.setTitle(view.getContext().getString(R.string.title_set_speed_popup));
         popDialog.setView(linearLayout);
 
@@ -488,6 +498,11 @@ public class BookPresenter extends MvpPresenter<Activity> implements ActivityPre
                     dialog.dismiss();
                 });
         popDialog.setNegativeButton(R.string.cancel, null);
+        // bottom left: back to 1x and close; always set, a previewed speed must not keep playing
+        popDialog.setNeutralButton(R.string.speed_standard, (dialog, which) -> {
+            confirmed[0] = true;
+            setSpeed(1f);
+        });
         popDialog.setOnDismissListener(dialog -> {
             mSpeedDialog = null;
             if (!confirmed[0]) {
@@ -748,7 +763,7 @@ public class BookPresenter extends MvpPresenter<Activity> implements ActivityPre
 
                     @Override
                     public void onSubscribe(@NotNull Disposable d) {
-                        mDisposables.add(d);
+                        mAudioLoad = replace(mAudioLoad, d);
                     }
                 });
 
@@ -775,9 +790,18 @@ public class BookPresenter extends MvpPresenter<Activity> implements ActivityPre
 
                     @Override
                     public void onSubscribe(@NotNull Disposable d) {
-                        mDisposables.add(d);
+                        mOtherArtistLoad = replace(mOtherArtistLoad, d);
                     }
                 });
+    }
+
+    /** {@code next} tracked in place of {@code previous}, which is cancelled when still running. */
+    private Disposable replace(Disposable previous, Disposable next) {
+        if (previous != null) {
+            mDisposables.remove(previous); // removes and disposes it
+        }
+        mDisposables.add(next);
+        return next;
     }
 
     @OptIn(markerClass = UnstableApi.class)
@@ -870,15 +894,14 @@ public class BookPresenter extends MvpPresenter<Activity> implements ActivityPre
                     error = true;
                 } else {
                     String errDetail = mLastError != null ? (" (" + mLastError.getClass().getSimpleName() + (mLastError.getMessage() != null ? ": " + mLastError.getMessage() : "") + ")") : "";
-                    // a rate limit (429) is a wait, not an error of the book: say so, and how long when the site did
-                    String head = !(mLastError instanceof RateLimitedException) ? mContext.getString(R.string.error_load_data)
-                            : ((RateLimitedException) mLastError).retryAfterSeconds > 0
+                    // what failed, told as on the description screen (no answer, site changed, no network ...);
+                    // a rate limit (429) is a wait, not an error of the book: how long, when the site said
+                    String head = mLastError instanceof RateLimitedException
+                            && ((RateLimitedException) mLastError).retryAfterSeconds > 0
                             ? mContext.getString(R.string.site_rate_limited_after, Url.hostOf(mBookPOJO.getUrl()),
                                     ((RateLimitedException) mLastError).retryAfterSeconds)
-                            : mContext.getString(R.string.site_rate_limited);
-                    getViewState().showLoadError(head
-                            + errDetail + "\n" + mContext.getString(R.string.go_offline),
-                            ErrorReport.of(mLastError, mBookPOJO.getUrl()));
+                            : mContext.getString(BookDescriptionPresenter.errorMessage(mLastError));
+                    getViewState().showLoadError(head + errDetail, ErrorReport.of(mLastError, mBookPOJO.getUrl()));
                     error = true;
                 }
             }

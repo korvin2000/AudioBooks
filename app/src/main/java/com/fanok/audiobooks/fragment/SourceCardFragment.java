@@ -680,7 +680,7 @@ public class SourceCardFragment extends Fragment {
      */
     private void renderActive(@NonNull List<Provider> order, int index, int active) {
         boolean isActive = index < active;
-        int limit = Math.min(Sources.MAX_ACTIVE, order.size());
+        int limit = Math.min(Sources.maxActive(), order.size());
         boolean only = isActive && active == 1;
         setChecked(activeSwitch, isActive, activeListener);
         activeSwitch.setEnabled(!only);
@@ -700,12 +700,12 @@ public class SourceCardFragment extends Fragment {
 
         int accent = ContextCompat.getColor(requireContext(), R.color.sources_accent);
         int track = ContextCompat.getColor(requireContext(), R.color.sources_track);
-        int[] cells = new int[Sources.MAX_ACTIVE];
+        int[] cells = new int[limit];
         for (int i = 0; i < cells.length; i++) {
             cells[i] = i >= active ? track : i == index ? accent : ColorUtils.setAlphaComponent(accent, 0x99);
         }
         meter.setCells(cells, -1, isActive ? index : -1);
-        meterCount.setText(getString(R.string.sources_meter_count, active, Sources.MAX_ACTIVE));
+        meterCount.setText(getString(R.string.sources_meter_count, active, limit));
         meter.setContentDescription(meterCount.getText());
         meterFree.setText(active >= limit ? getString(R.string.sources_section_limit)
                 : getString(R.string.sources_meter_free, limit - active));

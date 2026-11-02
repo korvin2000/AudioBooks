@@ -57,10 +57,10 @@
             android:drawableStart="@drawable/ic_reting"
             tools:text="1840" />
 
-        <!-- a favourite person toggle (GenreListAddapter.showStars); genres keep it GONE -->
+        <!-- a favourite person toggle (GenreListAddapter.showStars); genres keep it GONE; 40dp keeps the number close -->
         <ImageButton
             android:id="@+id/star"
-            android:layout_width="48dp"
+            android:layout_width="40dp"
             android:layout_height="match_parent"
             android:background="?attr/selectableItemBackgroundBorderless"
             android:contentDescription="@string/people_star_add"
