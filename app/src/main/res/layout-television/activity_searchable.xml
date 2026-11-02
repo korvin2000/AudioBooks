@@ -94,8 +94,6 @@
             android:minHeight="@dimen/search_row_height"
             android:textColor="?attr/hrefColor"
             android:textSize="@dimen/search_text_size"
-            app:insetBottom="0dp"
-            app:insetTop="0dp"
             android:visibility="gone"
             tools:text="Повторить (2)" />
     </LinearLayout>

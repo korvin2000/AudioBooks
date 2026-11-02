@@ -53,5 +53,5 @@
     <!-- inside a tile or a plate at the sides, and from a row's label to its plates -->
     <dimen name="search_space">6dp</dimen>
     <!-- the "34 authors" / "2 series" label: the same width, so both plate rows start in one column -->
-    <dimen name="search_label_width">64dp</dimen>
+    <dimen name="search_label_width">80dp</dimen>
 </resources>
