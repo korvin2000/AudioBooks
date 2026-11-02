@@ -222,6 +222,30 @@ public class MediaPlayerService extends MediaBrowserServiceCompat {
 
     private static volatile DataSource.Factory upstreamForTest;
 
+    @Nullable
+    private static volatile SessionListener sessionListener;
+
+    /**
+     * Follows what the session shows, for an in-process reader such as a launcher widget bridge; told on the main
+     * thread after each publication. The service names no reader: one registers itself at process start.
+     */
+    public interface SessionListener {
+
+        /**
+         * @param metadata what the session shows, null without a book
+         * @param state    the session's state; its speed is 0 unless playing
+         * @param speed    the player's speed
+         * @param seconds  the chapters' lengths in seconds (0 = unknown) when they are the whole book, else null
+         */
+        void onSession(@Nullable MediaMetadataCompat metadata, @NonNull PlaybackStateCompat state, float speed,
+                @Nullable int[] seconds);
+    }
+
+    /** The one listener; null removes it. */
+    public static void setSessionListener(@Nullable SessionListener listener) {
+        sessionListener = listener;
+    }
+
     /** What to play. Handed to the service in-process by {@link #start}, never through preferences. */
     public static final class Request {
         @Nullable
@@ -325,6 +349,13 @@ public class MediaPlayerService extends MediaBrowserServiceCompat {
     private long pausedAt = -1;
     private long lastCheckpointAt;
     private int shownIcon;
+    /** What the session was last given, handed to the {@link SessionListener} as one sample. */
+    @Nullable
+    private MediaMetadataCompat shownMetadata;
+    @Nullable
+    private PlaybackStateCompat shownState;
+    @Nullable
+    private int[] shownSeconds;
     private boolean isForeground;
     @Nullable
     private Hourglass sleepTimer;
@@ -544,6 +575,9 @@ public class MediaPlayerService extends MediaBrowserServiceCompat {
             }
             mediaSession = null;
         }
+        //the listener learns the session is gone
+        shownMetadata = null;
+        tellListener();
 
         //4. receivers
         if (receiverRegistered) {
@@ -1614,7 +1648,7 @@ public class MediaPlayerService extends MediaBrowserServiceCompat {
     private void publishState() {
         isPlay = hasBook() && wantPlaying;
         if (mediaSession != null) {
-            mediaSession.setPlaybackState(buildPlaybackState());
+            mediaSession.setPlaybackState(shownState = buildPlaybackState());
         }
         int icon = showsPause() ? R.drawable.ic_pause : R.drawable.ic_play;
         if (icon != shownIcon) {
@@ -1624,6 +1658,7 @@ public class MediaPlayerService extends MediaBrowserServiceCompat {
         updateStallNotice();
         handler.removeCallbacks(notifyTask);
         handler.post(notifyTask);
+        tellListener();
     }
 
     /** Waiting for data while it should play: a moment at a chapter start or a seek, or a network stall. */
@@ -1729,7 +1764,8 @@ public class MediaPlayerService extends MediaBrowserServiceCompat {
             return;
         }
         if (!hasBook()) {
-            mediaSession.setMetadata(null);
+            mediaSession.setMetadata(shownMetadata = null);
+            tellListener();
             return;
         }
         AudioPOJO audio = chapters.get(chapterIndex);
@@ -1766,7 +1802,24 @@ public class MediaPlayerService extends MediaBrowserServiceCompat {
                 && player.getDuration() != C.TIME_UNSET) {
             metadata.putLong(MediaMetadataCompat.METADATA_KEY_DURATION, player.getDuration());
         }
-        mediaSession.setMetadata(metadata.build());
+        mediaSession.setMetadata(shownMetadata = metadata.build());
+        //an offline subset is not the whole book: its lengths would make a wrong share of it
+        shownSeconds = ordinals == null ? BookPresenter.secondsOf(chapters) : null;
+        tellListener();
+    }
+
+    /** Hands the listener the session's last metadata and state together; its failure never reaches playback. */
+    private void tellListener() {
+        SessionListener listener = sessionListener;
+        if (listener == null || shownState == null) {
+            return;
+        }
+        try {
+            listener.onSession(shownMetadata, shownState,
+                    player != null ? player.getPlaybackParameters().speed : currentSpeed(), shownSeconds);
+        } catch (RuntimeException e) {
+            Log.e(TAG, "session listener failed", e);
+        }
     }
 
     private void sendInternal(Intent intent) {

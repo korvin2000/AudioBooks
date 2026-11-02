@@ -34,6 +34,8 @@
         <intent>
             <action android:name="android.speech.action.RECOGNIZE_SPEECH" />
         </intent>
+        <!-- widgets.ExternalWidgetsProvider.TRUSTED: their signature is checked, their CHANGED sent to them -->
+        <package android:name="ru.genesis.launcher" />
     </queries>
 
     <uses-feature
@@ -257,6 +259,14 @@
             android:name=".MySuggestionProvider"
             android:authorities="${applicationId}.MySuggestionProvider"
             android:exported="false" />
+        <!-- the book being played, for launcher widgets the user allowed: always enabled (launchers look for it once),
+             refusing until consent; checks the caller itself -->
+        <provider
+            android:name=".widgets.ExternalWidgetsProvider"
+            android:authorities="${applicationId}.externalwidgets"
+            android:enabled="true"
+            android:exported="true"
+            tools:ignore="ExportedContentProvider" />
 
         <receiver
             android:name=".broadcasts.OnCancelBroadcastReceiver"

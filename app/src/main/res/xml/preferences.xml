@@ -367,6 +367,14 @@
             android:summary="@string/autoload_last_book_desc"
             android:title="@string/autoload_last_book" />
 
+        <!-- widgets.SessionMirror.PREF: consent to show the book in launcher widgets -->
+        <CheckBoxPreference
+            android:defaultValue="false"
+            android:icon="@drawable/ic_share"
+            android:key="external_widgets"
+            android:summary="@string/external_widgets_desc"
+            android:title="@string/external_widgets" />
+
         <EditTextPreference
             android:defaultValue="120"
             android:icon="@drawable/ic_buffer"
