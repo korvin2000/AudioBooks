@@ -38,13 +38,31 @@ public final class SourceProbe {
         /** Diagnostic text of a failure; null otherwise. */
         @Nullable
         public final String message;
+        /** When the check ended (epoch millis); 0 when unknown (an older version's result). */
+        public final long at;
+        /** True when the check went through the proxy, false when direct; null when unknown. */
+        @Nullable
+        public final Boolean proxied;
 
         public Result(@NonNull Provider provider, @NonNull ProviderPage.Status status, long millis,
                 @Nullable String message) {
+            this(provider, status, millis, message, 0, null);
+        }
+
+        public Result(@NonNull Provider provider, @NonNull ProviderPage.Status status, long millis,
+                @Nullable String message, long at, @Nullable Boolean proxied) {
             this.provider = provider;
             this.status = status;
             this.millis = millis;
             this.message = message;
+            this.at = at;
+            this.proxied = proxied;
+        }
+
+        /** This result, ended at {@code at} on the route {@code proxied}. */
+        @NonNull
+        public Result stamped(long at, boolean proxied) {
+            return new Result(provider, status, millis, message, at, proxied);
         }
 
         public boolean isUp() {

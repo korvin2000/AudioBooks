@@ -1,0 +1,155 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- One site in the source list: its place, icon (the letter in its colour shows through until the icon is drawn),
+     title with badges, book count, last check and route. The row is the touch target: a tap opens the card, a long
+     press the row menu; its content description says it all for TalkBack. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:clickable="true"
+    android:focusable="true"
+    android:foreground="?attr/selectableItemBackground"
+    android:gravity="center_vertical"
+    android:minHeight="60dp"
+    android:orientation="horizontal"
+    android:paddingStart="8dp"
+    android:paddingTop="6dp"
+    android:paddingEnd="4dp"
+    android:paddingBottom="6dp"
+    tools:viewBindingIgnore="true">
+
+    <TextView
+        android:id="@+id/sourceRowPosition"
+        android:layout_width="26dp"
+        android:layout_height="wrap_content"
+        android:fontFeatureSettings="tnum"
+        android:gravity="end"
+        android:importantForAccessibility="no"
+        android:textColor="@color/sources_text_secondary"
+        android:textSize="13sp"
+        tools:text="1" />
+
+    <FrameLayout
+        android:layout_width="36dp"
+        android:layout_height="36dp"
+        android:layout_marginStart="10dp"
+        android:importantForAccessibility="noHideDescendants">
+
+        <TextView
+            android:id="@+id/sourceRowLetter"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:gravity="center"
+            android:textColor="@android:color/white"
+            android:textSize="16sp"
+            android:textStyle="bold"
+            tools:text="A" />
+
+        <com.google.android.material.imageview.ShapeableImageView
+            android:id="@+id/sourceRowIcon"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:scaleType="centerCrop"
+            app:shapeAppearanceOverlay="@style/ShapeAppearance.App.SourceIcon" />
+    </FrameLayout>
+
+    <LinearLayout
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="12dp"
+        android:layout_weight="1"
+        android:importantForAccessibility="noHideDescendants"
+        android:orientation="vertical">
+
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <TextView
+                android:id="@+id/sourceRowTitle"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:ellipsize="end"
+                android:maxLines="1"
+                android:textColor="?attr/colorPrimaryText"
+                android:textSize="16sp"
+                tools:text="Akniga" />
+
+            <TextView
+                android:id="@+id/sourceRowCatalog"
+                style="@style/Widget.App.Sources.Badge"
+                android:text="@string/sources_badge_catalog"
+                android:visibility="gone" />
+
+            <TextView
+                android:id="@+id/sourceRowNew"
+                style="@style/Widget.App.Sources.Badge"
+                android:text="@string/sources_badge_new"
+                android:textColor="@color/sources_ok"
+                android:visibility="gone" />
+        </LinearLayout>
+
+        <TextView
+            android:id="@+id/sourceRowMeta"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="1dp"
+            android:textColor="@color/sources_text_secondary"
+            android:textSize="13sp"
+            tools:text="≈ 72 тыс. книг" />
+    </LinearLayout>
+
+    <!-- the last check: a dot in its colour and the time, or a spinner while the site is checked -->
+    <FrameLayout
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="8dp"
+        android:importantForAccessibility="noHideDescendants"
+        android:minWidth="64dp">
+
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="end|center_vertical"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <View
+                android:id="@+id/sourceRowDot"
+                android:layout_width="8dp"
+                android:layout_height="8dp"
+                android:background="@drawable/bg_status_dot" />
+
+            <TextView
+                android:id="@+id/sourceRowStatus"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="6dp"
+                android:fontFeatureSettings="tnum"
+                android:maxLines="1"
+                android:textColor="@color/sources_text_secondary"
+                android:textSize="13sp"
+                tools:text="0,8 с" />
+        </LinearLayout>
+
+        <ProgressBar
+            android:id="@+id/sourceRowProgress"
+            android:layout_width="16dp"
+            android:layout_height="16dp"
+            android:layout_gravity="end|center_vertical"
+            android:visibility="gone" />
+    </FrameLayout>
+
+    <ImageView
+        android:id="@+id/sourceRowRoute"
+        android:layout_width="40dp"
+        android:layout_height="40dp"
+        android:importantForAccessibility="no"
+        android:padding="10dp"
+        android:scaleType="centerInside"
+        tools:src="@drawable/ic_shield_check" />
+</LinearLayout>

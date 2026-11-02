@@ -26,7 +26,8 @@ public final class Sources {
     public static final String PREF = "pref_sources";
     /** The most sources that can be active at once. */
     public static final int MAX_ACTIVE = 13;
-    private static final String SELECTED = "sorce_books";
+    /** The catalog source: the {@link Provider#prefValue} of the source the drawer sections open. */
+    public static final String SELECTED = "sorce_books";
 
     /** One consistent snapshot: the order and the active count change together. */
     static final class State {
@@ -87,6 +88,57 @@ public final class Sources {
         state = s;
         prefs.edit().putString(PREF, format(s.order, s.active)).apply();
         return keepSelectedActive(prefs);
+    }
+
+    /** Moves {@code provider} to {@code position} (0-based) of the user's order ({@link #moved}) and stores it. */
+    public static synchronized boolean moveTo(@NonNull SharedPreferences prefs, @NonNull Provider provider,
+            int position) {
+        State s = moved(state, provider, position);
+        return save(prefs, s.order, s.active);
+    }
+
+    /** Switches {@code provider} on or off ({@link #switched}) and stores it. */
+    public static synchronized boolean setActive(@NonNull SharedPreferences prefs, @NonNull Provider provider,
+            boolean on) {
+        State s = switched(state, provider, on);
+        return save(prefs, s.order, s.active);
+    }
+
+    /**
+     * Pure: {@code provider} at {@code position} (0-based, clamped), the sources between shifted by one. The active
+     * count stays: a source moved into the active part pushes the last active one out, one moved out lets the first
+     * inactive one in.
+     */
+    @NonNull
+    static State moved(@NonNull State s, @NonNull Provider provider, int position) {
+        List<Provider> order = new ArrayList<>(s.order);
+        order.remove(provider);
+        order.add(Math.max(0, Math.min(order.size(), position)), provider);
+        return new State(order, s.active);
+    }
+
+    /** Pure, for a preview: {@code order} after {@link #moveTo} of {@code provider} to {@code position} (0-based). */
+    @NonNull
+    public static List<Provider> moved(@NonNull List<Provider> order, @NonNull Provider provider, int position) {
+        return moved(new State(new ArrayList<>(order), 1), provider, position).order;
+    }
+
+    /**
+     * Pure: {@code provider} switched on, as the last active source (at {@link #MAX_ACTIVE} in place of the last one,
+     * which becomes the first inactive), or off, as the first inactive one. The only active source stays on.
+     */
+    @NonNull
+    static State switched(@NonNull State s, @NonNull Provider provider, boolean on) {
+        int index = s.order.indexOf(provider);
+        if (index < 0 || (index < s.active) == on || (!on && s.active == 1)) {
+            return s;
+        }
+        if (!on) {
+            return new State(moved(s, provider, s.active - 1).order, s.active - 1);
+        }
+        return s.active < Math.min(MAX_ACTIVE, s.order.size())
+                ? new State(moved(s, provider, s.active).order, s.active + 1)
+                : moved(s, provider, s.active - 1);
     }
 
     /** The selected source must be active: otherwise the first active one is selected. True when it moved. */

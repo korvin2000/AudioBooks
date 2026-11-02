@@ -33,6 +33,10 @@ public interface FavoriteDao {
     @Query("SELECT COUNT(id) FROM favorite WHERE url_book = :url")
     int count(String url);
 
+    /** The page of every book, for counting the books of each site (search.SourceLibrary). */
+    @Query("SELECT url_book FROM favorite")
+    List<String> getUrls();
+
     @Query("SELECT genre FROM favorite WHERE genre <> '' GROUP BY genre ORDER BY genre ASC")
     List<String> getGenres();
 

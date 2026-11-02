@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The source screens (list, card, position sheet) in the light theme; values-night has the dark and the black.
+     Stronger than the light palette's #999 and #42a5f5 on #fafafa (about 2.8:1): small text and links must read. -->
+<resources>
+    <!-- switches, buttons, the meter, the route shield -->
+    <color name="sources_accent">#1976D2</color>
+    <color name="sources_on_accent">#FFFFFF</color>
+    <color name="sources_link">#1976D2</color>
+    <color name="sources_text_primary">#000000</color>
+    <color name="sources_text_secondary">#666666</color>
+    <color name="sources_ok">#2E7D32</color>
+    <color name="sources_warn">#A15C00</color>
+    <color name="sources_bad">#C62828</color>
+    <!-- the meter's empty cells, the lines between rows -->
+    <color name="sources_track">#24000000</color>
+    <color name="sources_line">#1F000000</color>
+    <!-- badges, chips, region tiles -->
+    <color name="sources_chip">#0F000000</color>
+    <color name="sources_info_box">#141976D2</color>
+    <color name="sources_warn_box">#1FFFB300</color>
+    <!-- the row whose card is open beside the list (tablets), the user's region tile -->
+    <color name="sources_selected">#1F1976D2</color>
+</resources>

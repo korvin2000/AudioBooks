@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The source list's toolbar (fragment.SourcesFragment): check the active sites now; the sources dialog. -->
+<menu xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+    <item
+        android:id="@+id/sourcesRefresh"
+        android:icon="@drawable/ic_refresh"
+        android:title="@string/sources_refresh"
+        app:showAsAction="always" />
+    <item
+        android:id="@+id/sourcesManage"
+        android:title="@string/sources_entry"
+        app:showAsAction="never" />
+</menu>

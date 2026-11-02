@@ -13,8 +13,6 @@ import android.content.res.Configuration;
 import android.net.Uri;
 import android.os.Bundle;
 import android.os.PowerManager;
-import android.util.TypedValue;
-import android.widget.TextView;
 import android.widget.Toast;
 import androidx.appcompat.app.AlertDialog;
 import androidx.preference.Preference;
@@ -27,7 +25,6 @@ import com.fanok.audiobooks.activity.ActivitySendEmail;
 import com.fanok.audiobooks.activity.MainActivity;
 import com.fanok.audiobooks.update.Updater;
 import com.google.android.material.navigation.NavigationView;
-import java.util.ArrayList;
 import org.jetbrains.annotations.NotNull;
 
 public class AboutFragment extends PreferenceFragmentCompat {
@@ -203,14 +200,10 @@ public class AboutFragment extends PreferenceFragmentCompat {
         MainActivity activity = (MainActivity) getActivity();
         if (activity != null) {
             NavigationView navigationView = activity.getNavigationView();
-            ArrayList<TextView> mTextViewArrayList = activity.getTextViewArrayList();
-            final TypedValue SelectedValue = new TypedValue();
-            activity.getTheme().resolveAttribute(R.attr.mySelectableItemBackground, SelectedValue,
-                    true);
             if (navigationView != null) {
                 navigationView.setCheckedItem(R.id.nav_about);
-            } else if (mTextViewArrayList != null && mTextViewArrayList.size() > 9) {
-                mTextViewArrayList.get(9).setBackgroundResource(SelectedValue.resourceId);
+            } else {
+                activity.highlightNav(R.id.layout_nav_about);
             }
         }
     }

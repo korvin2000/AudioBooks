@@ -33,6 +33,7 @@ import com.fanok.audiobooks.R;
 import com.fanok.audiobooks.activity.BookActivity;
 import com.fanok.audiobooks.activity.ImageFullScreenActivity;
 import com.fanok.audiobooks.activity.MainActivity;
+import com.fanok.audiobooks.activity.SourceActivity;
 import com.fanok.audiobooks.adapter.BooksOtherAdapter;
 import com.fanok.audiobooks.adapter.ExpandableText;
 import com.fanok.audiobooks.interface_pacatge.book_content.Description;
@@ -42,6 +43,7 @@ import com.fanok.audiobooks.pojo.OtherArtistPOJO;
 import com.fanok.audiobooks.policy.DefaultCover;
 import com.fanok.audiobooks.presenter.BookDescriptionPresenter;
 import com.fanok.audiobooks.search.GenrePicks;
+import com.fanok.audiobooks.search.Provider;
 import com.google.gson.Gson;
 import com.squareup.picasso.Picasso;
 import java.util.ArrayList;
@@ -61,6 +63,9 @@ public class DescriptionBookFragment extends MvpAppCompatFragment implements Des
     private TextView mArtist;
     private TextView mSeries;
     private LinearLayout mSeriesConteiner;
+    /** The book's site beside the cover, which opens its card; absent on TV. */
+    @Nullable
+    private TextView mSource;
     private TextView mDesc;
     private TextView mShowMore;
     /** Copies the description; beside "show less" only, absent on TV. */
@@ -112,17 +117,37 @@ public class DescriptionBookFragment extends MvpAppCompatFragment implements Des
 
     /** The book's page URL, which its list item's default cover is keyed by; {@code poster} when unknown. */
     private String coverKey(String poster) {
+        String url = bookUrl();
+        return url != null ? url : poster;
+    }
+
+    @Nullable
+    private String bookUrl() {
         try {
             Bundle args = getArguments();
             if (args != null && args.containsKey(ARG_BOOK_POJO)) {
                 BookPOJO pojo = new Gson().fromJson(args.getString(ARG_BOOK_POJO), BookPOJO.class);
-                if (pojo != null && pojo.getUrl() != null) {
+                if (pojo != null) {
                     return pojo.getUrl();
                 }
             }
         } catch (Exception ignored) {
         }
-        return poster;
+        return null;
+    }
+
+    /** The book's site under the duration and ratings, opening the site's card; hidden for an unknown host. */
+    private void bindSource() {
+        if (mSource == null) {
+            return;
+        }
+        Provider provider = Provider.ofUrl(bookUrl());
+        mSource.setVisibility(provider == null ? View.GONE : View.VISIBLE);
+        if (provider != null) {
+            mSource.setText(provider.title);
+            mSource.setContentDescription(getString(R.string.sources_book_site, provider.title));
+            mSource.setOnClickListener(view -> SourceActivity.start(requireContext(), provider));
+        }
     }
 
     @Nullable
@@ -142,6 +167,7 @@ public class DescriptionBookFragment extends MvpAppCompatFragment implements Des
         mArtist = view.findViewById(R.id.artist);
         mSeries = view.findViewById(R.id.series);
         mSeriesConteiner = view.findViewById(R.id.seriesConteiner);
+        mSource = view.findViewById(R.id.bookSource);
         mDesc = view.findViewById(R.id.desc);
         mShowMore = view.findViewById(R.id.showMore);
         mCopyDesc = view.findViewById(R.id.copyDesc);
@@ -226,6 +252,7 @@ public class DescriptionBookFragment extends MvpAppCompatFragment implements Des
         mArtist = null;
         mSeries = null;
         mSeriesConteiner = null;
+        mSource = null;
         mDesc = null;
         mShowMore = null;
         mCopyDesc = null;
@@ -346,6 +373,8 @@ public class DescriptionBookFragment extends MvpAppCompatFragment implements Des
             } else if (mSeriesConteiner.getVisibility() != View.GONE) {
                 mSeriesConteiner.setVisibility(View.GONE);
             }
+
+            bindSource();
 
             if (description.isOtherReader() && activity != null) {
                 ArrayList<OtherArtistPOJO> otherReaders = description.getOtherReaders();

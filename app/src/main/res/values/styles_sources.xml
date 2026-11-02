@@ -1,0 +1,219 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- The source screens' controls (switches, buttons, slider, toggle) in their own accent, the link blue of
+         colors_sources: colorPrimary is the toolbar colour, near the background on the black theme. -->
+    <style name="ThemeOverlay.App.Sources" parent="">
+        <item name="colorPrimary">@color/sources_accent</item>
+        <item name="colorSecondary">@color/sources_accent</item>
+        <item name="colorAccent">@color/sources_accent</item>
+        <item name="colorOnPrimary">@color/sources_on_accent</item>
+        <item name="colorOnSecondary">@color/sources_on_accent</item>
+        <item name="colorControlActivated">@color/sources_accent</item>
+    </style>
+
+    <!-- The position sheet on the app's own item colour: the default surface stays light under the dark themes, and
+         the sheet's light text vanished on it -->
+    <style name="ThemeOverlay.App.SourceSheet" parent="ThemeOverlay.MaterialComponents.BottomSheetDialog">
+        <item name="bottomSheetStyle">@style/Widget.App.SourceSheet</item>
+    </style>
+
+    <style name="Widget.App.SourceSheet" parent="Widget.MaterialComponents.BottomSheet.Modal">
+        <item name="backgroundTint">?attr/backgroundItem</item>
+    </style>
+
+    <!-- A section of the list: «АКТИВНЫЕ», «НЕАКТИВНЫЕ» -->
+    <style name="Widget.App.Sources.Section" parent="">
+        <item name="android:textSize">12sp</item>
+        <item name="android:textStyle">bold</item>
+        <item name="android:textAllCaps">true</item>
+        <item name="android:letterSpacing">0.06</item>
+        <item name="android:textColor">@color/sources_text_secondary</item>
+    </style>
+
+    <!-- A section of the card: «О сайте», «Плюсы и минусы» -->
+    <style name="Widget.App.Sources.Title" parent="">
+        <item name="android:layout_width">match_parent</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:layout_marginTop">22dp</item>
+        <item name="android:layout_marginBottom">6dp</item>
+        <item name="android:textSize">17sp</item>
+        <item name="android:textStyle">bold</item>
+        <item name="android:textColor">?attr/colorPrimaryText</item>
+    </style>
+
+    <!-- A fact beside the cover; its icon (18dp, tinted) is set in code -->
+    <style name="Widget.App.Sources.Fact" parent="">
+        <item name="android:layout_width">match_parent</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:minHeight">26dp</item>
+        <item name="android:gravity">center_vertical</item>
+        <item name="android:drawablePadding">8dp</item>
+        <item name="android:textSize">14sp</item>
+        <item name="android:textColor">?attr/colorPrimaryText</item>
+    </style>
+
+    <!-- A line of the card with an icon: fragments, takedowns, a plus, a minus, the sorts -->
+    <style name="Widget.App.Sources.Line" parent="Widget.App.Sources.Fact">
+        <item name="android:layout_marginTop">6dp</item>
+        <item name="android:lineSpacingExtra">2dp</item>
+    </style>
+
+    <!-- «каталог», «новый» beside a title -->
+    <style name="Widget.App.Sources.Badge" parent="">
+        <item name="android:layout_width">wrap_content</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:layout_marginStart">6dp</item>
+        <item name="android:paddingStart">6dp</item>
+        <item name="android:paddingEnd">6dp</item>
+        <item name="android:paddingTop">1dp</item>
+        <item name="android:paddingBottom">1dp</item>
+        <item name="android:background">@drawable/bg_source_badge</item>
+        <item name="android:maxLines">1</item>
+        <item name="android:textSize">11sp</item>
+        <item name="android:textColor">@color/sources_link</item>
+    </style>
+
+    <!-- A row of «Ваши настройки»: an icon, two lines, a control; the row is the touch target -->
+    <style name="Widget.App.Sources.Row" parent="">
+        <item name="android:layout_width">match_parent</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:minHeight">56dp</item>
+        <item name="android:orientation">horizontal</item>
+        <item name="android:gravity">center_vertical</item>
+        <item name="android:paddingStart">16dp</item>
+        <item name="android:paddingEnd">12dp</item>
+        <item name="android:paddingTop">6dp</item>
+        <item name="android:paddingBottom">6dp</item>
+        <item name="android:background">?attr/selectableItemBackground</item>
+        <item name="android:clickable">true</item>
+        <item name="android:focusable">true</item>
+    </style>
+
+    <style name="Widget.App.Sources.RowIcon" parent="">
+        <item name="android:layout_width">24dp</item>
+        <item name="android:layout_height">24dp</item>
+        <item name="android:importantForAccessibility">no</item>
+        <item name="tint">@color/sources_text_secondary</item>
+    </style>
+
+    <style name="Widget.App.Sources.RowText" parent="">
+        <item name="android:layout_width">0dp</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:layout_weight">1</item>
+        <item name="android:layout_marginStart">16dp</item>
+        <item name="android:layout_marginEnd">8dp</item>
+        <item name="android:orientation">vertical</item>
+    </style>
+
+    <style name="Widget.App.Sources.RowTitle" parent="">
+        <item name="android:layout_width">wrap_content</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:textSize">16sp</item>
+        <item name="android:textColor">?attr/colorPrimaryText</item>
+    </style>
+
+    <style name="Widget.App.Sources.RowSummary" parent="">
+        <item name="android:layout_width">wrap_content</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:layout_marginTop">1dp</item>
+        <item name="android:textSize">13sp</item>
+        <item name="android:textColor">@color/sources_text_secondary</item>
+    </style>
+
+    <style name="Widget.App.Sources.Divider" parent="">
+        <item name="android:layout_width">match_parent</item>
+        <item name="android:layout_height">1dp</item>
+        <item name="android:layout_marginStart">56dp</item>
+        <item name="android:background">@color/sources_line</item>
+    </style>
+
+    <style name="Widget.App.Sources.Card" parent="Widget.MaterialComponents.CardView">
+        <item name="cardBackgroundColor">?attr/backgroundItem</item>
+        <item name="cardCornerRadius">16dp</item>
+        <item name="cardElevation">0dp</item>
+        <item name="strokeWidth">0dp</item>
+    </style>
+
+    <!-- The list's state chips: region, proxy, last check -->
+    <style name="Widget.App.Sources.InfoChip" parent="Widget.MaterialComponents.Chip.Action">
+        <item name="android:textSize">13sp</item>
+        <item name="android:textColor">?attr/colorPrimaryText</item>
+        <item name="chipBackgroundColor">@color/sources_chip</item>
+        <item name="chipIconSize">16dp</item>
+        <item name="chipIconTint">@color/sources_text_secondary</item>
+        <item name="chipStartPadding">8dp</item>
+        <item name="iconStartPadding">0dp</item>
+        <item name="textStartPadding">6dp</item>
+    </style>
+
+    <!-- A feature of the site in the app: a label, the check when the app has it -->
+    <style name="Widget.App.Sources.FeatureChip" parent="Widget.MaterialComponents.Chip.Action">
+        <item name="android:clickable">false</item>
+        <item name="android:focusable">false</item>
+        <item name="android:textSize">13sp</item>
+        <item name="android:textColor">?attr/colorPrimaryText</item>
+        <item name="chipBackgroundColor">@color/sources_chip</item>
+        <item name="chipIcon">@drawable/ic_check</item>
+        <item name="chipIconSize">16dp</item>
+        <item name="chipIconTint">@color/sources_ok</item>
+        <item name="chipMinHeight">30dp</item>
+        <item name="ensureMinTouchTargetSize">false</item>
+    </style>
+
+    <style name="Widget.App.Sources.Button" parent="Widget.MaterialComponents.Button.UnelevatedButton">
+        <item name="cornerRadius">20dp</item>
+        <item name="android:textAllCaps">false</item>
+        <item name="iconSize">18dp</item>
+    </style>
+
+    <style name="Widget.App.Sources.Button.Outlined" parent="Widget.MaterialComponents.Button.OutlinedButton">
+        <item name="cornerRadius">20dp</item>
+        <item name="android:textAllCaps">false</item>
+        <item name="iconSize">18dp</item>
+    </style>
+
+    <style name="Widget.App.Sources.Button.Text" parent="Widget.MaterialComponents.Button.TextButton">
+        <item name="android:textAllCaps">false</item>
+    </style>
+
+    <!-- Порядок / Книги / Отклик -->
+    <style name="Widget.App.Sources.Toggle" parent="Widget.MaterialComponents.Button.OutlinedButton">
+        <item name="android:layout_width">0dp</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:layout_weight">1</item>
+        <item name="android:textAllCaps">false</item>
+    </style>
+
+    <!-- «Избранное 5» of «В вашей библиотеке»: a touch target of its own, in the link colour -->
+    <style name="Widget.App.Sources.Counter" parent="">
+        <item name="android:layout_width">wrap_content</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:minHeight">48dp</item>
+        <item name="android:gravity">center_vertical</item>
+        <item name="android:paddingStart">6dp</item>
+        <item name="android:paddingEnd">6dp</item>
+        <item name="android:maxLines">1</item>
+        <item name="android:textSize">14sp</item>
+        <item name="android:textColor">@color/sources_link</item>
+        <item name="android:background">?attr/selectableItemBackground</item>
+    </style>
+
+    <style name="Widget.App.Sources.CounterDot" parent="">
+        <item name="android:layout_width">wrap_content</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:importantForAccessibility">no</item>
+        <item name="android:text">·</item>
+        <item name="android:textSize">14sp</item>
+        <item name="android:textColor">@color/sources_text_secondary</item>
+    </style>
+
+    <style name="ShapeAppearance.App.SourceIcon" parent="">
+        <item name="cornerFamily">rounded</item>
+        <item name="cornerSize">25%</item>
+    </style>
+
+    <style name="ShapeAppearance.App.SourceCover" parent="">
+        <item name="cornerFamily">rounded</item>
+        <item name="cornerSize">10dp</item>
+    </style>
+</resources>

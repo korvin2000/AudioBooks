@@ -77,6 +77,64 @@ public class SourcesTest {
     }
 
     @Test
+    public void aSourceMovedToAPositionShiftsTheOthersAndTheActiveCountStays() {
+        Sources.State s = new Sources.State(Arrays.asList(Provider.AKNIGA, Provider.KNIGAVUHE, Provider.IZIBUK,
+                Provider.ABMP3, Provider.OTRUB), 3);
+        Sources.State up = Sources.moved(s, Provider.IZIBUK, 0);
+        assertEquals(Arrays.asList(Provider.IZIBUK, Provider.AKNIGA, Provider.KNIGAVUHE, Provider.ABMP3,
+                Provider.OTRUB), up.order);
+        assertEquals(3, up.active);
+        Sources.State in = Sources.moved(s, Provider.OTRUB, 1);
+        assertEquals("an inactive one moved in pushes the last active out",
+                Arrays.asList(Provider.AKNIGA, Provider.OTRUB, Provider.KNIGAVUHE), in.order.subList(0, in.active));
+        Sources.State out = Sources.moved(s, Provider.AKNIGA, 3);
+        assertEquals("an active one moved out lets the first inactive in",
+                Arrays.asList(Provider.KNIGAVUHE, Provider.IZIBUK, Provider.ABMP3), out.order.subList(0, out.active));
+        assertEquals("clamped", Provider.AKNIGA, Sources.moved(s, Provider.AKNIGA, 99).order.get(4));
+    }
+
+    @Test
+    public void aSourceSwitchedOnIsTheLastActiveAndOffTheFirstInactive() {
+        List<Provider> five = Arrays.asList(Provider.AKNIGA, Provider.KNIGAVUHE, Provider.IZIBUK, Provider.ABMP3,
+                Provider.OTRUB);
+        Sources.State on = Sources.switched(new Sources.State(five, 2), Provider.OTRUB, true);
+        assertEquals(Arrays.asList(Provider.AKNIGA, Provider.KNIGAVUHE, Provider.OTRUB), on.order.subList(0, 3));
+        assertEquals(3, on.active);
+        Sources.State off = Sources.switched(new Sources.State(five, 3), Provider.AKNIGA, false);
+        assertEquals(Arrays.asList(Provider.KNIGAVUHE, Provider.IZIBUK, Provider.AKNIGA), off.order.subList(0, 3));
+        assertEquals(2, off.active);
+        Sources.State only = new Sources.State(five, 1);
+        assertEquals("the only active one stays on", only, Sources.switched(only, Provider.AKNIGA, false));
+        Sources.State already = new Sources.State(five, 2);
+        assertEquals(already, Sources.switched(already, Provider.AKNIGA, true));
+    }
+
+    @Test
+    public void atTheLimitASourceSwitchedOnTakesTheLastActivePlace() {
+        Sources.State full = Sources.parse(null);
+        Provider last = full.order.get(Sources.MAX_ACTIVE - 1);
+        Provider extra = full.order.get(Sources.MAX_ACTIVE + 2);
+        Sources.State on = Sources.switched(full, extra, true);
+        assertEquals(Sources.MAX_ACTIVE, on.active);
+        assertEquals(extra, on.order.get(Sources.MAX_ACTIVE - 1));
+        assertEquals("the last active one is the first inactive", last, on.order.get(Sources.MAX_ACTIVE));
+    }
+
+    @Test
+    public void theCardsChangesAreStored() {
+        FakePrefs prefs = new FakePrefs();
+        prefs.edit().putString(Sources.PREF, "otrub,abook,uknig|izibuc").apply();
+        Sources.load(prefs);
+        Sources.moveTo(prefs, Provider.UKNIG, 0);
+        assertEquals(Arrays.asList(Provider.UKNIG, Provider.OTRUB, Provider.AKNIGA), Sources.active());
+        Sources.setActive(prefs, Provider.IZIBUK, true);
+        assertEquals(4, Sources.activeCount());
+        Sources.load(prefs);
+        assertEquals(Arrays.asList(Provider.UKNIG, Provider.OTRUB, Provider.AKNIGA, Provider.IZIBUK),
+                Sources.active());
+    }
+
+    @Test
     public void theListIsLoadedFromThePreferences() {
         FakePrefs prefs = new FakePrefs();
         prefs.edit().putString(Sources.PREF, "otrub,abook|uknig").apply();

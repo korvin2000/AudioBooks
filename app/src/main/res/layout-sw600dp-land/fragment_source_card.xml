@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- A source card on a tablet in landscape, in two columns: the book-like part on the left (head, description,
+     pluses and minuses), everything the user changes and checks on the right. -->
+<androidx.core.widget.NestedScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="?attr/backgraundColor"
+    android:fillViewport="true"
+    android:theme="@style/ThemeOverlay.App.Sources"
+    tools:viewBindingIgnore="true">
+
+    <LinearLayout
+        android:id="@+id/sourceCardColumns"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:paddingBottom="24dp">
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:orientation="vertical">
+
+            <include layout="@layout/source_card_head" />
+
+            <include layout="@layout/source_card_about" />
+
+            <TextView
+                android:id="@+id/sourceFooter"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="16dp"
+                android:layout_marginTop="20dp"
+                android:layout_marginEnd="16dp"
+                android:textColor="@color/sources_text_secondary"
+                android:textSize="12sp"
+                tools:text="Сведения о сайте на ноябрь 2026. Число книг — оценка." />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:orientation="vertical">
+
+            <include layout="@layout/source_card_settings" />
+
+            <!-- phase B: «В вашей библиотеке» -->
+            <FrameLayout
+                android:id="@+id/sourceLibrarySlot"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:visibility="gone" />
+
+            <include layout="@layout/source_card_more" />
+        </LinearLayout>
+    </LinearLayout>
+</androidx.core.widget.NestedScrollView>

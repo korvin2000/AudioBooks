@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- «В вашей библиотеке» of a source card (inflated into sourceLibrarySlot): the site's books in the favorites, the
+     history and the downloads; each counter opens that list narrowed to the site, a zero one is dimmed and inert. -->
+<com.google.android.material.card.MaterialCardView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    style="@style/Widget.App.Sources.Card"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_marginStart="12dp"
+    android:layout_marginTop="12dp"
+    android:layout_marginEnd="12dp"
+    tools:viewBindingIgnore="true">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:paddingTop="8dp"
+        android:paddingBottom="2dp">
+
+        <TextView
+            style="@style/Widget.App.Sources.Section"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:accessibilityHeading="true"
+            android:paddingStart="16dp"
+            android:paddingTop="4dp"
+            android:paddingEnd="16dp"
+            android:text="@string/sources_library_title"
+            tools:ignore="UnusedAttribute" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:paddingStart="8dp"
+            android:paddingEnd="8dp">
+
+            <TextView
+                android:id="@+id/sourceLibraryFavorites"
+                style="@style/Widget.App.Sources.Counter"
+                tools:text="Избранное 5" />
+
+            <TextView
+                style="@style/Widget.App.Sources.CounterDot" />
+
+            <TextView
+                android:id="@+id/sourceLibraryHistory"
+                style="@style/Widget.App.Sources.Counter"
+                tools:text="История 23" />
+
+            <TextView
+                style="@style/Widget.App.Sources.CounterDot" />
+
+            <TextView
+                android:id="@+id/sourceLibrarySaved"
+                style="@style/Widget.App.Sources.Counter"
+                tools:text="Загружено 2" />
+        </LinearLayout>
+    </LinearLayout>
+</com.google.android.material.card.MaterialCardView>

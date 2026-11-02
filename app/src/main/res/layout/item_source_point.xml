@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- A plus or a minus of a source card; its sign (an icon in green or red) is set in code. -->
+<TextView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    style="@style/Widget.App.Sources.Line"
+    android:layout_marginTop="4dp"
+    tools:text="Живые комментарии и «Прямой эфир»"
+    tools:viewBindingIgnore="true" />

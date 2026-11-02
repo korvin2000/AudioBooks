@@ -21,8 +21,6 @@ import android.os.Environment;
 import android.os.PowerManager;
 import android.provider.SearchRecentSuggestions;
 import android.util.Log;
-import android.util.TypedValue;
-import android.widget.TextView;
 import android.text.format.Formatter;
 import android.widget.Toast;
 
@@ -93,6 +91,19 @@ public class SettingsFragment extends PreferenceFragmentCompat implements
 
     /** The "Управление источниками" entry ({@link SourcesDialogFragment}). */
     private static final String SOURCES_DIALOG = "sources_dialog";
+    /** An argument of {@link #withSourcesDialog}: open the sources dialog over the screen, once. */
+    private static final String ARG_OPEN_SOURCES = "openSourcesDialog";
+
+    /** "Источники и сеть" with the sources dialog open: where the source screens send "Управление источниками". */
+    @NonNull
+    public static SettingsFragment withSourcesDialog() {
+        SettingsFragment fragment = new SettingsFragment();
+        Bundle args = new Bundle();
+        args.putString("rootKey", "group_sources");
+        args.putBoolean(ARG_OPEN_SOURCES, true);
+        fragment.setArguments(args);
+        return fragment;
+    }
 
     private static final int EXTERNAL_STORAGE_PERMISSION_REQUEST_CODE = 342;
 
@@ -279,14 +290,10 @@ public class SettingsFragment extends PreferenceFragmentCompat implements
             CharSequence group = getArguments() != null ? getPreferenceScreen().getTitle() : null;
             activity.setTitle(group != null ? group : getString(R.string.menu_settings));
             NavigationView navigationView = activity.getNavigationView();
-            ArrayList<TextView> mTextViewArrayList = activity.getTextViewArrayList();
-            final TypedValue SelectedValue = new TypedValue();
-            activity.getTheme().resolveAttribute(R.attr.mySelectableItemBackground, SelectedValue,
-                    true);
             if (navigationView != null) {
                 navigationView.setCheckedItem(R.id.nav_settings);
-            } else if (mTextViewArrayList != null && mTextViewArrayList.size() > 8) {
-                mTextViewArrayList.get(8).setBackgroundResource(SelectedValue.resourceId);
+            } else {
+                activity.highlightNav(R.id.layout_nav_settings);
             }
         }
     }
@@ -338,6 +345,10 @@ public class SettingsFragment extends PreferenceFragmentCompat implements
         fillSources(); // before the summaries: the source list's summary is its chosen entry
         initSummary(getPreferenceScreen());
         initSourcesEntry();
+        if (savedInstanceState == null && getArguments() != null && getArguments().getBoolean(ARG_OPEN_SOURCES)
+                && getChildFragmentManager().findFragmentByTag(SourcesDialogFragment.TAG) == null) {
+            new SourcesDialogFragment().show(getChildFragmentManager(), SourcesDialogFragment.TAG);
+        }
         getChildFragmentManager().setFragmentResultListener(SourcesDialogFragment.RESULT_CLOSED, this,
                 (requestKey, result) -> {
                     fillSources();

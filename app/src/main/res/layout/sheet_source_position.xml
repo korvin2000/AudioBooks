@@ -1,0 +1,171 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- «Место в списке» (fragment.SourcePositionSheet): the place, picked with Выше / Ниже, the slider or the shortcuts;
+     the strip of every site with the line after the active ones; who shifts and who crosses the line. Nothing
+     changes before «Переместить». -->
+<androidx.core.widget.NestedScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:theme="@style/ThemeOverlay.App.Sources"
+    tools:viewBindingIgnore="true">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:paddingStart="16dp"
+        android:paddingTop="16dp"
+        android:paddingEnd="16dp"
+        android:paddingBottom="12dp">
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:accessibilityHeading="true"
+            android:text="@string/sources_position_title"
+            android:textColor="?attr/colorPrimaryText"
+            android:textSize="19sp"
+            android:textStyle="bold"
+            tools:ignore="UnusedAttribute" />
+
+        <TextView
+            android:id="@+id/sheetSubtitle"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="2dp"
+            android:textColor="@color/sources_text_secondary"
+            android:textSize="13sp"
+            tools:text="«Akniga» сейчас № 1 · активных 13 из 13" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/sheetUp"
+                style="@style/Widget.App.Sources.Button.Outlined"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/sources_move_up"
+                app:icon="@drawable/ic_source_up" />
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:gravity="center"
+                android:orientation="vertical">
+
+                <TextView
+                    android:id="@+id/sheetValue"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:fontFeatureSettings="tnum"
+                    android:textColor="?attr/colorPrimaryText"
+                    android:textSize="28sp"
+                    android:textStyle="bold"
+                    tools:text="№ 1" />
+
+                <TextView
+                    android:id="@+id/sheetOf"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:textColor="@color/sources_text_secondary"
+                    android:textSize="12sp"
+                    tools:text="из 23" />
+            </LinearLayout>
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/sheetDown"
+                style="@style/Widget.App.Sources.Button.Outlined"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/sources_move_down"
+                app:icon="@drawable/ic_source_down" />
+        </LinearLayout>
+
+        <com.fanok.audiobooks.fragment.SourceSegmentsView
+            android:id="@+id/sheetStrip"
+            android:layout_width="match_parent"
+            android:layout_height="28dp"
+            android:layout_marginStart="16dp"
+            android:layout_marginTop="12dp"
+            android:layout_marginEnd="16dp" />
+
+        <com.google.android.material.slider.Slider
+            android:id="@+id/sheetSlider"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:contentDescription="@string/sources_position_title"
+            android:stepSize="1"
+            android:valueFrom="1"
+            android:valueTo="23" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal">
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/sheetFirst"
+                style="@style/Widget.App.Sources.Button.Text"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/sources_sheet_first" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/sheetLastActive"
+                style="@style/Widget.App.Sources.Button.Text"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/sources_sheet_last_active" />
+        </LinearLayout>
+
+        <TextView
+            android:id="@+id/sheetChangesTitle"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:text="@string/sources_sheet_changes"
+            android:textColor="?attr/colorPrimaryText"
+            android:textSize="15sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/sheetChanges"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:accessibilityLiveRegion="polite"
+            android:lineSpacingExtra="4dp"
+            android:textSize="14sp"
+            tools:text="• «Akniga»: № 1 → № 5" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:gravity="end"
+            android:orientation="horizontal">
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/sheetCancel"
+                style="@style/Widget.App.Sources.Button.Text"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/cancel" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/sheetMove"
+                style="@style/Widget.App.Sources.Button"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="8dp"
+                android:text="@string/sources_sheet_move" />
+        </LinearLayout>
+    </LinearLayout>
+</androidx.core.widget.NestedScrollView>

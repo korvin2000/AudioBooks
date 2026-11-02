@@ -91,7 +91,13 @@ hide them meanwhile.
    `SERVER`, `INDEX`, `GENRES`, ... as constants of its adapter. Existing users get the new site inactive, at the end
    of their list (`search/Sources`); the user switches it on. Add the host to the deep-link intent filter in
    `AndroidManifest.xml`; a site that moved gets its old hosts in `Url.HOST_ALIASES`. Add the book-page fixture to
-   `BookPageFixtures.BOOK_PAGES`.
+   `BookPageFixtures.BOOK_PAGES`. Give the site its card ("Источники" screen, `search/SourceInfo`): a folder
+   `app/src/main/assets/sources/<row name in lower case>/` with `info.json` (copy a neighbour's: a tagline, two or
+   three sentences on what sets the site apart from the others, approximate books with the month counted, hosting
+   country or CDN, start date, regions where it is blocked, web mirrors, fragments, takedowns, related sites, the
+   version that added it, pluses and minuses; an unknown fact is `null`, never a guess), `icon.webp` (96×96, ≤ 5 KB)
+   and, unless the site hides behind an anti-bot page, `cover.webp` (its mobile home page, 240×360, ≤ 12 KB, no ads).
+   `search/SourceInfoTest` fails until the folder is complete.
 4. **Test.** `source/SourceContractTest` already checks every row without fixtures: the deep-link host, page 2 and
    every Order item on the site's host, a sorted listing keeping its menu, period round trips, the book search, every host of
    the site on its own proxy route, timeout and folder. The site's own test asserts what its fixtures show (cards, next page and last page, search,

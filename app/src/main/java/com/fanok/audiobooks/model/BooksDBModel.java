@@ -246,6 +246,18 @@ public class BooksDBModel extends BooksDBAbstract implements BooksDBHelperInterf
         return new ArrayList<>(list);
     }
 
+    /** The page of every book in {@code table}: what a source card counts by site. */
+    public List<String> getUrls(int table) {
+        if (table == Consts.TABLE_FAVORITE) {
+            return getDatabase().favoriteDao().getUrls();
+        } else if (table == Consts.TABLE_HISTORY) {
+            return getDatabase().historyDao().getUrls();
+        } else if (table == Consts.TABLE_SAVED) {
+            return getDatabase().savedDao().getUrls();
+        }
+        throw new IllegalArgumentException("Incorect table id");
+    }
+
     @Override
     public ArrayList<String> getSeries(int table) {
         List<String> list;

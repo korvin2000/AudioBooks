@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- A note under a setting of the source card (the proxy is off): a box tinted with the accent. -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <solid android:color="@color/sources_info_box" />
+    <corners android:radius="10dp" />
+</shape>

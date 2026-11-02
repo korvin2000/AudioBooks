@@ -212,6 +212,22 @@
                     android:textSize="@dimen/textSizeBookDescription"
                     tools:text="+4972" />
 
+                <!-- the site of the book, opening its card (SourceActivity); hidden for an unknown host -->
+                <TextView
+                    android:id="@+id/bookSource"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="@dimen/text_margin_book_description"
+                    android:background="?attr/selectableItemBackground"
+                    android:drawableStart="@drawable/ic_source_layers"
+                    android:drawablePadding="4dp"
+                    android:maxLines="1"
+                    android:singleLine="true"
+                    android:textColor="?attr/hrefColor"
+                    android:textSize="@dimen/textSizeBookDescription"
+                    android:visibility="gone"
+                    tools:text="Книга в ухе" />
+
                 <View
                     android:id="@+id/descLine"
                     android:layout_width="match_parent"

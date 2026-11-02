@@ -38,7 +38,8 @@ import java.util.concurrent.TimeUnit;
  */
 public final class AppRegion {
 
-    static final String PREF_REGION = "region";
+    /** The region of the last check ({@link #last}); the source screens watch it. */
+    public static final String PREF_REGION = "region";
     static final String PREF_COUNTRY = "region_country";
     static final String PREF_SOURCE = "region_source";
     static final String PREF_VIA = "region_via";

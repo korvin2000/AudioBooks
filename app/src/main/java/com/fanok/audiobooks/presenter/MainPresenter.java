@@ -17,6 +17,7 @@ import com.fanok.audiobooks.fragment.AboutFragment;
 import com.fanok.audiobooks.fragment.BooksFragment;
 import com.fanok.audiobooks.fragment.FavoriteFragment;
 import com.fanok.audiobooks.fragment.SettingsFragment;
+import com.fanok.audiobooks.fragment.SourcesFragment;
 import com.fanok.audiobooks.interface_pacatge.main.MainView;
 import com.fanok.audiobooks.model.BooksDBModel;
 import com.fanok.audiobooks.pojo.BookPOJO;
@@ -50,6 +51,11 @@ public class MainPresenter extends MvpPresenter<MainView> implements
 
     @Override
     public void onItemSelected(int id) {
+        if (id == R.id.nav_sources || id == R.id.layout_nav_sources) {
+            // every site, not a section of the selected one
+            getViewState().showFragment(new SourcesFragment(), SourcesFragment.TAG);
+            return;
+        }
         Provider source = Provider.current();
         if (source == null) {
             return;

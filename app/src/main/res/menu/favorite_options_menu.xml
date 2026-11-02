@@ -32,6 +32,11 @@
                 android:id="@+id/series_filter"
                 android:title="@string/filter_series" />
 
+            <!-- the sites of the listed books (FavoritePresenter); the only filter of the history -->
+            <item
+                android:id="@+id/source_filter"
+                android:title="@string/source" />
+
             <item
                 android:id="@+id/saved_filter"
                 android:title="@string/menu_saved" />
