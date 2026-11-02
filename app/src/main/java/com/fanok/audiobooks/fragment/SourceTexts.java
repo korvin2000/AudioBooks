@@ -79,6 +79,8 @@ public final class SourceTexts {
                 return context.getString(R.string.sources_status_empty);
             case BLOCKED:
                 return context.getString(R.string.sources_status_blocked);
+            case RATE_LIMITED:
+                return context.getString(R.string.sources_status_rate_limited);
             case TIMEOUT:
                 return context.getString(R.string.sources_status_timeout);
             default:

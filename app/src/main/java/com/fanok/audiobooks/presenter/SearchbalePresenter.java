@@ -533,18 +533,13 @@ public class SearchbalePresenter extends MvpPresenter<SearchableView> implements
         for (Provider p : sources) {
             long[] answer = answers.get(p.name());
             SourceProbe.Result check = checks.get(p);
-            boolean silent = check != null && (answer == null || check.at > answer[1]) ? isFailure(check.status)
-                    : answer != null && answer[0] == 1;
+            boolean silent = check != null && (answer == null || check.at > answer[1])
+                    ? ProviderPage.isFailure(check.status) : answer != null && answer[0] == 1;
             if (silent) {
                 out.add(p);
             }
         }
         return out;
-    }
-
-    private static boolean isFailure(ProviderPage.Status status) {
-        return status == ProviderPage.Status.ERROR || status == ProviderPage.Status.TIMEOUT
-                || status == ProviderPage.Status.BLOCKED;
     }
 
     /**

@@ -167,6 +167,24 @@ Checks at the end: `:app:testDebugUnitTest` 963 tests, 0 failures (1 pre-existin
   authors + 4 series for "Кинг", 11 series for "пикник на обочине", sort submenu, genres, the recordings dialog with
   15 recordings, the collection and a series plate opening their listings).
 
+### 2.7 Third session (2 November 2026, evening) — branch `feature/search-ranking-429`
+- **A surname ranks its author's works** (`SearchUi.authorWord` / `namesAuthor`, `SearchOrder.groups(sort, author)` /
+  `offers(sort, author, siteTab)`): a request anywhere of one significant word that is no number names an author
+  when the exact word (`Offer.authorHas`, no prefix: "Кингсли" is no evidence) is in the author of ≥ 3 works, from
+  ≥ 2 catalogs, holding a strict majority of the covered works **weighted by the catalogs that carry each work**
+  ("гарри": Harry Potter on many sites outweighs Гарри Гаррисон). Decided anew from every set of cards (no latch).
+  By relevance then: a work titled exactly as asked first (bucket 0, `Offer.titleIs`), the author's works by tier
+  and catalogs (bucket 1), the rest by plain relevance; a site's tab keeps the site's order inside bucket 1. Plain
+  group relevance also got "catalogs desc" after score (equal matches: the work more sites carry first). The design
+  was checked with Codex (gpt-6.1-sol) before building; its six changes are in.
+- **HTTP 429 is RATE_LIMITED, not BLOCKED** (`net/RateLimitedException`, `ProviderPage.Status.RATE_LIMITED` +
+  `retryAfterSeconds`, `ProviderPage.isFailure(Status)`): `Retry-After` read as seconds or an HTTP date (≤ 1 h);
+  `SiteHttp.throwForStatus` for `parse` and `json`; `SiteHttp.executeOnce` does not ask a host inside its window
+  (`LIMITED_UNTIL`, the requested and the answering host) and fails fast with the seconds left. Aknigi24 sleeps a
+  site's wait of ≤ 5 s, else gives up. The search asks a page again by itself once when the site's wait is ≤ 10 s
+  (`SearchSession.AUTO_RETRY_SECONDS`; the tile keeps searching); longer, or no wait said, is an amber "лимит
+  запросов" tile to retry. Catalog: no route offer on 429, a toast with the wait; book pages say the site asks to wait.
+
 ## 3. Decisions that deviate from the spec (and why)
 - Ranking + grouping shipped together with stage 0–2 (spec §14 p.10 split them into releases): the owner asked for
   them now; "Как пришло" and "Группировать" in the menu restore the old view.
@@ -176,17 +194,16 @@ Checks at the end: `:app:testDebugUnitTest` 963 tests, 0 failures (1 pre-existin
 - Chips: no icons / rounding / outline (owner's explicit request, chosen variant: Opus 5.5 tiles).
 - Narration choice is a simple dialog, not the `BottomSheetDialogFragment` sheet with availability checks (§9.5).
 - Snapshot written with plain Java (tmp + rename), not `AtomicFile` — JVM-testable.
+- §6.5 relevance has two more keys: the author buckets for a one-word author request (§2.7) and "catalogs desc"
+  after score for groups. Without the "Новых выше" freeze (§6.5) a row may still move while results stream in.
 
 ## 4. Remaining work (prioritized)
 1. ~~Merge `feature/search-compact-block`~~ (merged, `de62053`).
 2. ~~Genre filter~~ (done in §2.6).
-3. **Ranking tuning**: for a one-word surname query ("кинг") title matches (weight 1.0) beat the author's books
-   (0.95); consider boosting AUTHOR when the query is a single person-like word, or tie-breaking by number of
-   catalogs. Keep the corpus tests (appendix B) green.
+3. ~~Ranking tuning~~ (done in §2.7; thresholds 3 works / 2 catalogs / weighted majority are a first guess, to be
+   checked on real queries).
 4. ~~"Slow" marker and time limits~~ (done in §2.6 as a soft limit: no absolute pass limit, nothing is cut off).
-5. **RATE_LIMITED + Retry-After** (W36): `ProviderPage.httpStatus/retryAfterSeconds`, one `SiteHttp.throwForStatus`
-   for `parse` and `json`; catalog code in `BooksPresenter` compares with BLOCKED (do not offer proxy on 429);
-   `SourcesDialogFragment` status text.
+5. ~~RATE_LIMITED + Retry-After~~ (done in §2.7).
 6. **Response cache** (§7.5): cache response *bodies* (Jsoup `Document` is not thread-safe), LRU by bytes (~8 MB),
    in-flight coalescing with consumer counting; ABMP3 one URL for all pages; Книга в ухе chips from the search page.
 7. **"В вашей библиотеке"** row (favourites/history matched with `SearchMatcher`, no network).

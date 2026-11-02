@@ -33,6 +33,7 @@ import com.fanok.audiobooks.BookRemovedException;
 import com.fanok.audiobooks.Consts;
 import com.fanok.audiobooks.EncodingExeption;
 import com.fanok.audiobooks.R;
+import com.fanok.audiobooks.Url;
 import com.fanok.audiobooks.activity.SleepTimerActivity;
 import com.fanok.audiobooks.interface_pacatge.book_content.Activity;
 import com.fanok.audiobooks.interface_pacatge.book_content.ActivityPresenter;
@@ -43,6 +44,7 @@ import com.fanok.audiobooks.model.AudioModel;
 import com.fanok.audiobooks.model.BooksDBModel;
 import com.fanok.audiobooks.model.OtherArtistModel;
 import com.fanok.audiobooks.model.OtherSourceModel;
+import com.fanok.audiobooks.net.RateLimitedException;
 import com.fanok.audiobooks.pojo.AudioListPOJO;
 import com.fanok.audiobooks.pojo.AudioPOJO;
 import com.fanok.audiobooks.pojo.BookPOJO;
@@ -805,7 +807,13 @@ public class BookPresenter extends MvpPresenter<Activity> implements ActivityPre
                     error = true;
                 } else {
                     String errDetail = mLastError != null ? (" (" + mLastError.getClass().getSimpleName() + (mLastError.getMessage() != null ? ": " + mLastError.getMessage() : "") + ")") : "";
-                    getViewState().showLoadError(mContext.getString(R.string.error_load_data)
+                    // a rate limit (429) is a wait, not an error of the book: say so, and how long when the site did
+                    String head = !(mLastError instanceof RateLimitedException) ? mContext.getString(R.string.error_load_data)
+                            : ((RateLimitedException) mLastError).retryAfterSeconds > 0
+                            ? mContext.getString(R.string.site_rate_limited_after, Url.hostOf(mBookPOJO.getUrl()),
+                                    ((RateLimitedException) mLastError).retryAfterSeconds)
+                            : mContext.getString(R.string.site_rate_limited);
+                    getViewState().showLoadError(head
                             + errDetail + "\n" + mContext.getString(R.string.go_offline),
                             ErrorReport.of(mLastError, mBookPOJO.getUrl()));
                     error = true;

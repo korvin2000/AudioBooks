@@ -10,6 +10,7 @@ import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.preference.PreferenceManager;
 import com.fanok.audiobooks.CookesExeption;
+import com.fanok.audiobooks.net.RateLimitedException;
 import com.fanok.audiobooks.R;
 import com.fanok.audiobooks.Url;
 import com.fanok.audiobooks.pojo.BookPOJO;
@@ -81,6 +82,8 @@ public class LoadBook extends AppCompatActivity {
                         int message;
                         if (e instanceof CookesExeption) {
                             message = CookesExeption.messageFor(e.getMessage());
+                        } else if (e instanceof RateLimitedException) {
+                            message = R.string.site_rate_limited;
                         } else if (e instanceof IllegalArgumentException
                                 && String.valueOf(e.getMessage()).startsWith("unsupported host")) {
                             message = R.string.worong_data_sorce;

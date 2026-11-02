@@ -8,6 +8,7 @@ import com.fanok.audiobooks.model.ComentsModel;
 import com.fanok.audiobooks.model.OtherArtistModel;
 import com.fanok.audiobooks.model.OtherSourceModel;
 import com.fanok.audiobooks.net.JsonPage;
+import com.fanok.audiobooks.net.RateLimitedException;
 import com.fanok.audiobooks.net.SiteHttp;
 import com.fanok.audiobooks.pojo.AudioPOJO;
 import com.fanok.audiobooks.pojo.BookPOJO;
@@ -70,8 +71,10 @@ public final class Aknigi24 implements SourceParser {
     static final int LETTER_PAGES = 1000;
     /** Bound of the pages read for a book's series tab or its comments. */
     static final int MAX_PAGES = 10;
-    /** The first wait after a 429; the second waits twice as long. */
+    /** The first wait after a 429 without a Retry-After; the second waits twice as long. */
     private static final int THROTTLE_MS = 1500;
+    /** A longer wait the site asks for is not slept through: the page fails as rate limited, to be asked later. */
+    static final int MAX_THROTTLE_MS = 5000;
 
     private static final List<Sort.Entry> MENU = Sort.menu(Sort.NEW, Sort.RATING, Sort.TITLE, Sort.DURATION);
     private static final Pattern GENRE = Pattern.compile("^https?://[^/]+/genre/[^/?#]+");
@@ -81,18 +84,26 @@ public final class Aknigi24 implements SourceParser {
 
     // ---------------------------------------------------------------- SourceParser
 
-    /** The site answers a burst (about a dozen quick requests) with 429: wait and ask again, twice at most. */
+    /**
+     * The site answers a burst (about a dozen quick requests) with 429: wait as long as it asks (else 1.5 s, then 3 s)
+     * and ask again, twice at most; a wait longer than {@link #MAX_THROTTLE_MS} is not slept through.
+     */
     @Override
     public Document fetch(String url) throws IOException {
         for (int attempt = 1; ; attempt++) {
             try {
                 return SiteHttp.get(url);
             } catch (HttpStatusException e) {
-                if (e.getStatusCode() != 429 || attempt > 2) {
+                if (e.getStatusCode() != RateLimitedException.STATUS || attempt > 2) {
+                    throw e;
+                }
+                int asked = e instanceof RateLimitedException ? ((RateLimitedException) e).retryAfterSeconds : 0;
+                long wait = asked > 0 ? asked * 1000L : attempt * THROTTLE_MS;
+                if (wait > MAX_THROTTLE_MS) {
                     throw e;
                 }
                 try {
-                    Thread.sleep(attempt * THROTTLE_MS);
+                    Thread.sleep(wait);
                 } catch (InterruptedException interrupted) {
                     Thread.currentThread().interrupt();
                     throw new InterruptedIOException("cancelled while throttled");

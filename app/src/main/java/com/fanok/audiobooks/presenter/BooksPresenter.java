@@ -737,11 +737,21 @@ public class BooksPresenter extends MvpPresenter<BooksView> implements
     }
 
     private void showFailure(ProviderPage<?> result) {
-        if (result.status == ProviderPage.Status.BLOCKED) {
+        if (result.status == ProviderPage.Status.RATE_LIMITED) {
+            getViewState().showToast(rateLimited(result));
+        } else if (result.status == ProviderPage.Status.BLOCKED) {
             getViewState().showToast(CookesExeption.messageFor(mUrl));
         } else {
             getViewState().showToast(R.string.error_load_data);
         }
+    }
+
+    /** "Akniga просит не спешить: … через 30 с" (429): a wait, not a fault of the site or of its route. */
+    private String rateLimited(ProviderPage<?> result) {
+        String site = mProvider != null ? mProvider.title : Url.hostOf(mUrl);
+        return result.retryAfterSeconds > 0
+                ? mContext.getString(R.string.site_rate_limited_after, site, result.retryAfterSeconds)
+                : mContext.getString(R.string.site_rate_limited_site, site);
     }
 
     // ---------------------------------------------------------------- route offer
@@ -781,10 +791,12 @@ public class BooksPresenter extends MvpPresenter<BooksView> implements
 
     /**
      * A site that fails while the device is online: offers its other route once, in place of the error toast. A
-     * blocked site with the proxy off keeps the cookie hint: a challenge, not a route, is the likelier cause.
+     * blocked site with the proxy off keeps the cookie hint: a challenge, not a route, is the likelier cause. A rate
+     * limit (429) is never a route's fault: the site asks to wait, and going round it would only ask more.
      */
     private boolean offerRoute(ProviderPage<?> result) {
-        if (mProvider == null || !Consts.isNetworkAvailable(mContext)) {
+        if (mProvider == null || !Consts.isNetworkAvailable(mContext)
+                || result.status == ProviderPage.Status.RATE_LIMITED) {
             return false;
         }
         boolean wasDirect = AppProxy.isDirect(mProvider);
@@ -851,7 +863,9 @@ public class BooksPresenter extends MvpPresenter<BooksView> implements
         if (AppProxy.isDirect(mProvider) != tried.wasDirect) {
             AppProxy.setDirect(getDefaultSharedPreferences(mContext), mProvider, tried.wasDirect);
         }
-        if (result.status == ProviderPage.Status.BLOCKED) {
+        if (result.status == ProviderPage.Status.RATE_LIMITED) {
+            getViewState().showToast(rateLimited(result));
+        } else if (result.status == ProviderPage.Status.BLOCKED) {
             getViewState().showToast(CookesExeption.messageFor(mUrl)); // the cookie hint is what can help
         } else {
             getViewState().showToast(mContext.getString(R.string.route_none, mProvider.title));

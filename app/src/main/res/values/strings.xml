@@ -571,6 +571,9 @@
     <string name="vpn_ukrane_value" translatable="false">vpn_ukrane</string>
     <string name="cookes_baza_knig_exeption">Сайт требует проверку в браузере. Откройте его в настройках (Cookies сайта) или попробуйте позже</string>
     <string name="site_challenge">Сайт временно не пускает приложение (защита от ботов или перегрузка). Попробуйте позже</string>
+    <string name="site_rate_limited">Сайт просит не так часто: слишком много запросов подряд. Повторите чуть позже</string>
+    <string name="site_rate_limited_site">%s просит не так часто: слишком много запросов подряд. Повторите чуть позже</string>
+    <string name="site_rate_limited_after">%1$s просит не так часто: слишком много запросов подряд. Повторите через %2$d с</string>
     <string name="getCookies">Получить Cookies</string>
     <string name="cookies_info_baza_knig">Для доступа к источнику База Книг необходимо обновить Cookies</string>
     <string name="error_cookies_load">Не удалось обновить cookies</string>
@@ -660,6 +663,7 @@
     <string name="sources_seconds">%1$.1f с</string>
     <string name="sources_status_empty">пусто</string>
     <string name="sources_status_blocked">блок</string>
+    <string name="sources_status_rate_limited">лимит запросов</string>
     <string name="sources_status_timeout">нет ответа</string>
     <string name="sources_status_error">ошибка</string>
     <!-- BooksFragment: a listing of the selected site failed; offered once per site while the app runs -->
