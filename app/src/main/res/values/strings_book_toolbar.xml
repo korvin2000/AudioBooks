@@ -5,6 +5,8 @@
     <string name="book_toolbar_speed">Скорость · %1$s</string>
     <string name="book_toolbar_speed_pref">Скорость воспроизведения</string>
     <string name="book_toolbar_speed_desc">Скорость воспроизведения %1$s</string>
+    <!-- the speed dialog's bottom-left button: back to 1x -->
+    <string name="speed_standard">Стандарт</string>
     <string name="book_toolbar_settings">Настройки панели…</string>
     <string name="book_fav_author_item">Автор в избранном</string>
     <string name="book_fav_reader_item">Чтец в избранном</string>
@@ -22,4 +24,13 @@
     <!-- The snackbar after a toolbar toggle of a person, with "Отменить". -->
     <string name="book_fav_added">Добавлено в избранное: %1$s</string>
     <string name="book_fav_removed">Удалено из избранного: %1$s</string>
+
+    <!-- «Поделиться» (BookLinks): the book's link both ways. -->
+    <string name="book_link_send">Отправить ссылку…</string>
+    <string name="book_link_copy">Скопировать ссылку</string>
+    <string name="book_link_open">Открыть книгу по ссылке…</string>
+    <string name="book_link_defaults">Открывать ссылки сайтов в приложении…</string>
+    <string name="book_link_open_title">Открыть книгу по ссылке</string>
+    <string name="book_link_hint">Ссылка на книгу с сайта-источника</string>
+    <string name="book_link_same">Эта книга уже открыта</string>
 </resources>

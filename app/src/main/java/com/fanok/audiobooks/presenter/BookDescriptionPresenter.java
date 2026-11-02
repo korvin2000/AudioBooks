@@ -6,6 +6,7 @@ import androidx.annotation.NonNull;
 import com.arellomobile.mvp.InjectViewState;
 import com.arellomobile.mvp.MvpPresenter;
 import com.fanok.audiobooks.App;
+import com.fanok.audiobooks.BookRemovedException;
 import com.fanok.audiobooks.Consts;
 import com.fanok.audiobooks.CookesExeption;
 import com.fanok.audiobooks.net.RateLimitedException;
@@ -20,6 +21,11 @@ import io.reactivex.android.schedulers.AndroidSchedulers;
 import io.reactivex.disposables.CompositeDisposable;
 import io.reactivex.schedulers.Schedulers;
 import java.io.IOException;
+import java.io.UncheckedIOException;
+import java.net.ConnectException;
+import java.net.SocketException;
+import java.net.SocketTimeoutException;
+import java.net.UnknownHostException;
 
 @InjectViewState
 public class BookDescriptionPresenter extends MvpPresenter<Description> implements
@@ -126,21 +132,40 @@ public class BookDescriptionPresenter extends MvpPresenter<Description> implemen
     }
 
     /**
-     * The message for a failed load: a site challenge ({@link CookesExeption}), an HTTP error
-     * ({@code HttpStatusException}) or other network/page failure ({@link IOException}), an unsupported source.
+     * The message for a failed load, shared with the chapter-load dialog: no network ({@code null}: nothing was asked),
+     * a site challenge ({@link CookesExeption}), a rate limit, a book taken down, no answer in time, an HTTP error
+     * ({@code HttpStatusException}) or other network failure ({@link IOException}), an unsupported source, a page that
+     * is not what the site served before ({@link IllegalStateException}). jsoup's {@link UncheckedIOException} is
+     * told by its cause.
      */
-    static int errorMessage(Throwable e) {
+    static int errorMessage(Throwable error) {
+        Throwable e = error instanceof UncheckedIOException && error.getCause() != null ? error.getCause() : error;
+        if (e == null) {
+            return R.string.error_no_network;
+        }
         if (e instanceof CookesExeption) {
             return CookesExeption.messageFor(e.getMessage());
         }
         if (e instanceof RateLimitedException) {
             return R.string.site_rate_limited;
         }
+        if (e instanceof BookRemovedException) {
+            return R.string.book_taken_down;
+        }
+        if (e instanceof UnknownHostException || e instanceof ConnectException) {
+            return R.string.error_site_unreachable; // no internet, or the site is down or blocked
+        }
+        if (e instanceof SocketTimeoutException || e instanceof SocketException) {
+            return R.string.error_site_no_answer;
+        }
         if (e instanceof IOException) {
             return R.string.error_load_data;
         }
         if (e instanceof IllegalArgumentException) {
             return R.string.worong_data_sorce;
+        }
+        if (e instanceof IllegalStateException) {
+            return R.string.error_site_changed;
         }
         return R.string.error_display_data;
     }

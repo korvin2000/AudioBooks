@@ -151,16 +151,25 @@
             android:text="@string/time_zero"
             android:textColor="?attr/colorPrimaryText" />
 
-        <ImageButton
+        <!-- the speed as text ("1,5×"), as on the toolbar (BookActivity.bindSpeedButton); opens the speed dialog -->
+        <TextView
             android:id="@+id/speed"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
+            android:layout_gravity="center_vertical"
             android:background="?selectableItemBackgroundBorderless"
+            android:clickable="true"
             android:contentDescription="@string/speed"
+            android:focusable="true"
+            android:gravity="center"
+            android:maxLines="1"
+            android:minWidth="64dp"
+            android:minHeight="24dp"
             android:paddingStart="@dimen/text_margin"
             android:paddingEnd="@dimen/text_margin"
-            android:scaleType="centerInside"
-            android:src="@drawable/ic_play_speed" />
+            android:textColor="?attr/colorPrimaryText"
+            android:textStyle="bold"
+            tools:text="1,5×" />
 
     </LinearLayout>
 

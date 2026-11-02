@@ -5,7 +5,9 @@ import android.content.Context;
 import android.view.LayoutInflater;
 import android.view.Menu;
 import android.view.View;
+import android.widget.ImageView;
 import android.widget.TextView;
+import androidx.annotation.DrawableRes;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.ActionBar;
@@ -21,11 +23,13 @@ import com.fanok.audiobooks.model.FavoritePeople;
 import io.reactivex.Single;
 import io.reactivex.android.schedulers.AndroidSchedulers;
 import io.reactivex.schedulers.Schedulers;
+import java.util.function.IntConsumer;
 
 /**
  * The title of Избранное: "★ Книги ⌄" on the activity's shared toolbar, a menu of the three lists (books, authors,
  * readers) with their sizes. The list on screen puts it up and takes it down with its view; the choice is remembered,
- * so the drawer, the start screen and the links open the list chosen last.
+ * so the drawer, the start screen and the links open the list chosen last. The history puts up the same switcher for
+ * its listening status (FavoriteFragment).
  */
 public final class FavoritesSwitcher {
     /** The books; the people lists are {@link FavoritePeople#AUTHOR} and {@link FavoritePeople#READER}. */
@@ -61,8 +65,28 @@ public final class FavoritesSwitcher {
         return kind == FavoritePeople.AUTHOR ? 1 : kind == FavoritePeople.READER ? 2 : 0;
     }
 
+    /** Opens the menu of a switcher: {@code anchor} is the switcher, {@code arrow} its arrow. */
+    interface Opener {
+        void open(@NonNull MainActivity activity, @NonNull View anchor, @NonNull View arrow);
+    }
+
     /** Puts the switcher on the toolbar for {@code owner}, the list {@code kind} on screen, in place of the title. */
     static void install(@NonNull Fragment owner, int kind) {
+        Context context = owner.getContext();
+        if (context == null) {
+            return;
+        }
+        String name = context.getString(title(kind));
+        install(owner, R.drawable.ic_favorite_remove, name, context.getString(R.string.favorites_switcher_desc, name),
+                (activity, anchor, arrow) -> open(activity, anchor, arrow, kind));
+    }
+
+    /**
+     * Puts a switcher ("{@code icon} {@code name} ⌄") on the toolbar for {@code owner}, in place of the title; a tap
+     * calls {@code opener}. Избранное and the history (its listening status) share it.
+     */
+    static void install(@NonNull Fragment owner, @DrawableRes int icon, @NonNull String name,
+            @NonNull String description, @NonNull Opener opener) {
         MainActivity activity = owner.getActivity() instanceof MainActivity ? (MainActivity) owner.getActivity() : null;
         Toolbar toolbar = activity == null ? null : activity.findViewById(R.id.toolbar);
         ActionBar bar = activity == null ? null : activity.getSupportActionBar();
@@ -80,14 +104,14 @@ public final class FavoritesSwitcher {
         view.setTag(owner);
         bar.setDisplayShowTitleEnabled(false);
         bar.setSubtitle(null);
-        String name = activity.getString(title(kind));
+        ((ImageView) view.findViewById(R.id.favoritesSwitcherIcon)).setImageResource(icon);
         ((TextView) view.findViewById(R.id.favoritesSwitcherTitle)).setText(name);
-        view.setContentDescription(activity.getString(R.string.favorites_switcher_desc, name));
+        view.setContentDescription(description);
         view.findViewById(R.id.favoritesSwitcherSubtitle).setVisibility(View.GONE);
         View arrow = view.findViewById(R.id.favoritesSwitcherArrow);
         arrow.setRotation(0);
         final View anchor = view;
-        view.setOnClickListener(v -> open(activity, anchor, arrow, kind));
+        view.setOnClickListener(v -> opener.open(activity, anchor, arrow));
     }
 
     /** Takes the switcher down if {@code owner} has it; the toolbar shows the title again. */
@@ -166,27 +190,42 @@ public final class FavoritesSwitcher {
 
     private static void showMenu(@NonNull MainActivity activity, @NonNull View anchor, @NonNull View arrow, int kind,
             @Nullable int[] counts) {
+        String[] names = new String[KINDS.length];
+        for (int i = 0; i < KINDS.length; i++) {
+            String name = activity.getString(TITLES[i]);
+            names[i] = counts == null ? name : activity.getString(R.string.favorites_list_count, name, counts[i]);
+        }
+        choose(activity, anchor, arrow, names, index(kind), i -> {
+            int chosen = KINDS[i];
+            if (chosen != kind) {
+                PreferenceManager.getDefaultSharedPreferences(activity).edit().putInt(PREF_KIND, chosen).apply();
+                activity.switchFavorites(create(chosen));
+            }
+        });
+    }
+
+    /**
+     * The menu of a switcher: {@code names} with the one at {@code checked} ticked; {@code pick} gets the index
+     * chosen. The arrow points up while it is open.
+     */
+    static void choose(@NonNull MainActivity activity, @NonNull View anchor, @NonNull View arrow,
+            @NonNull String[] names, int checked, @NonNull IntConsumer pick) {
         if (!anchor.isAttachedToWindow() || activity.isFinishing()) {
             arrow.setRotation(0);
             return;
         }
         PopupMenu popup = new PopupMenu(activity, anchor);
         Menu menu = popup.getMenu();
-        for (int i = 0; i < KINDS.length; i++) {
-            String name = activity.getString(TITLES[i]);
-            menu.add(0, i, i, counts == null ? name : activity.getString(R.string.favorites_list_count, name,
-                    counts[i]));
+        for (int i = 0; i < names.length; i++) {
+            menu.add(0, i, i, names[i]);
         }
         menu.setGroupCheckable(0, true, true);
-        menu.getItem(index(kind)).setChecked(true);
+        menu.getItem(checked).setChecked(true);
         popup.setOnMenuItemClickListener(item -> {
-            int chosen = KINDS[item.getItemId()];
-            if (chosen != kind) {
-                PreferenceManager.getDefaultSharedPreferences(activity).edit().putInt(PREF_KIND, chosen).apply();
-                activity.switchFavorites(create(chosen));
-            }
+            pick.accept(item.getItemId());
             return true;
         });
+        arrow.setRotation(180);
         popup.setOnDismissListener(p -> arrow.setRotation(0));
         popup.show();
     }

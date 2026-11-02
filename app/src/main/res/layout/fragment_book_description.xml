@@ -207,9 +207,10 @@
 
             </LinearLayout>
 
-            <!-- Автор / Чтец / Серия: rows of book_label_row_height, a touch target each. The Автор and Чтец labels
-                 toggle that person as a favourite (amber, with a star, while one); the names open the site's listing;
-                 the series name opens СЕРИЯ and, when cut, scrolls once now and then (SeriesPeek) -->
+            <!-- Автор / Чтец / Серия: compact rows, their 7dp gap is the views' top padding (so still clickable).
+                 The Автор and Чтец labels toggle that person as a favourite (amber, with a star, while one); the
+                 names open the site's listing; the series name opens СЕРИЯ and, when cut, scrolls once now and then
+                 (SeriesPeek) -->
             <LinearLayout
                 android:id="@+id/autorConteiner"
                 android:layout_width="wrap_content"
@@ -225,7 +226,7 @@
                     android:drawablePadding="4dp"
                     android:gravity="center_vertical"
                     android:maxLines="1"
-                    android:minHeight="@dimen/book_label_row_height"
+                    android:paddingTop="@dimen/text_margin_book_description"
                     android:singleLine="true"
                     android:text="@string/autor"
                     android:textColor="?attr/subTextColor"
@@ -239,7 +240,7 @@
                     android:layout_marginStart="@dimen/recycler_item_textmargin"
                     android:gravity="center_vertical"
                     android:maxLines="1"
-                    android:minHeight="@dimen/book_label_row_height"
+                    android:paddingTop="@dimen/text_margin_book_description"
                     android:singleLine="true"
                     android:textColor="?attr/hrefColor"
                     android:textSize="@dimen/textSizeBookDescription"
@@ -261,7 +262,7 @@
                     android:drawablePadding="4dp"
                     android:gravity="center_vertical"
                     android:maxLines="1"
-                    android:minHeight="@dimen/book_label_row_height"
+                    android:paddingTop="@dimen/text_margin_book_description"
                     android:singleLine="true"
                     android:text="@string/artist"
                     android:textColor="?attr/subTextColor"
@@ -275,7 +276,7 @@
                     android:layout_marginStart="@dimen/recycler_item_textmargin"
                     android:gravity="center_vertical"
                     android:maxLines="1"
-                    android:minHeight="@dimen/book_label_row_height"
+                    android:paddingTop="@dimen/text_margin_book_description"
                     android:singleLine="true"
                     android:textColor="?attr/hrefColor"
                     android:textSize="@dimen/textSizeBookDescription"
@@ -297,7 +298,7 @@
                     android:drawablePadding="4dp"
                     android:gravity="center_vertical"
                     android:maxLines="1"
-                    android:minHeight="@dimen/book_label_row_height"
+                    android:paddingTop="@dimen/text_margin_book_description"
                     android:singleLine="true"
                     android:text="@string/series"
                     android:textColor="?attr/subTextColor"
@@ -312,7 +313,7 @@
                     android:ellipsize="end"
                     android:gravity="center_vertical"
                     android:maxLines="1"
-                    android:minHeight="@dimen/book_label_row_height"
+                    android:paddingTop="@dimen/text_margin_book_description"
                     android:singleLine="true"
                     android:textColor="?attr/hrefColor"
                     android:textSize="@dimen/textSizeBookDescription"

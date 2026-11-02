@@ -370,7 +370,7 @@
     <string name="search_chip_empty">%s: ничего не найдено</string>
     <string name="search_chip_failed">%1$s: %2$s. Удерживайте, чтобы повторить</string>
     <string name="sources_status_stopped">остановлен</string>
-    <string name="unknown_source">Неизвестный источник</string>
+    <string name="unknown_source">Это не ссылка на книгу с поддерживаемого сайта</string>
     <string name="error_send_mail">Не удалось отправить сообщение!</string>
     <string name="message_help_disable_battery_optimisetion">Здравствуйте! Помогите пожалуйста отключить режим экономии заряда батареи на моем устройстве.</string>
     <string name="icon" translatable="false">icon</string>
@@ -395,6 +395,7 @@
     <string name="enter_new_password">Введите новый пароль</string>
     <string name="only_plus">Данная функция доступна только для обладателей Plus версии.</string>
     <string name="all">Все</string>
+    <string name="search_all_sources">По всем</string>
     <string name="dowland">Скачать</string>
     <string name="of">из</string>
     <string name="completed">Завершено</string>
@@ -444,8 +445,8 @@
     <string name="open_4pda">Открыть тему на 4pda</string>
     <string name="open_github">Открыть на GitHub</string>
     <string name="open_telegram">Группа в Telegram</string>
-    <string name="dbip" translatable="false">IP Geolocation by DB-IP</string>
-    <string name="dbip_summary">Регион подключения: данные db-ip.com, лицензия CC BY 4.0</string>
+    <string name="about_region">Регион: %1$s</string>
+    <string name="about_region_summary">По IP-адресу подключения · IP Geolocation by DB-IP (CC BY 4.0)</string>
     <string name="dowland_delete">Скачать/Удалить</string>
     <string name="delete_complite">Удаление завершено</string>
     <string name="delete_result">Удалено %1$d из %2$d</string>
@@ -467,7 +468,6 @@
     <string name="scrollToSelectedDesc">Первым в списке будет стоять активный аудиофайл</string>
     <string name="offline">Офлайн</string>
     <string name="ofline_desc">Скрывать незагруженные главы из списка в офлайн режиме</string>
-    <string name="go_offline">Переход в офлайн режим</string>
     <string name="book_taken_down">Удалена правообладателем. Поищите на другом источнике</string>
     <string name="book_taken_down_partial">Удалена правообладателем. Доступны скачанные главы</string>
     <string name="clear_saving">Очистить сохраненное</string>
@@ -748,13 +748,13 @@
     <string name="settings_sources">Источники и сеть</string>
     <string name="settings_sources_summary">Сайт каталога, сайты поиска, прокси, проверка сайтов</string>
     <string name="settings_downloads">Загрузки</string>
-    <string name="settings_downloads_summary">Папка для скачивания, место кеша, автоэкспорт, офлайн</string>
+    <string name="settings_downloads_summary">Папка для скачивания, папки при сохранении, место кеша, автоэкспорт, офлайн</string>
     <string name="settings_library">Избранное и история</string>
     <string name="settings_library_summary">Сортировка, поиск, импорт избранного</string>
     <string name="settings_data">Резервное копирование</string>
     <string name="settings_data_summary">Резервная копия, восстановление, очистка данных</string>
     <string name="settings_general">Общие</string>
-    <string name="settings_general_summary">Раздел при запуске, буфер, деление файла на разделы, отчёты об ошибках, автообновление, родительский контроль</string>
+    <string name="settings_general_summary">Раздел при запуске, последняя книга, буфер, число источников, деление файла на разделы, отчёты об ошибках, автообновление, родительский контроль</string>
     <string name="error_reports">Отчеты об ошибках</string>
     <string name="error_reports_desc">Показывать подробный отчет об ошибке в диалоге</string>
     <string name="auto_update">Автообновление</string>

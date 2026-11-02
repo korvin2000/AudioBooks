@@ -198,12 +198,12 @@ public class SourcesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder
             holder.limit.setVisibility(View.GONE);
             return;
         }
-        int limit = Math.min(Sources.MAX_ACTIVE, Provider.values().length);
-        holder.count.setText(context.getString(R.string.sources_section_count, header.count, Sources.MAX_ACTIVE));
+        int limit = Math.min(Sources.maxActive(), Provider.values().length);
+        holder.count.setText(context.getString(R.string.sources_section_count, header.count, limit));
         holder.limit.setVisibility(header.count >= limit ? View.VISIBLE : View.GONE);
         int accent = ContextCompat.getColor(context, R.color.sources_accent);
         int track = ContextCompat.getColor(context, R.color.sources_track);
-        int[] cells = new int[Sources.MAX_ACTIVE];
+        int[] cells = new int[limit];
         for (int i = 0; i < cells.length; i++) {
             cells[i] = i < header.count ? accent : track;
         }

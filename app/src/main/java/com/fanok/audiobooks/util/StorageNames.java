@@ -12,6 +12,9 @@ public final class StorageNames {
     /** Keeps "NNN - title.ext" well below the 255-byte limit of FAT/ext4 and SAF providers. */
     static final int MAX_NAME_BYTES = 120;
 
+    /** Keeps a book's flat folder "Title - Author (Reader)" well below the same 255-byte limit. */
+    static final int MAX_FOLDER_BYTES = 150;
+
     private static final String RESERVED = "\\/:*?\"<>|";
 
     private static final Set<String> DOS_DEVICES = new HashSet<>(Arrays.asList(
@@ -73,6 +76,25 @@ public final class StorageNames {
         String safe = safeName(name);
         safe = trimTrailingDotsAndSpaces(truncateUtf8(safe, MAX_NAME_BYTES - utf8Length(prefix + " - " + suffix)));
         return safe.isEmpty() ? prefix + suffix : prefix + " - " + safe + suffix;
+    }
+
+    /**
+     * A book's one folder in the flat layout: "Title - Author (Reader)", the reader left out when empty or the same
+     * as the author. One safe path segment, never hidden (no leading dot), at most {@link #MAX_FOLDER_BYTES} UTF-8
+     * bytes: the reader is dropped first, then the author, and the title is cut last; "Unknown" for no usable title.
+     */
+    public static String bookFolderName(String title, String author, String reader) {
+        String name = trimLeadingDotsAndSpaces(safeName(title == null ? "" : title));
+        // the cut may leave trailing dots or spaces, or a DOS device name
+        name = safeName(truncateUtf8(name, MAX_FOLDER_BYTES));
+        if (name.isEmpty()) name = "Unknown";
+        String safeAuthor = author == null ? "" : safeName(author);
+        String safeReader = reader == null ? "" : safeName(reader);
+        String withAuthor = safeAuthor.isEmpty() ? name : name + " - " + safeAuthor;
+        String full = safeReader.isEmpty() || safeReader.equalsIgnoreCase(safeAuthor)
+                ? withAuthor : withAuthor + " (" + safeReader + ")";
+        if (utf8Length(full) <= MAX_FOLDER_BYTES) return full;
+        return utf8Length(withAuthor) <= MAX_FOLDER_BYTES ? withAuthor : name;
     }
 
     /** The audio extension of a file name or URL path ("mp3" for "…/01.MP3?x=1"), or {@code fallback}. */
@@ -148,6 +170,12 @@ public final class StorageNames {
         int end = s.length();
         while (end > 0 && (s.charAt(end - 1) == '.' || Character.isWhitespace(s.charAt(end - 1)))) end--;
         return s.substring(0, end);
+    }
+
+    private static String trimLeadingDotsAndSpaces(String s) {
+        int start = 0;
+        while (start < s.length() && (s.charAt(start) == '.' || Character.isWhitespace(s.charAt(start)))) start++;
+        return s.substring(start);
     }
 
     private static boolean isDigit(char c) {

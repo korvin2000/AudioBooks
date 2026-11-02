@@ -74,7 +74,7 @@ public interface Activity extends MvpView {
     @StateStrategyType(AddToEndSingleStrategy.class)
     void stateElse();
 
-    /** The speed was changed (the speed dialog's OK): the toolbar's speed item shows it. */
+    /** The speed was changed (the speed dialog's OK or Стандарт): the toolbar item and player button show it. */
     @StateStrategyType(SkipStrategy.class)
     void showSpeed(float speed);
 

@@ -50,9 +50,11 @@ import com.fanok.audiobooks.fragment.BooksFragment;
 import com.fanok.audiobooks.fragment.FavoriteFragment;
 import com.fanok.audiobooks.fragment.SettingsFragment;
 import com.fanok.audiobooks.interface_pacatge.main.MainView;
+import com.fanok.audiobooks.model.BooksDBModel;
 import com.fanok.audiobooks.pojo.BookPOJO;
 import com.fanok.audiobooks.pojo.StorageUtil;
 import com.fanok.audiobooks.presenter.MainPresenter;
+import com.fanok.audiobooks.service.Checkpoint;
 import com.fanok.audiobooks.service.MediaPlayerService;
 import com.fanok.audiobooks.region.AppRegion;
 import com.fanok.audiobooks.search.Provider;
@@ -293,8 +295,12 @@ public class MainActivity extends MvpAppCompatActivity
             SharedPreferences pref = PreferenceManager
                     .getDefaultSharedPreferences(this);
             fragment = Integer.parseInt(pref.getString("pref_start_screen", "0"));
-            mPresenter.startFragment(fragment,
-                    intent.getBooleanExtra("notificationClick", false));
+            boolean notificationClick = intent.getBooleanExtra("notificationClick", false);
+            mPresenter.startFragment(fragment, notificationClick);
+            if (fragment != Consts.LAST_BOOK && !notificationClick
+                    && pref.getBoolean("pref_autoload_last_book", false)) {
+                openLastBook();
+            }
         }
         if (intent.hasExtra(EXTRA_SOURCES)) {
             pendingSources = intent; // above the start screen, so Back leads to it
@@ -709,9 +715,42 @@ public class MainActivity extends MvpAppCompatActivity
         return super.dispatchKeyEvent(event);
     }
 
+    /**
+     * «Автозагрузка последней книги»: the book played last (the player's, else the last checkpoint's) opens paused over
+     * the start screen, so Back leads to it; nothing when there is none.
+     */
+    private void openLastBook() {
+        Context app = getApplicationContext();
+        new Thread(() -> {
+            String url = MediaPlayerService.currentBookUrl();
+            if (url == null) {
+                Checkpoint last = new StorageUtil(app).loadLastCheckpoint();
+                url = last == null ? null : last.bookUrl;
+            }
+            BookPOJO book = null;
+            try {
+                book = url == null ? null : new BooksDBModel(app).getSomewhere(url);
+            } catch (RuntimeException e) {
+                Log.w(TAG, "openLastBook: cannot read the book", e);
+            }
+            BookPOJO found = book;
+            runOnUiThread(() -> {
+                if (found != null && !isFinishing() && !isDestroyed()) {
+                    BookActivity.startNewActivity(this, found, false, true);
+                }
+            });
+        }).start();
+    }
+
     @Override
     public void showBooksActivity(@Nullable BookPOJO bookPOJO) {
         if (bookPOJO == null) return;
+        if (LoadBook.opensAsListing(bookPOJO.getUrl())) {
+            // a collection from history or "last book": its listing, as tapping its card opens it (BooksPresenter.open)
+            showFragment(BooksFragment.newInstance(bookPOJO.getUrl(), R.string.menu_audiobooks, bookPOJO.getName(),
+                    Consts.MODEL_BOOKS), "collectionBooks");
+            return;
+        }
         BookActivity.startNewActivity(this, bookPOJO);
     }
 }

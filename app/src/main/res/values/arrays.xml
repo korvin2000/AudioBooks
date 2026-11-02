@@ -109,4 +109,13 @@
         <item>45</item>
     </string-array>
 
+    <string-array name="folder_layout_titles">
+        <item>Вложенные папки (источник/название/чтец)</item>
+        <item>Одна папка: Название - Автор (Чтец)</item>
+    </string-array>
+    <string-array name="folder_layout_values" translatable="false">
+        <item>nested</item>
+        <item>flat</item>
+    </string-array>
+
 </resources>

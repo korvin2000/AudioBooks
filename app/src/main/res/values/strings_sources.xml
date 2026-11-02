@@ -184,4 +184,8 @@
     <string name="sources_library_saved">Загружено %1$d</string>
     <!-- a site in the source filter of the favorites, the history, the downloads: its title and its books there -->
     <string name="sources_filter_value">%1$s · %2$d</string>
+
+    <!-- Настройки → Общие: the most active sources (search.Sources.PREF_MAX) -->
+    <string name="sources_max_title">Максимальное количество источников</string>
+    <string name="sources_max_summary">Активными могут быть до %1$s сайтов одновременно (от 3 до 20)</string>
 </resources>

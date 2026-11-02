@@ -84,11 +84,20 @@ public class BooksDBModel extends BooksDBAbstract implements BooksDBHelperInterf
         getDatabase().audioDao().deleteUnreferenced();
     }
 
-    /** Moves the book to the top of the history: REPLACE drops the old row of the same URL in the same statement. */
+    /** Moves the book to the top of the history, opened now. */
     @Override
     public void addHistory(BookPOJO book) {
+        addHistory(book, System.currentTimeMillis());
+    }
+
+    /**
+     * Moves the book to the top of the history: REPLACE drops the old row of the same URL in the same statement.
+     * {@code openedAt} is when its page was opened (epoch ms); 0 means unknown (a restored backup).
+     */
+    public void addHistory(BookPOJO book, long openedAt) {
         HistoryEntity entity = new HistoryEntity();
         entity.fromPojo(book);
+        entity.openedAt = openedAt;
         getDatabase().historyDao().insert(entity);
     }
 
@@ -140,6 +149,11 @@ public class BooksDBModel extends BooksDBAbstract implements BooksDBHelperInterf
     @Override
     public ArrayList<BookPOJO> getAllHistory() {
         return toPojos(getDatabase().historyDao().getAll());
+    }
+
+    /** The history opened at {@code since} or later (epoch ms), newest first. */
+    public ArrayList<BookPOJO> getHistorySince(long since) {
+        return toPojos(getDatabase().historyDao().getSince(since));
     }
 
     @Override

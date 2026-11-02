@@ -113,8 +113,9 @@ public final class SearchSession<T> {
     private final Scheduler main;
     private final long timeoutSeconds;
     /**
-     * Sources loading at once; the rest start as these answer. Today's number of sites, so their search runs as before;
-     * it bounds the fan-out on a phone's network once there are more.
+     * Sources loading at once; the rest start as these answer. The default limit of active sources
+     * ({@link Sources#DEFAULT_MAX_ACTIVE}), so such a search runs all at once; it bounds the fan-out on a phone's
+     * network when the user allows more.
      */
     static final int MAX_PARALLEL = 13;
     /**

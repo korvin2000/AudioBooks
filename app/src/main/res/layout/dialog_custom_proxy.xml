@@ -150,7 +150,7 @@
             android:textColor="?android:attr/textColorSecondary"
             android:textSize="12sp" />
 
-        <!-- "Проверить" and "По умолчанию" here keep the dialog's own buttons (Сохранить, Отмена) on one line -->
+        <!-- "Проверить" and "Сбросить" here keep the dialog's own buttons (Сохранить, Отмена) on one line -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"

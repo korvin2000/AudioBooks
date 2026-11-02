@@ -13,8 +13,13 @@ import android.content.res.Configuration;
 import android.net.Uri;
 import android.os.Bundle;
 import android.os.PowerManager;
+import android.text.SpannableString;
+import android.text.Spanned;
+import android.text.TextUtils;
+import android.text.style.ForegroundColorSpan;
 import android.widget.Toast;
 import androidx.appcompat.app.AlertDialog;
+import androidx.core.content.ContextCompat;
 import androidx.preference.Preference;
 import androidx.preference.PreferenceFragmentCompat;
 import androidx.preference.PreferenceManager;
@@ -23,8 +28,12 @@ import com.fanok.audiobooks.BuildConfig;
 import com.fanok.audiobooks.R;
 import com.fanok.audiobooks.activity.ActivitySendEmail;
 import com.fanok.audiobooks.activity.MainActivity;
+import com.fanok.audiobooks.region.AppRegion;
+import com.fanok.audiobooks.region.Region;
+import com.fanok.audiobooks.region.RegionCheck;
 import com.fanok.audiobooks.update.Updater;
 import com.google.android.material.navigation.NavigationView;
+import java.util.Locale;
 import org.jetbrains.annotations.NotNull;
 
 public class AboutFragment extends PreferenceFragmentCompat {
@@ -151,7 +160,8 @@ public class AboutFragment extends PreferenceFragmentCompat {
             return true;
         });
 
-        preferenceClickListner("open_dbip", preference -> {
+        // the credit of the IP table (CC BY 4.0) asks for a link
+        preferenceClickListner("about_region", preference -> {
             openInBrowser("https://db-ip.com");
             return true;
         });
@@ -192,9 +202,26 @@ public class AboutFragment extends PreferenceFragmentCompat {
         super.onResume();
         Preference version = findPreference("version");
         if (version != null) {
-            version.setSummary(getString(R.string.version) + " " + BuildConfig.VERSION_NAME + "\n"
-                    + getString(R.string.update_check_hint));
+            // the hint in blue: it is the only thing on this screen that does something on a click
+            SpannableString hint = new SpannableString(getString(R.string.update_check_hint));
+            hint.setSpan(new ForegroundColorSpan(ContextCompat.getColor(requireContext(), R.color.sources_link)), 0,
+                    hint.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+            version.setSummary(TextUtils.concat(
+                    getString(R.string.version) + " " + BuildConfig.VERSION_NAME + "\n", hint));
             version.setTitle(getString(R.string.app_name));
+        }
+
+        Preference region = findPreference("about_region");
+        if (region != null) {
+            // "Регион: Россия"; for the west and the rest the country too: "Регион: Запад · Германия"
+            RegionCheck.Result last = AppRegion.last(requireContext());
+            boolean known = last != null && last.source != RegionCheck.Source.NONE;
+            String name = SourceTexts.regionName(requireContext(), known ? last.region : null);
+            if (known && last.region != Region.RUSSIA && last.region != Region.UKRAINE
+                    && last.country != null && last.country.length() == 2) {
+                name += " · " + new Locale("", last.country).getDisplayCountry(new Locale("ru"));
+            }
+            region.setTitle(known ? getString(R.string.about_region, name) : name);
         }
 
         MainActivity activity = (MainActivity) getActivity();

@@ -12,6 +12,10 @@ import com.fanok.audiobooks.source.SourceParser;
 import io.reactivex.Observable;
 
 import java.io.IOException;
+import java.io.UncheckedIOException;
+import java.net.ProtocolException;
+import java.net.SocketException;
+import java.net.SocketTimeoutException;
 import java.net.URL;
 import java.util.ArrayList;
 import org.jetbrains.annotations.NotNull;
@@ -22,7 +26,8 @@ import org.jsoup.nodes.Document;
  * {@code parseXxx} takes already-fetched content, calls no Android API and runs in JVM tests.
  * Failures are errors, never fake chapters: an unknown host, a page without the player or a page
  * that yields no playable chapter make {@link #getAudio} emit {@code onError}, so the caller can
- * fall back to offline chapters. One malformed chapter is skipped and counted, not fatal.
+ * fall back to offline chapters. One malformed chapter is skipped and counted, not fatal. A load the network broke
+ * is repeated once ({@link #loadRetrying}).
  */
 public class AudioModel implements AudioModelInterfece {
 
@@ -30,6 +35,9 @@ public class AudioModel implements AudioModelInterfece {
     interface PageSource {
         Document get(String url) throws IOException;
     }
+
+    /** The pause before the one repeat of a load the network broke; tests set 0 (as ProxyFinder.retryDelayMs). */
+    static long retryPauseMs = 1_500;
 
     Context mContext;
 
@@ -48,8 +56,8 @@ public class AudioModel implements AudioModelInterfece {
         return Observable.create(emitter -> {
             ArrayList<AudioPOJO> chapters;
             try {
-                chapters = load(url, pages);
-            } catch (Exception e) {
+                chapters = loadRetrying(url, pages);
+            } catch (Exception e) { // InterruptedException on dispose included: tryOnError is safe then
                 emitter.tryOnError(e);
                 return;
             }
@@ -58,6 +66,28 @@ public class AudioModel implements AudioModelInterfece {
                 emitter.onComplete();
             }
         });
+    }
+
+    /**
+     * {@link #load}, once more after {@link #retryPauseMs} when the network broke it (no answer in time, a reset, a cut
+     * body). An HTTP status, a challenge or a page without chapters is the site's answer: a repeat gets the same.
+     */
+    static ArrayList<AudioPOJO> loadRetrying(String url, PageSource pages) throws IOException, InterruptedException {
+        try {
+            return load(url, pages);
+        } catch (IOException | UncheckedIOException e) {
+            if (!isTransient(e)) {
+                throw e;
+            }
+            Thread.sleep(retryPauseMs);
+            return load(url, pages);
+        }
+    }
+
+    /** Pure: the network failed, not the site's answer (an HTTP status, a rate limit, an unknown host never is). */
+    static boolean isTransient(Throwable e) {
+        Throwable t = e instanceof UncheckedIOException ? e.getCause() : e; // jsoup wraps body-read failures
+        return t instanceof SocketTimeoutException || t instanceof SocketException || t instanceof ProtocolException;
     }
 
     /** A provider's parser: {@code base} is the page's final URL, which relative media URLs resolve against. */

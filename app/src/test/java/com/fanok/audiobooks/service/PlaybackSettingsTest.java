@@ -23,9 +23,9 @@ public class PlaybackSettingsTest {
         assertEquals(1f, PlaybackSettings.clampSpeed(1f), DELTA);
         assertEquals(1.5f, PlaybackSettings.clampSpeed(1.5f), DELTA);
         assertEquals(0.25f, PlaybackSettings.clampSpeed(0.25f), DELTA);
-        assertEquals(4f, PlaybackSettings.clampSpeed(4f), DELTA);
-        assertEquals(4f, PlaybackSettings.clampSpeed(10f), DELTA);
-        assertEquals(4f, PlaybackSettings.clampSpeed(Float.POSITIVE_INFINITY), DELTA);
+        assertEquals(2.5f, PlaybackSettings.clampSpeed(4f), DELTA); // saved by an older version
+        assertEquals(2.5f, PlaybackSettings.clampSpeed(10f), DELTA);
+        assertEquals(2.5f, PlaybackSettings.clampSpeed(Float.POSITIVE_INFINITY), DELTA);
     }
 
     @Test

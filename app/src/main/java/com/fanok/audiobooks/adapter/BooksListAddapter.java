@@ -32,6 +32,7 @@ import com.fanok.audiobooks.Url;
 import com.fanok.audiobooks.model.AudioDBModel;
 import com.fanok.audiobooks.model.AudioListDBModel;
 import com.fanok.audiobooks.model.BooksDBModel;
+import com.fanok.audiobooks.model.ListeningProgress;
 import com.fanok.audiobooks.pojo.AudioListPOJO;
 import com.fanok.audiobooks.pojo.BookPOJO;
 import com.fanok.audiobooks.search.Provider;
@@ -520,38 +521,8 @@ public class BooksListAddapter extends RecyclerView.Adapter<BooksListAddapter.My
 
                     boolean saved = dbModel.inSaved(url);
 
-                    int progress = -1;
-                    if (procent && audioListModel != null) {
-                        ArrayList<AudioListPOJO> pos = audioListModel.get(url);
-                        if (pos.isEmpty()) {
-                            progress = -1;
-                        } else {
-                            String last = audioModel.getName(url);
-                            if (last == null || last.isEmpty()) {
-                                progress = 0;
-                            } else {
-                                int current = 0;
-                                int total = 0;
-                                boolean bFound = false;
-                                for (AudioListPOJO po : pos) {
-                                    if (!bFound) {
-                                        if (po.getAudioName().equals(last)) {
-                                            bFound = true;
-                                            current += audioModel.getTime(url);
-                                        } else {
-                                            current += po.getTime();
-                                        }
-                                    }
-                                    total += po.getTime();
-                                }
-                                if (total != 0) {
-                                    progress = current * 100 / total;
-                                } else {
-                                    progress = 0;
-                                }
-                            }
-                        }
-                    }
+                    // the history's status filter uses the same percent
+                    int progress = procent ? ListeningProgress.of(audioListModel, audioModel, url) : -1;
                     progressCache.put(url, progress);
 
                     int dl = 0;

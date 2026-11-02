@@ -13,6 +13,9 @@ import io.reactivex.Single;
 public interface FavoriteModel {
     Observable<ArrayList<BookPOJO>> getBooks(int table);
 
+    /** The history opened since {@code since} (epoch ms), only the books of {@code status} (HistoryFilter). */
+    Observable<ArrayList<BookPOJO>> getHistory(int status, long since);
+
     /** Book URL → NOT_SAVED / SAVED / SAVED_ALL, computed off the main thread. */
     Single<Map<String, Integer>> savedStates(@NonNull List<BookPOJO> books);
 }

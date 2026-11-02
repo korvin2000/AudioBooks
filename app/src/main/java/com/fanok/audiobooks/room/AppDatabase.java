@@ -19,7 +19,7 @@ import java.util.Set;
     AudioEntity.class,
     BooksAudioEntity.class,
     FavoritePersonEntity.class
-}, version = 19)
+}, version = 20)
 public abstract class AppDatabase extends RoomDatabase {
     public abstract FavoriteDao favoriteDao();
     public abstract HistoryDao historyDao();
@@ -93,8 +93,17 @@ public abstract class AppDatabase extends RoomDatabase {
         }
     };
 
+    static final Migration MIGRATION_19_20 = new Migration(19, 20) {
+        @Override
+        public void migrate(@NonNull SupportSQLiteDatabase database) {
+            // when a book's page was last opened (the history's period); the rows so far stay undated
+            database.execSQL("ALTER TABLE `history` ADD COLUMN `opened_at` INTEGER NOT NULL DEFAULT 0");
+        }
+    };
+
     /** Every upgrade path, chained; the builder and the migration tests use the same list. */
-    static final Migration[] MIGRATIONS = {MIGRATION_15_16, MIGRATION_16_17, MIGRATION_17_18, MIGRATION_18_19};
+    static final Migration[] MIGRATIONS = {MIGRATION_15_16, MIGRATION_16_17, MIGRATION_17_18, MIGRATION_18_19,
+            MIGRATION_19_20};
 
     /**
      * Recreates {@code table} with {@code columns}. The new table is filled under a temporary name and gets

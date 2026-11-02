@@ -249,6 +249,20 @@ public class SettingsFragment extends PreferenceFragmentCompat implements
         }
     }
 
+    /** The choices of the active-source limit, {@link Sources#MIN_LIMIT}..{@link Sources#MAX_LIMIT}. */
+    private void fillSourcesMax() {
+        ListPreference max = findPreference(Sources.PREF_MAX);
+        if (max == null) {
+            return;
+        }
+        CharSequence[] values = new CharSequence[Sources.MAX_LIMIT - Sources.MIN_LIMIT + 1];
+        for (int i = 0; i < values.length; i++) {
+            values[i] = String.valueOf(Sources.MIN_LIMIT + i);
+        }
+        max.setEntries(values);
+        max.setEntryValues(values);
+    }
+
     /** "Управление источниками": how many are active and how many take the proxy; the dialog does the rest. */
     private void initSourcesEntry() {
         Preference entry = findPreference(SOURCES_DIALOG);
@@ -354,6 +368,7 @@ public class SettingsFragment extends PreferenceFragmentCompat implements
                 requireActivity().getApplicationContext(), R.xml.preferences,
                 false);
         fillSources(); // before the summaries: the source list's summary is its chosen entry
+        fillSourcesMax();
         initSummary(getPreferenceScreen());
         initSourcesEntry();
         if (savedInstanceState == null && getArguments() != null && getArguments().getBoolean(ARG_OPEN_SOURCES)
@@ -776,6 +791,14 @@ public class SettingsFragment extends PreferenceFragmentCompat implements
         if (Updater.PREF.equals(key) && sharedPreferences.getBoolean(key, true) && getContext() != null) {
             Updater.check(getContext(), null); // switched on: the first check now, not at the next period
         }
+        if (Sources.PREF_MAX.equals(key)) {
+            int before = Sources.activeCount();
+            Sources.load(sharedPreferences); // a lower limit cuts the active sources; a higher one switches none on
+            if (Sources.activeCount() < before && getContext() != null) {
+                Toast.makeText(getContext(), getString(R.string.sources_max, Sources.maxActive()),
+                        Toast.LENGTH_SHORT).show();
+            }
+        }
         updatePrefSummary(findPreference(key));
     }
 
@@ -957,8 +980,9 @@ public class SettingsFragment extends PreferenceFragmentCompat implements
                 if (backup.getBooksHistory() != null) {
                     database.historyDao().deleteAll();
                     for (int i = 0; i < backup.getBooksHistory().size(); i++) {
+                        // undated (0): restored rows show only in «За всё время», never as opened today
                         booksDBModel.addHistory(
-                                backup.getBooksHistory().get(backup.getBooksHistory().size() - 1 - i));
+                                backup.getBooksHistory().get(backup.getBooksHistory().size() - 1 - i), 0);
                     }
                 }
 
@@ -1013,7 +1037,12 @@ public class SettingsFragment extends PreferenceFragmentCompat implements
         if (p instanceof ListPreference) {
             ListPreference listPref = (ListPreference) p;
             p.setSummary(SeekStep.PREF.equals(p.getKey())
-                    ? getString(R.string.seek_step_summary, listPref.getEntry()) : listPref.getEntry());
+                    ? getString(R.string.seek_step_summary, listPref.getEntry())
+                    : Sources.PREF_MAX.equals(p.getKey())
+                            ? getString(R.string.sources_max_summary, listPref.getEntry())
+                            : DownloadStorageHelper.PREF_FOLDER_LAYOUT.equals(p.getKey())
+                                    ? getString(R.string.folder_layout_summary, listPref.getEntry())
+                                    : listPref.getEntry());
         } else if (p instanceof EditTextPreference) {
             EditTextPreference editTextPref = (EditTextPreference) p;
             if (p.getTitle().toString().toLowerCase().contains("password")) {

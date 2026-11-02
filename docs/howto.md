@@ -360,7 +360,8 @@ adb exec-out run-as com.fanok.books tar -cf - databases shared_prefs files > app
 - OkHttp lets the proxy resolve host names, so audio and downloads also work where DNS is filtered.
 - **Settings → Источники и сеть → Управление источниками** (`fragment/SourcesDialogFragment`) is one dialog for the
   sources: their order (drag a row by its handle, or the row's menu on TV and with TalkBack), the active ones (above
-  the divider, 1–13, `search/Sources`), the route of each site (direct or through the proxy; the header sets all at
+  the divider, 1 up to the limit: 13 by default, 3–20 in «Настройки → Общие → Максимальное количество
+  источников», `Sources.PREF_MAX`, `search/Sources`), the route of each site (direct or through the proxy; the header sets all at
   once) and their availability. Only active sources exist for the source menu, the source setting, the searches and
   "on other sites"; links, the library and the routes still know every site (`Provider.ofUrl` and friends). The order
   and the active ones are one preference, `pref_sources` (`"abook,izibuc|otrub"`, active before `|`); a site added

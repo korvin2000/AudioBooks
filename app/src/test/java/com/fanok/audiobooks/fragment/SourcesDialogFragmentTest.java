@@ -5,9 +5,11 @@ import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
 import com.fanok.audiobooks.fragment.SourcesDialogFragment.Rows;
+import com.fanok.audiobooks.net.FakePrefs;
 import com.fanok.audiobooks.search.Provider;
 import com.fanok.audiobooks.search.Sources;
 
+import org.junit.After;
 import org.junit.Test;
 
 import java.util.Arrays;
@@ -20,6 +22,11 @@ public class SourcesDialogFragmentTest {
     private static final Provider B = Provider.values()[1];
     private static final Provider C = Provider.values()[2];
     private static final Provider D = Provider.values()[3];
+
+    @After
+    public void restoreDefaults() {
+        Sources.load(new FakePrefs()); // the limit is static
+    }
 
     /** {@code [A, B, | C, D]}: two active, two inactive. */
     private static List<Object> rows() {
@@ -37,7 +44,23 @@ public class SourcesDialogFragmentTest {
     @Test
     public void limitIsTheSmallerOfMaxActiveAndTotal() {
         assertEquals(5, Rows.limit(5));
-        assertEquals(Sources.MAX_ACTIVE, Rows.limit(Sources.MAX_ACTIVE + 7));
+        assertEquals(Sources.maxActive(), Rows.limit(Sources.maxActive() + 7));
+    }
+
+    @Test
+    public void aHigherLimitLetsMoreSourcesCrossTheDivider() {
+        FakePrefs prefs = new FakePrefs();
+        prefs.edit().putString(Sources.PREF_MAX, "20").apply();
+        Sources.load(prefs);
+        Provider[] all = Provider.values();
+        assertEquals(20, Rows.limit(all.length));
+        List<Object> rows = Rows.of(Arrays.asList(all), Sources.DEFAULT_MAX_ACTIVE);
+        for (int active = Sources.DEFAULT_MAX_ACTIVE; active < 20; active++) {
+            assertTrue("source " + (active + 1), Rows.canMove(rows, active + 1, active));
+            Rows.move(rows, active + 1, active);
+        }
+        assertEquals(20, Rows.divider(rows));
+        assertFalse("not a 21st", Rows.canMove(rows, 21, 20));
     }
 
     @Test
@@ -94,7 +117,7 @@ public class SourcesDialogFragmentTest {
         Provider[] all = Provider.values();
         List<Object> rows = Rows.of(Arrays.asList(all), all.length - 1);
         int divider = Rows.divider(rows);
-        boolean room = all.length <= Sources.MAX_ACTIVE;
+        boolean room = all.length <= Sources.maxActive();
         assertEquals(room, Rows.canMove(rows, divider + 1, divider));
         assertEquals(room, Rows.canMove(rows, divider + 1, 0));
     }

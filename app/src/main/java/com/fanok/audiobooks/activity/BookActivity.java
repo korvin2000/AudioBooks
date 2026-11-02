@@ -142,6 +142,8 @@ public class BookActivity extends MvpAppCompatActivity implements Activity {
     }
 
     private static final String ARG_BOOK = "arg_book";
+    /** The book opens paused whatever «Автовоспроизведение» says (MainActivity: «Автозагрузка последней книги»). */
+    private static final String ARG_PAUSED = "arg_paused";
     /** Far beyond the system long press (~500 ms), so a slow tap never switches books by accident. */
     private static final long SWITCH_BOOK_HOLD_MS = 2500;
     private static final String PREF_SEEK_BUTTONS = "seekButtonsPref";
@@ -185,7 +187,7 @@ public class BookActivity extends MvpAppCompatActivity implements Activity {
     private boolean mSwitchHintShowing;
     @InjectPresenter
     BookPresenter mPresenter;
-    private ImageButton mSpeed;
+    private TextView mSpeed;
     private RecyclerView mList;
     private TextView mNameCurent;
     private ProgressBar mProgressBar;
@@ -327,8 +329,14 @@ public class BookActivity extends MvpAppCompatActivity implements Activity {
 
     public static void startNewActivity(@NonNull Context context, @NonNull BookPOJO bookPOJO,
             boolean notificationClick) {
+        startNewActivity(context, bookPOJO, notificationClick, false);
+    }
+
+    public static void startNewActivity(@NonNull Context context, @NonNull BookPOJO bookPOJO,
+            boolean notificationClick, boolean paused) {
         Intent intent = new Intent(context, BookActivity.class);
         intent.putExtra("notificationClick", notificationClick);
+        intent.putExtra(ARG_PAUSED, paused);
         String json = new GsonBuilder().serializeNulls().create().toJson(bookPOJO);
         intent.putExtra(ARG_BOOK, json);
         //one policy for every way in; a "notificationClick" extra is never a reason to skip it
@@ -433,7 +441,9 @@ public class BookActivity extends MvpAppCompatActivity implements Activity {
         Intent intent = getIntent();
         String json = intent.getStringExtra(ARG_BOOK);
         if (json == null) throw new NullPointerException();
-        return new BookPresenter(BookPOJO.parceJsonToBookPojo(json), getApplicationContext());
+        BookPresenter presenter = new BookPresenter(BookPOJO.parceJsonToBookPojo(json), getApplicationContext());
+        presenter.setPaused(intent.getBooleanExtra(ARG_PAUSED, false));
+        return presenter;
     }
 
     @UnstableApi
@@ -922,8 +932,19 @@ public class BookActivity extends MvpAppCompatActivity implements Activity {
         }
     }
 
+    /** The player's speed button: the same "1,5×" as the toolbar, opening the speed dialog. */
+    private void bindSpeedButton() {
+        if (mSpeed == null) {
+            return;
+        }
+        String speed = BookPresenter.speedText(BookPresenter.getSpeed());
+        mSpeed.setText(speed);
+        mSpeed.setContentDescription(getString(R.string.book_toolbar_speed_desc, speed));
+    }
+
     @Override
     public void showSpeed(float speed) {
+        bindSpeedButton();
         if (mMenu != null) {
             bindSpeedItem(mMenu);
         }
@@ -1194,12 +1215,7 @@ public class BookActivity extends MvpAppCompatActivity implements Activity {
 
     @Override
     public void shareTextUrl() {
-        Intent sendIntent = new Intent();
-        sendIntent.setAction(Intent.ACTION_SEND);
-        sendIntent.putExtra(Intent.EXTRA_TEXT, mBookPOJO.getUrl());
-        sendIntent.setType("text/plain");
-        Intent shareIntent = Intent.createChooser(sendIntent, null);
-        startActivity(shareIntent);
+        BookLinks.show(this, mBookPOJO);
     }
 
 
@@ -1273,25 +1289,41 @@ public class BookActivity extends MvpAppCompatActivity implements Activity {
             return;
         }
         String full = message + "\n\n" + report;
-        TextView text = new TextView(this);
-        text.setText(full);
-        text.setTextIsSelectable(true);
         int pad = (int) (16 * getResources().getDisplayMetrics().density);
+        // what happened, "Скопировать отчёт", then the details: three dialog buttons would not fit on one line
+        TextView text = new TextView(this);
+        text.setText(message);
+        text.setTextIsSelectable(true);
         text.setPadding(pad, pad / 2, pad, 0);
+        Button copy = new Button(this, null, androidx.appcompat.R.attr.borderlessButtonStyle);
+        copy.setText(R.string.error_report_copy);
+        copy.setOnClickListener(v -> {
+            android.content.ClipboardManager clipboard =
+                    (android.content.ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
+            if (clipboard != null) {
+                clipboard.setPrimaryClip(android.content.ClipData.newPlainText(
+                        getString(R.string.error_report_title), full));
+                showToast(R.string.copied);
+            }
+        });
+        TextView details = new TextView(this);
+        details.setText(report);
+        details.setTextIsSelectable(true);
+        details.setPadding(pad, 0, pad, 0);
+        LinearLayout body = new LinearLayout(this);
+        body.setOrientation(LinearLayout.VERTICAL);
+        body.addView(text);
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        lp.setMarginStart(pad / 2);
+        body.addView(copy, lp);
+        body.addView(details);
         ScrollView scroll = new ScrollView(this);
-        scroll.addView(text);
+        scroll.addView(body);
         new AlertDialog.Builder(this)
                 .setTitle(R.string.error_report_title)
                 .setView(scroll)
-                .setPositiveButton(R.string.copy, (d, which) -> {
-                    android.content.ClipboardManager clipboard =
-                            (android.content.ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
-                    if (clipboard != null) {
-                        clipboard.setPrimaryClip(android.content.ClipData.newPlainText(
-                                getString(R.string.error_report_title), full));
-                        showToast(R.string.copied);
-                    }
-                })
+                .setPositiveButton(R.string.retry, (d, which) -> mPresenter.getAudio())
                 .setNegativeButton(R.string.close, null)
                 .show();
     }
@@ -1820,6 +1852,7 @@ public class BookActivity extends MvpAppCompatActivity implements Activity {
         mFavorites.refresh(); //the book may have been (un)marked on another screen meanwhile
         bindTopSideButtons();
         invalidateOptionsMenu(); //the toolbar settings may have changed meanwhile
+        bindSpeedButton(); //the speed may have changed on another book's screen
         View decorView = getWindow().getDecorView();
         int uiOptions = View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN;
         decorView.setSystemUiVisibility(uiOptions);

@@ -52,6 +52,15 @@ public class DownloadStorageHelper {
     public static boolean autoExport(@NonNull Context context) {
         return PreferenceManager.getDefaultSharedPreferences(context).getBoolean(PREF_AUTO_EXPORT, true);
     }
+
+    /** "nested" (the default): "source/book/reader" below the download folder; "flat": one folder per book. */
+    public static final String PREF_FOLDER_LAYOUT = "folder_layout";
+
+    /** Whether a book without exported chapters yet is exported into one folder "Title - Author (Reader)". */
+    static boolean flatFolders(@NonNull Context context) {
+        return "flat".equals(PreferenceManager.getDefaultSharedPreferences(context)
+                .getString(PREF_FOLDER_LAYOUT, "nested"));
+    }
     public static final String PREF_DOWNLOAD_URI = "pref_download_uri";
 
     /** One worker serialises library scans and deletions so their read-modify-write passes never interleave. */
@@ -244,8 +253,10 @@ public class DownloadStorageHelper {
     }
 
     /**
-     * Exports, on the storage worker, every completed download of the given books whose chapter has no copy yet, into
-     * "source/book/reader/NNN - title.ext" below the download folder, as a file any player opens: a single-file
+     * Exports, on the storage worker, every completed download of the given books whose chapter has no copy yet, as
+     * "NNN - title.ext" into the book's folder below the download folder: that of its existing copies, else
+     * "source/book/reader" or, with the "folder_layout" setting "flat", one folder "Title - Author (Reader)"
+     * ({@link #exportRelativeDir}). Each is a file any player opens: a single-file
      * chapter as it was downloaded, a chapter clipped out of a stream (HLS, or one file shared by several chapters) cut
      * out of it without re-encoding ({@link ChapterExtractor}), so every copy is exactly its chapter. A chapter's
      * local_uri is recorded only once its file is complete under its final name; asking again resumes after an
@@ -340,6 +351,7 @@ public class DownloadStorageHelper {
         // chapters cut out of one download, in one pass over it
         java.util.Map<String, Download> streams = new java.util.LinkedHashMap<>();
         java.util.Map<String, List<Integer>> clipped = new java.util.HashMap<>();
+        String folder = null;
         int bookExported = 0;
         for (int i = 0; i < rows.size(); i++) {
             BooksAudioEntity row = rows.get(i);
@@ -353,9 +365,10 @@ public class DownloadStorageHelper {
             Download download = DownloadUtil.find(index, entries.get(i), row.urlAudio);
             if (download == null || download.state != Download.STATE_COMPLETED) continue;
             if (book == null) book = DownloadUtil.bookOf(download.request);
+            if (folder == null) folder = bookFolder(app, bookUrl, book, rows, row.booksName);
             if (DownloadUtil.isProgressive(download.request) && !isClipped(row)) {
                 try {
-                    String uri = exportChapter(app, cache, download, book, bookUrl, row, numberOf(row, i));
+                    String uri = exportChapter(app, cache, download, folder, row, numberOf(row, i));
                     model.getDatabase().booksAudioDao().updateLocalUriById(row.id, uri);
                     row.localUri = uri;
                     bookExported++;
@@ -371,12 +384,42 @@ public class DownloadStorageHelper {
             }
         }
         for (java.util.Map.Entry<String, Download> stream : streams.entrySet()) {
-            bookExported += exportClips(app, cache, stream.getValue(), book, bookUrl, rows,
-                    clipped.get(stream.getKey()), model, tally);
+            bookExported += exportClips(app, cache, stream.getValue(), folder, rows, clipped.get(stream.getKey()),
+                    model, tally);
         }
-        if (bookExported > 0) exportCover(app, book, bookUrl);
+        if (bookExported > 0) exportCover(app, book, folder);
         tally.exported += bookExported;
         releaseExported(app, index, model, bookUrl, rows, entries);
+    }
+
+    /**
+     * The book's folder relative to the download folder: that of its first recorded copy that exists strictly below
+     * it, so one book stays in one folder whatever the layout was when its other chapters were exported; else the
+     * folder of the chosen layout ({@link #flatFolders}), named by {@code book} or {@code fallbackName}.
+     */
+    @NonNull
+    private static String bookFolder(@NonNull Context context, @NonNull String bookUrl, @Nullable BookPOJO book,
+                                     @NonNull List<BooksAudioEntity> rows, @Nullable String fallbackName) {
+        String root = getDownloadPath(context);
+        while (root.length() > 1 && root.endsWith("/")) root = root.substring(0, root.length() - 1);
+        for (BooksAudioEntity row : rows) {
+            String copy = localCopyOf(context, row); // local_uri, or a pre-18 copy still kept in url_audio
+            if (copy == null) continue;
+            String path;
+            try {
+                path = copy.startsWith("content://")
+                        ? pathOfDocumentId(DocumentsContract.getDocumentId(Uri.parse(copy)))
+                        : copy.startsWith("file://") ? Uri.parse(copy).getPath() : copy;
+            } catch (Exception e) {
+                continue;
+            }
+            int slash = path != null && path.startsWith(root + "/") ? path.lastIndexOf('/') : -1;
+            if (slash > root.length() + 1) return path.substring(root.length() + 1, slash);
+        }
+        String bookName = book != null ? book.getName() : fallbackName;
+        String artist = book != null ? book.getArtist() : null;
+        String autor = book != null ? book.getAutor() : null;
+        return exportRelativeDir(bookUrl, bookName, artist, autor, flatFolders(context));
     }
 
     /** Temporary files of an export the process died in; no other export runs meanwhile (one storage worker). */
@@ -394,29 +437,22 @@ public class DownloadStorageHelper {
 
     /**
      * Cuts the chapters {@code at} (indexes into {@code rows}) out of {@code download} in one pass, each into its own
-     * file below the download folder (file path first, else the selected SAF tree through a temporary file of the
-     * app), recording each copy as soon as it is complete; returns how many were exported.
+     * file in the book's {@code folder} below the download folder (file path first, else the selected SAF tree
+     * through a temporary file of the app), recording each copy as soon as it is complete; returns how many were
+     * exported.
      */
     @androidx.annotation.OptIn(markerClass = androidx.media3.common.util.UnstableApi.class)
     private static int exportClips(@NonNull Context context, @NonNull Cache cache, @NonNull Download download,
-                                   @Nullable BookPOJO book, @NonNull String bookUrl,
-                                   @NonNull List<BooksAudioEntity> rows, @NonNull List<Integer> at,
-                                   @NonNull AudioListDBModel model, @NonNull Tally tally) {
-        BooksAudioEntity first = rows.get(at.get(0));
-        String bookName = book != null ? book.getName() : first.booksName;
-        String artist = book != null ? book.getArtist() : null;
-        String autor = book != null ? book.getAutor() : null;
-        final File dir = getBookDownloadDir(context, bookUrl, bookName, artist, autor);
+                                   @NonNull String folder, @NonNull List<BooksAudioEntity> rows,
+                                   @NonNull List<Integer> at, @NonNull AudioListDBModel model, @NonNull Tally tally) {
+        final File dir = new File(getDownloadPath(context), folder);
         final boolean toDir = (dir.isDirectory() || dir.mkdirs()) && canCreateFileInDir(dir);
-        final DocumentFile voiceDoc;
+        final DocumentFile bookDoc;
         if (toDir) {
-            voiceDoc = null;
+            bookDoc = null;
         } else {
-            DocumentFile root = getRootDocumentFile(context);
-            DocumentFile source = root != null ? findOrCreateSubdir(root, getSourceName(bookUrl)) : null;
-            DocumentFile bookDoc = source != null ? findOrCreateSubdir(source, sanitizeFileName(bookName)) : null;
-            voiceDoc = bookDoc != null ? findOrCreateSubdir(bookDoc, voiceFolder(artist, autor)) : null;
-            if (voiceDoc == null) {
+            bookDoc = safDir(getRootDocumentFile(context), folder);
+            if (bookDoc == null) {
                 tally.failed += at.size();
                 if (tally.error == null) tally.error = "Download folder does not accept files: " + dir;
                 return 0;
@@ -453,7 +489,7 @@ public class DownloadStorageHelper {
                                 .getAbsolutePath();
                     } else {
                         try {
-                            uri = exportToTree(context, voiceDoc, out -> copyFile(file, out), number, row.nameAudio,
+                            uri = exportToTree(context, bookDoc, out -> copyFile(file, out), number, row.nameAudio,
                                     extension);
                         } finally {
                             //noinspection ResultOfMethodCallIgnored
@@ -537,19 +573,19 @@ public class DownloadStorageHelper {
         }
     }
 
-    /** Writes one chapter below the download folder (file path first, else the selected SAF tree); returns its URI. */
+    /**
+     * Writes one chapter into the book's {@code folder} below the download folder (file path first, else the selected
+     * SAF tree); returns its URI.
+     */
     @androidx.annotation.OptIn(markerClass = androidx.media3.common.util.UnstableApi.class)
     @NonNull
     private static String exportChapter(@NonNull Context context, @NonNull Cache cache, @NonNull Download download,
-                                        @Nullable BookPOJO book, @NonNull String bookUrl, @NonNull BooksAudioEntity row,
-                                        int number) throws IOException {
+                                        @NonNull String folder, @NonNull BooksAudioEntity row, int number)
+            throws IOException {
         long length = DownloadUtil.lengthOf(cache, download);
         String key = DownloadUtil.cacheKeyOf(download.request);
         String fallbackExt = StorageNames.audioExtension(row.urlAudio, "mp3");
-        String bookName = book != null ? book.getName() : row.booksName;
-        String artist = book != null ? book.getArtist() : null;
-        String autor = book != null ? book.getAutor() : null;
-        File dir = getBookDownloadDir(context, bookUrl, bookName, artist, autor);
+        File dir = new File(getDownloadPath(context), folder);
         removeStaleTemps(dir);
         IOException fileError;
         try {
@@ -560,14 +596,12 @@ public class DownloadStorageHelper {
         }
         DocumentFile root = getRootDocumentFile(context);
         if (root == null) throw fileError;
-        DocumentFile source = findOrCreateSubdir(root, getSourceName(bookUrl));
-        DocumentFile bookDoc = source != null ? findOrCreateSubdir(source, sanitizeFileName(bookName)) : null;
-        DocumentFile voiceDoc = bookDoc != null ? findOrCreateSubdir(bookDoc, voiceFolder(artist, autor)) : null;
-        if (voiceDoc == null) throw new IOException("Download folder does not accept " + row.nameAudio, fileError);
+        DocumentFile bookDoc = safDir(root, folder);
+        if (bookDoc == null) throw new IOException("Download folder does not accept " + row.nameAudio, fileError);
         long free = new File(getDownloadPath(context)).getUsableSpace();
         if (free > 0 && free < length + SPACE_MARGIN) throw new IOException("Not enough free space");
         Uri uri = download.request.uri;
-        return exportToTree(context, voiceDoc, out -> DownloadUtil.copyExact(cache, key, uri, length, out), number,
+        return exportToTree(context, bookDoc, out -> DownloadUtil.copyExact(cache, key, uri, length, out), number,
                 row.nameAudio, fallbackExt);
     }
 
@@ -729,9 +763,9 @@ public class DownloadStorageHelper {
     }
 
     /** Saves the book cover next to its exported chapters once (file path only); failures leave no file. */
-    private static void exportCover(@NonNull Context context, @Nullable BookPOJO book, @NonNull String bookUrl) {
+    private static void exportCover(@NonNull Context context, @Nullable BookPOJO book, @NonNull String folder) {
         if (book == null || book.getPhoto() == null || !DeletionPlanner.isRemote(book.getPhoto())) return;
-        File dir = getBookDownloadDir(context, bookUrl, book.getName(), book.getArtist(), book.getAutor());
+        File dir = new File(getDownloadPath(context), folder);
         File cover = new File(dir, "cover.jpg");
         if (!dir.isDirectory() || cover.exists()) return;
         File temp = null;
@@ -762,6 +796,16 @@ public class DownloadStorageHelper {
             return child;
         }
         return parent.createDirectory(name);
+    }
+
+    /** The folder {@code relative} ("a/b/c") below the SAF tree {@code root}, created as needed; else null. */
+    @Nullable
+    private static DocumentFile safDir(@Nullable DocumentFile root, @NonNull String relative) {
+        DocumentFile dir = root;
+        for (String name : relative.split("/")) {
+            if (!name.isEmpty()) dir = findOrCreateSubdir(dir, name);
+        }
+        return dir;
     }
 
     @Nullable
@@ -843,14 +887,19 @@ public class DownloadStorageHelper {
     }
 
     @NonNull
-    public static File getBookDownloadDir(@NonNull Context context, @Nullable String bookUrl, @Nullable String bookName, @Nullable String artistName, @Nullable String autorName) {
-        return new File(getDownloadPath(context), exportRelativeDir(bookUrl, bookName, artistName, autorName));
+    public static File getBookDownloadDir(@NonNull Context context, @Nullable String bookUrl, @Nullable String bookName, @Nullable String artistName, @Nullable String autorName, boolean flat) {
+        return new File(getDownloadPath(context), exportRelativeDir(bookUrl, bookName, artistName, autorName, flat));
     }
 
-    /** "source/book/reader": where below the download root the exporter writes a book's chapters. */
+    /**
+     * Where below the download root the exporter writes the chapters of a book without copies yet:
+     * "source/book/reader", or with {@code flat} one folder "Title - Author (Reader)"
+     * ({@link StorageNames#bookFolderName}).
+     */
     @NonNull
     static String exportRelativeDir(@Nullable String bookUrl, @Nullable String bookName,
-                                    @Nullable String artistName, @Nullable String autorName) {
+                                    @Nullable String artistName, @Nullable String autorName, boolean flat) {
+        if (flat) return StorageNames.bookFolderName(bookName, autorName, artistName);
         return getSourceName(bookUrl) + "/" + sanitizeFileName(bookName) + "/" + voiceFolder(artistName, autorName);
     }
 
@@ -894,15 +943,20 @@ public class DownloadStorageHelper {
                 }
             }
 
-            File dir = getBookDownloadDir(context, book.getUrl(), book.getName(), book.getArtist(), book.getAutor());
-            if (dir != null && dir.exists()) {
-                String cover = findCoverImage(dir);
-                if (!cover.isEmpty()) return cover;
-                File[] files = dir.listFiles();
-                if (files != null) {
-                    for (File f : files) {
-                        if (f.isFile() && isImageFileName(f.getName())) {
-                            return f.getAbsolutePath();
+            // the folder of the chosen layout, then that of the other one
+            boolean flat = flatFolders(context);
+            for (boolean layout : new boolean[]{flat, !flat}) {
+                File dir = getBookDownloadDir(context, book.getUrl(), book.getName(), book.getArtist(),
+                        book.getAutor(), layout);
+                if (dir.exists()) {
+                    String cover = findCoverImage(dir);
+                    if (!cover.isEmpty()) return cover;
+                    File[] files = dir.listFiles();
+                    if (files != null) {
+                        for (File f : files) {
+                            if (f.isFile() && isImageFileName(f.getName())) {
+                                return f.getAbsolutePath();
+                            }
                         }
                     }
                 }
@@ -967,8 +1021,9 @@ public class DownloadStorageHelper {
 
     /**
      * What the scan must not import as separate books: the copies recorded for online books (local_uri, or a local
-     * url_audio written before local_uri existed) and the export folder of every saved online book, as absolute
-     * paths or, for a SAF scan, as "source/book/reader" below the tree.
+     * url_audio written before local_uri existed) and the export folders of every saved online book, as absolute
+     * paths or, for a SAF scan, as "source/book/reader" (and "Title - Author (Reader)" while the flat layout is chosen:
+     * a user's own folder of that name stays importable otherwise) below the tree.
      */
     @NonNull
     private static Set<String> exportedLocations(@NonNull Context context, @NonNull BooksDBModel booksDBModel,
@@ -981,11 +1036,14 @@ public class DownloadStorageHelper {
         }
         java.util.ArrayList<BookPOJO> saved = booksDBModel.getAllSaved();
         if (saved != null) {
+            boolean[] layouts = flatFolders(context) ? new boolean[]{false, true} : new boolean[]{false};
             for (BookPOJO book : saved) {
                 if (book.getUrl() == null || DeletionPlanner.isImportedBook(book.getUrl())) continue;
-                exported.add(saf
-                        ? exportRelativeDir(book.getUrl(), book.getName(), book.getArtist(), book.getAutor())
-                        : getBookDownloadDir(context, book.getUrl(), book.getName(), book.getArtist(), book.getAutor()).getAbsolutePath());
+                for (boolean flat : layouts) {
+                    exported.add(saf
+                            ? exportRelativeDir(book.getUrl(), book.getName(), book.getArtist(), book.getAutor(), flat)
+                            : getBookDownloadDir(context, book.getUrl(), book.getName(), book.getArtist(), book.getAutor(), flat).getAbsolutePath());
+                }
             }
         }
         return exported;
@@ -1582,6 +1640,11 @@ public class DownloadStorageHelper {
         for (int k = chain.size() - 1; k >= chain.size() - depth; k--) {
             File dir = chain.get(k);
             String[] children = dir.list();
+            // the cover exportCover wrote next to the chapters goes with the book's last one
+            if (k == chain.size() - 1 && children != null && children.length == 1 && "cover.jpg".equals(children[0])
+                    && new File(dir, children[0]).delete()) {
+                children = dir.list();
+            }
             if (children == null || children.length > 0 || !dir.delete()) return;
         }
     }

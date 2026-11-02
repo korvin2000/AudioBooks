@@ -82,6 +82,38 @@
         </menu>
     </item>
 
+    <!-- history only: the period of the last opening of the book's page (model.HistoryFilter) -->
+    <item
+        android:id="@+id/history_period"
+        android:icon="@drawable/ic_calendar_range"
+        android:title="@string/history_period"
+        android:visible="false"
+        app:showAsAction="always">
+        <menu>
+            <group android:checkableBehavior="single">
+                <item
+                    android:id="@+id/history_period_all"
+                    android:title="@string/history_period_all" />
+
+                <item
+                    android:id="@+id/history_period_year"
+                    android:title="@string/history_period_year" />
+
+                <item
+                    android:id="@+id/history_period_month"
+                    android:title="@string/history_period_month" />
+
+                <item
+                    android:id="@+id/history_period_week"
+                    android:title="@string/history_period_week" />
+
+                <item
+                    android:id="@+id/history_period_day"
+                    android:title="@string/history_period_day" />
+            </group>
+        </menu>
+    </item>
+
     <!-- favorites and history only; asks first (FavoriteFragment#confirmClear). Every item is "always": the clear
          icon is a fourth one, it never pushes search, filter or order into the overflow menu -->
     <item

@@ -51,7 +51,7 @@
     <string name="proxy_custom_failed">Не работает: %1$s</string>
     <string name="proxy_custom_save">Сохранить</string>
     <string name="proxy_custom_cancel">Отмена</string>
-    <string name="proxy_custom_reset">По умолчанию</string>
+    <string name="proxy_custom_reset">Сбросить</string>
     <string name="proxy_custom_error_host">Только хост или IP: без порта, «/» и пробелов</string>
     <string name="proxy_custom_error_port">Порт: число от 1 до 65535</string>
     <string name="proxy_custom_error_user">Укажите логин к паролю</string>
