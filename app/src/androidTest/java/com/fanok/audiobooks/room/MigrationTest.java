@@ -62,7 +62,7 @@ public class MigrationTest {
         AppDatabase room = openWithRoom();
         try {
             SupportSQLiteDatabase db = room.getOpenHelper().getWritableDatabase();
-            assertEquals(18, db.getVersion());
+            assertEquals(19, db.getVersion());
             assertEquals(2, count(db, "favorite"));
             assertEquals(1, count(db, "history"));
             assertEquals(1, count(db, "saved"));
@@ -123,6 +123,23 @@ public class MigrationTest {
             assertEquals(-1, c.getInt(1));
         }
         assertEquals(Boolean.FALSE, indexes(db, "books_audio").get("index_books_audio_url_book"));
+    }
+
+    @Test
+    public void migrate18To19AddsFavoritePeople() throws Exception {
+        try (SupportSQLiteDatabase db = helper.createDatabase(DB, 18)) {
+            db.execSQL("INSERT INTO favorite (name, url_book, coments) VALUES ('Book', 'https://example.com/b', 0)");
+        }
+
+        SupportSQLiteDatabase db = helper.runMigrationsAndValidate(DB, 19, true, AppDatabase.MIGRATION_18_19);
+        assertEquals(1, count(db, "favorite"));
+        assertEquals(0, count(db, "favorite_person"));
+        assertEquals(Boolean.TRUE, indexes(db, "favorite_person").get("index_favorite_person_kind_person_key"));
+        db.execSQL("INSERT INTO favorite_person (kind, name, person_key, urls, added_at)"
+                + " VALUES (0, 'Стивен Кинг', '[кинг, стивен]|[]', '', 1)");
+        db.execSQL("INSERT INTO favorite_person (kind, name, person_key, urls, added_at)"
+                + " VALUES (1, 'Стивен Кинг', '[кинг, стивен]|[]', '', 2)");
+        assertEquals(2, count(db, "favorite_person"));
     }
 
     private SQLiteDatabase createVersion16() {

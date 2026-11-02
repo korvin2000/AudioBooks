@@ -12,6 +12,9 @@ public class BackupValidatorTest {
     private static final String AUDIO = "{\"name\":\"Chapter\",\"url\":\"https://example.com/b\",\"time\":5}";
     private static final String TRACK = "{\"bookUrl\":\"https://example.com/b\",\"bookName\":\"Book\","
             + "\"audioName\":\"Chapter\",\"audioUrl\":\"https://example.com/1.mp3\",\"time\":3}";
+    private static final String AUTHOR = "{\"kind\":0,\"name\":\"Стивен Кинг\","
+            + "\"urls\":[\"https://example.com/author/king\"],\"addedAt\":5}";
+    private static final String READER = "{\"kind\":1,\"name\":\"Игорь Князев\",\"addedAt\":3}";
 
     @Test
     public void rejectsNullAndEmpty() {
@@ -80,6 +83,43 @@ public class BackupValidatorTest {
         assertNull(backup.getBooksHistory());
         assertNull(backup.getBooksSaved());
         assertNull(backup.getAudioList());
+    }
+
+    @Test
+    public void parsesFavoritePeople() throws Exception {
+        BackupPOJO backup = BackupPOJO.parse("{\"mVersion\":2,\"mBooksFavorite\":[" + BOOK + "],"
+                + "\"mPeopleFavorite\":[" + AUTHOR + "," + READER + "]}");
+
+        assertEquals(2, backup.getPeopleFavorite().size());
+        FavoritePersonPOJO author = backup.getPeopleFavorite().get(0);
+        assertEquals(0, author.getKind());
+        assertEquals("Стивен Кинг", author.getName());
+        assertEquals(1, author.getUrls().size());
+        assertEquals("https://example.com/author/king", author.getUrls().get(0));
+        assertEquals(5, author.getAddedAt());
+        FavoritePersonPOJO reader = backup.getPeopleFavorite().get(1);
+        assertEquals(1, reader.getKind());
+        assertEquals(0, reader.getUrls().size());
+        assertEquals(3, reader.getAddedAt());
+    }
+
+    @Test
+    public void documentWithoutPeopleLeavesThemAloneAndEmptyClearsThem() throws Exception {
+        assertNull(BackupPOJO.parse("{\"mVersion\":2,\"mBooksFavorite\":[" + BOOK + "]}").getPeopleFavorite());
+        assertNull(BackupPOJO.parse("{\"mBooksFavorite\":[]}").getPeopleFavorite());
+        assertEquals(0, BackupPOJO.parse("{\"mVersion\":2,\"mPeopleFavorite\":[]}").getPeopleFavorite().size());
+        assertNull(BackupPOJO.parse("{\"mVersion\":2,\"mPeopleFavorite\":[" + READER + "]}").getBooksFavorite());
+    }
+
+    @Test
+    public void rejectsMalformedPerson() {
+        assertRejected("{\"mVersion\":2,\"mPeopleFavorite\":[" + AUTHOR + ",{\"kind\":2,\"name\":\"Кинг\"}]}");
+        assertRejected("{\"mVersion\":2,\"mPeopleFavorite\":[{\"kind\":-1,\"name\":\"Кинг\"}]}");
+        assertRejected("{\"mVersion\":2,\"mPeopleFavorite\":[{\"kind\":0,\"name\":\"  \"}]}");
+        assertRejected("{\"mVersion\":2,\"mPeopleFavorite\":[{\"kind\":0}]}");
+        assertRejected("{\"mVersion\":2,\"mPeopleFavorite\":[{\"kind\":1,\"name\":\"—\"}]}");
+        assertRejected("{\"mVersion\":2,\"mPeopleFavorite\":[" + READER + ",null]}");
+        assertRejected("{\"mVersion\":2,\"mPeopleFavorite\":[{\"kind\":0,\"name\":\"Кинг\",\"urls\":\"x\"}]}");
     }
 
     private static void assertRejected(String json) {

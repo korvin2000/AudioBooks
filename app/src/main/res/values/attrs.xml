@@ -13,5 +13,7 @@
         <attr name="colorItemMenu" format="color" />
         <attr name="prefIconColor" format="color" />
         <attr name="deleteColor" format="color" />
+        <!-- "My favourite" (a favourite author/reader/book) in content; toolbars keep white icons -->
+        <attr name="favoriteColor" format="color" />
     </declare-styleable>
 </resources>

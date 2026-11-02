@@ -550,4 +550,39 @@ public class SearchUiTest {
         assertEquals("the cards of All, ungrouped: the title first, then the author's", Arrays.asList("Кинг", "МногоГолосье. Стивен Кинг"),
                 rowTitles(SearchUi.reduce(in)).subList(0, 2));
     }
+
+    private static Offer ranked(Provider source, int rank, String title, String author) {
+        BookPOJO b = new BookPOJO();
+        b.setName(title);
+        b.setAutor(author);
+        b.setUrl(source.server + "/u" + (next++));
+        return new Offer(b, source, source.ordinal(), rank);
+    }
+
+    /**
+     * A person's books: the name asked anywhere hides no card of a listing however its field is spelled, and "newest
+     * first" interleaves the sites by their own places, a searched card last.
+     */
+    @Test
+    public void aPersonsBooksHideNothingAndComeNewestFirst() {
+        in.request = SearchRequest.anywhere("Стивен Кинг");
+        in.sort = Sort.NEWEST;
+        in.personKind = 0;
+        in.sources = Arrays.asList(Provider.AKNIGA, Provider.IZIBUK, Provider.GOLOSOM);
+        state(Provider.AKNIGA, false, Status.OK, 2);
+        state(Provider.IZIBUK, false, Status.OK, 2);
+        state(Provider.GOLOSOM, false, Status.OK, 1);
+        in.offers = Arrays.asList(
+                ranked(Provider.GOLOSOM, Integer.MAX_VALUE, "Найдена поиском", "Стивен Кинг"),
+                ranked(Provider.AKNIGA, 0, "Новая на Акниге", "С. Кинг"),
+                ranked(Provider.IZIBUK, 1, "Вторая на Изибуке", "Кинг"),
+                ranked(Provider.AKNIGA, 1, "Вторая на Акниге", "Ричард Бахман"),
+                ranked(Provider.IZIBUK, 0, "Новая на Изибуке", "Стивен Кинг"));
+        SearchUi.State s = SearchUi.reduce(in);
+        assertEquals(0, s.hiddenByScope);
+        assertEquals(Arrays.asList("Новая на Акниге", "Новая на Изибуке", "Вторая на Акниге", "Вторая на Изибуке",
+                "Найдена поиском"), rowTitles(s));
+        assertEquals(3, s.chips.size());
+        assertEquals(0, s.input.personKind);
+    }
 }

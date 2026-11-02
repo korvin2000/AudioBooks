@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Избранное → Авторы / Чтецы (FavoritePeopleFragment): the ids of the books' menu where they do the same;
+     an empty list hides them all -->
+<menu xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+
+    <item
+        android:id="@+id/app_bar_search"
+        android:icon="@drawable/ic_search_black_24dp"
+        android:title="@string/search"
+        app:actionViewClass="androidx.appcompat.widget.SearchView"
+        app:showAsAction="collapseActionView|always" />
+
+    <item
+        android:id="@+id/filter"
+        android:icon="@drawable/ic_filter"
+        android:title="@string/filter"
+        app:showAsAction="always">
+        <menu>
+            <item
+                android:id="@+id/people_site_filter"
+                android:title="@string/favorite_people_filter_site" />
+
+            <item
+                android:id="@+id/people_books_filter"
+                android:checkable="true"
+                android:title="@string/favorite_people_filter_books" />
+
+            <item
+                android:id="@+id/people_genre_filter"
+                android:title="@string/favorite_people_filter_genre" />
+        </menu>
+    </item>
+
+    <item
+        android:id="@+id/order"
+        android:icon="@drawable/ic_sort"
+        android:title="@string/order"
+        app:showAsAction="always">
+        <menu>
+            <group android:checkableBehavior="single">
+                <item
+                    android:id="@+id/people_sort_date"
+                    android:title="@string/favorite_people_sort_date" />
+
+                <item
+                    android:id="@+id/people_sort_name"
+                    android:title="@string/favorite_people_sort_name" />
+
+                <item
+                    android:id="@+id/people_sort_books"
+                    android:title="@string/favorite_people_sort_books" />
+            </group>
+        </menu>
+    </item>
+
+    <item
+        android:id="@+id/clear_list"
+        android:icon="@drawable/ic_delete_sweep"
+        android:title="@string/clear_list"
+        app:showAsAction="always" />
+</menu>

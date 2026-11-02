@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The favourite star of a person: the site's Авторы/Исполнители rows and the book long-press sheet. -->
+<resources>
+    <string name="people_star_add">Добавить в избранное</string>
+    <string name="people_star_remove">Убрать из избранного</string>
+    <!-- the sheet's star toggles the first person of the field: the tooltip names them -->
+    <string name="people_star_add_name">Добавить в избранное: %1$s</string>
+    <string name="people_star_remove_name">Убрать из избранного: %1$s</string>
+    <!-- shown once, after the very first person ever added -->
+    <string name="people_star_hint_author">Автор добавлен в Избранное → Авторы</string>
+    <string name="people_star_hint_reader">Чтец добавлен в Избранное → Чтецы</string>
+</resources>

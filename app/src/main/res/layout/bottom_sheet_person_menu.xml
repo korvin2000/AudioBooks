@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The long-press sheet of a favourite person (FavoritePeopleFragment): the name, then rows of
+     bottom_sheet_person_row ("Искать книги", "Открыть на <site>"…, "Удалить из избранного"). -->
+<androidx.core.widget.NestedScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:background="?attr/backgraundColor"
+    tools:viewBindingIgnore="true">
+
+    <LinearLayout
+        android:id="@+id/personActions"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical">
+
+        <TextView
+            android:id="@+id/personName"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:ellipsize="end"
+            android:maxLines="1"
+            android:paddingStart="16dp"
+            android:paddingTop="16dp"
+            android:paddingEnd="16dp"
+            android:textColor="?attr/colorPrimaryText"
+            android:textSize="16sp"
+            tools:text="Стивен Кинг" />
+
+        <TextView
+            android:id="@+id/personDesc"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:maxLines="2"
+            android:paddingStart="16dp"
+            android:paddingEnd="16dp"
+            android:paddingBottom="16dp"
+            android:textColor="?attr/subTextColor"
+            android:textSize="14sp"
+            tools:text="Акнига · 3 книги в избранном" />
+
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1px"
+            android:alpha="0.3"
+            android:background="?attr/colorPrimaryText" />
+    </LinearLayout>
+</androidx.core.widget.NestedScrollView>

@@ -1,6 +1,7 @@
 package com.fanok.audiobooks.search;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
 
 import com.fanok.audiobooks.pojo.BookPOJO;
 import com.fanok.audiobooks.search.SearchGrouper.Group;
@@ -108,5 +109,74 @@ public class SearchOrderTest {
         Collections.sort(offers, SearchOrder.offers(Sort.SITE));
         assertEquals("Первая", offers.get(0).book.getName());
         assertEquals("Третья", offers.get(2).book.getName());
+    }
+
+    private static List<String> names(List<Offer> offers) {
+        List<String> out = new ArrayList<>();
+        for (Offer o : offers) {
+            out.add(o.book.getName());
+        }
+        return out;
+    }
+
+    /** A person's books: every site's newest, then every site's second newest; a searched card after every listed one. */
+    @Test
+    public void newestInterleavesTheSitesByTheirOwnPlacesSearchedCardsLast() {
+        String q = "стивен кинг";
+        List<Offer> offers = new ArrayList<>(Arrays.asList(
+                offer(Provider.GOLOSOM, Integer.MAX_VALUE, "Найдена", "Стивен Кинг", null, null, q),
+                offer(Provider.IZIBUK, 1, "Изибук 2", "Стивен Кинг", null, null, q),
+                offer(Provider.AKNIGA, 1, "Акнига 2", "Стивен Кинг", null, null, q),
+                offer(Provider.IZIBUK, 0, "Изибук 1", "Стивен Кинг", null, null, q),
+                offer(Provider.AKNIGA, 0, "Акнига 1", "Стивен Кинг", null, null, q)));
+        Collections.sort(offers, SearchOrder.offers(Sort.NEWEST));
+        assertEquals(Arrays.asList("Акнига 1", "Изибук 1", "Акнига 2", "Изибук 2", "Найдена"), names(offers));
+    }
+
+    /** A work by its best place on any site; among equal places the work more sites carry first. */
+    @Test
+    public void newestGroupsByTheirBestPlaceThenByTheSitesThatCarryThem() {
+        String q = "стивен кинг";
+        List<Group> g = sorted(Sort.NEWEST,
+                offer(Provider.GOLOSOM, Integer.MAX_VALUE, "Найдена", "Стивен Кинг", null, null, q),
+                offer(Provider.AKNIGA, 1, "Вторая", "Стивен Кинг", null, null, q),
+                offer(Provider.AKNIGA, 0, "Одна", "Стивен Кинг", null, null, q),
+                offer(Provider.AKNIGA, 2, "Оно", "Стивен Кинг", null, null, q),
+                offer(Provider.IZIBUK, 0, "Оно", "Стивен Кинг", null, null, q));
+        assertEquals(Arrays.asList("Оно", "Одна", "Вторая", "Найдена"), titles(g));
+    }
+
+    /** Fixed keys: any arrival order of the same cards sorts to the same list. */
+    @Test
+    public void newestIsTheSameWhateverTheOrderOfArrival() {
+        Provider[] sites = {Provider.AKNIGA, Provider.IZIBUK, Provider.GOLOSOM, Provider.KNIGAVUHE};
+        java.util.Random random = new java.util.Random(7);
+        List<Offer> offers = new ArrayList<>();
+        for (int i = 0; i < 40; i++) {
+            Provider site = sites[i % sites.length];
+            int rank = random.nextInt(4) == 0 ? Integer.MAX_VALUE : random.nextInt(6);
+            offers.add(offer(site, rank, "Книга " + random.nextInt(12), "Стивен Кинг", null, null, "кинг"));
+        }
+        List<Offer> a = new ArrayList<>(offers);
+        List<Offer> b = new ArrayList<>(offers);
+        Collections.shuffle(a, new java.util.Random(1));
+        Collections.shuffle(b, new java.util.Random(2));
+        Collections.sort(a, SearchOrder.offers(Sort.NEWEST));
+        Collections.sort(b, SearchOrder.offers(Sort.NEWEST));
+        assertEquals(a, b);
+        List<Group> ga = SearchGrouper.group(a, Collections.<String>emptySet(), true);
+        List<Group> gb = SearchGrouper.group(b, Collections.<String>emptySet(), true);
+        Collections.sort(ga, SearchOrder.groups(Sort.NEWEST));
+        Collections.sort(gb, SearchOrder.groups(Sort.NEWEST));
+        List<String> ida = new ArrayList<>();
+        List<String> idb = new ArrayList<>();
+        for (int i = 0; i < ga.size(); i++) {
+            ida.add(ga.get(i).id);
+            idb.add(gb.get(i).id);
+        }
+        assertEquals(ida, idb);
+        for (int i = 1; i < a.size(); i++) {
+            assertTrue(a.get(i - 1).nativeRank <= a.get(i).nativeRank);
+        }
     }
 }

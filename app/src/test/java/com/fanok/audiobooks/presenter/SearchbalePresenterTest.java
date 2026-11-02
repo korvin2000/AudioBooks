@@ -25,6 +25,8 @@ public class SearchbalePresenterTest {
         assertEquals(SearchOrder.Sort.TITLE, SearchbalePresenter.sortOf("TITLE"));
         assertEquals(SearchOrder.Sort.RELEVANCE, SearchbalePresenter.sortOf("FROM_A_LATER_VERSION"));
         assertEquals(SearchOrder.Sort.RELEVANCE, SearchbalePresenter.sortOf(null));
+        assertEquals("newest first is a person's books' alone", SearchOrder.Sort.RELEVANCE,
+                SearchbalePresenter.sortOf("NEWEST"));
         assertEquals(EnumSet.of(Field.AUTHOR, Field.READER), SearchbalePresenter.scopeOf("AUTHOR, READER,LATER"));
         assertTrue(SearchbalePresenter.scopeOf("").isEmpty());
         assertTrue(SearchbalePresenter.scopeOf(null).isEmpty());

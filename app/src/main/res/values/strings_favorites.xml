@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Избранное: the switcher of the lists on the toolbar (FavoritesSwitcher) -->
+    <string name="favorites_books">Книги</string>
+    <string name="favorites_authors">Авторы</string>
+    <string name="favorites_readers">Чтецы</string>
+    <string name="favorites_list_count">%1$s · %2$d</string>
+    <string name="favorites_switcher_desc">Избранное: %1$s. Выбрать список</string>
+
+    <!-- Избранное → Авторы / Чтецы (FavoritePeopleFragment) -->
+    <plurals name="favorite_people_books">
+        <item quantity="one">%d книга в избранном</item>
+        <item quantity="few">%d книги в избранном</item>
+        <item quantity="many">%d книг в избранном</item>
+        <item quantity="other">%d книги в избранном</item>
+    </plurals>
+    <string name="favorite_people_no_books">нет книг в избранном</string>
+    <string name="favorite_people_filter_site">Сайт</string>
+    <string name="favorite_people_filter_books">Есть книги в избранном</string>
+    <string name="favorite_people_filter_genre">Жанр</string>
+    <string name="favorite_people_sort_date">По дате добавления</string>
+    <string name="favorite_people_sort_name">По имени</string>
+    <string name="favorite_people_sort_books">По числу книг в избранном</string>
+    <string name="favorite_people_search">Искать книги</string>
+    <string name="favorite_people_open_on">Открыть на %1$s</string>
+    <string name="favorite_people_remove">Удалить из избранного</string>
+    <string name="favorite_people_removed">Удалено из избранного: %1$s</string>
+    <string name="favorite_people_nothing_found">Никого не найдено</string>
+    <string name="favorite_people_empty_authors">Здесь пока нет авторов.\nОтметьте автора звёздочкой в разделе «Авторы» или на странице книги.</string>
+    <string name="favorite_people_empty_readers">Здесь пока нет чтецов.\nОтметьте чтеца звёздочкой в разделе «Исполнители» или на странице книги.</string>
+    <string name="favorite_people_open_authors">Открыть «Авторы»</string>
+    <string name="favorite_people_open_readers">Открыть «Исполнители»</string>
+    <string name="favorite_people_clear_authors">Убрать всех авторов из избранного?</string>
+    <string name="favorite_people_clear_readers">Убрать всех чтецов из избранного?</string>
+</resources>

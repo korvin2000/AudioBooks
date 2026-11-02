@@ -20,6 +20,7 @@ import android.widget.LinearLayout;
 import android.widget.SeekBar;
 import android.widget.TextView;
 import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 import androidx.annotation.OptIn;
 import androidx.appcompat.app.AlertDialog;
 import androidx.media3.common.util.UnstableApi;
@@ -53,6 +54,7 @@ import com.fanok.audiobooks.pojo.StorageUtil;
 import com.fanok.audiobooks.service.Checkpoint;
 import com.fanok.audiobooks.service.MediaPlayerService;
 import com.fanok.audiobooks.service.PlaybackSettings;
+import com.fanok.audiobooks.util.BookProgress;
 import com.fanok.audiobooks.util.DownloadUtil;
 import com.fanok.audiobooks.util.ErrorReport;
 
@@ -64,6 +66,7 @@ import io.reactivex.disposables.Disposable;
 import io.reactivex.schedulers.Schedulers;
 import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Objects;
 import org.jetbrains.annotations.NotNull;
 
@@ -106,6 +109,9 @@ public class BookPresenter extends MvpPresenter<Activity> implements ActivityPre
     /** Index of each chapter of {@link #mAudioPOJO} in the book's full list when it is the offline subset, else null. */
     private int[] mOrdinals;
 
+    /** The playing chapter's index in the book's full list while the player holds this book, else -1. */
+    private int mPlayingChapter = -1;
+
     /** Legacy last-chapter title, shown until the chapter list is loaded; never used to resume. */
     private String last = "";
 
@@ -114,6 +120,11 @@ public class BookPresenter extends MvpPresenter<Activity> implements ActivityPre
     private final CompositeDisposable mDisposables = new CompositeDisposable();
 
     private static float speed = 1;
+
+    /** The speed dialog's slider moves by 0.05x, from PlaybackSettings.MIN_SPEED to MAX_SPEED. */
+    private static final int SPEED_STEPS_PER_UNIT = 20;
+    /** A D-pad press on the slider: 0.25x. */
+    private static final int SPEED_KEY_STEPS = 5;
 
     /** The open speed dialog, or null; it belongs to the current screen and goes with it. */
     private AlertDialog mSpeedDialog;
@@ -219,6 +230,29 @@ public class BookPresenter extends MvpPresenter<Activity> implements ActivityPre
         speed = value;
         new StorageUtil(mContext).storeSpeed(value);
         playAtSpeed(value);
+        getViewState().showSpeed(value);
+    }
+
+    /** "1,5×", "1×", "0,25×": the speed as the book's toolbar and menu show it. */
+    public static String speedText(float value) {
+        int hundredths = Math.round(PlaybackSettings.clampSpeed(value) * 100);
+        int fraction = hundredths % 100;
+        String text = String.valueOf(hundredths / 100);
+        if (fraction != 0) {
+            text += "," + (fraction % 10 == 0 ? String.valueOf(fraction / 10) : (fraction < 10 ? "0" : "") + fraction);
+        }
+        return text + "×";
+    }
+
+    /** The speed dialog's slider position of {@code value}. */
+    static int speedStep(float value) {
+        return Math.round((PlaybackSettings.clampSpeed(value) - PlaybackSettings.MIN_SPEED) * SPEED_STEPS_PER_UNIT);
+    }
+
+    /** The speed at a slider position, rounded to hundredths. */
+    static float speedAt(int step) {
+        float value = PlaybackSettings.MIN_SPEED + (float) step / SPEED_STEPS_PER_UNIT;
+        return PlaybackSettings.clampSpeed(Math.round(value * 100) / 100f);
     }
 
     /** Plays at this speed without keeping it: the speed dialog lets it be heard before OK. */
@@ -247,11 +281,9 @@ public class BookPresenter extends MvpPresenter<Activity> implements ActivityPre
         getAudio();
     }
 
+    /** The favourite items follow BookActivity's BookFavorites, which reads the book's state off the main thread. */
     @Override
     public void onCreateOptionsMenu(Menu menu) {
-        if (mBookPOJO != null && mBooksDBModel != null) {
-            getViewState().setIsFavorite(mBooksDBModel.inFavorite(mBookPOJO));
-        }
     }
 
     @Override
@@ -291,18 +323,9 @@ public class BookPresenter extends MvpPresenter<Activity> implements ActivityPre
 
     @Override
     public void onOptionsMenuItemSelected(MenuItem item) {
+        //the favourite items and the speed are BookActivity's (BookFavorites, buttonSpeedClick)
         int itemId = item.getItemId();
-        if (itemId == R.id.addFavorite) {
-            if (!mBooksDBModel.inFavorite(mBookPOJO)) {
-                mBooksDBModel.addFavorite(mBookPOJO);
-                getViewState().setIsFavorite(true);
-            }
-        } else if (itemId == R.id.removeFavorite) {
-            if (mBooksDBModel.inFavorite(mBookPOJO)) {
-                mBooksDBModel.removeFavorite(mBookPOJO);
-                getViewState().setIsFavorite(false);
-            }
-        } else if (itemId == R.id.refresh) {
+        if (itemId == R.id.refresh) {
             getViewState().refreshActivity();
         } else if (itemId == R.id.share) {
             getViewState().shareTextUrl();
@@ -411,8 +434,8 @@ public class BookPresenter extends MvpPresenter<Activity> implements ActivityPre
     @Override
     public void buttonSpeedClick(View view) {
 
-        final int step = 10;
         final float initial = speed;
+        final float[] chosen = {speed};
         final boolean[] confirmed = {false};
         dismissSpeedDialog();
 
@@ -421,22 +444,21 @@ public class BookPresenter extends MvpPresenter<Activity> implements ActivityPre
         linearLayout.setOrientation(LinearLayout.VERTICAL);
         final TextView textView = new TextView(view.getContext());
         textView.setGravity(Gravity.CENTER_HORIZONTAL);
-        textView.setText(String.valueOf(speed));
+        textView.setText(speedText(speed));
         textView.setTextColor(getAttributeColor(textView.getContext(), R.attr.colorPrimaryText));
         linearLayout.addView(textView);
         final SeekBar seek = new SeekBar(view.getContext());
-        seek.setMax(300);
-        seek.incrementProgressBy(step);
-        seek.setProgress((int) (speed * 100));
+        //no SeekBar.setMin below API 26: position 0 is PlaybackSettings.MIN_SPEED, the end MAX_SPEED
+        seek.setMax(speedStep(PlaybackSettings.MAX_SPEED));
+        seek.setKeyProgressIncrement(SPEED_KEY_STEPS);
+        seek.setProgress(speedStep(speed));
         seek.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
             @Override
             public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
-                progress = progress / step;
-                progress = progress * step;
-                String s = progress / 100 + "." + progress % 100;
-                textView.setText(s);
+                chosen[0] = speedAt(progress);
+                textView.setText(speedText(chosen[0]));
                 if (fromUser) {
-                    playAtSpeed(Float.parseFloat(s));
+                    playAtSpeed(chosen[0]);
                 }
             }
 
@@ -460,9 +482,8 @@ public class BookPresenter extends MvpPresenter<Activity> implements ActivityPre
         popDialog.setPositiveButton(R.string.ok,
                 (dialog, which) -> {
                     confirmed[0] = true;
-                    float s = PlaybackSettings.clampSpeed(Float.parseFloat(textView.getText().toString()));
-                    if (s != speed) {
-                        setSpeed(s);
+                    if (chosen[0] != speed) {
+                        setSpeed(chosen[0]);
                     }
                     dialog.dismiss();
                 });
@@ -560,14 +581,46 @@ public class BookPresenter extends MvpPresenter<Activity> implements ActivityPre
         getViewState().setImageDrawable(id);
     }
 
+    /** The player's progress; while it plays this book, also the description's time line (BookProgress). */
     @Override
     public void updateTime(int timeCurrent, int timeEnd, int buffered) {
         getViewState().updateTime(timeCurrent, timeEnd, buffered);
+        if (mPlayingChapter >= 0 && playsThisBook()) {
+            BookProgress.position(mBookPOJO.getUrl(), mPlayingChapter, timeCurrent);
+        }
     }
 
+    /** The player's chapter: when it is this book's, the progress that follows is in it. */
     @Override
     public void setSelected(int pos, @NonNull String name) {
         getViewState().setSelected(pos, name);
+        mPlayingChapter = playsThisBook() && mAudioPOJO != null && pos >= 0 && pos < mAudioPOJO.size()
+                && name.equals(mAudioPOJO.get(pos).getName()) ? ordinal(mOrdinals, pos) : -1;
+    }
+
+    private boolean playsThisBook() {
+        return mBookPOJO.getUrl() != null && mBookPOJO.getUrl().equals(MediaPlayerService.currentBookUrl());
+    }
+
+    /** The index in the book's full list of chapter {@code index} of a list that is the subset {@code ordinals}, or all. */
+    static int ordinal(@Nullable int[] ordinals, int index) {
+        return ordinals != null && index < ordinals.length ? ordinals[index] : index;
+    }
+
+    /** The chapters' lengths in seconds (0 = unknown), in their order. */
+    static int[] secondsOf(@NonNull List<AudioPOJO> chapters) {
+        int[] seconds = new int[chapters.size()];
+        for (int i = 0; i < seconds.length; i++) {
+            seconds[i] = chapters.get(i).getTime();
+        }
+        return seconds;
+    }
+
+    /** The book's chapter lengths, in its full list's order, for the description's time line. */
+    private void feedChapters(@NonNull int[] seconds) {
+        if (seconds.length > 0 && mBookPOJO.getUrl() != null) {
+            BookProgress.chapters(mBookPOJO.getUrl(), seconds);
+        }
     }
 
     @Override
@@ -641,6 +694,7 @@ public class BookPresenter extends MvpPresenter<Activity> implements ActivityPre
                 }
                 mAudioPOJO = audioPOJOS;
                 mOrdinals = null;
+                feedChapters(secondsOf(mAudioPOJO));
                 getViewState().showData(mAudioPOJO, mBookPOJO.getUrl(), mAudioPOJO.size());
                 getViewState().showProgres(false);
                 error = false;
@@ -687,6 +741,7 @@ public class BookPresenter extends MvpPresenter<Activity> implements ActivityPre
                     public void onNext(@NotNull ArrayList<AudioPOJO> bookPOJOS) {
                         mAudioPOJO = bookPOJOS;
                         mOrdinals = null;
+                        feedChapters(secondsOf(mAudioPOJO));
                         getViewState().showData(mAudioPOJO, mBookPOJO.getUrl(), mAudioPOJO.size());
                         error = false;
                     }
@@ -732,10 +787,16 @@ public class BookPresenter extends MvpPresenter<Activity> implements ActivityPre
 
         boolean foundSaved = false;
         int rowsTotal = 0;
+        int[] rowSeconds = new int[0];
         if (mBookPOJO != null && mBookPOJO.getUrl() != null) {
             try {
                 java.util.List<com.fanok.audiobooks.room.BooksAudioEntity> savedList = mAudioListDBModel.getRows(mBookPOJO.getUrl());
                 rowsTotal = savedList.size();
+                //every saved chapter's length, held or not: the time line counts the whole book
+                rowSeconds = new int[rowsTotal];
+                for (int j = 0; j < rowsTotal; j++) {
+                    rowSeconds[j] = savedList.get(j).time;
+                }
                 if (!savedList.isEmpty()) {
                     DownloadIndex downloadIndex = null;
                     try {
@@ -781,6 +842,7 @@ public class BookPresenter extends MvpPresenter<Activity> implements ActivityPre
         }
         final boolean finalFoundSaved = foundSaved;
         final int finalRowsTotal = rowsTotal;
+        final int[] finalRowSeconds = rowSeconds;
         final ArrayList<AudioPOJO> finalLocalAudio = localAudio;
         final int[] finalOrdinals = new int[localOrdinals.size()];
         for (int i = 0; i < finalOrdinals.length; i++) {
@@ -793,6 +855,7 @@ public class BookPresenter extends MvpPresenter<Activity> implements ActivityPre
                 mIsOfflineFallback = true;
                 mAudioPOJO = finalLocalAudio;
                 mOrdinals = finalOrdinals;
+                feedChapters(finalRowSeconds);
                 // only the held chapters are listed: the book's status counts them against all its saved rows
                 getViewState().showData(mAudioPOJO, mBookPOJO.getUrl(), finalRowsTotal);
                 getViewState().showProgres(false);

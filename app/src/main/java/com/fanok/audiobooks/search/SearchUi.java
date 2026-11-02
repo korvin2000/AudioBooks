@@ -123,6 +123,11 @@ public final class SearchUi {
         public Set<Provider> slow = Collections.emptySet();
         /** Sources silent the last time: asked, marked slow, never waited for. */
         public Set<Provider> silent = Collections.emptySet();
+        /**
+         * The books of one person ({@link PersonSearch}): the kind of the person, {@code FavoritePeople.AUTHOR} or
+         * {@code READER}, for the screen; -1 for a text search.
+         */
+        public int personKind = -1;
     }
 
     public static final class State {

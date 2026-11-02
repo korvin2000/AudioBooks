@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- One action of bottom_sheet_person_menu, styled as the rows of bootom_sheet_books_menu; text and icon set in code. -->
+<TextView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:background="?android:attr/selectableItemBackground"
+    android:clickable="true"
+    android:drawablePadding="30dp"
+    android:ellipsize="end"
+    android:focusable="true"
+    android:maxLines="1"
+    android:padding="16dp"
+    android:textColor="?attr/colorPrimaryText"
+    android:textSize="16sp"
+    tools:drawableStart="@drawable/ic_magnify"
+    tools:text="@string/favorite_people_search"
+    tools:viewBindingIgnore="true" />

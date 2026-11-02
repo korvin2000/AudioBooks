@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The book screen's description page (ОБЗОР): the time line and the favourite labels and header. -->
+<resources>
+    <!-- the time line of a started book: what is left at the current speed -->
+    <string name="book_desc_time_left">осталось %1$s</string>
+    <!-- beside the progress line when the speed is not 1× -->
+    <string name="book_desc_time_speed">при %1$s</string>
+    <!-- beside the full progress line of a listened book: its length -->
+    <string name="book_desc_time_of">из %1$s</string>
+    <!-- a chapter's length is unknown: no remainder is invented -->
+    <string name="book_desc_time_chapter">гл. %1$d из %2$d</string>
+
+    <!-- the Автор / Чтец label, which toggles that person -->
+    <string name="book_desc_label_on">%1$s: в избранном</string>
+    <string name="book_desc_label_off">%1$s: не в избранном</string>
+
+    <!-- snackbars after a toggle, with Отменить -->
+    <string name="book_desc_author_on">%1$s — в избранных авторах</string>
+    <string name="book_desc_author_off">%1$s — больше не в избранных авторах</string>
+    <string name="book_desc_reader_on">%1$s — в избранных чтецах</string>
+    <string name="book_desc_reader_off">%1$s — больше не в избранных чтецах</string>
+    <string name="book_desc_book_on">Книга в избранном</string>
+    <string name="book_desc_book_off">Книга больше не в избранном</string>
+</resources>

@@ -38,6 +38,11 @@ public final class SearchSession<T> {
         default long timeoutSeconds() {
             return 0;
         }
+
+        /** An empty first page is asked again in the other letter case (a search); false for a listing. */
+        default boolean caseRetry() {
+            return true;
+        }
     }
 
     public interface Listener<T> {
@@ -493,7 +498,7 @@ public final class SearchSession<T> {
         // (SRCH-10): it no longer waits for the slowest site of the pass
         String variant = caseVariant(query);
         if (page.status == ProviderPage.Status.EMPTY && a.pageNo == 1 && query.equals(a.query) && variant != null
-                && caseTried.add(s)) {
+                && s.caseRetry() && caseTried.add(s)) {
             queryOf.put(s, variant);
             nextPage.put(s, 1);
             // one search of the site, in two letter cases: its wait goes on from the first ask

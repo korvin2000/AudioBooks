@@ -80,6 +80,7 @@ import com.fanok.audiobooks.download.DownloadStatus;
 import com.fanok.audiobooks.download.DownloadStatusText;
 import com.fanok.audiobooks.adapter.SectionsPagerAdapter;
 import com.fanok.audiobooks.interface_pacatge.book_content.Activity;
+import com.fanok.audiobooks.model.FavoritePeople;
 import com.fanok.audiobooks.pojo.AudioPOJO;
 import com.fanok.audiobooks.pojo.BookPOJO;
 import com.fanok.audiobooks.pojo.OtherArtistPOJO;
@@ -88,9 +89,11 @@ import com.fanok.audiobooks.policy.ParentalControl;
 import com.fanok.audiobooks.presenter.BookPresenter;
 import com.fanok.audiobooks.service.MediaPlayerService;
 import com.fanok.audiobooks.service.SeekStep;
+import com.fanok.audiobooks.util.BookProgress;
 import com.fanok.audiobooks.android_equalizer.DialogEqualizerFragment;
 import com.google.android.gms.tasks.Task;
 import com.google.android.material.bottomsheet.BottomSheetBehavior;
+import com.google.android.material.snackbar.Snackbar;
 import com.google.android.material.tabs.TabLayout;
 import com.google.android.material.tabs.TabLayoutMediator;
 import com.google.android.play.core.review.ReviewInfo;
@@ -101,6 +104,7 @@ import com.squareup.picasso.Picasso;
 import com.squareup.picasso.Target;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
 import org.jetbrains.annotations.NotNull;
@@ -158,14 +162,19 @@ public class BookActivity extends MvpAppCompatActivity implements Activity {
     private static final long SEEK_COMMIT_SETTLE_MS = 1000;
     private static final int SEEK_COMMIT_TOLERANCE_MS = 1500;
     /** Menu items that can be toolbar icons, in toolbar order, and the setting of each; the favourite pair shares one. */
-    private static final int[] TOOLBAR_ITEMS = {R.id.addFavorite, R.id.share, R.id.download_delete, R.id.sleep_timer,
-            R.id.equalizer, R.id.settings, R.id.openSite, R.id.addMainScreen, R.id.refresh};
-    private static final String[] TOOLBAR_KEYS = {"toolbar_favorite", "toolbar_share", "toolbar_download",
-            "toolbar_sleep_timer", "toolbar_equalizer", "toolbar_settings", "toolbar_open_site", "toolbar_main_screen",
-            "toolbar_refresh"};
-    /** Widths in the book toolbar: the back arrow, an action icon (styles.xml Widget.App.ActionButton), the overflow. */
+    private static final int[] TOOLBAR_ITEMS = {R.id.addFavorite, R.id.favoriteAuthor, R.id.favoriteReader, R.id.share,
+            R.id.playbackSpeed, R.id.download_delete, R.id.sleep_timer, R.id.equalizer, R.id.settings, R.id.openSite,
+            R.id.addMainScreen, R.id.refresh};
+    private static final String[] TOOLBAR_KEYS = {"toolbar_favorite", "toolbar_favorite_author",
+            "toolbar_favorite_reader", "toolbar_share", "toolbar_speed", "toolbar_download", "toolbar_sleep_timer",
+            "toolbar_equalizer", "toolbar_settings", "toolbar_open_site", "toolbar_main_screen", "toolbar_refresh"};
+    /**
+     * Widths in the book toolbar: the back arrow, an action icon (styles.xml Widget.App.ActionButton), the speed as
+     * text (action_book_speed), the overflow.
+     */
     private static final int TOOLBAR_NAV_DP = 56;
     private static final int TOOLBAR_ICON_DP = 32;
+    private static final int TOOLBAR_SPEED_DP = 44;
     private static final int TOOLBAR_OVERFLOW_DP = 40;
     /** Below this width left by the icons the title and author are not shown at all. */
     private static final int TOOLBAR_TITLE_MIN_DP = 120;
@@ -213,8 +222,12 @@ public class BookActivity extends MvpAppCompatActivity implements Activity {
     private LinearLayoutManager mLinearLayoutManager;
     private SharedPreferences pref;
 
-    private MenuItem mAddFavorite;
-    private MenuItem mRemoveFavorite;
+    /** The options menu while it exists: its favourite and speed items follow their state in place. */
+    @Nullable
+    private Menu mMenu;
+    /** The book's and its people's favourite state, shared by the toolbar, the ★ tab and the description. */
+    private BookFavorites mFavorites;
+    private final BookFavorites.Listener mFavoritesListener = this::onBookFavoritesChanged;
 
     private boolean mNotificationClick;
 
@@ -433,6 +446,8 @@ public class BookActivity extends MvpAppCompatActivity implements Activity {
         String json = intent.getStringExtra(ARG_BOOK);
         if (json == null) throw new NullPointerException();
         mBookPOJO = BookPOJO.parceJsonToBookPojo(json);
+        mFavorites = new BookFavorites(this, mBookPOJO);
+        mFavorites.addListener(mFavoritesListener);
 
         pref = PreferenceManager
                 .getDefaultSharedPreferences(this);
@@ -493,9 +508,16 @@ public class BookActivity extends MvpAppCompatActivity implements Activity {
         tabs = findViewById(R.id.tabs);
         Toolbar toolbar = findViewById(R.id.toolbar);
         setSupportActionBar(toolbar);
-        new TabLayoutMediator(tabs, viewPager,
-                (tab, position) -> tab.setText(sectionsPagerAdapter.getPageTitle(position))
-        ).attach();
+        // the ★ tab is an icon in the colours of the tabs' titles; ОБЗОР before it stays the page shown first
+        tabs.setTabIconTint(tabs.getTabTextColors());
+        new TabLayoutMediator(tabs, viewPager, (tab, position) -> {
+            if (sectionsPagerAdapter.kindAt(position) == SectionsPagerAdapter.FAVORITES) {
+                tab.setIcon(favoritesTabIcon());
+                tab.setContentDescription(R.string.menu_favorite);
+            } else {
+                tab.setText(sectionsPagerAdapter.getPageTitle(position));
+            }
+        }).attach();
         // the comments tab shows only when there are comments; its list reuses this fetch
         comentsCount = com.fanok.audiobooks.model.ComentsModel.shared(mBookPOJO.getUrl(), savedInstanceState == null)
                 .observeOn(io.reactivex.android.schedulers.AndroidSchedulers.mainThread())
@@ -814,14 +836,99 @@ public class BookActivity extends MvpAppCompatActivity implements Activity {
         }
     }
 
+    /** The favourites of this book and its people; the ★ tab, the description and the cover's sheet use it too. */
+    @NonNull
+    public BookFavorites favorites() {
+        return mFavorites;
+    }
+
+    /** The book or one of its people was marked or unmarked: the ★ tab's icon and the toolbar's items follow. */
+    private void onBookFavoritesChanged() {
+        TabLayout.Tab tab = tabs == null ? null
+                : tabs.getTabAt(sectionsPagerAdapter.positionOfKind(SectionsPagerAdapter.FAVORITES));
+        if (tab != null) {
+            tab.setIcon(favoritesTabIcon());
+        }
+        if (mMenu != null && bindFavoriteItems(mMenu)) {
+            invalidateOptionsMenu(); //an author or reader item came or went: the toolbar is laid out anew
+        }
+    }
+
+    private int favoritesTabIcon() {
+        return mFavorites.isBook() ? R.drawable.ic_favorite_remove : R.drawable.ic_favorite_add;
+    }
+
+    /**
+     * The book's add/remove pair, and the author and reader items: checked (filled icon) when a person of the field
+     * is a favourite, hidden when the book names nobody. True when one of these two was shown or hidden.
+     */
+    private boolean bindFavoriteItems(@NonNull Menu menu) {
+        boolean book = mFavorites.isBook();
+        menu.findItem(R.id.addFavorite).setVisible(!book);
+        menu.findItem(R.id.removeFavorite).setVisible(book);
+        return bindPersonItem(menu.findItem(R.id.favoriteAuthor), FavoritePeople.AUTHOR, R.drawable.ic_favorite_author,
+                R.drawable.ic_favorite_author_on)
+                | bindPersonItem(menu.findItem(R.id.favoriteReader), FavoritePeople.READER,
+                R.drawable.ic_favorite_reader, R.drawable.ic_favorite_reader_on);
+    }
+
+    private boolean bindPersonItem(@NonNull MenuItem item, int kind, int offIcon, int onIcon) {
+        boolean shown = !mFavorites.people(kind).isEmpty();
+        boolean changed = item.isVisible() != shown;
+        item.setVisible(shown);
+        boolean on = mFavorites.any(kind);
+        if (item.isChecked() != on) {
+            item.setChecked(on);
+            item.setIcon(on ? onIcon : offIcon);
+        }
+        return changed;
+    }
+
+    /**
+     * The author or reader item: one person is toggled at once, with a snackbar that can undo it; several are listed
+     * in the favourites sheet, one row each.
+     */
+    private void togglePerson(int kind) {
+        List<String> people = mFavorites.people(kind);
+        if (people.size() > 1) {
+            mFavorites.showSheet(this);
+            return;
+        }
+        if (people.isEmpty()) {
+            return;
+        }
+        String name = people.get(0);
+        boolean on = mFavorites.toggle(kind, name);
+        Snackbar bar = Snackbar.make(findViewById(R.id.view_pager),
+                getString(on ? R.string.book_fav_added : R.string.book_fav_removed, name), Snackbar.LENGTH_LONG)
+                .setAction(R.string.undo, v -> mFavorites.undo(kind, name));
+        //above the collapsed player, which is drawn over the screen's bottom
+        if (bottomSheetBehavior != null && bottomSheetBehavior.getState() == BottomSheetBehavior.STATE_COLLAPSED) {
+            bar.setAnchorView(mPlayer);
+        }
+        bar.show();
+    }
+
+    /** The speed item: "Скорость · 1,5×" in the overflow, the text "1,5×" on the toolbar; opens the speed dialog. */
+    private void bindSpeedItem(@NonNull Menu menu) {
+        MenuItem item = menu.findItem(R.id.playbackSpeed);
+        String speed = BookPresenter.speedText(BookPresenter.getSpeed());
+        item.setTitle(getString(R.string.book_toolbar_speed, speed));
+        View action = item.getActionView();
+        if (action instanceof TextView) {
+            ((TextView) action).setText(speed);
+            action.setContentDescription(getString(R.string.book_toolbar_speed_desc, speed));
+            action.setOnClickListener(v -> mPresenter.buttonSpeedClick(mSpeed));
+        }
+    }
+
     @Override
-    public void setIsFavorite(boolean b) {
-        if (b) {
-            mAddFavorite.setVisible(false);
-            mRemoveFavorite.setVisible(true);
-        } else {
-            mAddFavorite.setVisible(true);
-            mRemoveFavorite.setVisible(false);
+    public void showSpeed(float speed) {
+        if (mMenu != null) {
+            bindSpeedItem(mMenu);
+        }
+        if (mBookPOJO != null && mBookPOJO.getUrl() != null) {
+            BookProgress.refresh(mBookPOJO.getUrl()); // the description's time left is at this speed
         }
     }
 
@@ -855,7 +962,19 @@ public class BookActivity extends MvpAppCompatActivity implements Activity {
     @UnstableApi
     @Override
     public boolean onOptionsItemSelected(MenuItem menuItem) {
-        if (menuItem.getItemId() == android.R.id.home) {
+        int id = menuItem.getItemId();
+        if (id == R.id.addFavorite || id == R.id.removeFavorite) {
+            mFavorites.toggleBook();
+            return true;
+        } else if (id == R.id.favoriteAuthor || id == R.id.favoriteReader) {
+            togglePerson(id == R.id.favoriteAuthor ? FavoritePeople.AUTHOR : FavoritePeople.READER);
+            return true;
+        } else if (id == R.id.playbackSpeed) {
+            //the player's own speed button is the dialog's anchor: a view of this screen's theme, not the toolbar's
+            mPresenter.buttonSpeedClick(mSpeed);
+            return true;
+        }
+        if (id == android.R.id.home) {
             if (mNotificationClick) {
                 Intent intent = new Intent(this, MainActivity.class);
                 intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
@@ -914,6 +1033,7 @@ public class BookActivity extends MvpAppCompatActivity implements Activity {
     @Override
     protected void onDestroy() {
         showingView = "";
+        mFavorites.release();
         comentsCount.dispose();
         if (isFinishing()) {
             com.fanok.audiobooks.model.ComentsModel.cancel(mBookPOJO.getUrl());
@@ -926,11 +1046,12 @@ public class BookActivity extends MvpAppCompatActivity implements Activity {
     public boolean onCreateOptionsMenu(Menu menu) {
         MenuInflater inflater = getMenuInflater();
         inflater.inflate(R.menu.book_activity_options_menu, menu);
-        mAddFavorite = menu.findItem(R.id.addFavorite);
-        mRemoveFavorite = menu.findItem(R.id.removeFavorite);
+        mMenu = menu;
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) {
             menu.findItem(R.id.addMainScreen).setVisible(false);
         }
+        bindFavoriteItems(menu);
+        bindSpeedItem(menu);
 
         mPresenter.onCreateOptionsMenu(menu);
         layoutToolbar(menu);
@@ -953,26 +1074,24 @@ public class BookActivity extends MvpAppCompatActivity implements Activity {
                 continue;
             }
             if (onToolbar(TOOLBAR_KEYS[i])) {
-                wanted++;
+                wanted += toolbarWidth(TOOLBAR_ITEMS[i]);
             } else {
                 others = true;
             }
         }
         int room = getResources().getConfiguration().screenWidthDp - TOOLBAR_NAV_DP;
-        int shown = Math.min(wanted, room / TOOLBAR_ICON_DP);
-        if (shown < wanted || others) {
+        if (wanted > room || others) {
             room -= TOOLBAR_OVERFLOW_DP;
-            shown = Math.min(wanted, room / TOOLBAR_ICON_DP);
         }
-        room -= shown * TOOLBAR_ICON_DP;
+        //the chosen ones in order, each while it still fits
         for (int i = 0; i < TOOLBAR_ITEMS.length; i++) {
             MenuItem item = menu.findItem(TOOLBAR_ITEMS[i]);
             if (item == null || !item.isVisible() && TOOLBAR_ITEMS[i] != R.id.addFavorite) {
                 continue;
             }
-            boolean icon = shown > 0 && onToolbar(TOOLBAR_KEYS[i]);
+            boolean icon = onToolbar(TOOLBAR_KEYS[i]) && toolbarWidth(TOOLBAR_ITEMS[i]) <= room;
             if (icon) {
-                shown--;
+                room -= toolbarWidth(TOOLBAR_ITEMS[i]);
             }
             int action = icon ? MenuItem.SHOW_AS_ACTION_ALWAYS : MenuItem.SHOW_AS_ACTION_NEVER;
             item.setShowAsAction(action);
@@ -1002,6 +1121,10 @@ public class BookActivity extends MvpAppCompatActivity implements Activity {
 
     private boolean onToolbar(@NonNull String key) {
         return pref.getBoolean(key, "toolbar_favorite".equals(key) || "toolbar_share".equals(key));
+    }
+
+    private static int toolbarWidth(int itemId) {
+        return itemId == R.id.playbackSpeed ? TOOLBAR_SPEED_DP : TOOLBAR_ICON_DP;
     }
 
     /** In the collapsed player the collapse button, turned upwards, shows that the chapter list opens. */
@@ -1040,7 +1163,7 @@ public class BookActivity extends MvpAppCompatActivity implements Activity {
 
     /** The collapsed player's buttons beside play: chapters, or rewind/forward as "Кнопки плеера" asks. */
     private void bindTopSideButtons() {
-        mTopSeek = pref.getBoolean(PREF_SEEK_BUTTONS, false);
+        mTopSeek = pref.getBoolean(PREF_SEEK_BUTTONS, true);
         if (mPreviousTop != null) {
             mPreviousTop.setImageResource(mTopSeek ? R.drawable.ic_fast_rewind : R.drawable.ic_skip_previous);
             mPreviousTop.setContentDescription(getString(mTopSeek ? R.string.rewind_back : R.string.previous));
@@ -1215,9 +1338,10 @@ public class BookActivity extends MvpAppCompatActivity implements Activity {
         return super.onPrepareOptionsMenu(menu);
     }
 
+    /** "Настройки панели…": the settings open at Оформление → Панель книги, Back walks up to the root. */
     @Override
     public void startMainActivity(int fragmentId) {
-        MainActivity.startMainActivity(this, fragmentId, "settings");
+        MainActivity.startMainActivity(this, fragmentId, "book_toolbar");
     }
 
 
@@ -1436,7 +1560,9 @@ public class BookActivity extends MvpAppCompatActivity implements Activity {
             }else if(keyCode == KeyEvent.KEYCODE_DPAD_RIGHT) {
                 if (currentFocus.getId()==R.id.genre||currentFocus.getId()==R.id.autorConteiner||currentFocus.getId()==R.id.author||
                         currentFocus.getId()==R.id.artistConteiner||currentFocus.getId()==R.id.artist||currentFocus.getId()==R.id.seriesConteiner||
-                        currentFocus.getId()==R.id.series||currentFocus.getId()==R.id.showMore) {
+                        currentFocus.getId()==R.id.series||currentFocus.getId()==R.id.showMore||
+                        currentFocus.getId()==R.id.authorLabel||currentFocus.getId()==R.id.artistLabel||
+                        currentFocus.getId()==R.id.seriesLabel) {
                     View playerView = findViewById(R.id.player);
                     if (playerView != null) {
                         playerView.requestFocus();
@@ -1691,6 +1817,7 @@ public class BookActivity extends MvpAppCompatActivity implements Activity {
             showEqualizer(sessionId);
         }
         showingView = mBookPOJO.getUrl();
+        mFavorites.refresh(); //the book may have been (un)marked on another screen meanwhile
         bindTopSideButtons();
         invalidateOptionsMenu(); //the toolbar settings may have changed meanwhile
         View decorView = getWindow().getDecorView();

@@ -56,5 +56,19 @@
             android:textColor="?attr/colorPrimaryText"
             android:drawableStart="@drawable/ic_reting"
             tools:text="1840" />
+
+        <!-- the row keeps focus and its D-pad click; GenreListAddapter's key listeners move focus
+         to the star on D-pad right and back on D-pad left -->
+        <ImageButton
+            android:id="@+id/star"
+            android:layout_width="48dp"
+            android:layout_height="match_parent"
+            android:background="@drawable/focusable"
+            android:contentDescription="@string/people_star_add"
+            android:focusable="true"
+            android:scaleType="center"
+            android:src="@drawable/ic_star_toggle"
+            android:visibility="gone"
+            tools:visibility="visible" />
     </LinearLayout>
 </LinearLayout>

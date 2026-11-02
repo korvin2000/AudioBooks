@@ -45,6 +45,7 @@ public class App extends Application {
     private static final String PREF_STORE_UID = "media3_store_uid";
     /** Set once the stored "bufferSize" was moved from the old default (60 s) to the new one. */
     private static final String PREF_BUFFER_120 = "buffer_default_120";
+    private static final String PREF_SEEK_BUTTONS_ON = "seek_buttons_default_on";
 
     // One download manager, cache and executor for the process lifetime, created once on first use and never
     // released or re-created: the download folder setting only names where explicit exports go.
@@ -317,6 +318,11 @@ public class App extends Application {
                 editor.putString("bufferSize", String.valueOf(PlaybackSettings.DEFAULT_BUFFER_SECONDS));
             }
             editor.apply();
+        }
+        // the player's side buttons now rewind by default; the old default "false" the settings screen stored can't be
+        // told from a choice, so it moves once
+        if (!pref.getBoolean(PREF_SEEK_BUTTONS_ON, false)) {
+            pref.edit().putBoolean(PREF_SEEK_BUTTONS_ON, true).putBoolean("seekButtonsPref", true).apply();
         }
 
         AppThemes.applyNightMode(this);

@@ -42,8 +42,10 @@ public final class SearchGrouper {
         /** The source's place in the listener's order of sources. */
         public final int order;
         /**
-         * The site's own rank, page·1000 + position; {@link Integer#MAX_VALUE} for a site whose order is not by
-         * relevance (by date, by views), so that its order never lifts a card.
+         * The site's own rank, its place in the site's sequence: relevance in a search, the person's books newest
+         * first in a person's listing ({@link PersonSearch}); {@link Integer#MAX_VALUE} for a site whose search order
+         * is not by relevance (by date, by views), and for a person's card found by a search, so that such an order
+         * never lifts a card.
          */
         public final int nativeRank;
         public final Card card;

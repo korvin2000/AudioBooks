@@ -185,6 +185,17 @@ Checks at the end: `:app:testDebugUnitTest` 963 tests, 0 failures (1 pre-existin
   (`SearchSession.AUTO_RETRY_SECONDS`; the tile keeps searching); longer, or no wait said, is an amber "лимит
   запросов" tile to retry. Catalog: no route offer on 429, a toast with the wait; book pages say the site asks to wait.
 
+### 2.8 Person search, newest first — branch `feature/favorite-people`
+- Favourite authors/readers (`model/FavoritePeople`, Room `favorite_person`, DB v19, in the backup) open
+  `SearchableActivity.personIntent(ctx, kind, name)`: person mode in `SearchbalePresenter` (no pref writes, no
+  snapshot, no answer history; a typed query leaves it). `search/PersonSearch` plans one source per site: LISTING (a
+  saved person page; an empty page 1 drops it once and falls back), RESOLVE (the site's people search, only an exact
+  `FavoritePeople.key` hit, then `learnUrl`), SEARCH (book search by name, strict person match, up to 2 more site pages
+  past a filtered-empty one; readers only on Golosom). Pages are learned from single-person cards only on SEARCH sites.
+- `Sort.NEWEST` ("Сначала новые (порядок сайтов)", person mode only): each site's own sequence interleaved, SEARCH
+  cards last; no dates exist on cards. Not built (need live probes first): per-site date-sorted person URLs, a re-rank
+  by the numeric id in book URLs, hiding the person's own plate.
+
 ## 3. Decisions that deviate from the spec (and why)
 - Ranking + grouping shipped together with stage 0–2 (spec §14 p.10 split them into releases): the owner asked for
   them now; "Как пришло" and "Группировать" in the menu restore the old view.

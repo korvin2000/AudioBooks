@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The books of a favourite author or reader on every site (SearchableActivity.personIntent). -->
+<resources>
+    <!-- No date is known across sites: every site's own newest-first order, interleaved. -->
+    <string name="person_search_sort_newest">Сначала новые (порядок сайтов)</string>
+    <!-- The summary line: whose books these are (the search field shows the name). -->
+    <string name="person_search_author">Автор</string>
+    <string name="person_search_reader">Чтец</string>
+</resources>

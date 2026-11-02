@@ -53,6 +53,7 @@ import com.fanok.audiobooks.download.StoreLocation;
 import com.fanok.audiobooks.model.AudioDBModel;
 import com.fanok.audiobooks.model.AudioListDBModel;
 import com.fanok.audiobooks.model.BooksDBModel;
+import com.fanok.audiobooks.model.FavoritePeople;
 import com.fanok.audiobooks.net.AppProxy;
 import com.fanok.audiobooks.net.ProxyFinder;
 import com.fanok.audiobooks.pojo.BackupPOJO;
@@ -101,6 +102,16 @@ public class SettingsFragment extends PreferenceFragmentCompat implements
         Bundle args = new Bundle();
         args.putString("rootKey", "group_sources");
         args.putBoolean(ARG_OPEN_SOURCES, true);
+        fragment.setArguments(args);
+        return fragment;
+    }
+
+    /** The nested PreferenceScreen {@code rootKey} of the settings, as {@link #onNavigateToScreen} opens it. */
+    @NonNull
+    public static SettingsFragment withRoot(@NonNull String rootKey) {
+        SettingsFragment fragment = new SettingsFragment();
+        Bundle args = new Bundle();
+        args.putString("rootKey", rootKey);
         fragment.setArguments(args);
         return fragment;
     }
@@ -795,6 +806,7 @@ public class SettingsFragment extends PreferenceFragmentCompat implements
         backup.setBooksSaved(booksDBModel.getAllSaved());
         backup.setAudio(audioDBModel.getAll());
         backup.setAudioList(audioListDBModel.getAll());
+        backup.setPeopleFavorite(FavoritePeople.get(context).backup());
         backup.setSkippedRows(booksDBModel.getSkippedRows() + audioDBModel.getSkippedRows());
         if (backup.getSkippedRows() > 0) {
             Log.w("SettingsFragment", "Backup left out " + backup.getSkippedRows() + " unreadable rows");
@@ -971,7 +983,14 @@ public class SettingsFragment extends PreferenceFragmentCompat implements
                         audioListDBModel.add(backup.getAudioList().get(i));
                     }
                 }
+
+                if (backup.getPeopleFavorite() != null) {
+                    FavoritePeople.replaceAll(database, backup.getPeopleFavorite());
+                }
             });
+            if (backup.getPeopleFavorite() != null) {
+                FavoritePeople.get(context).reload();
+            }
             return true;
         } catch (RuntimeException e) {
             Log.e("SettingsFragment", "Restore failed, database left unchanged", e);

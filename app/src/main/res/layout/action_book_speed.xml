@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The speed item on the book toolbar: the value as text ("1,5×"), not an icon. The menu inflates an action layout
+     without a parent, so only the view's own minimum size counts; BookActivity.layoutToolbar budgets 44 dp for it. -->
+<TextView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content"
+    android:background="?attr/selectableItemBackgroundBorderless"
+    android:clickable="true"
+    android:focusable="true"
+    android:gravity="center"
+    android:maxLines="1"
+    android:minWidth="44dp"
+    android:minHeight="40dp"
+    android:textColor="?attr/colorItemMenu"
+    android:textSize="14sp"
+    android:textStyle="bold"
+    tools:text="1,5×"
+    tools:viewBindingIgnore="true" />

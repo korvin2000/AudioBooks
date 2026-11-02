@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The ★ tab of the book screen (FavoritesTabFragment): the favourites panel, scrolling when the people are many. -->
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="?attr/backgraundColor"
+    android:fillViewport="true"
+    tools:viewBindingIgnore="true">
+
+    <include
+        android:id="@+id/favoritesPanel"
+        layout="@layout/view_favorites_panel" />
+</ScrollView>

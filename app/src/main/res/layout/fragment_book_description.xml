@@ -28,14 +28,14 @@
             android:orientation="vertical"
             android:padding="@dimen/text_margin_book_description">
 
+            <!-- "Автор — Название": the author toggles the author, the title the book; a long press copies it -->
             <TextView
                 android:id="@+id/title"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:textColor="?attr/colorPrimaryText"
                 android:textSize="@dimen/titleSizeBookDescription"
-                android:textIsSelectable="true"
-                tools:text="Роулинг Джоан - Гарри Поттер и Орден Феникса" />
+                tools:text="Роулинг Джоан — Гарри Поттер и Орден Феникса" />
 
             <LinearLayout
                 android:layout_width="match_parent"
@@ -101,42 +101,91 @@
 
                     </LinearLayout>
 
+                    <!-- the book's length; once started, what is left at the current speed -->
                     <TextView
                         android:id="@+id/time"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:layout_marginTop="@dimen/text_margin_book_description"
+                        android:drawablePadding="4dp"
                         android:maxLines="1"
                         android:singleLine="true"
                         android:textColor="?attr/subTextColor"
                         android:textSize="@dimen/textSizeBookDescription"
                         app:drawableStartCompat="@drawable/ic_clock"
-                        tools:text="13 часов 15 минут" />
+                        tools:text="осталось 5 ч. 12 мин." />
 
-                    <TextView
-                        android:id="@+id/favorite"
+                    <!-- under a started book's time: how much is behind, with the speed or the chapter beside it -->
+                    <LinearLayout
+                        android:id="@+id/timeProgressRow"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="@dimen/book_time_bar_inset"
+                        android:layout_marginTop="3dp"
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal"
+                        android:visibility="gone"
+                        tools:visibility="visible">
+
+                        <com.google.android.material.progressindicator.LinearProgressIndicator
+                            android:id="@+id/timeProgress"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:importantForAccessibility="no"
+                            android:max="1000"
+                            app:indicatorColor="?attr/subTextColor"
+                            app:trackCornerRadius="2dp"
+                            app:trackThickness="@dimen/book_time_bar_height"
+                            tools:progress="430" />
+
+                        <TextView
+                            android:id="@+id/timeNote"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginStart="6dp"
+                            android:maxLines="1"
+                            android:singleLine="true"
+                            android:textColor="?attr/subTextColor"
+                            android:textSize="@dimen/subTextSize"
+                            android:visibility="gone"
+                            tools:text="при 1,5×"
+                            tools:visibility="visible" />
+                    </LinearLayout>
+
+                    <!-- the site's favourites counter (a heart: a star is MY favourite) and the rating, on one row -->
+                    <LinearLayout
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:layout_marginTop="@dimen/text_margin_book_description"
-                        android:maxLines="1"
-                        android:singleLine="true"
-                        android:textColor="?attr/subTextColor"
-                        android:textSize="@dimen/textSizeBookDescription"
-                        app:drawableStartCompat="@drawable/ic_favorite_description"
-                        tools:text="520" />
+                        android:orientation="horizontal">
 
+                        <TextView
+                            android:id="@+id/favorite"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="@dimen/text_margin_book_description"
+                            android:layout_marginEnd="@dimen/book_meta_gap"
+                            android:drawablePadding="4dp"
+                            android:maxLines="1"
+                            android:singleLine="true"
+                            android:textColor="?attr/subTextColor"
+                            android:textSize="@dimen/textSizeBookDescription"
+                            app:drawableStartCompat="@drawable/ic_site_favorites"
+                            tools:text="213" />
 
-                    <TextView
-                        android:id="@+id/reting"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="@dimen/text_margin_book_description"
-                        android:maxLines="1"
-                        android:singleLine="true"
-                        android:textColor="?attr/subTextColor"
-                        android:textSize="@dimen/textSizeBookDescription"
-
-                        tools:text="+4972" />
+                        <TextView
+                            android:id="@+id/reting"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="@dimen/text_margin_book_description"
+                            android:drawablePadding="4dp"
+                            android:maxLines="1"
+                            android:singleLine="true"
+                            android:textColor="?attr/subTextColor"
+                            android:textSize="@dimen/textSizeBookDescription"
+                            app:drawableStartCompat="@drawable/ic_reting"
+                            tools:text="4 972" />
+                    </LinearLayout>
 
                     <!-- the site of the book, opening its card (SourceActivity); hidden for an unknown host -->
                     <TextView
@@ -158,17 +207,25 @@
 
             </LinearLayout>
 
+            <!-- Автор / Чтец / Серия: rows of book_label_row_height, a touch target each. The Автор and Чтец labels
+                 toggle that person as a favourite (amber, with a star, while one); the names open the site's listing;
+                 the series name opens СЕРИЯ and, when cut, scrolls once now and then (SeriesPeek) -->
             <LinearLayout
                 android:id="@+id/autorConteiner"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="@dimen/text_margin_book_description"
+                android:gravity="center_vertical"
                 android:orientation="horizontal">
 
                 <TextView
+                    android:id="@+id/authorLabel"
                     android:layout_width="@dimen/text_width"
                     android:layout_height="wrap_content"
+                    android:background="?attr/selectableItemBackground"
+                    android:drawablePadding="4dp"
+                    android:gravity="center_vertical"
                     android:maxLines="1"
+                    android:minHeight="@dimen/book_label_row_height"
                     android:singleLine="true"
                     android:text="@string/autor"
                     android:textColor="?attr/subTextColor"
@@ -180,7 +237,9 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_marginStart="@dimen/recycler_item_textmargin"
+                    android:gravity="center_vertical"
                     android:maxLines="1"
+                    android:minHeight="@dimen/book_label_row_height"
                     android:singleLine="true"
                     android:textColor="?attr/hrefColor"
                     android:textSize="@dimen/textSizeBookDescription"
@@ -191,13 +250,18 @@
                 android:id="@+id/artistConteiner"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="@dimen/text_margin_book_description"
+                android:gravity="center_vertical"
                 android:orientation="horizontal">
 
                 <TextView
+                    android:id="@+id/artistLabel"
                     android:layout_width="@dimen/text_width"
                     android:layout_height="wrap_content"
+                    android:background="?attr/selectableItemBackground"
+                    android:drawablePadding="4dp"
+                    android:gravity="center_vertical"
                     android:maxLines="1"
+                    android:minHeight="@dimen/book_label_row_height"
                     android:singleLine="true"
                     android:text="@string/artist"
                     android:textColor="?attr/subTextColor"
@@ -209,7 +273,9 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_marginStart="@dimen/recycler_item_textmargin"
+                    android:gravity="center_vertical"
                     android:maxLines="1"
+                    android:minHeight="@dimen/book_label_row_height"
                     android:singleLine="true"
                     android:textColor="?attr/hrefColor"
                     android:textSize="@dimen/textSizeBookDescription"
@@ -220,13 +286,18 @@
                 android:id="@+id/seriesConteiner"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="@dimen/text_margin_book_description"
+                android:gravity="center_vertical"
                 android:orientation="horizontal">
 
                 <TextView
+                    android:id="@+id/seriesLabel"
                     android:layout_width="@dimen/text_width"
                     android:layout_height="wrap_content"
+                    android:background="?attr/selectableItemBackground"
+                    android:drawablePadding="4dp"
+                    android:gravity="center_vertical"
                     android:maxLines="1"
+                    android:minHeight="@dimen/book_label_row_height"
                     android:singleLine="true"
                     android:text="@string/series"
                     android:textColor="?attr/subTextColor"
@@ -238,7 +309,10 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_marginStart="@dimen/recycler_item_textmargin"
+                    android:ellipsize="end"
+                    android:gravity="center_vertical"
                     android:maxLines="1"
+                    android:minHeight="@dimen/book_label_row_height"
                     android:singleLine="true"
                     android:textColor="?attr/hrefColor"
                     android:textSize="@dimen/textSizeBookDescription"

@@ -649,6 +649,32 @@ public class MainActivity extends MvpAppCompatActivity
 
     }
 
+    /**
+     * Another list of Избранное (books, authors, readers) in place of the one on screen, under its tag: Back leads
+     * where it led before and the back stack keeps its depth. The screen's own entry is popped and pushed again in
+     * one go, so nothing in between is drawn.
+     */
+    public void switchFavorites(@NonNull Fragment fragment) {
+        FragmentManager fragmentManager = getSupportFragmentManager();
+        Fragment current = fragmentManager.findFragmentById(R.id.container);
+        if (fragmentManager.isStateSaved() || current == null || current.getTag() == null) {
+            return;
+        }
+        String tag = current.getTag();
+        boolean pushed = fragmentManager.popBackStackImmediate(tag, FragmentManager.POP_BACK_STACK_INCLUSIVE);
+        FragmentTransaction transaction = fragmentManager.beginTransaction().replace(R.id.container, fragment, tag);
+        if (pushed) {
+            transaction.addToBackStack(tag);
+        }
+        transaction.commit();
+        fragmentManager.executePendingTransactions();
+    }
+
+    /** A drawer section ({@code R.id.nav_*}), as if chosen there: an empty list's way to where it is filled. */
+    public void openSection(int navId) {
+        mPresenter.onItemSelected(navId);
+    }
+
     private static String urlArg(Fragment fragment) {
         Bundle args = fragment.getArguments();
         return args == null ? null : args.getString("url");

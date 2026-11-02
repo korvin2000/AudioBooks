@@ -21,6 +21,7 @@ import com.fanok.audiobooks.Consts;
 import com.fanok.audiobooks.CookesExeption;
 import com.fanok.audiobooks.R;
 import com.fanok.audiobooks.Url;
+import com.fanok.audiobooks.adapter.BookSheetPeople;
 import com.fanok.audiobooks.fragment.BooksFragment;
 import com.fanok.audiobooks.interface_pacatge.books.BooksView;
 import com.fanok.audiobooks.model.AutorsModel;
@@ -534,6 +535,7 @@ public class BooksPresenter extends MvpPresenter<BooksView> implements
                     books.get(position).getSeries(), Consts.MODEL_BOOKS),
                     "seriesBooks");
         });
+        BookSheetPeople.bind(layout, books.get(position));
         dialog.show();
     }
 

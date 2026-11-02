@@ -1,5 +1,6 @@
 package com.fanok.audiobooks.pojo;
 
+import com.fanok.audiobooks.model.FavoritePeople;
 import com.google.gson.Gson;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
@@ -13,7 +14,7 @@ public class BackupPOJO {
     private static final int LEGACY_VERSION = 1;
     private static final String KEY_VERSION = "mVersion";
     private static final String[] COLLECTIONS = {
-            "mBooksFavorite", "mBooksHistory", "mBooksSaved", "mAudio", "mAudioList"};
+            "mBooksFavorite", "mBooksHistory", "mBooksSaved", "mAudio", "mAudioList", "mPeopleFavorite"};
 
     private int mVersion = VERSION;
     private ArrayList<BookPOJO> mBooksFavorite;
@@ -21,6 +22,8 @@ public class BackupPOJO {
     private ArrayList<BookPOJO> mBooksSaved;
     private ArrayList<TimeStartPOJO> mAudio;
     private ArrayList<AudioListPOJO> mAudioList;
+    /** Favourite authors and readers, newest first; absent in files written before them. */
+    private ArrayList<FavoritePersonPOJO> mPeopleFavorite;
     /** Rows left out of this backup because they could not be read; not written to the file. */
     private transient int mSkippedRows;
 
@@ -92,6 +95,15 @@ public class BackupPOJO {
                         && audio.getTime() >= 0, "mAudioList", i);
             }
         }
+        if (backup.mPeopleFavorite != null) {
+            for (int i = 0; i < backup.mPeopleFavorite.size(); i++) {
+                FavoritePersonPOJO person = backup.mPeopleFavorite.get(i);
+                require(person != null
+                        && (person.getKind() == FavoritePeople.AUTHOR || person.getKind() == FavoritePeople.READER)
+                        && notBlank(person.getName()) && FavoritePeople.key(person.getName()) != null,
+                        "mPeopleFavorite", i);
+            }
+        }
         return backup;
     }
 
@@ -157,6 +169,14 @@ public class BackupPOJO {
 
     public void setBooksSaved(ArrayList<BookPOJO> booksSaved) {
         mBooksSaved = booksSaved;
+    }
+
+    public ArrayList<FavoritePersonPOJO> getPeopleFavorite() {
+        return mPeopleFavorite;
+    }
+
+    public void setPeopleFavorite(ArrayList<FavoritePersonPOJO> peopleFavorite) {
+        mPeopleFavorite = peopleFavorite;
     }
 
     public ArrayList<TimeStartPOJO> getAudio() {
