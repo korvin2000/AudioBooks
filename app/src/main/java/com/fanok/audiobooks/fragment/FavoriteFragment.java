@@ -7,6 +7,7 @@ import static com.fanok.audiobooks.Consts.setColorPrimeriTextInIconItemMenu;
 
 import android.annotation.SuppressLint;
 import android.app.Activity;
+import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.res.Configuration;
@@ -51,6 +52,7 @@ import com.fanok.audiobooks.R;
 import com.fanok.audiobooks.activity.BookActivity;
 import com.fanok.audiobooks.activity.MainActivity;
 import com.fanok.audiobooks.activity.SearchableActivity;
+import com.fanok.audiobooks.adapter.BookSheetPeople;
 import com.fanok.audiobooks.adapter.BooksListAddapter;
 import com.fanok.audiobooks.databinding.FragmentFavoriteBinding;
 import com.fanok.audiobooks.interface_pacatge.favorite.FavoriteView;
@@ -94,6 +96,9 @@ public class FavoriteFragment extends MvpAppCompatFragment implements FavoriteVi
     private FragmentFavoriteBinding binding;
 
     private BottomSheetDialog bookMenu;
+
+    /** The whole favorites (not a site's part of them): the toolbar's title is the lists' switcher. */
+    private boolean switcher;
 
     public static FavoriteFragment newInstance(int title, int table) {
         FavoriteFragment fragment = new FavoriteFragment();
@@ -242,6 +247,10 @@ public class FavoriteFragment extends MvpAppCompatFragment implements FavoriteVi
         if (titleId != 0) {
             requireActivity().setTitle(titleId);
         }
+        switcher = table == TABLE_FAVORITE && !requireArguments().containsKey(ARG_SOURCE);
+        if (switcher) {
+            FavoritesSwitcher.install(this, FavoritesSwitcher.BOOKS);
+        }
         setSubTitle(""); // the previous screen's subtitle; an active filter sets its own on view-state replay
 
         SharedPreferences pref = PreferenceManager
@@ -333,6 +342,7 @@ public class FavoriteFragment extends MvpAppCompatFragment implements FavoriteVi
         }
         mAddapterBooks = null;
         searchView = null;
+        FavoritesSwitcher.uninstall(this);
         super.onDestroyView();
         binding = null;
     }
@@ -417,6 +427,9 @@ public class FavoriteFragment extends MvpAppCompatFragment implements FavoriteVi
 
     @Override
     public void setSubTitle(@NotNull String text) {
+        if (switcher && FavoritesSwitcher.setSubtitle(this, text)) {
+            return;
+        }
         MainActivity mainActivity = (MainActivity) getActivity();
         if (mainActivity != null) {
             Objects.requireNonNull(mainActivity.getSupportActionBar()).setSubtitle(text);
@@ -432,16 +445,22 @@ public class FavoriteFragment extends MvpAppCompatFragment implements FavoriteVi
         }
     }
 
+    private void confirmClear() {
+        confirmClear(requireContext(), titleId != 0 ? titleId : R.string.app_name,
+                table == TABLE_HISTORY ? R.string.confirm_clear_history : R.string.confirm_clear_favorite,
+                () -> mPresenter.clearAll());
+    }
+
     /**
-     * Asks before emptying the list; "Yes" counts down {@link #CLEAR_CONFIRM_DELAY_S} seconds before it can be
+     * Asks before emptying a list; "Yes" counts down {@link #CLEAR_CONFIRM_DELAY_S} seconds before it can be
      * pressed, so a stray tap on the toolbar icon clears nothing.
      */
-    private void confirmClear() {
-        final String yes = getString(R.string.yes);
-        final AlertDialog dialog = new AlertDialog.Builder(requireContext())
-                .setTitle(titleId != 0 ? titleId : R.string.app_name)
-                .setMessage(table == TABLE_HISTORY ? R.string.confirm_clear_history : R.string.confirm_clear_favorite)
-                .setPositiveButton(yes, (d, which) -> mPresenter.clearAll())
+    static void confirmClear(@NonNull Context context, int title, int message, @NonNull Runnable clear) {
+        final String yes = context.getString(R.string.yes);
+        final AlertDialog dialog = new AlertDialog.Builder(context)
+                .setTitle(title)
+                .setMessage(message)
+                .setPositiveButton(yes, (d, which) -> clear.run())
                 .setNegativeButton(R.string.cancel, null)
                 .show();
         final Button button = dialog.getButton(AlertDialog.BUTTON_POSITIVE);
@@ -591,6 +610,7 @@ public class FavoriteFragment extends MvpAppCompatFragment implements FavoriteVi
             dialog.dismiss();
             mPresenter.onMenuSeries(book.getUrlSeries(), book.getSeries());
         });
+        BookSheetPeople.bind(layout, book); // the stars of the author and reader rows, once their visibility is set
         dialog.show();
     }
 

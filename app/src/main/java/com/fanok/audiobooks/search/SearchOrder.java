@@ -14,8 +14,12 @@ import java.util.Locale;
  */
 public final class SearchOrder {
 
-    /** {@code ARRIVAL}: as the sites answered, the order of the search before ranking. */
-    public enum Sort { RELEVANCE, ARRIVAL, TITLE, AUTHOR, READER, SHORTEST, LONGEST, SITE }
+    /**
+     * {@code ARRIVAL}: as the sites answered, the order of the search before ranking. {@code NEWEST}: a person's books
+     * (PersonSearch), every site's newest first, then every site's second newest...: each card by its place in its
+     * site's own sequence ({@link Offer#nativeRank}), a work by its best place; no clock across sites is claimed.
+     */
+    public enum Sort { RELEVANCE, ARRIVAL, TITLE, AUTHOR, READER, SHORTEST, LONGEST, SITE, NEWEST }
 
     private static final Collator RU = Collator.getInstance(new Locale("ru", "RU"));
 
@@ -57,6 +61,10 @@ public final class SearchOrder {
                         break;
                     case ARRIVAL:
                         c = Integer.compare(firstArrival(a), firstArrival(b));
+                        break;
+                    case NEWEST:
+                        c = Integer.compare(firstRank(a), firstRank(b));
+                        c = c != 0 ? c : Integer.compare(b.catalogs(), a.catalogs());
                         break;
                     default:
                         c = byRelevance(a, b, author);
@@ -105,6 +113,10 @@ public final class SearchOrder {
                         break;
                     case ARRIVAL:
                         c = Integer.compare(a.arrival, b.arrival);
+                        break;
+                    case NEWEST:
+                        c = Integer.compare(a.nativeRank, b.nativeRank);
+                        c = c != 0 ? c : Integer.compare(a.order, b.order);
                         break;
                     default:
                         c = author == null ? 0 : Integer.compare(bucket(a, author), bucket(b, author));
@@ -210,6 +222,15 @@ public final class SearchOrder {
         int first = Integer.MAX_VALUE;
         for (Offer o : g.offers) {
             first = Math.min(first, o.arrival);
+        }
+        return first;
+    }
+
+    /** The best place of the group's cards in their sites' own sequences. */
+    static int firstRank(Group g) {
+        int first = Integer.MAX_VALUE;
+        for (Offer o : g.offers) {
+            first = Math.min(first, o.nativeRank);
         }
         return first;
     }

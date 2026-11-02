@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The book's favourites (BookFavorites.bindPanel): the ★ tab and the cover's long-press sheet show this same panel.
+     The rows (item_favorites_toggle) are added in code: the book, then each author and each reader. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/favoritesPanel"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:background="?attr/backgraundColor"
+    android:orientation="vertical"
+    android:paddingTop="8dp"
+    android:paddingBottom="8dp"
+    tools:viewBindingIgnore="true">
+
+    <LinearLayout
+        android:id="@+id/favoritesRows"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical" />
+
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="1px"
+        android:layout_marginTop="8dp"
+        android:layout_marginBottom="8dp"
+        android:alpha="0.3"
+        android:background="?attr/colorPrimaryText" />
+
+    <TextView
+        android:id="@+id/openFavorites"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="?android:attr/selectableItemBackground"
+        android:clickable="true"
+        android:drawablePadding="30dp"
+        android:focusable="true"
+        android:gravity="center_vertical"
+        android:minHeight="56dp"
+        android:paddingStart="16dp"
+        android:paddingEnd="16dp"
+        android:text="@string/book_fav_open_favorites"
+        android:textColor="?attr/colorPrimaryText"
+        android:textSize="16sp"
+        app:drawableStartCompat="@drawable/ic_menu_favorite" />
+
+    <TextView
+        android:id="@+id/openHistory"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="?android:attr/selectableItemBackground"
+        android:clickable="true"
+        android:drawablePadding="30dp"
+        android:focusable="true"
+        android:gravity="center_vertical"
+        android:minHeight="56dp"
+        android:paddingStart="16dp"
+        android:paddingEnd="16dp"
+        android:text="@string/book_fav_open_history"
+        android:textColor="?attr/colorPrimaryText"
+        android:textSize="16sp"
+        app:drawableStartCompat="@drawable/ic_menu_history" />
+</LinearLayout>

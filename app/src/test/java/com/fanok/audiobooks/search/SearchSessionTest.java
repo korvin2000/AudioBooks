@@ -638,4 +638,101 @@ public class SearchSessionTest {
         assertEquals(Arrays.asList(1, 1), asked);
         assertEquals(ProviderPage.Status.OK, s.states().get(0).status);
     }
+
+    // ---------------------------------------------------------------- a person's books (PersonSearch)
+
+    /** The sites of a person's sources from memory: what was asked, a listing page of two cards, one people hit. */
+    private static final class PersonNet implements PersonSearch.Net {
+        final List<String> asked = new ArrayList<>();
+
+        @Override
+        public ProviderPage<com.fanok.audiobooks.pojo.BookPOJO> listing(Provider p, String url, int page) {
+            asked.add("listing " + url + " " + page);
+            if (url.contains("empty")) {
+                return ProviderPage.empty();
+            }
+            List<com.fanok.audiobooks.pojo.BookPOJO> cards = new ArrayList<>();
+            for (String letter : new String[]{"a", "b"}) {
+                com.fanok.audiobooks.pojo.BookPOJO b = new com.fanok.audiobooks.pojo.BookPOJO();
+                b.setName(page + letter);
+                b.setUrl(p.server + "/" + page + letter);
+                cards.add(b);
+            }
+            return ProviderPage.of(cards, true);
+        }
+
+        @Override
+        public ProviderPage<com.fanok.audiobooks.pojo.GenrePOJO> people(Provider p, boolean reader, String name) {
+            asked.add("people " + name);
+            return ProviderPage.of(Collections.singletonList(
+                    new com.fanok.audiobooks.pojo.GenrePOJO("Кинг Стивен", p.server + "/author/king/")), false);
+        }
+
+        @Override
+        public ProviderPage<com.fanok.audiobooks.pojo.BookPOJO> books(Provider p, String query, int page) {
+            asked.add("books " + query + " " + page);
+            return ProviderPage.empty();
+        }
+    }
+
+    private SearchSession<com.fanok.audiobooks.pojo.BookPOJO> personSession(List<PersonSearch.Source> sources,
+            List<String> items) {
+        return new SearchSession<>(new ArrayList<SearchSession.Source<com.fanok.audiobooks.pojo.BookPOJO>>(sources),
+                com.fanok.audiobooks.pojo.BookPOJO::getUrl, scheduler, scheduler, 10,
+                new SearchSession.Listener<com.fanok.audiobooks.pojo.BookPOJO>() {
+                    @Override
+                    public void onItems(List<com.fanok.audiobooks.pojo.BookPOJO> all) {
+                        items.clear();
+                        for (com.fanok.audiobooks.pojo.BookPOJO b : all) {
+                            items.add(b.getName());
+                        }
+                    }
+
+                    @Override
+                    public void onFinished(List<com.fanok.audiobooks.pojo.BookPOJO> all, int failedSources) {
+                        finished.add(String.valueOf(all.size()));
+                    }
+                });
+    }
+
+    /** Page 1 looks the person up once and lists the page found; page 2 comes from that page alone. */
+    @Test
+    public void aPersonsLookupResolvesOnceThenItsPageIsListed() {
+        PersonNet net = new PersonNet();
+        List<String> found = new ArrayList<>();
+        List<PersonSearch.Source> plan = PersonSearch.plan("Стивен Кинг", false,
+                Collections.<Provider, String>emptyMap(), Collections.singletonList(Provider.AKNIGA), net,
+                (p, url) -> found.add(url));
+        List<String> items = new ArrayList<>();
+        SearchSession<com.fanok.audiobooks.pojo.BookPOJO> s = personSession(plan, items);
+        s.search("Стивен Кинг");
+        scheduler.triggerActions();
+        String page = Provider.AKNIGA.server + "/author/king/";
+        assertEquals(Arrays.asList("people Стивен Кинг", "listing " + page + " 1"), net.asked);
+        assertEquals(Collections.singletonList(page), found);
+        assertEquals(Arrays.asList("1a", "1b"), items);
+        assertTrue(plan.get(0).listing());
+        assertTrue(s.loadNext("AKNIGA"));
+        scheduler.triggerActions();
+        assertEquals("listing " + page + " 2", net.asked.get(2));
+        assertEquals(3, net.asked.size());
+        assertEquals(Arrays.asList("1a", "1b", "2a", "2b"), items);
+    }
+
+    /** A person's empty page is the same in any letter case: it is not asked again (no case retry). */
+    @Test
+    public void anEmptyListingIsNotAskedAgainInTheOtherCase() {
+        PersonNet net = new PersonNet();
+        String empty = Provider.IZIBUK.server + "/empty";
+        List<PersonSearch.Source> plan = PersonSearch.plan("Кинг", false,
+                Collections.singletonMap(Provider.IZIBUK, empty), Collections.singletonList(Provider.IZIBUK), net,
+                null);
+        SearchSession<com.fanok.audiobooks.pojo.BookPOJO> s = personSession(plan, new ArrayList<>());
+        s.search("Кинг");
+        scheduler.triggerActions();
+        // the saved page that lists nothing gives way once to the site's lookup, then its book search; no case retry
+        assertEquals(Arrays.asList("listing " + empty + " 1", "people Кинг", "books Кинг 1"), net.asked);
+        assertEquals(Collections.singletonList("0"), finished);
+        assertEquals(ProviderPage.Status.EMPTY, s.states().get(0).status);
+    }
 }

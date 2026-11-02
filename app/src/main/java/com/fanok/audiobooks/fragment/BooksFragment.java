@@ -56,6 +56,7 @@ import com.fanok.audiobooks.adapter.GenreListAddapter;
 import com.fanok.audiobooks.databinding.DialogDurationFilterBinding;
 import com.fanok.audiobooks.databinding.FragmentBooksBinding;
 import com.fanok.audiobooks.interface_pacatge.books.BooksView;
+import com.fanok.audiobooks.model.FavoritePeople;
 import com.fanok.audiobooks.pojo.BookPOJO;
 import com.fanok.audiobooks.pojo.GenrePOJO;
 import com.fanok.audiobooks.policy.ParentalControl;
@@ -322,6 +323,10 @@ public class BooksFragment extends MvpAppCompatFragment implements BooksView {
             case Consts.MODEL_AUTOR:
             case Consts.MODEL_ARTIST:
                 mAddapterGenre = new GenreListAddapter();
+                if (modelID != Consts.MODEL_GENRE) {
+                    mAddapterGenre.showStars(modelID == Consts.MODEL_AUTOR
+                            ? FavoritePeople.AUTHOR : FavoritePeople.READER);
+                }
                 binding.list.setAdapter(mAddapterGenre);
                 break;
         }
@@ -944,6 +949,9 @@ public class BooksFragment extends MvpAppCompatFragment implements BooksView {
             mAddapterBooks.refreshItem();
         }
         mParentalVersion = parentalVersion;
+        if (mAddapterGenre != null) {
+            mAddapterGenre.refreshStars(); // a person may have left the favourites on another screen
+        }
         MainActivity activity = (MainActivity) getActivity();
         if (activity != null) {
             NavigationView navigationView = activity.getNavigationView();

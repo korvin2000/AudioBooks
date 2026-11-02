@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Book toolbar / overflow: reader IS in favourites. Letter "Ч" + solid star badge. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path
+        android:fillColor="?attr/colorItemMenu"
+        android:fillType="evenOdd"
+        android:pathData="M2.4,4.6 H5.2 V11.2 H10 V4.6 H12.8 V18.2 H10 V13.8 H4.8 C3.5,13.8 2.4,12.7 2.4,11.4 Z" />
+    <path
+        android:fillColor="?attr/colorItemMenu"
+        android:fillType="evenOdd"
+        android:pathData="M19.0,13.6 L20.12,16.66 L23.37,16.78 L20.81,18.79 L21.7,21.92 L19.0,20.1 L16.3,21.92 L17.19,18.79 L14.63,16.78 L17.88,16.66 Z" />
+</vector>

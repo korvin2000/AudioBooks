@@ -90,6 +90,11 @@ public final class ProviderPage<T> {
         return isFailure(status);
     }
 
+    /** This page's status, message and wait without its items, as a page of another kind (a failed step of a load). */
+    public <U> ProviderPage<U> asFailure() {
+        return new ProviderPage<>(Collections.<U>emptyList(), false, status, message, retryAfterSeconds);
+    }
+
     /** A failed answer: the page did not come (an error, a timeout, a block, a rate limit). */
     public static boolean isFailure(Status status) {
         return status == Status.ERROR || status == Status.TIMEOUT || status == Status.BLOCKED

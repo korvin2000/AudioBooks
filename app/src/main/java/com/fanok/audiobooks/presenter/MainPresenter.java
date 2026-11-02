@@ -16,6 +16,7 @@ import com.fanok.audiobooks.R;
 import com.fanok.audiobooks.fragment.AboutFragment;
 import com.fanok.audiobooks.fragment.BooksFragment;
 import com.fanok.audiobooks.fragment.FavoriteFragment;
+import com.fanok.audiobooks.fragment.FavoritesSwitcher;
 import com.fanok.audiobooks.fragment.SettingsFragment;
 import com.fanok.audiobooks.fragment.SourcesFragment;
 import com.fanok.audiobooks.interface_pacatge.main.MainView;
@@ -29,6 +30,8 @@ public class MainPresenter extends MvpPresenter<MainView> implements
         com.fanok.audiobooks.interface_pacatge.main.MainPresenter {
 
     private static final String TAG = "MainPresenter";
+    /** The settings link's url for Оформление → Панель книги (the book screen's "Настройки панели…"). */
+    private static final String BOOK_TOOLBAR = "book_toolbar";
 
     private final Context mContext;
 
@@ -69,9 +72,8 @@ public class MainPresenter extends MvpPresenter<MainView> implements
         } else if (id == R.id.nav_artist || id == R.id.layout_nav_artist) {
             openSection(source.performers, R.string.menu_artist, Consts.MODEL_ARTIST, "artist");
         } else if (id == R.id.nav_favorite || id == R.id.layout_nav_favorite) {
-            Fragment fragment = FavoriteFragment.newInstance(R.string.menu_favorite,
-                    Consts.TABLE_FAVORITE);
-            getViewState().showFragment(fragment, "favorite");
+            // the list chosen last: books, authors or readers
+            getViewState().showFragment(FavoritesSwitcher.remembered(mContext), FavoritesSwitcher.TAG);
 
         } else if (id == R.id.nav_history || id == R.id.layout_nav_history) {
             Fragment fragment = FavoriteFragment.newInstance(R.string.menu_history,
@@ -133,9 +135,19 @@ public class MainPresenter extends MvpPresenter<MainView> implements
                         url, R.string.menu_artist, Consts.MODEL_ARTIST);
                 getViewState().showFragment(fragment, "artist");
                 break;
+            case Consts.FRAGMENT_SETTINGS:
+                if (BOOK_TOOLBAR.equals(url)) {
+                    // Settings → Оформление → Панель книги, each on the back stack, so Back walks up
+                    getViewState().showFragment(new SettingsFragment(), "settings");
+                    getViewState().showFragment(SettingsFragment.withRoot("group_appearance"),
+                            "settings:group_appearance");
+                    getViewState().showFragment(SettingsFragment.withRoot(BOOK_TOOLBAR), "settings:" + BOOK_TOOLBAR);
+                } else {
+                    startFragment(fragmentID, false);
+                }
+                break;
             case Consts.FRAGMENT_FAVORITE:
             case Consts.FRAGMENT_HISTORY:
-            case Consts.FRAGMENT_SETTINGS:
             case Consts.FRAGMENT_SAVED:
                 startFragment(fragmentID, false);
                 break;
@@ -164,9 +176,7 @@ public class MainPresenter extends MvpPresenter<MainView> implements
                 openSection(source.performers, R.string.menu_artist, Consts.MODEL_ARTIST, "artist");
             }
         } else if (fragmentID == Consts.FRAGMENT_FAVORITE) {
-            fragment = FavoriteFragment.newInstance(R.string.menu_favorite,
-                    Consts.TABLE_FAVORITE);
-            getViewState().showFragment(fragment, "favorite");
+            getViewState().showFragment(FavoritesSwitcher.remembered(mContext), FavoritesSwitcher.TAG);
 
         } else if (fragmentID == Consts.FRAGMENT_HISTORY) {
             fragment = FavoriteFragment.newInstance(R.string.menu_history,

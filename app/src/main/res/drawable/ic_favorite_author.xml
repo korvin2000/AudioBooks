@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Book toolbar / overflow: author NOT in favourites. Letter "А" + outline star badge. Family: ic_favorite_add (book), ic_favorite_author, ic_favorite_reader. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path
+        android:fillColor="?attr/colorItemMenu"
+        android:fillType="evenOdd"
+        android:pathData="M6.4,4.6 L8.6,4.6 L14.04,18.2 L11.44,18.2 L10.24,15.2 L4.76,15.2 L3.56,18.2 L0.96,18.2 Z M7.5,8.35 L5.72,12.8 L9.28,12.8 Z" />
+    <path
+        android:fillColor="?attr/colorItemMenu"
+        android:fillType="evenOdd"
+        android:pathData="M19.0,13.6 L20.12,16.66 L23.37,16.78 L20.81,18.79 L21.7,21.92 L19.0,20.1 L16.3,21.92 L17.19,18.79 L14.63,16.78 L17.88,16.66 Z M19.0,15.3 L18.41,17.39 L16.24,17.3 L18.05,18.51 L17.3,20.55 L19.0,19.2 L20.7,20.55 L19.95,18.51 L21.76,17.3 L19.59,17.39 Z" />
+</vector>

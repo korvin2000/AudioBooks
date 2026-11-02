@@ -11,6 +11,8 @@
     <color name="selectableItemBackground">#666666</color>
     <color name="colorDelete">#B70000</color>
     <color name="colorDeleteLight">#E50000</color>
+    <color name="favoriteColor">#FFB74D</color>
+    <color name="favoriteColorLight">#9C5200</color>
 
     <color name="primaryColorLight">#009688</color>
     <color name="primaryDarkColorLight">#00675b</color>

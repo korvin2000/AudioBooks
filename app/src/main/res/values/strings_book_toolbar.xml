@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The book screen's toolbar items, its ★ tab and the favourites panel (BookFavorites) the cover's long press opens. -->
+<resources>
+    <!-- The overflow title of the speed item; on the toolbar the item shows the value alone. -->
+    <string name="book_toolbar_speed">Скорость · %1$s</string>
+    <string name="book_toolbar_speed_pref">Скорость воспроизведения</string>
+    <string name="book_toolbar_speed_desc">Скорость воспроизведения %1$s</string>
+    <string name="book_toolbar_settings">Настройки панели…</string>
+    <string name="book_fav_author_item">Автор в избранном</string>
+    <string name="book_fav_reader_item">Чтец в избранном</string>
+
+    <!-- A row of the panel: the role, then whether it is a favourite ("Автор · в избранном"). -->
+    <string name="book_fav_role_book">Книга</string>
+    <string name="book_fav_role_author">Автор</string>
+    <string name="book_fav_role_reader">Чтец</string>
+    <string name="book_fav_on">в избранном</string>
+    <string name="book_fav_off">не в избранном</string>
+    <string name="book_fav_row_state">%1$s · %2$s</string>
+    <string name="book_fav_open_favorites">Открыть «Избранное»</string>
+    <string name="book_fav_open_history">Открыть «Историю»</string>
+
+    <!-- The snackbar after a toolbar toggle of a person, with "Отменить". -->
+    <string name="book_fav_added">Добавлено в избранное: %1$s</string>
+    <string name="book_fav_removed">Удалено из избранного: %1$s</string>
+</resources>

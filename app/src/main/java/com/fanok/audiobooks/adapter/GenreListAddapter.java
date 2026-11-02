@@ -1,22 +1,50 @@
 package com.fanok.audiobooks.adapter;
 
 
+import static androidx.preference.PreferenceManager.getDefaultSharedPreferences;
+
 import android.annotation.SuppressLint;
+import android.content.SharedPreferences;
+import android.view.KeyEvent;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.ImageButton;
 import android.widget.TextView;
 import androidx.annotation.NonNull;
 import androidx.recyclerview.widget.RecyclerView;
 import com.fanok.audiobooks.R;
+import com.fanok.audiobooks.model.FavoritePeople;
 import com.fanok.audiobooks.pojo.GenrePOJO;
+import com.google.android.material.snackbar.Snackbar;
 import java.util.ArrayList;
+import java.util.List;
 
 /** @noinspection ClassEscapesDefinedScope*/
 public class GenreListAddapter extends RecyclerView.Adapter<GenreListAddapter.MyHolder> {
 
+    /** Payload of a rebind that only re-reads the star. */
+    private static final Object STAR = new Object();
+
+    /** Set once the hint after the very first favourite person ever was shown. */
+    private static final String HINT_PREF = "people_star_hint_shown";
+
     private RecyclerTushListner listner;
     private ArrayList<GenrePOJO> mModel;
+    /** FavoritePeople.AUTHOR / READER when rows show a favourite star; -1 (genres) shows none. */
+    private int mStarKind = -1;
+
+    /** Rows get a star at the end that toggles that person in FavoritePeople of {@code kind}. */
+    public void showStars(int kind) {
+        mStarKind = kind;
+    }
+
+    /** Re-reads the stars (another screen may have changed the favourites); rebinds only the stars. */
+    public void refreshStars() {
+        if (mStarKind >= 0 && getItemCount() > 0) {
+            notifyItemRangeChanged(0, getItemCount(), STAR);
+        }
+    }
 
     public void setClickListner(RecyclerTushListner listner) {
         this.listner = listner;
@@ -59,6 +87,15 @@ public class GenreListAddapter extends RecyclerView.Adapter<GenreListAddapter.My
     }
 
     @Override
+    public void onBindViewHolder(@NonNull MyHolder myHolder, int i, @NonNull List<Object> payloads) {
+        if (payloads.contains(STAR)) {
+            myHolder.bindStar(mModel.get(i));
+        } else {
+            super.onBindViewHolder(myHolder, i, payloads);
+        }
+    }
+
+    @Override
     public int getItemCount() {
         if (mModel == null) {
             return 0;
@@ -80,18 +117,38 @@ public class GenreListAddapter extends RecyclerView.Adapter<GenreListAddapter.My
 
         private final TextView mReting;
 
+        private final ImageButton mStar;
+
         MyHolder(@NonNull final View itemView) {
             super(itemView);
 
             mName = itemView.findViewById(R.id.name);
             mReting = itemView.findViewById(R.id.reting);
             mDescription = itemView.findViewById(R.id.desc);
+            mStar = itemView.findViewById(R.id.star);
+            mStar.setOnClickListener(view -> {
+                int position = getBindingAdapterPosition();
+                GenrePOJO person = getItem(position);
+                if (person == null || mStarKind < 0) {
+                    return;
+                }
+                if (FavoritePeople.get(view.getContext()).toggle(mStarKind, person.getName(), person.getUrl())) {
+                    firstAddHint(view);
+                }
+                notifyItemChanged(position, STAR);
+            });
             itemView.setOnClickListener(view -> {
                 int position = getBindingAdapterPosition();
                 if (listner != null && position != RecyclerView.NO_POSITION) {
                     listner.onClickItem(itemView, position);
                 }
             });
+            // TV: the star is the row's last child, so the focus search never picks it for D-pad right
+            itemView.setOnKeyListener((view, keyCode, event) -> keyCode == KeyEvent.KEYCODE_DPAD_RIGHT
+                    && event.getAction() == KeyEvent.ACTION_DOWN
+                    && mStar.getVisibility() == View.VISIBLE && mStar.requestFocus());
+            mStar.setOnKeyListener((view, keyCode, event) -> keyCode == KeyEvent.KEYCODE_DPAD_LEFT
+                    && event.getAction() == KeyEvent.ACTION_DOWN && itemView.requestFocus());
         }
 
         void bind(GenrePOJO book) {
@@ -109,7 +166,30 @@ public class GenreListAddapter extends RecyclerView.Adapter<GenreListAddapter.My
                 mReting.setVisibility(View.GONE);
             }
             mDescription.setText(description);
+            bindStar(book);
+        }
 
+        void bindStar(GenrePOJO person) {
+            if (mStarKind < 0) {
+                mStar.setVisibility(View.GONE);
+                return;
+            }
+            boolean on = FavoritePeople.get(mStar.getContext()).has(mStarKind, person.getName());
+            mStar.setActivated(on);
+            mStar.setContentDescription(mStar.getContext().getString(
+                    on ? R.string.people_star_remove : R.string.people_star_add));
+            mStar.setVisibility(View.VISIBLE);
+        }
+
+        /** The very first person ever added says once where the favourites are kept. */
+        private void firstAddHint(View view) {
+            SharedPreferences pref = getDefaultSharedPreferences(view.getContext());
+            if (!pref.getBoolean(HINT_PREF, false)) {
+                pref.edit().putBoolean(HINT_PREF, true).apply();
+                Snackbar.make(view, mStarKind == FavoritePeople.AUTHOR
+                        ? R.string.people_star_hint_author : R.string.people_star_hint_reader,
+                        Snackbar.LENGTH_LONG).show();
+            }
         }
     }
 }

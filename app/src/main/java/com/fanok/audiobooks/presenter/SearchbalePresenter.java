@@ -16,12 +16,14 @@ import com.arellomobile.mvp.MvpPresenter;
 import com.fanok.audiobooks.Consts;
 import com.fanok.audiobooks.R;
 import com.fanok.audiobooks.Url;
+import com.fanok.audiobooks.adapter.BookSheetPeople;
 import com.fanok.audiobooks.interface_pacatge.searchable.SearchableModel;
 import com.fanok.audiobooks.interface_pacatge.searchable.SearchablePresenter;
 import com.fanok.audiobooks.interface_pacatge.searchable.SearchableView;
 import com.fanok.audiobooks.model.AutorsModel;
 import com.fanok.audiobooks.model.BooksDBModel;
 import com.fanok.audiobooks.model.BooksModel;
+import com.fanok.audiobooks.model.FavoritePeople;
 import com.fanok.audiobooks.model.SearchebleModel;
 import com.fanok.audiobooks.net.SiteHttp;
 import com.fanok.audiobooks.pojo.BookPOJO;
@@ -31,6 +33,7 @@ import com.fanok.audiobooks.pojo.SearchebleArrayPOJO;
 import com.fanok.audiobooks.policy.DefaultCover;
 import com.fanok.audiobooks.search.Genre;
 import com.fanok.audiobooks.search.GenrePicks;
+import com.fanok.audiobooks.search.PersonSearch;
 import com.fanok.audiobooks.search.Provider;
 import com.fanok.audiobooks.search.ProviderPage;
 import com.fanok.audiobooks.search.SearchGrouper.Narration;
@@ -43,6 +46,7 @@ import com.fanok.audiobooks.search.SearchUi;
 import com.fanok.audiobooks.search.SearchUrls;
 import com.fanok.audiobooks.search.SourceHealth;
 import com.fanok.audiobooks.search.SourceProbe;
+import com.fanok.audiobooks.search.TextNorm;
 import com.google.android.material.bottomsheet.BottomSheetDialog;
 import com.squareup.picasso.Picasso;
 import io.reactivex.BackpressureStrategy;
@@ -54,8 +58,10 @@ import io.reactivex.disposables.Disposable;
 import io.reactivex.schedulers.Schedulers;
 import io.reactivex.subjects.PublishSubject;
 import java.io.File;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.EnumMap;
 import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -72,6 +78,10 @@ import java.util.concurrent.TimeUnit;
  * ({@link SearchSnapshot}): opening the screen again shows it without a request, and so does submitting the same
  * request within {@link #FRESH_MS}. For authors and readers ({@link Consts#MODEL_AUTOR}, {@link Consts#MODEL_ARTIST})
  * the current source alone is asked, as before.
+ * <p>
+ * The books of one person ({@link #searchPerson}, a favourite author or reader) are the same screen over other sources
+ * ({@link PersonSearch}), newest first: it never writes the text search's order, scope or genres, never saves or
+ * restores a snapshot, asks for no author/series chips; a typed query goes back to the text search as it was.
  */
 @InjectViewState
 public class SearchbalePresenter extends MvpPresenter<SearchableView> implements
@@ -129,6 +139,16 @@ public class SearchbalePresenter extends MvpPresenter<SearchableView> implements
     private EnumSet<Provider> mSilent = EnumSet.noneOf(Provider.class);
     /** Recomputes the screen when the clock alone changes it (a slow mark, the end of a wait). */
     private Disposable mTick;
+
+    // the books of one person (FavoritePeople.AUTHOR or READER); -1 in a text search
+    private int mPersonKind = -1;
+    private String mPersonName;
+    /** The person's source of each planned site: whether a site's cards are its listing's, what it knows. */
+    private final Map<Provider, PersonSearch.Source> mPersonSources = new EnumMap<>(Provider.class);
+    /** Sites whose page of the person is known or was learnt in this search: a card teaches only the others. */
+    private final Set<Provider> mPersonKnown = EnumSet.noneOf(Provider.class);
+    /** Reads the person's saved pages before the sources are planned. */
+    private Disposable mPersonLoad;
 
     // MODEL_AUTOR / MODEL_ARTIST: one source, the current one
     private AutorsModel mModelGenre;
@@ -207,6 +227,9 @@ public class SearchbalePresenter extends MvpPresenter<SearchableView> implements
 
     /** Where the words must be found; empty: anywhere. The loaded cards are only scored again: no request (§5.3). */
     public void setScope(Set<SearchRequest.Field> scope) {
+        if (mPersonKind >= 0) {
+            return; // a person's books are looked for everywhere; the text search's scope stays as saved
+        }
         mScope = scope.isEmpty() ? EnumSet.noneOf(SearchRequest.Field.class) : EnumSet.copyOf(scope);
         mPreferences.edit().putString(PREF_SCOPE, joinNames(mScope)).apply();
         mRequest = new SearchRequest(mRequest.text, mScope);
@@ -216,13 +239,18 @@ public class SearchbalePresenter extends MvpPresenter<SearchableView> implements
     /** The genres to keep ("Чужой" in science fiction only); empty: every genre. The loaded cards only: no request. */
     public void setGenres(Set<Genre> genres) {
         mGenres = genres.isEmpty() ? EnumSet.noneOf(Genre.class) : EnumSet.copyOf(genres);
-        mPreferences.edit().putString(PREF_GENRES, joinNames(mGenres)).apply();
+        if (mPersonKind < 0) {
+            mPreferences.edit().putString(PREF_GENRES, joinNames(mGenres)).apply();
+        }
         publish();
     }
 
+    /** The order; a person's books keep theirs to themselves, the text search's saved one stays. */
     public void setSort(SearchOrder.Sort sort) {
         mSort = sort;
-        mPreferences.edit().putString(PREF_SORT, sort.name()).apply();
+        if (mPersonKind < 0) {
+            mPreferences.edit().putString(PREF_SORT, sort.name()).apply();
+        }
         publish();
     }
 
@@ -251,6 +279,9 @@ public class SearchbalePresenter extends MvpPresenter<SearchableView> implements
         }
         if (mChips != null) {
             mChips.dispose();
+        }
+        if (mPersonLoad != null) {
+            mPersonLoad.dispose();
         }
         mBooksDBModel.closeDB();
     }
@@ -340,6 +371,7 @@ public class SearchbalePresenter extends MvpPresenter<SearchableView> implements
         getViewState().setNotFoundVisibile(false);
         getViewState().showSourcesFailed(0);
         if (mModelId == Consts.MODEL_BOOKS) {
+            leavePerson();
             long now = System.currentTimeMillis();
             SearchSnapshot last = force ? null : mStore.load(now);
             if (last != null && last.text.equals(query) && now - last.savedAt < FRESH_MS && !last.cards.isEmpty()
@@ -355,6 +387,157 @@ public class SearchbalePresenter extends MvpPresenter<SearchableView> implements
             startGenreSearch(query);
         }
     }
+
+    /** "Обновить": the person's books asked again, or the text search asking every site. */
+    public void refresh() {
+        if (mPersonKind >= 0) {
+            startPersonSearch();
+        } else {
+            loadBoks(true);
+        }
+    }
+
+    /**
+     * The books of a person ({@link FavoritePeople#AUTHOR} or {@link FavoritePeople#READER}) on every active site,
+     * newest first as far as each site tells ({@link PersonSearch}). The text search's order, scope, genres and last
+     * search stay as saved; nothing of this search is saved.
+     */
+    public void searchPerson(int kind, @NonNull String name) {
+        if (mModelId != Consts.MODEL_BOOKS) {
+            return;
+        }
+        mPersonKind = kind;
+        mPersonName = name;
+        query = name;
+        mSort = SearchOrder.Sort.NEWEST;
+        mGenres = EnumSet.noneOf(Genre.class); // a saved genre filter would hide the person's other books
+        getViewState().setNotFoundVisibile(false);
+        getViewState().showSourcesFailed(0);
+        startPersonSearch();
+    }
+
+    /** The person's saved pages are read off the main thread; then every site is planned and asked. */
+    private void startPersonSearch() {
+        if (mSession != null) {
+            mSession.dispose();
+            mSession = null;
+        }
+        if (mChips != null) {
+            mChips.dispose();
+            mChips = null;
+        }
+        if (mPersonLoad != null) {
+            mPersonLoad.dispose();
+        }
+        if (mTick != null) {
+            mTick.dispose();
+            mTick = null;
+        }
+        mGeneration++;
+        clearOffers();
+        mPersonSources.clear();
+        mPersonKnown.clear();
+        mSearcheblPOJO = new SearcheblPOJO(); // no author/series chips: the plates come from the cards
+        mSources = Collections.emptyList();
+        filter = -1;
+        mRestoredAt = 0;
+        mFetchedAt = System.currentTimeMillis();
+        mSearched = false; // until the sites are planned
+        mRequest = SearchRequest.anywhere(mPersonName); // a listing's card is the person's however its field is spelled
+        final int gen = mGeneration;
+        final int kind = mPersonKind;
+        final String name = mPersonName;
+        final List<Provider> sites = enabled();
+        mPersonLoad = Single.fromCallable(() -> pages(FavoritePeople.get(mContext).find(kind, name), sites))
+                .subscribeOn(Schedulers.io())
+                .observeOn(AndroidSchedulers.mainThread())
+                .subscribe(urls -> planPerson(gen, urls), e -> {
+                    Log.w(TAG, "favourite person's pages", e);
+                    planPerson(gen, Collections.<Provider, String>emptyMap());
+                });
+    }
+
+    /** The saved pages of a favourite person by site; none for a person who is not a favourite. */
+    private static Map<Provider, String> pages(FavoritePeople.Person person, List<Provider> sites) {
+        Map<Provider, String> urls = new EnumMap<>(Provider.class);
+        if (person != null) {
+            for (Provider p : sites) {
+                String url = person.urlFor(p);
+                if (url != null) {
+                    urls.put(p, url);
+                }
+            }
+        }
+        return urls;
+    }
+
+    private void planPerson(int gen, Map<Provider, String> urls) {
+        if (gen != mGeneration || mPersonKind < 0) {
+            return; // another search started meanwhile
+        }
+        final int kind = mPersonKind;
+        final String name = mPersonName;
+        // a page found by a people search is kept for the next time (nothing for a person who is not a favourite)
+        PersonSearch.Found found = (p, url) -> AndroidSchedulers.mainThread().scheduleDirect(() -> {
+            if (gen == mGeneration) {
+                mPersonKnown.add(p);
+            }
+            FavoritePeople.get(mContext).learnUrl(kind, name, url);
+        });
+        List<PersonSearch.Source> planned = PersonSearch.plan(name, kind == FavoritePeople.READER, urls, enabled(),
+                mPersonNet, found);
+        List<Provider> sources = new ArrayList<>();
+        for (PersonSearch.Source s : planned) {
+            sources.add(s.provider);
+            mPersonSources.put(s.provider, s);
+            if (s.listing()) {
+                mPersonKnown.add(s.provider);
+            }
+        }
+        mSources = sources;
+        mSearched = true;
+        classify(sources);
+        mSession = session(new ArrayList<SearchSession.Source<BookPOJO>>(planned));
+        mSession.search(name);
+        publish();
+    }
+
+    /** Back to the text search: its saved order and genres apply again (its scope was never changed). */
+    private void leavePerson() {
+        if (mPersonKind < 0) {
+            return;
+        }
+        mPersonKind = -1;
+        mPersonName = null;
+        mPersonSources.clear();
+        mPersonKnown.clear();
+        if (mPersonLoad != null) {
+            mPersonLoad.dispose();
+            mPersonLoad = null;
+        }
+        mSort = sortOf(mPreferences.getString(PREF_SORT, null));
+        mGenres = namesOf(Genre.class, mPreferences.getString(PREF_GENRES, ""));
+    }
+
+    /** The sites as the catalog and the people lists reach them, for a person's sources (called off the main thread). */
+    private final PersonSearch.Net mPersonNet = new PersonSearch.Net() {
+        private final AutorsModel people = new AutorsModel();
+
+        @Override
+        public ProviderPage<BookPOJO> listing(Provider p, String url, int page) throws IOException {
+            return p.parser.loadListing(p.parser.pageUrl(url, page), page); // BooksPresenter's paging
+        }
+
+        @Override
+        public ProviderPage<GenrePOJO> people(Provider p, boolean reader, String name) throws IOException {
+            return people.search(p, reader ? SearchUrls.Category.PERFORMERS : SearchUrls.Category.AUTHORS, name, 1);
+        }
+
+        @Override
+        public ProviderPage<BookPOJO> books(Provider p, String query, int page) throws IOException {
+            return mBooksModel.search(p, query, page);
+        }
+    };
 
     /** Every source of a saved search had answered: a pass that was left half-way is asked again on submit. */
     private static boolean complete(SearchSnapshot s) {
@@ -464,6 +647,11 @@ public class SearchbalePresenter extends MvpPresenter<SearchableView> implements
                 }
             });
         }
+        return session(sources);
+    }
+
+    /** A search over {@code sources}: its cards become offers, its answers and its end publish the screen. */
+    private SearchSession<BookPOJO> session(List<SearchSession.Source<BookPOJO>> sources) {
         return new SearchSession<>(sources, book -> Url.canonical(book.getUrl()), Schedulers.io(),
                 AndroidSchedulers.mainThread(), SOURCE_TIMEOUT_SECONDS, new SearchSession.Listener<BookPOJO>() {
             @Override
@@ -498,17 +686,23 @@ public class SearchbalePresenter extends MvpPresenter<SearchableView> implements
         mFetchedAt = System.currentTimeMillis();
         mSearched = true;
         mRequest = new SearchRequest(q, mScope);
+        List<Provider> sources = enabled();
+        mSources = sources;
+        classify(sources);
+        mSession = booksSession(sources);
+        mSession.search(q);
+        publish();
+    }
+
+    /** The active sites the search may ask, the one selected in the settings first. */
+    private List<Provider> enabled() {
         List<Provider> sources = new ArrayList<>();
         for (Provider provider : Provider.selectedFirst()) {
             if (mPreferences.getBoolean(provider.prefKey, true)) {
                 sources.add(provider);
             }
         }
-        mSources = sources;
-        classify(sources);
-        mSession = booksSession(sources);
-        mSession.search(q);
-        publish();
+        return sources;
     }
 
     /** Which of {@code sources} are slow by nature, and which were silent the last time. */
@@ -554,6 +748,9 @@ public class SearchbalePresenter extends MvpPresenter<SearchableView> implements
         Provider p = providerOf(st.name);
         if (p != null && !failed) {
             mSilent.remove(p);
+        }
+        if (mPersonKind >= 0) {
+            return; // a person's listing or lookup says nothing of the site's text search
         }
         Map<String, long[]> answers = answers(mPreferences.getString(PREF_ANSWERS, ""));
         answers.put(st.name, new long[]{failed ? 1 : 0, System.currentTimeMillis()});
@@ -652,8 +849,14 @@ public class SearchbalePresenter extends MvpPresenter<SearchableView> implements
         mState = null;
     }
 
-    /** Turns the session's new items into offers, once each, in order of arrival. */
+    /**
+     * Turns the session's new items into offers, once each, in order of arrival. A site's own rank is its arrival
+     * count, the site's own sequence (a source loads its pages one after another): relevance in a search, the person's
+     * books newest first in a person's listing ({@link PersonSearch#rank}).
+     */
     private void arrived(List<BookPOJO> items) {
+        boolean reader = mPersonKind == FavoritePeople.READER;
+        TextNorm.Person person = mPersonKind >= 0 ? TextNorm.person(mPersonName) : null;
         for (BookPOJO book : items) {
             String url = book.getUrl();
             if (url == null || book.getName() == null || mOfferByUrl.containsKey(url)) {
@@ -663,12 +866,38 @@ public class SearchbalePresenter extends MvpPresenter<SearchableView> implements
             Integer before = mArrived.get(p);
             int n = before == null ? 0 : before;
             mArrived.put(p, n + 1);
-            // Bookish lists by date and База Книг by views: their order says nothing about the match (§6.5)
-            int rank = p == Provider.BOOKISH || p == Provider.BAZA_KNIG ? Integer.MAX_VALUE : n;
+            int rank;
+            if (person != null) {
+                PersonSearch.Source source = p == null ? null : mPersonSources.get(p);
+                rank = PersonSearch.rank(source != null && source.listing(), n);
+                learn(p, book, person, reader);
+            } else {
+                // Bookish lists by date and База Книг by views: their order says nothing about the match (§6.5)
+                rank = p == Provider.BOOKISH || p == Provider.BAZA_KNIG ? Integer.MAX_VALUE : n;
+            }
             int order = mSources.indexOf(p);
             Offer o = new Offer(book, p, order < 0 ? mSources.size() : order, rank, mOffers.size());
             mOffers.add(o);
             mOfferByUrl.put(url, o);
+        }
+    }
+
+    /**
+     * A card of a site whose page of the person is not known yet teaches it ({@link PersonSearch#teaches}: a field of
+     * that one person, the very same name): the favourite keeps it, so the next time the site is listed.
+     */
+    private void learn(Provider p, BookPOJO book, TextNorm.Person person, boolean reader) {
+        if (p == null || mPersonKnown.contains(p)) {
+            return;
+        }
+        PersonSearch.Source source = mPersonSources.get(p);
+        if (source == null || source.mode != PersonSearch.Mode.SEARCH) {
+            return; // a site with a people search learns only its one exact hit: namesakes are never guessed
+        }
+        String page = PersonSearch.teaches(book, person, reader);
+        if (page != null && Provider.ofUrl(page) == p) {
+            mPersonKnown.add(p);
+            FavoritePeople.get(mContext).learnUrl(mPersonKind, mPersonName, page);
         }
     }
 
@@ -699,6 +928,7 @@ public class SearchbalePresenter extends MvpPresenter<SearchableView> implements
         in.nowMs = System.currentTimeMillis(); // the clock of SearchSession.State#startedAt (the main scheduler's)
         in.slow = EnumSet.copyOf(mSlow);
         in.silent = EnumSet.copyOf(mSilent);
+        in.personKind = mPersonKind;
         Set<String> shown = new HashSet<>();
         if (mState != null) {
             for (SearchUi.Row r : mState.rows) {
@@ -726,9 +956,9 @@ public class SearchbalePresenter extends MvpPresenter<SearchableView> implements
         }
     }
 
-    /** Saves the current search for the next visit (§8). */
+    /** Saves the current search for the next visit (§8); a person's books never replace the last text search. */
     private void save() {
-        if (mModelId != Consts.MODEL_BOOKS || mSession == null || !mSearched) {
+        if (mModelId != Consts.MODEL_BOOKS || mSession == null || !mSearched || mPersonKind >= 0) {
             return;
         }
         SearchSnapshot s = new SearchSnapshot();
@@ -779,10 +1009,12 @@ public class SearchbalePresenter extends MvpPresenter<SearchableView> implements
         }
     }
 
+    /** The text search's saved order; "newest first" is a person's books' alone (a search's site order is relevance). */
     static SearchOrder.Sort sortOf(String name) {
         if (name != null) {
             try {
-                return SearchOrder.Sort.valueOf(name);
+                SearchOrder.Sort sort = SearchOrder.Sort.valueOf(name);
+                return sort == SearchOrder.Sort.NEWEST ? SearchOrder.Sort.RELEVANCE : sort;
             } catch (IllegalArgumentException ignored) {
                 // an order of a later version
             }
@@ -1009,6 +1241,7 @@ public class SearchbalePresenter extends MvpPresenter<SearchableView> implements
             getViewState().returnResult(bookPOJO.getUrlSeries(),
                     bookPOJO.getSeries(), Consts.MODEL_BOOKS, "searchebleBooks");
         });
+        BookSheetPeople.bind(layout, bookPOJO); // stars for the author and the reader, once their rows are set
         dialog.show();
     }
 }

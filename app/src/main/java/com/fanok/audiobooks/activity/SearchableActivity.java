@@ -61,6 +61,7 @@ import com.fanok.audiobooks.adapter.SearchebleAdapter;
 import com.fanok.audiobooks.databinding.ActivitySearchableBinding;
 import com.fanok.audiobooks.fragment.SourceTexts;
 import com.fanok.audiobooks.interface_pacatge.searchable.SearchableView;
+import com.fanok.audiobooks.model.FavoritePeople;
 import com.fanok.audiobooks.pojo.BookPOJO;
 import com.fanok.audiobooks.pojo.GenrePOJO;
 import com.fanok.audiobooks.pojo.SearcheblPOJO;
@@ -107,12 +108,18 @@ public class SearchableActivity extends MvpAppCompatActivity implements Searchab
             SearchRequest.Field.READER, SearchRequest.Field.SERIES};
     private static final int[] SCOPE_NAMES = {R.string.search_scope_title, R.string.search_scope_author,
             R.string.search_scope_reader, R.string.search_scope_series};
-    private static final SearchOrder.Sort[] SORTS = {SearchOrder.Sort.RELEVANCE, SearchOrder.Sort.ARRIVAL,
-            SearchOrder.Sort.TITLE, SearchOrder.Sort.AUTHOR, SearchOrder.Sort.READER, SearchOrder.Sort.SHORTEST,
-            SearchOrder.Sort.LONGEST, SearchOrder.Sort.SITE};
-    private static final int[] SORT_NAMES = {R.string.search_sort_relevance, R.string.search_sort_arrival,
-            R.string.search_sort_title, R.string.search_sort_author, R.string.search_sort_reader,
-            R.string.search_sort_shortest, R.string.search_sort_longest, R.string.search_sort_site};
+    /** The orders of the menu; "newest first" only for a person's books (in a search a site's order is relevance). */
+    private static final SearchOrder.Sort[] SORTS = {SearchOrder.Sort.NEWEST, SearchOrder.Sort.RELEVANCE,
+            SearchOrder.Sort.ARRIVAL, SearchOrder.Sort.TITLE, SearchOrder.Sort.AUTHOR, SearchOrder.Sort.READER,
+            SearchOrder.Sort.SHORTEST, SearchOrder.Sort.LONGEST, SearchOrder.Sort.SITE};
+    private static final int[] SORT_NAMES = {R.string.person_search_sort_newest, R.string.search_sort_relevance,
+            R.string.search_sort_arrival, R.string.search_sort_title, R.string.search_sort_author,
+            R.string.search_sort_reader, R.string.search_sort_shortest, R.string.search_sort_longest,
+            R.string.search_sort_site};
+    /** {@link #personIntent}: the kind of the person ({@link FavoritePeople#AUTHOR} or {@link FavoritePeople#READER}). */
+    public static final String EXTRA_PERSON_KIND = "person_kind";
+    /** {@link #personIntent}: the person's name as shown. */
+    public static final String EXTRA_PERSON_NAME = "person_name";
     /** Show the match score (0-100) on the cards: off by default, it is a ranking key, not a probability (§6.2). */
     private static final String PREF_SHOW_SCORE = "search_show_score";
 
@@ -147,13 +154,39 @@ public class SearchableActivity extends MvpAppCompatActivity implements Searchab
 
     private Menu mMenu;
 
+    /** The kind of the person whose books the menu was made for (no scope, "newest first"); -1: a text search. */
+    private int mPersonKind = -1;
+
+    /**
+     * The books of a person on every site, newest first as far as each site tells: a favourite author's
+     * ({@link FavoritePeople#AUTHOR}) or reader's ({@link FavoritePeople#READER}). The text search's saved order,
+     * scope, genres and last search stay as they are; a typed query goes back to them.
+     */
+    public static Intent personIntent(Context c, int kind, String name) {
+        return new Intent(c, SearchableActivity.class)
+                .putExtra(Consts.ARG_MODEL, Consts.MODEL_BOOKS)
+                .putExtra(EXTRA_PERSON_KIND, kind)
+                .putExtra(EXTRA_PERSON_NAME, name);
+    }
+
+    /** The person of a {@link #personIntent}; null for any other intent. */
+    private static String personOf(Intent intent) {
+        String name = intent == null ? null : intent.getStringExtra(EXTRA_PERSON_NAME);
+        return name == null || name.trim().isEmpty() ? null : name.trim();
+    }
+
+    private static int personKindOf(Intent intent) {
+        return personOf(intent) == null ? -1 : intent.getIntExtra(EXTRA_PERSON_KIND, FavoritePeople.AUTHOR);
+    }
+
     @ProvidePresenter
     SearchbalePresenter provide() {
         Intent intent = getIntent();
         int model = intent.getIntExtra(Consts.ARG_MODEL, Consts.MODEL_BOOKS);
-        // the search button opens the last search; so does a screen whose process died (its presenter is new)
-        return new SearchbalePresenter(model, getApplicationContext(), mRecreated || !isSearch(intent),
-                mSavedQuery);
+        // the search button opens the last search; so does a screen whose process died (its presenter is new);
+        // a person's books are asked again instead, and the last search is left as it is
+        return new SearchbalePresenter(model, getApplicationContext(),
+                personOf(intent) == null && (mRecreated || !isSearch(intent)), mSavedQuery);
     }
 
     private static boolean isSearch(Intent intent) {
@@ -184,6 +217,7 @@ public class SearchableActivity extends MvpAppCompatActivity implements Searchab
 
         Intent intent = getIntent();
         mModelId = intent.getIntExtra(Consts.ARG_MODEL, Consts.MODEL_BOOKS);
+        mPersonKind = mModelId == Consts.MODEL_BOOKS ? personKindOf(intent) : -1;
 
         Toolbar toolbar = findViewById(R.id.toolbar);
         setSupportActionBar(toolbar);
@@ -242,6 +276,11 @@ public class SearchableActivity extends MvpAppCompatActivity implements Searchab
             case Consts.MODEL_AUTOR:
             case Consts.MODEL_ARTIST:
                 mAddapterGenre = new GenreListAddapter();
+                if (mModelId == Consts.MODEL_AUTOR) {
+                    mAddapterGenre.showStars(FavoritePeople.AUTHOR); // a star adds the person to the favourites
+                } else if (mModelId == Consts.MODEL_ARTIST) {
+                    mAddapterGenre.showStars(FavoritePeople.READER);
+                }
                 binding.list.setAdapter(mAddapterGenre);
                 binding.sourcesScroll.setVisibility(View.GONE);
                 break;
@@ -314,13 +353,23 @@ public class SearchableActivity extends MvpAppCompatActivity implements Searchab
         // холодный ACTION_SEARCH (голосовой поиск, экземпляр под BookActivity) приходит в onCreate;
         // при пересоздании (поворот) запрос уже хранится в презентере. После смерти процесса презентер новый:
         // он показывает сохранённый поиск, а если его нет — запрос возвращается в поле без автозапуска (W02)
-        if (savedInstanceState == null) {
+        // a person's books after the process died are simply asked again: the intent still names the person
+        if (savedInstanceState == null || mPresenter.getQuery() == null && mPersonKind >= 0) {
             handleIntent(intent);
         } else if (mPresenter.getQuery() == null) {
             String query = savedInstanceState.getString(STATE_QUERY);
             if (query != null) {
                 binding.searchView.setQuery(query, false);
             }
+        }
+    }
+
+    /** Back on the authors / readers list: a star may have changed elsewhere (a book, the favourites). */
+    @Override
+    protected void onResume() {
+        super.onResume();
+        if (mAddapterGenre != null && (mModelId == Consts.MODEL_AUTOR || mModelId == Consts.MODEL_ARTIST)) {
+            mAddapterGenre.refreshStars();
         }
     }
 
@@ -372,7 +421,9 @@ public class SearchableActivity extends MvpAppCompatActivity implements Searchab
             SubMenu sorts = menu.findItem(R.id.search_sort).getSubMenu();
             if (sorts != null) {
                 for (int i = 0; i < SORTS.length; i++) {
-                    sorts.add(R.id.search_sort, Menu.FIRST + i, i, SORT_NAMES[i]);
+                    if (SORTS[i] != SearchOrder.Sort.NEWEST || mPersonKind >= 0) {
+                        sorts.add(R.id.search_sort, Menu.FIRST + i, i, SORT_NAMES[i]);
+                    }
                 }
                 sorts.setGroupCheckable(R.id.search_sort, true, true);
             }
@@ -409,7 +460,7 @@ public class SearchableActivity extends MvpAppCompatActivity implements Searchab
             }
             return true;
         } else if (id == R.id.search_refresh) {
-            mPresenter.loadBoks(true);
+            mPresenter.refresh();
             return true;
         }
         return super.onOptionsItemSelected(item);
@@ -422,6 +473,7 @@ public class SearchableActivity extends MvpAppCompatActivity implements Searchab
         MenuItem scope = mMenu.findItem(R.id.search_scope);
         if (scope != null) {
             scope.setIcon(mState.input.request.isAnywhere() ? R.drawable.ic_filter : R.drawable.ic_filter_active);
+            scope.setVisible(mPersonKind < 0); // a person's books are looked for everywhere
         }
         MenuItem sort = mMenu.findItem(R.id.search_sort);
         for (int i = 0; i < SORTS.length && sort != null; i++) {
@@ -521,6 +573,12 @@ public class SearchableActivity extends MvpAppCompatActivity implements Searchab
     @Override
     protected void onNewIntent(@NonNull Intent intent) {
         super.onNewIntent(intent);
+        if (mModelId != Consts.MODEL_BOOKS && personOf(intent) != null) {
+            // the authors / readers screen cannot show books: a books screen takes the person over
+            finish();
+            startActivity(intent);
+            return;
+        }
         setIntent(intent);
         handleIntent(intent);
         if (binding != null) {
@@ -529,7 +587,13 @@ public class SearchableActivity extends MvpAppCompatActivity implements Searchab
     }
 
     private void handleIntent(Intent intent) {
-        if (binding != null && isSearch(intent)) {
+        String person = personOf(intent);
+        if (binding != null && person != null && mModelId == Consts.MODEL_BOOKS) {
+            binding.searchView.setQuery(person, false);
+            binding.searchView.clearFocus(); // the books come at once: the keyboard would only cover them
+            setPersonKind(personKindOf(intent));
+            mPresenter.searchPerson(personKindOf(intent), person);
+        } else if (binding != null && isSearch(intent)) {
             String query = intent.getStringExtra(SearchManager.QUERY);
             if (query != null) {
                 SearchRecentSuggestions suggestions = new SearchRecentSuggestions(this,
@@ -623,6 +687,9 @@ public class SearchableActivity extends MvpAppCompatActivity implements Searchab
         boolean first = mState == null;
         boolean otherView = !first && otherView(mState.input, state.input);
         mState = state;
+        if (state.input.searched || state.input.personKind >= 0) {
+            setPersonKind(state.input.personKind); // a typed query left the person's books, or a new person came
+        }
         showChips(state);
         showProgress(state);
         showSummary(state);
@@ -634,6 +701,14 @@ public class SearchableActivity extends MvpAppCompatActivity implements Searchab
         }
         if (first && !state.rows.isEmpty()) {
             binding.searchView.clearFocus(); // restored results: the keyboard would cover them (W24)
+        }
+    }
+
+    /** The menu follows the mode: a person's books have "newest first" and no scope. */
+    private void setPersonKind(int kind) {
+        if (kind != mPersonKind) {
+            mPersonKind = kind;
+            invalidateOptionsMenu();
         }
     }
 
@@ -962,6 +1037,11 @@ public class SearchableActivity extends MvpAppCompatActivity implements Searchab
     /** One line: from when, the scope, how far, what failed; and the one action that helps now. */
     private void showSummary(SearchUi.State state) {
         List<String> parts = new ArrayList<>();
+        if (state.input.personKind >= 0) {
+            // the field shows the name: this says whose books these are
+            parts.add(getString(state.input.personKind == FavoritePeople.READER ? R.string.person_search_reader
+                    : R.string.person_search_author));
+        }
         if (state.input.restoredAt > 0) {
             parts.add(getString(R.string.search_summary_restored, when(state.input.restoredAt)));
         }
@@ -1081,7 +1161,9 @@ public class SearchableActivity extends MvpAppCompatActivity implements Searchab
         BookPOJO b = row.offer.book;
         List<String> notes = new ArrayList<>();
         SearchMatcher.Match m = row.match;
-        if (!m.fields.isEmpty() && !m.fields.contains(SearchRequest.Field.TITLE)) {
+        // a person's books: every card is the person's, how its fields match the name says nothing
+        boolean person = mState != null && mState.input.personKind >= 0;
+        if (!person && !m.fields.isEmpty() && !m.fields.contains(SearchRequest.Field.TITLE)) {
             if (m.fields.contains(SearchRequest.Field.READER)) {
                 notes.add(getString(R.string.search_matched_reader));
             } else if (m.fields.contains(SearchRequest.Field.SERIES)) {
@@ -1093,7 +1175,7 @@ public class SearchableActivity extends MvpAppCompatActivity implements Searchab
         }
         if (row.unknown) {
             notes.add(getString(R.string.search_no_scope_data));
-        } else if (m.tier == SearchMatcher.Tier.E && !m.fields.isEmpty()) {
+        } else if (!person && m.tier == SearchMatcher.Tier.E && !m.fields.isEmpty()) {
             notes.add(getString(R.string.search_similar));
         }
         if (score && !m.fields.isEmpty()) {

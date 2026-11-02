@@ -8,6 +8,7 @@ import androidx.viewpager2.adapter.FragmentStateAdapter;
 import com.fanok.audiobooks.R;
 import com.fanok.audiobooks.fragment.ComentsBookFragment;
 import com.fanok.audiobooks.fragment.DescriptionBookFragment;
+import com.fanok.audiobooks.fragment.FavoritesTabFragment;
 import com.fanok.audiobooks.fragment.OtherArtistFragment;
 import com.fanok.audiobooks.fragment.OtherSourceFragment;
 import com.fanok.audiobooks.fragment.SeriesBookFragment;
@@ -17,10 +18,11 @@ import java.util.ArrayList;
 import java.util.Arrays;
 
 /**
- * The book screen's tabs, kept by kind (one of the five known tabs) in that fixed order. Each tab has a stable id
+ * The book screen's tabs, kept by kind (one of the six known tabs) in that fixed order. Each tab has a stable id
  * derived from its kind, so a tab inserted before an already-created one keeps the created fragment (UI-11); the
  * "other source" and "other artist" tabs' ids also carry a version that changes with their data, so a stale fragment
- * is replaced rather than kept. Titles are for display only: the comments tab's carries the count.
+ * is replaced rather than kept. Titles are for display only: the comments tab's carries the count, and the ★ tab
+ * (FAVORITES, always shown and always last) has none: BookActivity gives it an icon.
  */
 public class SectionsPagerAdapter extends FragmentStateAdapter {
 
@@ -29,6 +31,7 @@ public class SectionsPagerAdapter extends FragmentStateAdapter {
     public static final int SERIES = 2;
     public static final int OTHER_ARTIST = 3;
     public static final int OTHER_SOURCE = 4;
+    public static final int FAVORITES = 5;
 
     private static final long OTHER_SOURCE_VERSION_STEP = 100;
 
@@ -71,9 +74,11 @@ public class SectionsPagerAdapter extends FragmentStateAdapter {
                 mContext.getResources().getString(R.string.tab_text_2),
                 mContext.getResources().getString(R.string.tab_text_3),
                 mContext.getResources().getString(R.string.tab_text_4),
-                mContext.getResources().getString(R.string.tab_text_5)};
+                mContext.getResources().getString(R.string.tab_text_5),
+                ""};
         tabItems = new ArrayList<>();
         tabItems.add(DESCRIPTION);
+        tabItems.add(FAVORITES);
     }
 
     private long idOf(int kind) {
@@ -105,6 +110,8 @@ public class SectionsPagerAdapter extends FragmentStateAdapter {
     @Override
     public Fragment createFragment(int position) {
         switch (tabItems.get(position)) {
+            case FAVORITES:
+                return new FavoritesTabFragment();
             case COMMENTS:
                 return ComentsBookFragment.newInstance(mBookPOJO.getUrl());
             case SERIES:
@@ -148,8 +155,17 @@ public class SectionsPagerAdapter extends FragmentStateAdapter {
         showTab(COMMENTS);
     }
 
-    /** The position of the tab a known title names, -1 when it is not shown. */
+    /** The position of the tab a known title names, -1 when it is not shown (or the title is empty: the ★ tab). */
     public int positionOf(String title) {
-        return tabItems.indexOf(Arrays.asList(knownTabs).indexOf(title));
+        return title == null || title.isEmpty() ? -1 : positionOfKind(Arrays.asList(knownTabs).indexOf(title));
+    }
+
+    /** The position of the tab of {@code kind}, -1 when it is not shown. */
+    public int positionOfKind(int kind) {
+        return tabItems.indexOf(kind);
+    }
+
+    public int kindAt(int position) {
+        return tabItems.get(position);
     }
 }

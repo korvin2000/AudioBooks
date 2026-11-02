@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Book page: the time line of a listened book ("прослушано"), in place of ic_clock (18dp like it). -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="@dimen/scale_drawable"
+    android:height="@dimen/scale_drawable"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path
+        android:fillColor="?attr/subTextColor"
+        android:pathData="M21,7L9,19L3.5,13.5L4.91,12.09L9,16.17L19.59,5.59L21,7Z" />
+</vector>

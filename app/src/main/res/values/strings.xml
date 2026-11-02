@@ -52,9 +52,9 @@
     <string name="play">Воспроизвести</string>
     <string name="next">Следуйщий</string>
     <string name="collapse">Свернуть</string>
-    <string name="autor">Автор:</string>
-    <string name="artist">Чтец:</string>
-    <string name="series">Серия:</string>
+    <string name="autor">Автор</string>
+    <string name="artist">Чтец</string>
+    <string name="series">Серия</string>
     <string name="show_more">Читать дальше</string>
     <string name="other_recomended_books">Рекомендуемые книги</string>
     <string name="try_again">Попробовать еще</string>

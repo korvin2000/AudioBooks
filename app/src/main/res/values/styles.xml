@@ -17,6 +17,7 @@
         <item name="colorItemMenu">@color/primaryTextColor</item>
         <item name="prefIconColor">@color/primaryTextColor</item>
         <item name="deleteColor">@color/colorDelete</item>
+        <item name="favoriteColor">@color/favoriteColor</item>
         <item name="toolbarStyle">@style/Widget.App.Toolbar</item>
         <item name="toolbarNavigationButtonStyle">@style/Widget.App.Toolbar.Button.Navigation</item>
         <item name="actionButtonStyle">@style/Widget.App.ActionButton</item>
@@ -99,6 +100,7 @@
         <item name="colorItemMenu">@color/primaryTextColor</item>
         <item name="prefIconColor">@color/primaryTextColor</item>
         <item name="deleteColor">@color/colorDelete</item>
+        <item name="favoriteColor">@color/favoriteColor</item>
         <item name="toolbarStyle">@style/Widget.App.Toolbar</item>
         <item name="toolbarNavigationButtonStyle">@style/Widget.App.Toolbar.Button.Navigation</item>
         <item name="actionButtonStyle">@style/Widget.App.ActionButton</item>
@@ -169,6 +171,7 @@
         <item name="colorItemMenu">@color/primaryTextColor</item>
         <item name="prefIconColor">@color/colorNavigayionItemLight</item>
         <item name="deleteColor">@color/colorDeleteLight</item>
+        <item name="favoriteColor">@color/favoriteColorLight</item>
         <item name="android:itemBackground">@drawable/custom_ripple</item>
         <item name="android:itemTextAppearance">@style/myCustomMenuTextAppearanceLight</item>
         <item name="toolbarStyle">@style/Widget.App.Toolbar</item>

@@ -19,12 +19,40 @@
             app:iconTint="?attr/colorItemMenu"
             app:showAsAction="ifRoom" />
 
+        <!-- the book's author / reader in the favourite people (BookFavorites); hidden when the book names none -->
+        <item
+            android:id="@+id/favoriteAuthor"
+            android:checkable="true"
+            android:icon="@drawable/ic_favorite_author"
+            android:title="@string/book_fav_author_item"
+            android:visible="false"
+            app:iconTint="?attr/colorItemMenu"
+            app:showAsAction="never" />
+
+        <item
+            android:id="@+id/favoriteReader"
+            android:checkable="true"
+            android:icon="@drawable/ic_favorite_reader"
+            android:title="@string/book_fav_reader_item"
+            android:visible="false"
+            app:iconTint="?attr/colorItemMenu"
+            app:showAsAction="never" />
+
         <item
             android:id="@+id/share"
             android:icon="@drawable/ic_share"
             android:title="@string/share"
             app:iconTint="?attr/colorItemMenu"
             app:showAsAction="ifRoom" />
+
+        <!-- the live speed dialog; on the toolbar the value as text (actionLayout), in the overflow "Скорость · 1,5×" -->
+        <item
+            android:id="@+id/playbackSpeed"
+            android:icon="@drawable/ic_play_speed"
+            android:title="@string/book_toolbar_speed_pref"
+            app:actionLayout="@layout/action_book_speed"
+            app:iconTint="?attr/colorItemMenu"
+            app:showAsAction="never" />
 
         <item
             android:id="@+id/download_delete"
@@ -50,7 +78,7 @@
         <item
             android:id="@+id/settings"
             android:icon="@drawable/ic_menu_settings"
-            android:title="@string/menu_settings"
+            android:title="@string/book_toolbar_settings"
             app:iconTint="?attr/colorItemMenu"
             app:showAsAction="never" />
 
