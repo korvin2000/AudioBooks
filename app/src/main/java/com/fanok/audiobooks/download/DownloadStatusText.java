@@ -7,6 +7,7 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
 import com.fanok.audiobooks.R;
+import com.fanok.audiobooks.util.RussianResources;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -26,7 +27,7 @@ public final class DownloadStatusText {
     @NonNull
     public static String line(@NonNull Context context, @NonNull DownloadStatus s) {
         if (s.state == DownloadStatus.NONE) return "";
-        Resources res = context.getResources();
+        Resources res = RussianResources.of(context); // its plurals by the Russian rules on any device language
         List<String> parts = new ArrayList<>(6);
         String label = stateLabel(res, s);
         if (label != null) parts.add(label);
@@ -66,7 +67,7 @@ public final class DownloadStatusText {
     @Nullable
     public static String brief(@NonNull Context context, @NonNull DownloadStatus s) {
         if (s.state == DownloadStatus.NONE) return null;
-        Resources res = context.getResources();
+        Resources res = RussianResources.of(context);
         if (s.state == DownloadStatus.COMPLETE) {
             return s.isCompleteBook() ? res.getString(R.string.download_status_complete_all)
                     : res.getQuantityString(R.plurals.download_chapters_of, s.chaptersTotal, s.chaptersDone, s.chaptersTotal);

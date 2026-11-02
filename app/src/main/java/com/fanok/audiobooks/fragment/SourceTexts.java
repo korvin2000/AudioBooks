@@ -25,6 +25,7 @@ import com.fanok.audiobooks.search.SourceInfo;
 import com.fanok.audiobooks.search.SourceProbe;
 import com.fanok.audiobooks.search.Sources;
 import com.fanok.audiobooks.source.Sort;
+import com.fanok.audiobooks.util.RussianResources;
 
 import io.reactivex.Single;
 import io.reactivex.schedulers.Schedulers;
@@ -132,7 +133,7 @@ public final class SourceTexts {
     /** «≈ 72 тыс. книг», «≈ 2 271 книга». */
     @NonNull
     public static String booksLine(@NonNull Context context, int count) {
-        Resources res = context.getResources();
+        Resources res = RussianResources.of(context);
         String number = books(count, res.getString(R.string.sources_books_thousands),
                 res.getString(R.string.sources_books_units));
         return count < FULL_BELOW ? res.getQuantityString(R.plurals.sources_books_count, count, number)

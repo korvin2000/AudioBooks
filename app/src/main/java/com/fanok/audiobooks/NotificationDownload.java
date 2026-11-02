@@ -18,6 +18,7 @@ import com.fanok.audiobooks.activity.ClearSavedActivity;
 import com.fanok.audiobooks.broadcasts.DownloadActionReceiver;
 import com.fanok.audiobooks.download.DownloadStatus;
 import com.fanok.audiobooks.download.DownloadStatusText;
+import com.fanok.audiobooks.util.RussianResources;
 
 /** The download notification: the book being downloaded and its {@link DownloadStatus} line, or why it waits. */
 public class NotificationDownload {
@@ -80,7 +81,7 @@ public class NotificationDownload {
         String text = DownloadStatusText.line(context, status);
         if (otherBooks > 0) {
             text = (text.isEmpty() ? "" : text + " · ")
-                    + context.getResources().getQuantityString(R.plurals.download_more_books, otherBooks, otherBooks);
+                    + RussianResources.of(context).getQuantityString(R.plurals.download_more_books, otherBooks, otherBooks);
         }
         return build(context, title, text, status.percent(), ongoing, actions, bookKey, otherBooks > 0);
     }

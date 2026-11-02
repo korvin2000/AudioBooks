@@ -68,6 +68,7 @@ import com.fanok.audiobooks.search.SearchOrder;
 import com.fanok.audiobooks.search.SearchRequest;
 import com.fanok.audiobooks.search.SearchUi;
 import com.fanok.audiobooks.search.TextNorm;
+import com.fanok.audiobooks.util.RussianResources;
 import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 import java.util.ArrayList;
 import java.util.EnumSet;
@@ -759,8 +760,8 @@ public class SearchableActivity extends MvpAppCompatActivity implements Searchab
                 break;
             case DONE:
             case PARTIAL:
-                parts.add(getResources().getQuantityString(R.plurals.search_found_books, shown, shown) + " "
-                        + getResources().getQuantityString(R.plurals.search_on_sites, state.sites, state.sites));
+                parts.add(RussianResources.of(this).getQuantityString(R.plurals.search_found_books, shown, shown) + " "
+                        + RussianResources.of(this).getQuantityString(R.plurals.search_on_sites, state.sites, state.sites));
                 break;
             case FAILED:
                 parts.add(getString(R.string.search_summary_none_answered));
@@ -868,7 +869,7 @@ public class SearchableActivity extends MvpAppCompatActivity implements Searchab
         }
         boolean several = g != null && g.offers.size() > 1;
         if (several && g.narrations.size() > 1) {
-            notes.add(0, getResources().getQuantityString(R.plurals.search_narrations, g.narrations.size(),
+            notes.add(0, RussianResources.of(this).getQuantityString(R.plurals.search_narrations, g.narrations.size(),
                     g.narrations.size()));
         }
         if (!notes.isEmpty()) {
@@ -891,7 +892,7 @@ public class SearchableActivity extends MvpAppCompatActivity implements Searchab
             d.setArtist(readers(g, mState == null ? SearchOrder.Sort.RELEVANCE : mState.input.sort));
             int sites = g.catalogs();
             if (sites > 1) {
-                labels.put(row.key, getResources().getQuantityString(R.plurals.search_sites, sites, sites));
+                labels.put(row.key, RussianResources.of(this).getQuantityString(R.plurals.search_sites, sites, sites));
             } else if (row.offer.source != null) {
                 labels.put(row.key, row.offer.source.title);
             }
@@ -1090,7 +1091,7 @@ public class SearchableActivity extends MvpAppCompatActivity implements Searchab
             return;
         }
         if (count > 0) {
-            binding.summary.setText(getResources().getQuantityString(
+            binding.summary.setText(RussianResources.of(this).getQuantityString(
                     R.plurals.search_sources_failed, count, count));
             binding.action.setText(R.string.retry);
             binding.action.setVisibility(View.VISIBLE);
