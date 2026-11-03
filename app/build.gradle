@@ -54,8 +54,8 @@ android {
         resValue "string", "suggestion_authority", applicationId + ".MySuggestionProvider"
         minSdkVersion 24 // 24+: network_security_config trust anchors (ISRG Root X1) work without bundling Conscrypt
         targetSdkVersion 34
-        versionCode 104
-        versionName "8.1"
+        versionCode 105
+        versionName "8.1.1"
         // the app speaks Russian only: the libraries' other translations would be dead weight in every APK
         resourceConfigurations += ['ru']
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
