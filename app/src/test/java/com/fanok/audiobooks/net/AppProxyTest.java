@@ -22,8 +22,10 @@ import java.net.URI;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.EnumMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 public class AppProxyTest {
@@ -247,5 +249,76 @@ public class AppProxyTest {
         assertFalse(AppProxy.isProxied(Provider.IZIBUK, AppProxy.readDirect(prefs)));
         AppProxy.setAllDirect(prefs, false);
         assertTrue("all through the proxy: none direct", AppProxy.readDirect(prefs).isEmpty());
+    }
+
+    /** Every choice of the user is hand-set, in the same write as the route. */
+    @Test
+    public void aRouteSetByTheUserIsHandSet() {
+        FakePrefs prefs = new FakePrefs();
+        assertTrue("nothing stored: nothing hand-set", AppProxy.readManual(prefs).isEmpty());
+        AppProxy.setDirect(prefs, Provider.AKNIGA, true);
+        AppProxy.setDirect(prefs, Provider.UKNIG, false); // already through the proxy: still the user's choice
+        assertEquals(new HashSet<>(Arrays.asList(Provider.AKNIGA.prefValue, Provider.UKNIG.prefValue)),
+                AppProxy.readManual(prefs));
+        assertEquals(Collections.singleton(Provider.AKNIGA.prefValue), AppProxy.readDirect(prefs));
+        AppProxy.setAllDirect(prefs, false);
+        assertEquals(Provider.values().length, AppProxy.readManual(prefs).size());
+        assertTrue(AppProxy.readDirect(prefs).isEmpty());
+    }
+
+    /** Before the hand-set routes were stored, a direct source was the user's choice: the old default was the proxy. */
+    @Test
+    public void theDirectSourcesOfAnOlderVersionCountAsHandSet() {
+        FakePrefs prefs = new FakePrefs();
+        prefs.edit().putStringSet(AppProxy.PREF_DIRECT, Collections.singleton(Provider.AKNIGA.prefValue)).apply();
+        assertEquals(Collections.singleton(Provider.AKNIGA.prefValue), AppProxy.readManual(prefs));
+        AppProxy.setDirect(prefs, Provider.UKNIG, true);
+        assertEquals(new HashSet<>(Arrays.asList(Provider.AKNIGA.prefValue, Provider.UKNIG.prefValue)),
+                AppProxy.readManual(prefs));
+        prefs.edit().putString(AppProxy.PREF_MANUAL, "garbled").apply();
+        assertEquals("wrongly typed: as if absent", AppProxy.readDirect(prefs), AppProxy.readManual(prefs));
+    }
+
+    @Test
+    public void theRegionRoutesOnlyTheSourcesNotSetByHand() {
+        Set<String> direct = new HashSet<>(Arrays.asList(Provider.AKNIGA.prefValue, Provider.UKNIG.prefValue));
+        Set<String> manual = new HashSet<>(Arrays.asList(Provider.AKNIGA.prefValue, Provider.IZIBUK.prefValue));
+        Map<Provider, Boolean> needsProxy = new EnumMap<>(Provider.class);
+        needsProxy.put(Provider.AKNIGA, true); // hand-set direct: stays direct
+        needsProxy.put(Provider.IZIBUK, false); // hand-set through the proxy: stays
+        needsProxy.put(Provider.UKNIG, true); // blocked here: through the proxy
+        needsProxy.put(Provider.BIBLUS, false); // works here: direct
+        needsProxy.put(Provider.GOLOSOM, null); // nobody knows: keeps its route
+        assertEquals(new HashSet<>(Arrays.asList(Provider.AKNIGA.prefValue, Provider.BIBLUS.prefValue)),
+                AppProxy.regionDirect(direct, manual, needsProxy));
+        Set<String> golosom = Collections.singleton(Provider.GOLOSOM.prefValue);
+        assertTrue("unknown: a direct source stays direct", AppProxy.regionDirect(golosom,
+                Collections.<String>emptySet(), needsProxy).contains(Provider.GOLOSOM.prefValue));
+        assertEquals("a source not in the map keeps its route", direct,
+                AppProxy.regionDirect(direct, Collections.<String>emptySet(), new EnumMap<>(Provider.class)));
+    }
+
+    @Test
+    public void theRegionsDefaultsAreWrittenOnceAndKeepTheOlderChoices() {
+        FakePrefs prefs = new FakePrefs();
+        // an older version: AKNIGA set direct by the user, the rest through the proxy by default
+        prefs.edit().putStringSet(AppProxy.PREF_DIRECT, Collections.singleton(Provider.AKNIGA.prefValue)).apply();
+        Map<Provider, Boolean> needsProxy = new EnumMap<>(Provider.class);
+        for (Provider provider : Provider.values()) {
+            needsProxy.put(provider, true);
+        }
+        needsProxy.put(Provider.BIBLUS, false);
+        assertTrue(AppProxy.applyRegionDefaults(prefs, needsProxy));
+        assertEquals("the user's AKNIGA kept, BIBLUS direct by the region",
+                new HashSet<>(Arrays.asList(Provider.AKNIGA.prefValue, Provider.BIBLUS.prefValue)),
+                AppProxy.readDirect(prefs));
+        assertEquals("migrated: the old direct ones are hand-set", Collections.singleton(Provider.AKNIGA.prefValue),
+                prefs.getStringSet(AppProxy.PREF_MANUAL, null));
+        assertFalse("nothing changed: no write", AppProxy.applyRegionDefaults(prefs, needsProxy));
+
+        // the region changed: BIBLUS blocked now, the hand-set AKNIGA still direct
+        needsProxy.put(Provider.BIBLUS, true);
+        assertTrue(AppProxy.applyRegionDefaults(prefs, needsProxy));
+        assertEquals(Collections.singleton(Provider.AKNIGA.prefValue), AppProxy.readDirect(prefs));
     }
 }

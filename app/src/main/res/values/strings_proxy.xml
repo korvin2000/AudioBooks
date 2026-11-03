@@ -10,9 +10,17 @@
 
     <string name="proxy_status_lists">Поиск прокси… загрузка списков</string>
     <string name="proxy_status_scanning">Поиск прокси… проверено %1$d из %2$d, найдено %3$d</string>
+    <!-- the search ranks its %1$d proxies by the site %2$s -->
+    <string name="proxy_status_site_check">Поиск прокси… найдено %1$d, проверка на сайте %2$s</string>
     <string name="proxy_status_working">Работает: %1$s · %2$d мс</string>
     <string name="proxy_status_working_spares">Работает: %1$s · %2$d мс · запасных: %3$d</string>
+    <!-- a second line under the proxy in use: %2$d of the %3$d proxies found opened the site %1$s -->
+    <string name="proxy_status_site">Сайт %1$s принял %2$d из %3$d</string>
+    <!-- a second line under the proxy in use: the last search found nothing, the list found before stays -->
+    <string name="proxy_status_kept">Новых прокси не найдено — работает прежний</string>
     <string name="proxy_status_not_found">Рабочий прокси не найден — попробуйте позже</string>
+    <!-- a search whose %1$d checked proxies all failed the control check -->
+    <string name="proxy_status_not_found_silent">Рабочий прокси не найден: ни один прокси не ответил контрольным серверам (возможно, сеть блокирует прокси). Проверено: %1$d</string>
     <string name="proxy_status_no_network">Нет сети</string>
     <string name="proxy_rescan">Найти заново</string>
     <string name="proxy_note">Публичные прокси бывают медленными и нестабильными; при сбое приложение подберёт другой.</string>

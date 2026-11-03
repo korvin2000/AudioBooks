@@ -243,11 +243,17 @@ public final class SourceTexts {
         }
     }
 
-    /** The region of the user's connection; null before the first check. */
+    /** The region of the user's connection; null before the first check and when the last one could not tell. */
     @Nullable
     public static Region region(@NonNull Context context) {
-        com.fanok.audiobooks.region.RegionCheck.Result result = AppRegion.last(context);
-        return result == null ? null : result.region;
+        return region(AppRegion.last(context));
+    }
+
+    /** Pure: the region of a check's {@code result}; null for none and for one that could not tell (stored as OTHER). */
+    @Nullable
+    static Region region(@Nullable com.fanok.audiobooks.region.RegionCheck.Result result) {
+        return result == null || result.source == com.fanok.audiobooks.region.RegionCheck.Source.NONE ? null
+                : result.region;
     }
 
     /** The sorts of the site's catalog (its Order menu) as one line; null when it has none. */

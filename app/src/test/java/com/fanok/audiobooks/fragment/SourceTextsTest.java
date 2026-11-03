@@ -5,6 +5,8 @@ import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
+import com.fanok.audiobooks.region.Region;
+import com.fanok.audiobooks.region.RegionCheck;
 import com.fanok.audiobooks.search.Provider;
 import com.fanok.audiobooks.search.ProviderPage;
 import com.fanok.audiobooks.search.SourceProbe;
@@ -129,5 +131,16 @@ public class SourceTextsTest {
         assertTrue(SourceTexts.watched("region"));
         assertTrue("cleared", SourceTexts.watched(null));
         assertFalse(SourceTexts.watched("pref_theme"));
+    }
+
+    @Test
+    public void aCheckThatCouldNotTellGivesNoRegion() {
+        assertNull("before the first check", SourceTexts.region((RegionCheck.Result) null));
+        assertNull("undetermined, stored as OTHER", SourceTexts.region(
+                new RegionCheck.Result(Region.OTHER, "", RegionCheck.Source.NONE, "", false)));
+        assertEquals(Region.OTHER, SourceTexts.region(
+                new RegionCheck.Result(Region.OTHER, "UZ", RegionCheck.Source.SERVICE, "ipinfo", false)));
+        assertEquals(Region.RUSSIA, SourceTexts.region(
+                new RegionCheck.Result(Region.RUSSIA, "", RegionCheck.Source.TIME_ZONE, "", false)));
     }
 }

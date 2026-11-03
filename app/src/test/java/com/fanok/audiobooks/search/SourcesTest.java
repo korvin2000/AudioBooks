@@ -12,7 +12,10 @@ import org.junit.Test;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
+import java.util.EnumMap;
 import java.util.List;
+import java.util.Map;
 
 /** The user's sources: the stored order and active count, read back safely; the selected source stays active. */
 public class SourcesTest {
@@ -210,5 +213,136 @@ public class SourcesTest {
         prefs.edit().putInt(Sources.PREF, 5).apply();
         Sources.load(prefs); // a wrongly typed value: the defaults
         assertEquals(Sources.parse(null).active, Sources.activeCount());
+    }
+
+    // auto-ranking: sites of separate catalogs, unless a test is about mirrors
+    private static final Provider A = Provider.KNIGAVUHE;
+    private static final Provider B = Provider.BAZA_KNIG;
+    private static final Provider C = Provider.AUDIOBOO;
+    private static final Provider D = Provider.BOOKISH;
+    private static final Provider E = Provider.AKNIG_XYZ;
+    private static final Provider F = Provider.SLUSHAT_KNIGI;
+
+    private final Map<Provider, SourceProbe.Result> results = new EnumMap<>(Provider.class);
+    private final Map<Provider, Integer> books = new EnumMap<>(Provider.class);
+
+    private void up(Provider provider, long millis, boolean proxied, Integer count) {
+        results.put(provider, new SourceProbe.Result(provider, ProviderPage.Status.OK, millis, null, 1, proxied));
+        if (count != null) {
+            books.put(provider, count);
+        }
+    }
+
+    private void down(Provider provider, ProviderPage.Status status) {
+        results.put(provider, new SourceProbe.Result(provider, status, 50, null, 1, false));
+    }
+
+    private List<Provider> ranked(Provider... order) {
+        return Sources.ranked(Arrays.asList(order), results, books);
+    }
+
+    @Test
+    public void withinThirtyFivePercentTheSiteWithMoreBooksRanksHigher() {
+        up(A, 100, false, 10);
+        up(B, 135, false, 1000);
+        assertEquals("135 ms is 35% above 100 ms: the same speed", Arrays.asList(B, A), ranked(A, B));
+    }
+
+    @Test
+    public void justOverThirtyFivePercentTheFasterSiteRanksHigher() {
+        up(A, 100, false, 10);
+        up(B, 136, false, 1000);
+        assertEquals(Arrays.asList(A, B), ranked(A, B));
+        assertEquals("whatever the user's order", Arrays.asList(A, B), ranked(B, A));
+    }
+
+    @Test
+    public void aGroupIsMeasuredFromItsFastestSiteNotFromItsLast() {
+        up(A, 100, false, 1);
+        up(B, 130, false, 5);
+        up(C, 170, false, 100); // within 35% of B, not of A: the next group
+        assertEquals(Arrays.asList(B, A, C), ranked(A, B, C));
+    }
+
+    @Test
+    public void withinAGroupEqualBooksGoByTimeAndUnknownBooksCountAsNone() {
+        up(A, 120, false, null);
+        up(B, 100, false, 0);
+        up(C, 130, false, 5);
+        assertEquals(Arrays.asList(C, B, A), ranked(A, B, C));
+    }
+
+    @Test
+    public void equalTimesKeepTheUsersOrder() {
+        up(A, 100, false, 7);
+        up(B, 100, false, 7);
+        assertEquals(Arrays.asList(A, B), ranked(A, B));
+        assertEquals(Arrays.asList(B, A), ranked(B, A));
+    }
+
+    @Test
+    public void aSiteThroughTheProxyMustBeTwiceAsFast() {
+        up(A, 190, false, 0);
+        up(B, 100, true, 0); // counts as 200 ms
+        assertEquals(Arrays.asList(A, B), ranked(B, A));
+        results.clear();
+        up(A, 210, false, 0);
+        up(B, 100, true, 0);
+        assertEquals(Arrays.asList(B, A), ranked(A, B));
+        results.clear();
+        books.clear();
+        up(A, 100, false, 1);
+        up(B, 100, true, 1000); // 200 ms: out of A's group, its books do not count
+        assertEquals(Arrays.asList(A, B), ranked(B, A));
+    }
+
+    @Test
+    public void aZeroTimeCountsAsOneMillisecond() {
+        up(A, 0, false, 0);
+        up(B, 1, false, 100);
+        assertEquals("the same time: more books first", Arrays.asList(B, A), ranked(A, B));
+    }
+
+    @Test
+    public void mirrorsOfAHigherRankedSiteFollowAllTheUniqueOnes() {
+        up(Provider.GOLOSKNIG, 50, false, 1000); // a mirror of Akniga
+        up(Provider.AKNIGA, 100, false, 1000);
+        up(Provider.IZIBUK, 400, false, 10);
+        up(Provider.OTRUB, 500, false, 10); // a mirror of Izibuk
+        up(A, 1000, false, 10);
+        down(B, ProviderPage.Status.ERROR);
+        assertEquals(Arrays.asList(Provider.GOLOSKNIG, Provider.IZIBUK, A, Provider.AKNIGA, Provider.OTRUB, B),
+                ranked(B, Provider.AKNIGA, Provider.OTRUB, Provider.GOLOSKNIG, A, Provider.IZIBUK));
+    }
+
+    @Test
+    public void theSitesThatDoNotWorkFollowInTheUsersOrder() {
+        down(A, ProviderPage.Status.ERROR);
+        down(C, ProviderPage.Status.EMPTY);
+        down(D, ProviderPage.Status.TIMEOUT);
+        down(E, ProviderPage.Status.BLOCKED);
+        down(F, ProviderPage.Status.RATE_LIMITED);
+        up(Provider.AKNIGA, 300, true, 5);
+        // B has no result
+        assertEquals(Arrays.asList(Provider.AKNIGA, F, E, A, B, D, C),
+                ranked(F, E, A, Provider.AKNIGA, B, D, C));
+        assertEquals(1, Sources.working(Arrays.asList(A, B, C, D, E, F, Provider.AKNIGA), results));
+        assertFalse(Sources.works(results.get(C)));
+        assertFalse(Sources.works(null));
+        assertTrue(Sources.works(results.get(Provider.AKNIGA)));
+    }
+
+    @Test
+    public void theFailedSitesBecomeInactiveButTheChosenCountIsNotRaised() {
+        assertEquals(3, Sources.rankedActive(5, 3));
+        assertEquals(2, Sources.rankedActive(2, 10));
+        assertEquals("at least one stays active", 1, Sources.rankedActive(5, 0));
+    }
+
+    @Test
+    public void noResultsKeepTheUsersOrder() {
+        assertEquals(Arrays.asList(C, A, B), ranked(C, A, B));
+        assertEquals(0, Sources.working(Arrays.asList(C, A, B), results));
+        assertEquals(Collections.<Provider>emptyList(), ranked());
     }
 }

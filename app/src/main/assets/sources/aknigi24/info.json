@@ -7,7 +7,9 @@
  "country": "RU",
  "cdn": null,
  "since": "2024-01",
- "blocked": null,
+ "blocked": [
+  "UA"
+ ],
  "fragments": null,
  "takedowns": true,
  "mirrors": [],

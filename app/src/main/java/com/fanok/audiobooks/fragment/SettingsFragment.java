@@ -94,14 +94,23 @@ public class SettingsFragment extends PreferenceFragmentCompat implements
     private static final String SOURCES_DIALOG = "sources_dialog";
     /** An argument of {@link #withSourcesDialog}: open the sources dialog over the screen, once. */
     private static final String ARG_OPEN_SOURCES = "openSourcesDialog";
+    /** An argument of {@link #withSourcesDialog(boolean)}: the sources dialog starts "Автоподбор" as it opens. */
+    private static final String ARG_AUTO_RANK = "autoRankSources";
 
     /** "Источники и сеть" with the sources dialog open: where the source screens send "Управление источниками". */
     @NonNull
     public static SettingsFragment withSourcesDialog() {
+        return withSourcesDialog(false);
+    }
+
+    /** {@link #withSourcesDialog()}; with {@code autoRank} the dialog starts "Автоподбор" as it opens. */
+    @NonNull
+    public static SettingsFragment withSourcesDialog(boolean autoRank) {
         SettingsFragment fragment = new SettingsFragment();
         Bundle args = new Bundle();
         args.putString("rootKey", "group_sources");
         args.putBoolean(ARG_OPEN_SOURCES, true);
+        args.putBoolean(ARG_AUTO_RANK, autoRank);
         fragment.setArguments(args);
         return fragment;
     }
@@ -373,7 +382,8 @@ public class SettingsFragment extends PreferenceFragmentCompat implements
         initSourcesEntry();
         if (savedInstanceState == null && getArguments() != null && getArguments().getBoolean(ARG_OPEN_SOURCES)
                 && getChildFragmentManager().findFragmentByTag(SourcesDialogFragment.TAG) == null) {
-            new SourcesDialogFragment().show(getChildFragmentManager(), SourcesDialogFragment.TAG);
+            (getArguments().getBoolean(ARG_AUTO_RANK) ? SourcesDialogFragment.autoRanking()
+                    : new SourcesDialogFragment()).show(getChildFragmentManager(), SourcesDialogFragment.TAG);
         }
         getChildFragmentManager().setFragmentResultListener(SourcesDialogFragment.RESULT_CLOSED, this,
                 (requestKey, result) -> {

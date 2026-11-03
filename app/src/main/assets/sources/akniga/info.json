@@ -7,7 +7,9 @@
  "country": null,
  "cdn": "DDoS-Guard",
  "since": "2014-07",
- "blocked": [],
+ "blocked": [
+  "UA"
+ ],
  "fragments": "some",
  "takedowns": null,
  "mirrors": [],

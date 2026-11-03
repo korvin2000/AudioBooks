@@ -18,6 +18,7 @@ import androidx.appcompat.app.AlertDialog;
 import androidx.fragment.app.DialogFragment;
 
 import com.fanok.audiobooks.R;
+import com.fanok.audiobooks.Url;
 import com.fanok.audiobooks.net.AppProxy;
 import com.fanok.audiobooks.net.ProxyConfig;
 import com.fanok.audiobooks.net.ProxyCandidate;
@@ -133,8 +134,10 @@ public class ProxyDialogFragment extends DialogFragment implements ProxyFinder.L
         boolean scanning = state.phase == ProxyFinder.Phase.SCANNING;
         progress.setVisibility(scanning ? View.VISIBLE : View.GONE);
         if (scanning) {
-            progress.setIndeterminate(state.total == 0);
-            if (state.total > 0) {
+            // the list download, and the site pass after the control checks: no count to show
+            boolean counted = state.total > 0 && state.site == null;
+            progress.setIndeterminate(!counted);
+            if (counted) {
                 progress.setMax(state.total);
                 progress.setProgress(state.tested);
             }
@@ -145,12 +148,20 @@ public class ProxyDialogFragment extends DialogFragment implements ProxyFinder.L
         status.setVisibility(text.length() > 0 ? View.VISIBLE : View.GONE);
     }
 
-    /** The automatic mode's status line in the dialog; empty before the first search. */
+    /**
+     * The automatic mode's status in the dialog; empty before the first search. Under the proxy in use, a second line
+     * says how the site ranked the search's proxies, or that a search found nothing new; a search that found nothing
+     * tells a network that blocks every proxy (no control server answered through any) from a lack of lists.
+     */
     @NonNull
     static CharSequence statusText(@NonNull Context context, @NonNull ProxyFinder.State state) {
         ProxyCandidate current = state.current;
         if (state.phase == ProxyFinder.Phase.SCANNING) {
-            return state.total == 0 ? context.getString(R.string.proxy_status_lists)
+            if (state.total == 0) {
+                return context.getString(R.string.proxy_status_lists);
+            }
+            return state.site != null
+                    ? context.getString(R.string.proxy_status_site_check, state.found, Url.hostOf(state.site))
                     : context.getString(R.string.proxy_status_scanning, state.tested, state.total, state.found);
         }
         if (state.phase == ProxyFinder.Phase.NO_NETWORK) {
@@ -158,12 +169,19 @@ public class ProxyDialogFragment extends DialogFragment implements ProxyFinder.L
         }
         if (current != null) {
             long ms = Math.max(0, current.latencyMs());
-            return state.spares > 0
+            String working = state.spares > 0
                     ? context.getString(R.string.proxy_status_working_spares, current.label(), ms, state.spares)
                     : context.getString(R.string.proxy_status_working, current.label(), ms);
+            if (state.phase == ProxyFinder.Phase.KEPT) {
+                return working + "\n" + context.getString(R.string.proxy_status_kept);
+            }
+            return state.site == null || state.found == 0 ? working : working + "\n" + context.getString(
+                    R.string.proxy_status_site, Url.hostOf(state.site), state.sitePassed, state.found);
         }
         if (state.phase == ProxyFinder.Phase.FAILED || state.lastScanAt > 0) {
-            return context.getString(R.string.proxy_status_not_found);
+            return state.found == 0 && state.tested > 0
+                    ? context.getString(R.string.proxy_status_not_found_silent, state.tested)
+                    : context.getString(R.string.proxy_status_not_found);
         }
         return "";
     }

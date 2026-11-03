@@ -666,6 +666,15 @@
     <string name="sources_status_rate_limited">лимит запросов</string>
     <string name="sources_status_timeout">нет ответа</string>
     <string name="sources_status_error">ошибка</string>
+    <string name="sources_autorank">Автоподбор</string>
+    <string name="sources_autorank_done">Источники упорядочены: работают %1$d из %2$d</string>
+    <string name="sources_autorank_offline">Ни один сайт не ответил: порядок не изменён. Проверьте подключение</string>
+    <string name="sources_autorank_failed">Автоподбор не удался: порядок не изменён</string>
+    <string name="sources_ranked_at">автоподбор %1$s</string>
+    <string name="sources_autorank_offer_title">Подобрать источники автоматически?</string>
+    <string name="sources_autorank_offer_message">Приложение проверит каждый сайт и поставит наверх быстрые, с большим числом книг, работающие без прокси и не повторяющие друг друга. Порядок потом можно изменить вручную.</string>
+    <string name="sources_autorank_offer_yes">Подобрать</string>
+    <string name="sources_autorank_offer_no">Не сейчас</string>
     <!-- BooksFragment: a listing of the selected site failed; offered once per site while the app runs -->
     <string name="route_offer_proxy">%1$s не отвечает напрямую</string>
     <string name="route_offer_proxy_action">Через прокси</string>

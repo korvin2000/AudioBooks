@@ -29,7 +29,7 @@ public class SourceInfoTest {
     private static final long COVER_BYTES = 12 * 1024;
     private static final long ICON_BYTES = 5 * 1024;
     private static final long INFO_BYTES = 2 * 1024;
-    private static final Set<String> REGIONS = new HashSet<>(Arrays.asList("RU", "UA"));
+    private static final Set<String> REGIONS = new HashSet<>(Arrays.asList("RU", "UA", "WEST", "OTHER"));
 
     private static File root() {
         File dir = new File("src/main/assets/" + SourceInfo.ROOT);
@@ -93,8 +93,39 @@ public class SourceInfoTest {
         assertEquals(Boolean.TRUE, ru.blockedIn(Region.RUSSIA));
         assertEquals(Boolean.FALSE, ru.blockedIn(Region.UKRAINE));
         assertEquals(Boolean.FALSE, ru.blockedIn(Region.WEST));
+        assertEquals(Boolean.FALSE, ru.blockedIn(Region.OTHER));
         assertNull("no region yet", ru.blockedIn(null));
         assertNull("unknown", SourceInfo.parse(new StringReader("{\"about\": \"Сайт.\"}")).blockedIn(Region.RUSSIA));
+    }
+
+    @Test
+    public void everyRegionHasItsOwnKey() {
+        SourceInfo elsewhere = SourceInfo.parse(new StringReader(
+                "{\"about\": \"Сайт.\", \"blocked\": [\"UA\", \"WEST\", \"OTHER\"]}"));
+        assertEquals(Boolean.FALSE, elsewhere.blockedIn(Region.RUSSIA));
+        assertEquals(Boolean.TRUE, elsewhere.blockedIn(Region.UKRAINE));
+        assertEquals(Boolean.TRUE, elsewhere.blockedIn(Region.WEST));
+        assertEquals(Boolean.TRUE, elsewhere.blockedIn(Region.OTHER));
+        SourceInfo nowhere = SourceInfo.parse(new StringReader("{\"about\": \"Сайт.\", \"blocked\": []}"));
+        for (Region region : Region.values()) {
+            assertEquals(region + ": known to work", Boolean.FALSE, nowhere.blockedIn(region));
+        }
+    }
+
+    /** Measured live on 2026-11-03 from home connections in each region. */
+    @Test
+    public void theMeasuredRegionsAreInTheFacts() throws IOException {
+        assertEquals(Arrays.asList("UA"), read(Provider.AKNIGA).blocked);
+        assertEquals(Arrays.asList("RU"), read(Provider.AUDIOBOO).blocked);
+        for (Provider provider : new Provider[]{Provider.KNIGAVUHE, Provider.IZIBUK, Provider.OTRUB, Provider.BIBLUS}) {
+            assertEquals(provider + " works from Russia", Boolean.FALSE, read(provider).blockedIn(Region.RUSSIA));
+        }
+        for (Provider provider : Provider.values()) {
+            SourceInfo facts = read(provider);
+            assertNotNull(provider + " was measured", facts.blocked);
+            assertEquals(provider + " works from the west", Boolean.FALSE, facts.blockedIn(Region.WEST));
+            assertEquals(provider + " works elsewhere", Boolean.FALSE, facts.blockedIn(Region.OTHER));
+        }
     }
 
     @Test
