@@ -27,8 +27,9 @@ interface CloudService {
 
     /**
      * Prepares the sign-in on {@code host} while it is being created (activity results are registered then). The
-     * returned action asks the user; once they agree, {@code finish} gets the blocking last step that names the
-     * account, which the sync runs on its own thread.
+     * returned action asks the user; once they answer, {@code finish} gets the blocking last step that names the
+     * account (null when they closed the sign-in; throws, with the reason, when it was refused), which the sync runs
+     * on its own thread.
      */
     @NonNull
     Runnable signIn(@NonNull Fragment host, @NonNull Consumer<Callable<CloudAccount>> finish);

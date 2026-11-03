@@ -228,7 +228,11 @@ public final class CloudSync {
      * connecting, so a later attempt to the same cloud still counts.
      */
     static void choose(@NonNull Context context, @Nullable CloudService service) {
-        prefs(context).edit().putString(PREF_CHOSEN, service == null ? "" : service.id()).apply();
+        SharedPreferences.Editor edit = prefs(context).edit().putString(PREF_CHOSEN, service == null ? "" : service.id());
+        if (connected(context) == null) {
+            edit.remove(PREF_ERROR); // the last sign-in's failure: a new attempt tells its own
+        }
+        edit.apply();
     }
 
     /**
@@ -240,13 +244,16 @@ public final class CloudSync {
         Context app = context.getApplicationContext();
         return last -> WORKER.execute(() -> {
             try {
-                CloudAccount account = last.call();
-                if (service.id().equals(prefs(app).getString(PREF_CHOSEN, null))) {
+                CloudAccount account = last.call(); // null: the user closed the sign-in
+                if (account != null && service.id().equals(prefs(app).getString(PREF_CHOSEN, null))) {
                     connect(app, service, account);
                 }
             } catch (Exception e) {
                 Log.w(TAG, "Sign-in failed", e);
                 String reason = e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName();
+                if (connected(app) == null) { // the screen shows it whole; a toast keeps two lines
+                    prefs(app).edit().putString(PREF_ERROR, reason).apply();
+                }
                 MAIN.post(() -> Toast.makeText(app, app.getString(R.string.sync_sign_in_failed, reason),
                         Toast.LENGTH_LONG).show());
             }
@@ -277,11 +284,17 @@ public final class CloudSync {
         return prefs(context).getString(PREF_ERROR, "").isEmpty();
     }
 
-    /** The status line: the account and the last sync, or why it failed. */
-    @NonNull
+    /**
+     * The status line: with a cloud connected, the account and the last sync or why it failed; with none, why the
+     * last sign-in failed, or null.
+     */
+    @Nullable
     static String status(@NonNull Context context) {
         SharedPreferences prefs = prefs(context);
         String error = prefs.getString(PREF_ERROR, "");
+        if (connected(context) == null) {
+            return error.isEmpty() ? null : context.getString(R.string.sync_sign_in_failed, error);
+        }
         if (!error.isEmpty()) {
             return context.getString(R.string.sync_failed, error);
         }

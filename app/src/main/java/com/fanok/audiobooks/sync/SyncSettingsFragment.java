@@ -99,8 +99,9 @@ public class SyncSettingsFragment extends PreferenceFragmentCompat
         cloud.setEntryValues(ids.toArray(new CharSequence[0]));
         cloud.setValue(connected == null ? "" : connected.id());
         cloud.setSummary(cloud.getEntry());
+        String status = CloudSync.status(context);
         now.setEnabled(connected != null);
-        now.setSummary(connected != null ? CloudSync.status(context)
+        now.setSummary(status != null ? status
                 : getString(ids.size() > 1 ? R.string.sync_summary : R.string.sync_unavailable));
     }
 

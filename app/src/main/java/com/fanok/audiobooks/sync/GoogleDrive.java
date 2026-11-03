@@ -1,7 +1,6 @@
 package com.fanok.audiobooks.sync;
 
 import android.accounts.Account;
-import android.app.Activity;
 import android.content.Context;
 import android.content.Intent;
 import androidx.activity.result.ActivityResultLauncher;
@@ -97,23 +96,50 @@ final class GoogleDrive implements Cloud {
             ActivityResultLauncher<IntentSenderRequest> consent = host.registerForActivityResult(
                     new ActivityResultContracts.StartIntentSenderForResult(), result -> {
                         Intent data = result.getData();
-                        if (result.getResultCode() == Activity.RESULT_OK && data != null) { // else cancelled
+                        if (data != null) { // none: closed without an answer
                             Context app = host.requireContext().getApplicationContext();
-                            finish.accept(() -> account(
-                                    Identity.getAuthorizationClient(app).getAuthorizationResultFromIntent(data)));
+                            finish.accept(() -> granted(app, data));
                         }
                     });
-            return () -> authorize(host.requireContext(), null)
-                    .addOnSuccessListener(result -> {
-                        if (!result.hasResolution() || result.getPendingIntent() == null) {
-                            finish.accept(() -> account(result)); // granted before
-                        } else if (host.isAdded()) {
-                            consent.launch(new IntentSenderRequest.Builder(result.getPendingIntent()).build());
-                        }
-                    })
-                    .addOnFailureListener(e -> finish.accept(() -> {
-                        throw e;
-                    }));
+            return () -> {
+                Context app = host.requireContext().getApplicationContext();
+                authorize(host.requireContext(), null)
+                        .addOnSuccessListener(result -> {
+                            if (!result.hasResolution() || result.getPendingIntent() == null) {
+                                finish.accept(() -> account(result)); // granted before
+                            } else if (host.isAdded()) {
+                                consent.launch(new IntentSenderRequest.Builder(result.getPendingIntent()).build());
+                            }
+                        })
+                        .addOnFailureListener(e -> finish.accept(() -> {
+                            throw e instanceof ApiException ? refusal(app, (ApiException) e) : e;
+                        }));
+            };
+        }
+
+        /**
+         * The account the consent screen granted, or null when the user closed it. A refusal comes back as a
+         * cancelled result too, with its reason in {@code data}: an app Google does not know is no cancel.
+         */
+        @Nullable
+        private static CloudAccount granted(Context app, Intent data) throws IOException {
+            try {
+                return account(Identity.getAuthorizationClient(app).getAuthorizationResultFromIntent(data));
+            } catch (ApiException e) {
+                if (e.getStatusCode() == CommonStatusCodes.CANCELED) {
+                    return null;
+                }
+                throw refusal(app, e);
+            }
+        }
+
+        /** Why Google refused, in words: an unregistered app (10) is the developer's setup, not the user's. */
+        private static IOException refusal(Context app, ApiException e) {
+            int code = e.getStatusCode();
+            return new IOException(code == CommonStatusCodes.DEVELOPER_ERROR
+                    ? app.getString(R.string.sync_google_unregistered)
+                    : code == CommonStatusCodes.NETWORK_ERROR ? app.getString(R.string.sync_offline)
+                    : "Google " + code + ": " + CommonStatusCodes.getStatusCodeString(code), e);
         }
 
         @NonNull

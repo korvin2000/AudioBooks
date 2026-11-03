@@ -1,11 +1,8 @@
 package com.fanok.audiobooks.sync;
 
-import android.content.ActivityNotFoundException;
 import android.content.Context;
-import android.content.Intent;
-import android.net.Uri;
-import android.util.Base64;
-import android.widget.Toast;
+import android.text.TextUtils;
+import androidx.activity.result.ActivityResultLauncher;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
@@ -15,17 +12,19 @@ import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParseException;
 import com.google.gson.JsonParser;
+import com.yandex.authsdk.YandexAuthException;
+import com.yandex.authsdk.YandexAuthLoginOptions;
+import com.yandex.authsdk.YandexAuthOptions;
+import com.yandex.authsdk.YandexAuthResult;
+import com.yandex.authsdk.YandexAuthSdk;
 import java.io.IOException;
 import java.io.InterruptedIOException;
 import java.math.BigInteger;
-import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
-import java.security.SecureRandom;
 import java.util.Locale;
 import java.util.concurrent.Callable;
 import java.util.function.Consumer;
-import okhttp3.FormBody;
 import okhttp3.HttpUrl;
 import okhttp3.MediaType;
 import okhttp3.OkHttpClient;
@@ -33,32 +32,30 @@ import okhttp3.Request;
 import okhttp3.RequestBody;
 import okhttp3.Response;
 
-/**
- * The sync file in the app folder of Yandex Disk, through the REST API. Sign-in: the browser shows a confirmation code
- * that the user types into the app; PKCE stands in for a client secret, which an app cannot keep.
- */
+/** The sync file in the app folder of Yandex Disk, through the REST API with the user's OAuth token. */
 final class YandexDisk implements Cloud {
 
-    private static final String API = "https://cloud-api.yandex.net/v1/disk/resources";
+    private static final String DISK = "https://cloud-api.yandex.net/v1/disk", API = DISK + "/resources";
     private static final String PATH = "app:/" + FILE;
     private static final MediaType OCTETS = MediaType.get("application/octet-stream");
 
+    private final Context app;
     private final String auth;
     private final OkHttpClient http;
 
-    YandexDisk(@NonNull String token, @NonNull OkHttpClient http) {
+    YandexDisk(@NonNull Context app, @NonNull String token, @NonNull OkHttpClient http) {
+        this.app = app;
         this.auth = "OAuth " + token;
         this.http = http;
     }
 
     /**
-     * Yandex Disk for the sync: offered when the build has a registered OAuth app (YANDEX_CLIENT_ID). The user
-     * allows the access in the browser, whose page then shows a code to type in here.
+     * Yandex Disk for the sync: offered when the build has a registered OAuth app (YANDEX_CLIENT_ID). Sign-in is
+     * Yandex's own LoginSDK: the Yandex app if installed, else a browser tab, else a WebView; the user signs in to their
+     * Yandex ID and comes back here with a token. The OAuth app's Android platform (package and signing key) is what
+     * lets the browser hand the token back.
      */
     static final class Service implements CloudService {
-
-        /** The fragment result of the code the user typed in. */
-        private static final String CODE_KEY = "yandex-code";
 
         @NonNull
         @Override
@@ -79,69 +76,43 @@ final class YandexDisk implements Cloud {
         @NonNull
         @Override
         public Runnable signIn(@NonNull Fragment host, @NonNull Consumer<Callable<CloudAccount>> finish) {
-            host.getChildFragmentManager().setFragmentResultListener(CODE_KEY, host, (key, result) -> {
-                String code = result.getString(CodeDialog.CODE, ""), verifier = result.getString(CodeDialog.STATE, "");
-                finish.accept(() -> new CloudAccount(null, token(CloudSync.http(), code, verifier)));
-            });
-            return () -> {
-                String verifier = verifier();
-                CodeDialog.ask(host, CODE_KEY, R.string.sync_yandex, R.string.sync_yandex_code, verifier);
-                try {
-                    host.startActivity(new Intent(Intent.ACTION_VIEW, authUrl(verifier)));
-                } catch (ActivityNotFoundException e) {
-                    Toast.makeText(host.requireContext(), R.string.sync_no_browser, Toast.LENGTH_LONG).show();
-                }
-            };
+            if (BuildConfig.YANDEX_CLIENT_ID.isEmpty()) {
+                return () -> { }; // the SDK refuses to start without a client id; the option is not offered then
+            }
+            ActivityResultLauncher<YandexAuthLoginOptions> login = host.registerForActivityResult(
+                    YandexAuthSdk.create(new YandexAuthOptions(host.requireContext())).getContract(), result -> {
+                        if (result instanceof YandexAuthResult.Success) {
+                            String token = ((YandexAuthResult.Success) result).getToken().getValue();
+                            Context app = host.requireContext().getApplicationContext();
+                            finish.accept(() -> account(app, token));
+                        } else if (result instanceof YandexAuthResult.Failure) {
+                            YandexAuthException e = ((YandexAuthResult.Failure) result).getException();
+                            finish.accept(() -> {
+                                throw new IOException("Yandex: " + TextUtils.join(", ", e.getErrors()), e);
+                            });
+                        } // cancelled: the user closed the sign-in
+                    });
+            return () -> login.launch(new YandexAuthLoginOptions());
+        }
+
+        /**
+         * The account behind {@code token}, named by its login, once its Disk answers: a Yandex ID without a Disk is
+         * turned away here rather than failing every sync.
+         */
+        private static CloudAccount account(Context app, String token) throws IOException {
+            YandexDisk disk = new YandexDisk(app, token, CloudSync.http());
+            try (Response response = disk.call(new Request.Builder().url(DISK))) {
+                disk.check(response);
+                JsonElement user = json(response).get("user");
+                return new CloudAccount(user != null && user.isJsonObject() ? string(user.getAsJsonObject(), "login")
+                        : null, token);
+            }
         }
 
         @NonNull
         @Override
         public Cloud open(@NonNull Context app, @NonNull CloudAccount account, @NonNull OkHttpClient http) {
-            return new YandexDisk(account.token != null ? account.token : "", http);
-        }
-    }
-
-    /** A new PKCE code verifier, kept until the user enters the code. */
-    @NonNull
-    static String verifier() {
-        byte[] random = new byte[32];
-        new SecureRandom().nextBytes(random);
-        return base64(random);
-    }
-
-    /** The page where the user picks an account, allows access and gets the code for {@link #token}. */
-    @NonNull
-    static Uri authUrl(@NonNull String verifier) {
-        byte[] challenge;
-        try {
-            challenge = MessageDigest.getInstance("SHA-256").digest(verifier.getBytes(StandardCharsets.US_ASCII));
-        } catch (NoSuchAlgorithmException e) {
-            throw new IllegalStateException(e);
-        }
-        return Uri.parse("https://oauth.yandex.ru/authorize").buildUpon()
-                .appendQueryParameter("response_type", "code")
-                .appendQueryParameter("client_id", BuildConfig.YANDEX_CLIENT_ID)
-                .appendQueryParameter("code_challenge", base64(challenge))
-                .appendQueryParameter("code_challenge_method", "S256")
-                .appendQueryParameter("force_confirm", "yes")
-                .build();
-    }
-
-    /** Exchanges the code the user typed for an access token. */
-    @NonNull
-    static String token(@NonNull OkHttpClient http, @NonNull String code, @NonNull String verifier)
-            throws IOException {
-        Request request = new Request.Builder().url("https://oauth.yandex.ru/token").post(new FormBody.Builder()
-                .add("grant_type", "authorization_code")
-                .add("code", code.trim())
-                .add("client_id", BuildConfig.YANDEX_CLIENT_ID)
-                .add("code_verifier", verifier)
-                .build()).build();
-        try (Response response = Cloud.send(http, request)) {
-            if (!response.isSuccessful()) {
-                throw failure("Yandex sign-in", response, "error_description", "error");
-            }
-            return field(json(response), "access_token");
+            return new YandexDisk(app, account.token != null ? account.token : "", http);
         }
     }
 
@@ -237,7 +208,7 @@ final class YandexDisk implements Cloud {
         }
     }
 
-    private static void check(Response response) throws IOException {
+    private void check(Response response) throws IOException {
         if (response.isSuccessful()) {
             return;
         }
@@ -247,18 +218,16 @@ final class YandexDisk implements Cloud {
         if (response.code() == 507) {
             throw new IOException("Yandex Disk is full");
         }
-        throw failure("Yandex Disk", response, "message", "description");
-    }
-
-    /** "{@code what} HTTP code: text", the text from the first of two fields of the error JSON that is present. */
-    private static IOException failure(String what, Response response, String first, String second)
-            throws IOException {
         JsonObject json = json(response);
-        String text = string(json, first);
-        if (text == null) {
-            text = string(json, second);
+        String error = string(json, "error");
+        if (error != null && error.contains("UnsupportedUserAccountType")) { // a Yandex ID registered with other mail
+            throw new IOException(app.getString(R.string.sync_yandex_no_disk));
         }
-        return new IOException(what + " HTTP " + response.code() + (text != null ? ": " + text : ""));
+        String text = string(json, "message");
+        if (text == null) {
+            text = string(json, "description");
+        }
+        throw new IOException("Yandex Disk HTTP " + response.code() + (text != null ? ": " + text : ""));
     }
 
     /** The body as a JSON object; empty when it is not one (an HTML error page of a proxy or the storage). */
@@ -283,9 +252,5 @@ final class YandexDisk implements Cloud {
             throw new IOException("Yandex Disk: no " + name + " in the answer");
         }
         return value;
-    }
-
-    private static String base64(byte[] bytes) {
-        return Base64.encodeToString(bytes, Base64.URL_SAFE | Base64.NO_PADDING | Base64.NO_WRAP);
     }
 }
