@@ -1117,6 +1117,9 @@ public class ProxyFinderTest {
         network.latency.put("2.2.2.2:80", 200L);
         network.latency.put("3.3.3.3:80", 300L);
         network.latency.put("4.4.4.4:1080", 400L);
+        // the search's site check stops once three passed: on a real network the 400 ms one answers last and is cut
+        // off. The fake answers at once whatever latency it reports, so it waits until the check is over, not racing
+        network.script = (label, url, attempt) -> url.equals(TARGET) && label.equals("4.4.4.4:1080") ? stall() : null;
         ProxyFinder finder = finder();
         finder.rescan();
 
