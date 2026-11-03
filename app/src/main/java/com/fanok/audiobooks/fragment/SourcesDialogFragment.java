@@ -17,6 +17,7 @@ import android.view.LayoutInflater;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.Button;
 import android.widget.ImageButton;
 import android.widget.ImageView;
 import android.widget.TextView;
@@ -39,15 +40,20 @@ import com.fanok.audiobooks.activity.SourceActivity;
 import com.fanok.audiobooks.net.AppProxy;
 import com.fanok.audiobooks.search.Provider;
 import com.fanok.audiobooks.search.SourceHealth;
+import com.fanok.audiobooks.search.SourceInfo;
 import com.fanok.audiobooks.search.SourceProbe;
+import com.fanok.audiobooks.search.SourceSnapshot;
 import com.fanok.audiobooks.search.Sources;
 import com.fanok.audiobooks.util.RussianDates;
 import com.google.android.material.color.MaterialColors;
 
+import io.reactivex.Single;
 import io.reactivex.android.schedulers.AndroidSchedulers;
 import io.reactivex.disposables.CompositeDisposable;
+import io.reactivex.schedulers.Schedulers;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.EnumMap;
 import java.util.EnumSet;
@@ -60,12 +66,15 @@ import java.util.Set;
  * their count; each row carries the site's last availability result and its route (direct or through the proxy).
  * Every change applies at once. The availability is checked only on request (the refresh button), for a site whose
  * route changed, and for a site that becomes active without a kept result: never on opening, it costs traffic.
+ * "Автоподбор" checks every site and orders them by {@link Sources#ranked}.
  */
 public class SourcesDialogFragment extends DialogFragment {
 
     public static final String TAG = "SourcesDialogFragment";
     /** Sent to the parent's fragment manager when the dialog closes. */
     public static final String RESULT_CLOSED = "sources_dialog_closed";
+    /** An argument of {@link #autoRanking}: start "Автоподбор" once, when the dialog is first shown. */
+    private static final String ARG_AUTO_RANK = "autoRank";
 
     private static final int TYPE_SOURCE = 0;
     private static final int TYPE_DIVIDER = 1;
@@ -99,6 +108,12 @@ public class SourcesDialogFragment extends DialogFragment {
     private View refreshProgress;
     /** Checks under way; the refresh button is a spinner while there is one. */
     private int running;
+    /** "Автоподбор" is under way: its button is off. */
+    private boolean ranking;
+    /** "Автоподбор" waits for the dialog's buttons ({@link #onStart}): asked by {@link #ARG_AUTO_RANK}. */
+    private boolean rankPending;
+    @Nullable
+    private Button rankButton;
     private final Runnable sync = this::sync;
     /** A field: SharedPreferences holds its listeners weakly. */
     private final SharedPreferences.OnSharedPreferenceChangeListener listener = (p, key) -> {
@@ -108,6 +123,16 @@ public class SourcesDialogFragment extends DialogFragment {
             hint.post(sync);
         }
     };
+
+    /** The dialog that starts "Автоподбор" as it opens. */
+    @NonNull
+    public static SourcesDialogFragment autoRanking() {
+        SourcesDialogFragment fragment = new SourcesDialogFragment();
+        Bundle args = new Bundle();
+        args.putBoolean(ARG_AUTO_RANK, true);
+        fragment.setArguments(args);
+        return fragment;
+    }
 
     @NonNull
     @Override
@@ -122,6 +147,12 @@ public class SourcesDialogFragment extends DialogFragment {
         results.putAll(SourceHealth.last(prefs));
         checking.clear();
         running = 0;
+        ranking = false; // a rotation cleared its checks
+        Bundle args = getArguments();
+        if (savedInstanceState == null && args != null && args.getBoolean(ARG_AUTO_RANK)) {
+            args.remove(ARG_AUTO_RANK); // once: not again when the dialog is built anew
+            rankPending = true;
+        }
 
         AlertDialog.Builder builder = new AlertDialog.Builder(context);
         View view = LayoutInflater.from(builder.getContext()).inflate(R.layout.dialog_sources, null, false);
@@ -152,6 +183,7 @@ public class SourcesDialogFragment extends DialogFragment {
         return builder.setTitle(R.string.sources_title)
                 .setView(view)
                 .setPositiveButton(R.string.proxy_close, null)
+                .setNeutralButton(R.string.sources_autorank, null)
                 .create();
     }
 
@@ -159,6 +191,17 @@ public class SourcesDialogFragment extends DialogFragment {
     public void onStart() {
         super.onStart();
         prefs.registerOnSharedPreferenceChangeListener(listener);
+        AlertDialog dialog = (AlertDialog) getDialog();
+        if (dialog != null) {
+            // set here, not in the builder: the dialog stays open, the ranking shows on its rows
+            rankButton = dialog.getButton(DialogInterface.BUTTON_NEUTRAL);
+            rankButton.setOnClickListener(v -> autoRank());
+            renderRank();
+        }
+        if (rankPending) {
+            rankPending = false;
+            autoRank();
+        }
     }
 
     @Override
@@ -237,9 +280,71 @@ public class SourcesDialogFragment extends DialogFragment {
 
     private void renderCheckedAt() {
         long at = SourceHealth.lastCheckedAt(prefs);
+        long rankedAt = prefs.getLong(Sources.PREF_RANKED_AT, 0);
         Context context = checkedAt.getContext();
-        checkedAt.setText(at == 0 ? context.getString(R.string.sources_never_checked)
-                : context.getString(R.string.sources_checked_at, RussianDates.dayAndTime(at)));
+        String text = at == 0 ? context.getString(R.string.sources_never_checked)
+                : context.getString(R.string.sources_checked_at, RussianDates.dayAndTime(at));
+        checkedAt.setText(rankedAt <= 0 ? text : text + SourceTexts.SEP
+                + context.getString(R.string.sources_ranked_at, RussianDates.dayAndTime(rankedAt)));
+    }
+
+    private void renderRank() {
+        if (rankButton != null) {
+            rankButton.setEnabled(!ranking);
+        }
+    }
+
+    /**
+     * "Автоподбор": the recommended routes of the region ({@link AppProxy#applyRegionDefaults}), a check of every site,
+     * then the order of {@link Sources#ranked} with the failed sites inactive, undoable from a snackbar. The order stays
+     * when no site worked (the region's routes are kept). A rotation stops it, as it stops the refresh.
+     */
+    private void autoRank() {
+        if (ranking) {
+            return;
+        }
+        ranking = true;
+        renderRank();
+        Context app = requireContext().getApplicationContext();
+        SourceSnapshot before = SourceSnapshot.take(prefs); // the routes too: the region's ones are part of the change
+        disposables.add(Single.fromCallable(() -> {
+            AppProxy.applyRegionDefaults(app);
+            Map<Provider, Integer> books = new EnumMap<>(Provider.class);
+            for (Provider provider : Provider.values()) {
+                SourceInfo info = SourceInfo.of(app, provider);
+                if (info != null && info.books != null) {
+                    books.put(provider, info.books);
+                }
+            }
+            return books;
+        }).subscribeOn(Schedulers.io())
+                .observeOn(AndroidSchedulers.mainThread())
+                .subscribe(books -> check(Arrays.asList(Provider.values()), PARALLEL,
+                        complete -> onRanked(before, complete, books)),
+                        e -> onRanked(before, false, Collections.<Provider, Integer>emptyMap())));
+    }
+
+    /**
+     * The end of the check of "Автоподбор". The rows' results rank: each site's latest accepted one, so a site whose
+     * route changed meanwhile counts by its newer check, not by the one this run made on the old route.
+     */
+    private void onRanked(@NonNull SourceSnapshot before, boolean complete, @NonNull Map<Provider, Integer> books) {
+        ranking = false;
+        renderRank();
+        Context context = requireContext();
+        List<Provider> order = Sources.all();
+        Map<Provider, SourceProbe.Result> got = new EnumMap<>(results);
+        int working = Sources.working(order, got);
+        if (!complete || working == 0) {
+            Toast.makeText(context, complete ? R.string.sources_autorank_offline : R.string.sources_autorank_failed,
+                    Toast.LENGTH_LONG).show();
+            return;
+        }
+        Sources.save(prefs, Sources.ranked(order, got, books), Sources.rankedActive(Sources.activeCount(), working));
+        prefs.edit().putLong(Sources.PREF_RANKED_AT, System.currentTimeMillis()).apply();
+        sync();
+        SourceActions.show(checkedAt, prefs, before, SourceSnapshot.take(prefs),
+                context.getString(R.string.sources_autorank_done, working, order.size()));
     }
 
     private void renderRefresh() {
@@ -274,8 +379,18 @@ public class SourcesDialogFragment extends DialogFragment {
         }
     }
 
+    /** The end of a check: whether it reached every site (false: it failed). */
+    private interface OnChecked {
+        void ended(boolean complete);
+    }
+
     /** Checks {@code providers} now; each row shows the check until its result comes. */
     private void check(@NonNull List<Provider> providers, int parallel) {
+        check(providers, parallel, null);
+    }
+
+    /** {@link #check(List, int)}, then {@code done}, when given, as it ends. */
+    private void check(@NonNull List<Provider> providers, int parallel, @Nullable OnChecked done) {
         if (providers.isEmpty()) {
             return;
         }
@@ -292,7 +407,17 @@ public class SourcesDialogFragment extends DialogFragment {
         renderRefresh();
         disposables.add(SourceHealth.check(prefs, providers, parallel)
                 .observeOn(AndroidSchedulers.mainThread())
-                .subscribe(result -> onResult(result, expected), e -> onChecked(expected), () -> onChecked(expected)));
+                .subscribe(result -> onResult(result, expected), e -> {
+                    onChecked(expected);
+                    if (done != null) {
+                        done.ended(false);
+                    }
+                }, () -> {
+                    onChecked(expected);
+                    if (done != null) {
+                        done.ended(true);
+                    }
+                }));
     }
 
     private void onResult(@NonNull SourceProbe.Result result, @NonNull Map<Provider, Integer> expected) {

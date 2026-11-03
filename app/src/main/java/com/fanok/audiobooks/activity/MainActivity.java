@@ -49,6 +49,7 @@ import com.fanok.audiobooks.R;
 import com.fanok.audiobooks.fragment.BooksFragment;
 import com.fanok.audiobooks.fragment.FavoriteFragment;
 import com.fanok.audiobooks.fragment.SettingsFragment;
+import com.fanok.audiobooks.fragment.SourcesDialogFragment;
 import com.fanok.audiobooks.interface_pacatge.main.MainView;
 import com.fanok.audiobooks.model.BooksDBModel;
 import com.fanok.audiobooks.pojo.BookPOJO;
@@ -59,6 +60,7 @@ import com.fanok.audiobooks.service.MediaPlayerService;
 import com.fanok.audiobooks.region.AppRegion;
 import com.fanok.audiobooks.search.Provider;
 import com.fanok.audiobooks.search.SourceSnapshot;
+import com.fanok.audiobooks.search.Sources;
 import com.fanok.audiobooks.update.Updater;
 import com.google.android.material.navigation.NavigationView;
 import com.google.android.material.snackbar.Snackbar;
@@ -228,7 +230,12 @@ public class MainActivity extends MvpAppCompatActivity
 
     /** Settings → "Источники и сеть" with the sources dialog open; Back returns here. */
     public void showSourcesSettings() {
-        showFragment(SettingsFragment.withSourcesDialog(), "settingsSources");
+        showSourcesSettings(false);
+    }
+
+    /** {@link #showSourcesSettings()}; with {@code autoRank} the dialog starts "Автоподбор" as it opens. */
+    public void showSourcesSettings(boolean autoRank) {
+        showFragment(SettingsFragment.withSourcesDialog(autoRank), "settingsSources");
     }
 
     /**
@@ -317,6 +324,9 @@ public class MainActivity extends MvpAppCompatActivity
         }
         if (shouldAskBatteryOptimization()) {
             dialogs.add(this::showBatteryDialog);
+        }
+        if (!PreferenceManager.getDefaultSharedPreferences(this).contains(Sources.PREF_RANKED_AT)) {
+            dialogs.add(this::showAutoRankDialog);
         }
     }
 
@@ -458,6 +468,50 @@ public class MainActivity extends MvpAppCompatActivity
                         (dialogInterface, i) -> mPresenter.openSettingsOptimizeBattery(dialogInterface))
                 .setOnDismissListener(dialog -> done.run())
                 .show();
+    }
+
+    /**
+     * The one-time offer of "Автоподбор": any answer, a cancel too, stores {@link Sources#PREF_RANKED_AT} as 0, so it
+     * never comes back; "Подобрать" opens the sources dialog, which runs it and stores its time. The next start-up
+     * dialog waits for the sources dialog to close, not to come over it.
+     */
+    private void showAutoRankDialog(@NonNull Runnable done) {
+        SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(this);
+        boolean[] accepted = new boolean[1];
+        new AlertDialog.Builder(this)
+                .setTitle(R.string.sources_autorank_offer_title)
+                .setMessage(R.string.sources_autorank_offer_message)
+                .setPositiveButton(R.string.sources_autorank_offer_yes, (dialog, which) -> {
+                    accepted[0] = true;
+                    afterSourcesDialog(done);
+                    showSourcesSettings(true);
+                })
+                .setNegativeButton(R.string.sources_autorank_offer_no, null)
+                .setOnDismissListener(dialog -> {
+                    if (!prefs.contains(Sources.PREF_RANKED_AT)) {
+                        prefs.edit().putLong(Sources.PREF_RANKED_AT, 0).apply();
+                    }
+                    if (!accepted[0]) {
+                        done.run();
+                    }
+                })
+                .show();
+    }
+
+    /** Runs {@code done} once, when the sources dialog that is about to open is gone. */
+    private void afterSourcesDialog(@NonNull Runnable done) {
+        FragmentManager fragments = getSupportFragmentManager();
+        fragments.registerFragmentLifecycleCallbacks(new FragmentManager.FragmentLifecycleCallbacks() {
+            @Override
+            public void onFragmentDestroyed(@NonNull FragmentManager fm, @NonNull Fragment fragment) {
+                if (fragment instanceof SourcesDialogFragment) {
+                    fragments.unregisterFragmentLifecycleCallbacks(this);
+                    if (!isChangingConfigurations() && !isFinishing()) {
+                        done.run(); // a rotation ends this activity's queue: the rest waits for the next start
+                    }
+                }
+            }
+        }, true);
     }
 
     @Override

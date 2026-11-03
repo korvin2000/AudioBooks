@@ -7,9 +7,7 @@
  "country": null,
  "cdn": "DDoS-Guard",
  "since": "2016-11",
- "blocked": [
-  "RU"
- ],
+ "blocked": [],
  "fragments": "some",
  "takedowns": null,
  "mirrors": [
@@ -24,7 +22,5 @@
   "Активные комментарии",
   "Счётчики книг по жанрам"
  ],
- "minuses": [
-  "Из РФ часть книг недоступна"
- ]
+ "minuses": []
 }

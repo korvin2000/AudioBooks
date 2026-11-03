@@ -7,7 +7,7 @@
  "country": "DE",
  "cdn": null,
  "since": "2021-12",
- "blocked": null,
+ "blocked": [],
  "fragments": null,
  "takedowns": true,
  "mirrors": [],

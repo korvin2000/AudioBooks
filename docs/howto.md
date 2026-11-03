@@ -95,7 +95,9 @@ hide them meanwhile.
    `BookPageFixtures.BOOK_PAGES`. Give the site its card ("Источники" screen, `search/SourceInfo`): a folder
    `app/src/main/assets/sources/<row name in lower case>/` with `info.json` (copy a neighbour's: a tagline, two or
    three sentences on what sets the site apart from the others, approximate books with the month counted, hosting
-   country or CDN, start date, regions where it is blocked, web mirrors, fragments, takedowns, related sites, the
+   country or CDN, start date, `blocked` (the regions where it is blocked or gives fragments only, so it needs the
+   proxy there: any of `"RU"`, `"UA"`, `"WEST"`, `"OTHER"`, the `region/Region` values, measured from home
+   connections there; `[]` when it works everywhere), web mirrors, fragments, takedowns, related sites, the
    version that added it, pluses and minuses; an unknown fact is `null`, never a guess), `icon.webp` (96×96, ≤ 5 KB)
    and, unless the site hides behind an anti-bot page, `cover.webp` (its mobile home page, 240×360, ≤ 12 KB, no ads).
    `search/SourceInfoTest` fails until the folder is complete.
@@ -369,9 +371,19 @@ adb exec-out run-as com.fanok.books tar -cf - databases shared_prefs files > app
   later is not in it and starts inactive. Switching the selected source off selects the first active one.
 - The route is chosen per host: a site's server, its subdomains and its `SourceParser.hosts()` follow the site's
   choice; any other host (a CDN several sites share) follows the proxy mode. The choice is stored inverted, as the set
-  of direct sites (`AppProxy.PREF_DIRECT`), so a new site uses the proxy until the user says otherwise. Changing it
+  of direct sites (`AppProxy.PREF_DIRECT`), so a new site uses the proxy until the user or the region says otherwise.
+  When the region check (`region/AppRegion`) finds the region, `AppProxy.applyRegionDefaults` sets every site the
+  user did not set by hand direct where its `blocked` leaves that region out and through the proxy where it names it
+  (a site without facts keeps its route); the user's choices in the dialog, on the card and from a route offer are
+  hand-set (`AppProxy.PREF_MANUAL`, written with the route) and kept. Changing the route
   drops pooled connections and installs a new `ProxySelector` instance (the platform `HttpURLConnection` pool of site
-  pages keys its connections by the selector); the automatic mode then verifies its proxy against a site that uses it.
+  pages keys its connections by the selector); the automatic mode then compares its proxy on a site that uses it.
+- The automatic mode (`net/ProxyFinder`) judges a public proxy by HTTPS connectivity checks (`ProxyFinder.CONTROLS`:
+  Google, Mozilla, Apple, Ubuntu; exact code and marker), never by an audiobook site, which may be down. The candidates
+  come from many lists (`ProxySources.ALL`) at most one per IP, three per /24 and eight per /16, with more from lists
+  that yielded more (`ProxySources.ListStats`). A short pass then asks the first site that takes the proxy through the
+  found ones: those it accepts go first, the rest stay as spares. A transport failure retires the proxy in use only
+  when a spare passes the same check; a site's refusal swaps in a spare that site accepts.
 - When a listing of a site fails, the catalog offers once per site while the app runs (`net/RouteOffer`) to try the
   other route; when that fails too the old route is restored. With the proxy off it offers the proxy settings.
 - `SourceProbe.probe(provider)` checks whether a site works from here (its first catalog page through its own adapter,

@@ -18,6 +18,8 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.preference.PreferenceManager;
 
+import com.fanok.audiobooks.net.AppProxy;
+
 import java.io.EOFException;
 import java.io.FileInputStream;
 import java.io.IOException;
@@ -33,7 +35,8 @@ import java.util.concurrent.TimeUnit;
 /**
  * The region of the user's connection ({@link Region}): checked once per process {@link #START_DELAY_S} after the
  * app starts ({@link #start}, like the update check), on a thread of its own, by {@link RegionCheck}; the result is
- * kept in the settings ({@link #last}) and logged. The requests bypass the app's proxy ({@link DirectNet}); a system
+ * kept in the settings ({@link #last}) and logged, and a found region sets the default routes of the sources
+ * ({@link AppProxy#applyRegionDefaults}). The requests bypass the app's proxy ({@link DirectNet}); a system
  * VPN, which an app cannot bypass, gives the VPN's region, and the result says so.
  */
 public final class AppRegion {
@@ -111,6 +114,14 @@ public final class AppRegion {
                 .apply();
         Log.i(TAG, result + " in " + (SystemClock.elapsedRealtime() - began) + " ms"
                 + (failed.isEmpty() ? "" : "; did not tell: " + failed));
+        if (result.source != RegionCheck.Source.NONE) {
+            try {
+                // at every start: a region changed since re-routes the sources the user did not set by hand
+                AppProxy.applyRegionDefaults(app);
+            } catch (RuntimeException e) {
+                Log.w(TAG, "Region routes not applied", e);
+            }
+        }
     }
 
     /** The table, read in place: about 3 KB at open, then at most one block of 512 bytes a lookup. */

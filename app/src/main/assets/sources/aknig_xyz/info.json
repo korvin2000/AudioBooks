@@ -7,7 +7,7 @@
  "country": "NL",
  "cdn": null,
  "since": "2024-02",
- "blocked": null,
+ "blocked": [],
  "fragments": null,
  "takedowns": true,
  "mirrors": [],

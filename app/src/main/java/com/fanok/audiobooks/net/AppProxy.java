@@ -8,7 +8,10 @@ import androidx.annotation.Nullable;
 
 import com.fanok.audiobooks.App;
 import com.fanok.audiobooks.Consts;
+import com.fanok.audiobooks.region.AppRegion;
+import com.fanok.audiobooks.region.RegionCheck;
 import com.fanok.audiobooks.search.Provider;
+import com.fanok.audiobooks.search.SourceInfo;
 import com.fanok.audiobooks.search.Sources;
 
 import io.reactivex.Single;
@@ -23,8 +26,10 @@ import java.net.ProxySelector;
 import java.net.SocketAddress;
 import java.net.URI;
 import java.util.Collections;
+import java.util.EnumMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.function.BiConsumer;
@@ -36,11 +41,12 @@ import java.util.function.Supplier;
  * The "Прокси" setting ({@link #PREF_MODE}): off (the device's network settings), the built-in proxy ("Свой прокси",
  * {@link ProxyConfig}: the build's server until the user sets another), or the automatic mode, where {@link ProxyFinder} supplies a verified public proxy. Installed once as
  * the process-wide {@link ProxySelector}, so every HTTP path (site pages through SiteHttp, audio and downloads through
- * OkHttp, covers) follows the setting without per-request code. The route is chosen per host: a source the user set to
- * go direct ({@link #PREF_DIRECT}) bypasses the proxy, with its subdomains and {@code SourceParser.hosts()}; any
- * other host (a shared CDN) follows the mode. The built-in proxy's login is handed only to its own host:port (a SOCKS
- * handshake through {@link Authenticator}, an HTTP proxy's 407 through {@link #proxyLogin}), never to a public proxy or
- * a site that asks for authentication.
+ * OkHttp, covers) follows the setting without per-request code. The route is chosen per host: a source set to go
+ * direct ({@link #PREF_DIRECT}) bypasses the proxy, with its subdomains and {@code SourceParser.hosts()}; any other
+ * host (a shared CDN) follows the mode. A source's route is the user's ({@link #PREF_MANUAL}) or else the default of
+ * the user's region ({@link #applyRegionDefaults}): direct where the site works, through the proxy where it is blocked.
+ * The built-in proxy's login is handed only to its own host:port (a SOCKS handshake through {@link Authenticator}, an
+ * HTTP proxy's 407 through {@link #proxyLogin}), never to a public proxy or a site that asks for authentication.
  */
 public final class AppProxy {
 
@@ -55,6 +61,12 @@ public final class AppProxy {
      * proxy (as before the setting existed), and so does a source added later.
      */
     public static final String PREF_DIRECT = "pref_proxy_direct";
+    /**
+     * The sources whose route the user chose by hand: a set of {@code Provider.prefValue}; the region's defaults
+     * ({@link #applyRegionDefaults}) leave them be. Absent (before the region defaults existed), the direct ones count
+     * as hand-set: the default was "through the proxy", so a direct source was the user's choice.
+     */
+    public static final String PREF_MANUAL = "pref_proxy_manual";
 
     private static volatile String mode = MODE_OFF;
     private static volatile ProxyFinder finder;
@@ -132,15 +144,15 @@ public final class AppProxy {
                 installSelector();
                 ProxyFinder f = finder;
                 String selected = selectedSource(p);
-                if (MODE_AUTO.equals(mode) && f != null
-                        && !ProxyFinder.targetOf(selected, before).equals(ProxyFinder.targetOf(selected, direct))) {
-                    f.recheckCurrent(); // the proxy is now checked against another site
+                if (MODE_AUTO.equals(mode) && f != null && !java.util.Objects.equals(
+                        ProxyFinder.targetOf(selected, before), ProxyFinder.targetOf(selected, direct))) {
+                    f.recheckSite(); // the proxy is now compared on another site
                 }
             } else if ((PREF_SOURCE.equals(key) || Sources.PREF.equals(key)) && MODE_AUTO.equals(mode)) {
-                // the proxy in use is checked against the new site; one it rejects is replaced
+                // the proxy in use is compared on the new site; a spare it serves instead takes the lead
                 ProxyFinder f = finder;
                 if (f != null) {
-                    f.recheckCurrent();
+                    f.recheckSite();
                 }
             }
         };
@@ -230,23 +242,97 @@ public final class AppProxy {
         }
     }
 
-    /** Stores whether {@code provider} goes direct; the listener applies it. */
-    public static void setDirect(@NonNull SharedPreferences prefs, @NonNull Provider provider, boolean goesDirect) {
+    /** Stores the user's choice whether {@code provider} goes direct, as hand-set; the listener applies it. */
+    public static synchronized void setDirect(@NonNull SharedPreferences prefs, @NonNull Provider provider,
+            boolean goesDirect) {
         Set<String> now = new HashSet<>(readDirect(prefs)); // nothing stored reads as an immutable empty set
-        if (goesDirect ? now.add(provider.prefValue) : now.remove(provider.prefValue)) {
-            prefs.edit().putStringSet(PREF_DIRECT, now).apply();
+        Set<String> manual = readManual(prefs);
+        boolean routed = goesDirect ? now.add(provider.prefValue) : now.remove(provider.prefValue);
+        boolean marked = manual.add(provider.prefValue);
+        if (routed || marked || storedManual(prefs) == null) {
+            prefs.edit().putStringSet(PREF_DIRECT, now).putStringSet(PREF_MANUAL, manual).apply();
         }
     }
 
-    /** Every source direct, or every source through the proxy: one write, so one change of route. */
-    public static void setAllDirect(@NonNull SharedPreferences prefs, boolean goDirect) {
+    /** Every source direct, or every source through the proxy, all hand-set: one write, so one change of route. */
+    public static synchronized void setAllDirect(@NonNull SharedPreferences prefs, boolean goDirect) {
         Set<String> now = new HashSet<>();
-        if (goDirect) {
-            for (Provider provider : Provider.values()) {
+        Set<String> manual = new HashSet<>();
+        for (Provider provider : Provider.values()) {
+            manual.add(provider.prefValue);
+            if (goDirect) {
                 now.add(provider.prefValue);
             }
         }
-        prefs.edit().putStringSet(PREF_DIRECT, now).apply();
+        prefs.edit().putStringSet(PREF_DIRECT, now).putStringSet(PREF_MANUAL, manual).apply();
+    }
+
+    /**
+     * The routes of the last region found ({@link AppRegion#last}) for the sources the user did not set by hand: direct
+     * where the site's facts ({@link SourceInfo#blockedIn}) say it works, through the proxy where it is blocked; a
+     * site nobody measured keeps its route. Nothing before a region is known. One write, and only when something
+     * changes, so the listener applies the routes once. Any thread.
+     */
+    public static void applyRegionDefaults(@NonNull Context context) {
+        RegionCheck.Result last = AppRegion.last(context);
+        if (last == null || last.region == null || last.source == RegionCheck.Source.NONE) {
+            return;
+        }
+        Map<Provider, Boolean> needsProxy = new EnumMap<>(Provider.class);
+        for (Provider provider : Provider.values()) {
+            SourceInfo info = SourceInfo.of(context, provider);
+            needsProxy.put(provider, info == null ? null : info.blockedIn(last.region));
+        }
+        applyRegionDefaults(prefs(context), needsProxy);
+    }
+
+    /**
+     * {@link #regionDirect} stored: {@link #PREF_DIRECT} when it changes and, the first time, {@link #PREF_MANUAL}
+     * (the migration), in one write; true when it wrote.
+     */
+    static synchronized boolean applyRegionDefaults(@NonNull SharedPreferences prefs,
+            @NonNull Map<Provider, Boolean> needsProxy) {
+        Set<String> direct = readDirect(prefs);
+        boolean migrate = storedManual(prefs) == null;
+        Set<String> manual = readManual(prefs);
+        Set<String> next = regionDirect(direct, manual, needsProxy);
+        boolean changed = !next.equals(direct);
+        if (!changed && !migrate) {
+            return false;
+        }
+        SharedPreferences.Editor editor = prefs.edit();
+        if (changed) {
+            editor.putStringSet(PREF_DIRECT, next);
+        }
+        if (migrate) {
+            editor.putStringSet(PREF_MANUAL, manual);
+        }
+        editor.apply();
+        return true;
+    }
+
+    /**
+     * Pure: the direct sources after the region's defaults. A source in {@code manual} keeps its route; any other goes
+     * direct when {@code needsProxy} says FALSE, takes the proxy when TRUE, and keeps its route when it says null or
+     * nothing (unknown).
+     */
+    @NonNull
+    static Set<String> regionDirect(@NonNull Set<String> direct, @NonNull Set<String> manual,
+            @NonNull Map<Provider, Boolean> needsProxy) {
+        Set<String> next = new HashSet<>(direct);
+        for (Map.Entry<Provider, Boolean> entry : needsProxy.entrySet()) {
+            String site = entry.getKey().prefValue;
+            Boolean blocked = entry.getValue();
+            if (blocked == null || manual.contains(site)) {
+                continue;
+            }
+            if (blocked) {
+                next.remove(site);
+            } else {
+                next.add(site);
+            }
+        }
+        return next;
     }
 
     /** True when the user set {@code provider} to go direct; otherwise it takes the proxy when the mode has one. */
@@ -301,6 +387,26 @@ public final class AppProxy {
                 return !autoProxies().isEmpty();
             default:
                 return false;
+        }
+    }
+
+    /**
+     * The sources whose route the user set by hand: the stored {@link #PREF_MANUAL} set or, before it is stored (or
+     * when it is wrongly typed), the direct ones.
+     */
+    @NonNull
+    public static Set<String> readManual(@NonNull SharedPreferences prefs) {
+        Set<String> stored = storedManual(prefs);
+        return new HashSet<>(stored == null ? readDirect(prefs) : stored);
+    }
+
+    /** The stored {@link #PREF_MANUAL} set as it is; null when absent or wrongly typed. */
+    @Nullable
+    private static Set<String> storedManual(@NonNull SharedPreferences prefs) {
+        try {
+            return prefs.getStringSet(PREF_MANUAL, null);
+        } catch (ClassCastException e) {
+            return null;
         }
     }
 
@@ -366,8 +472,8 @@ public final class AppProxy {
 
     /**
      * From the shared client's event listener: a call that was not cancelled could not connect through {@code address}
-     * (a refused tunnel or handshake reaches only this). Like a selector report, a hint the finder confirms with one
-     * probe before it moves on; the same failure reported by both queues one probe.
+     * (a refused tunnel or handshake reaches only this). Like a selector report, a hint the finder confirms by control
+     * checks before it moves on; the same failure reported by both queues one confirmation.
      */
     public static void reportConnectFailure(@Nullable SocketAddress address, @Nullable IOException failure) {
         ProxyFinder f = finder;
@@ -378,14 +484,14 @@ public final class AppProxy {
 
     /**
      * From {@link SiteHttp}: the site at {@code host} refused a request (403, 429). In the automatic mode, when that
-     * request went through the proxy, the proxy in use is checked by one probe and replaced when the site refuses it.
-     * Never throws.
+     * request went through the proxy, the finder compares the proxy in use with a spare on that site's home page and
+     * puts the spare first when only it passes. Never throws.
      */
     public static void reportSuspect(@Nullable String host) {
         try {
             ProxyFinder f = finder;
             if (MODE_AUTO.equals(mode) && f != null && proxied(host)) {
-                f.reportSuspect();
+                f.reportSuspect(host);
             }
         } catch (RuntimeException ignored) {
             // a hint must never break the request that gave it

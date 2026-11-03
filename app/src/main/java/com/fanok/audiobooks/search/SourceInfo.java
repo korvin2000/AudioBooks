@@ -66,7 +66,10 @@ public final class SourceInfo {
     /** Since when the site exists: "2014" or "2014-03". */
     @Nullable
     public final String since;
-    /** The regions (ISO codes: RU, UA) where the site is blocked or gives fragments only; null when unknown. */
+    /**
+     * The regions where the site is blocked or gives fragments only, so it needs the proxy there: "RU", "UA", "WEST",
+     * "OTHER" ({@link Region}), as measured from home connections there; null when unknown.
+     */
     @Nullable
     public final List<String> blocked;
     /** Other addresses of the same site. */
@@ -121,21 +124,27 @@ public final class SourceInfo {
     }
 
     /**
-     * True when the site is blocked or gives fragments only in {@code region}, so it wants the proxy there; false when
-     * it is known to work; null when nobody knows (no facts, or no region yet).
+     * True when the site is blocked or gives fragments only in {@code region} ({@link #blocked} names it: RUSSIA "RU",
+     * UKRAINE "UA", WEST "WEST", OTHER "OTHER"), so it wants the proxy there; false when it is known to work; null when
+     * nobody knows (no facts, or no region yet).
      */
     @Nullable
     public Boolean blockedIn(@Nullable Region region) {
-        if (blocked == null || region == null) {
-            return null;
-        }
+        return blocked == null || region == null ? null : blocked.contains(key(region));
+    }
+
+    /** The key of {@code region} in {@link #blocked}. */
+    @NonNull
+    static String key(@NonNull Region region) {
         switch (region) {
             case RUSSIA:
-                return blocked.contains("RU");
+                return "RU";
             case UKRAINE:
-                return blocked.contains("UA");
+                return "UA";
+            case WEST:
+                return "WEST";
             default:
-                return false;
+                return "OTHER";
         }
     }
 

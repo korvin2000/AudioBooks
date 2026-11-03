@@ -36,6 +36,15 @@ public class SourceSnapshotTest {
         assertEquals(snapshot, SourceSnapshot.decode(snapshot.encode()));
         SourceSnapshot bare = new SourceSnapshot(order, 1, null, Collections.<String>emptySet());
         assertEquals(bare, SourceSnapshot.decode(bare.encode()));
+        SourceSnapshot handSet = new SourceSnapshot(order, 2, null, Collections.singleton(Provider.AKNIGA.prefValue),
+                new HashSet<>(Arrays.asList(Provider.UKNIG.prefValue, Provider.GOLOSOM.prefValue)));
+        assertEquals(handSet, SourceSnapshot.decode(handSet.encode()));
+        assertFalse("the hand-set sites count", handSet.equals(new SourceSnapshot(order, 2, null,
+                Collections.singleton(Provider.AKNIGA.prefValue))));
+        String older = Sources.format(order, 2) + "\n\n" + Provider.AKNIGA.prefValue;
+        assertEquals("an older text: the direct sites were the hand-set ones",
+                new SourceSnapshot(order, 2, null, Collections.singleton(Provider.AKNIGA.prefValue)),
+                SourceSnapshot.decode(older));
         assertNull(SourceSnapshot.decode(null));
         assertNull(SourceSnapshot.decode("abook,izibuc|otrub"));
     }
@@ -62,7 +71,28 @@ public class SourceSnapshotTest {
         assertEquals(Provider.KNIGAVUHE, Provider.current());
         assertEquals(Provider.KNIGAVUHE.prefValue, prefs.getString(Sources.SELECTED, null));
         assertEquals(Collections.<String>emptySet(), AppProxy.readDirect(prefs));
+        assertEquals("the route is no longer hand-set", Collections.<String>emptySet(), AppProxy.readManual(prefs));
         assertEquals(before, SourceSnapshot.take(prefs));
+    }
+
+    @Test
+    public void undoingARouteBringsBackTheRegionsDefault() {
+        FakePrefs prefs = new FakePrefs();
+        Sources.load(prefs);
+        Consts.setSOURCE(Provider.AKNIGA.prefValue);
+        // the region's default: AKNIGA direct, not by hand
+        prefs.edit().putStringSet(AppProxy.PREF_DIRECT, Collections.singleton(Provider.AKNIGA.prefValue))
+                .putStringSet(AppProxy.PREF_MANUAL, Collections.singleton(Provider.UKNIG.prefValue)).apply();
+        SourceSnapshot before = SourceSnapshot.take(prefs);
+
+        AppProxy.setDirect(prefs, Provider.AKNIGA, false);
+        SourceSnapshot after = SourceSnapshot.take(prefs);
+        assertTrue(AppProxy.readManual(prefs).contains(Provider.AKNIGA.prefValue));
+
+        assertTrue(before.restoreIf(prefs, after));
+        assertEquals(Collections.singleton(Provider.AKNIGA.prefValue), AppProxy.readDirect(prefs));
+        assertEquals("AKNIGA follows the region again", Collections.singleton(Provider.UKNIG.prefValue),
+                AppProxy.readManual(prefs));
     }
 
     @Test
@@ -81,8 +111,12 @@ public class SourceSnapshotTest {
         assertEquals(Provider.GOLOSOM, Sources.all().get(0));
         assertTrue(AppProxy.readDirect(prefs).contains(Provider.IZIBUK.prefValue));
 
-        // nothing since the change: the undo puts it back
+        // switched back by hand: the route is the same, but now set by hand, which the undo would lose
         AppProxy.setDirect(prefs, Provider.IZIBUK, false);
+        assertFalse(before.restoreIf(prefs, after));
+
+        // nothing since the change: the undo puts it back
+        prefs.edit().putStringSet(AppProxy.PREF_MANUAL, Collections.<String>emptySet()).apply();
         assertTrue(before.restoreIf(prefs, after));
         assertEquals(before.encode(), SourceSnapshot.take(prefs).encode());
     }
