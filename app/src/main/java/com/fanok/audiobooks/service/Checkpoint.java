@@ -17,7 +17,10 @@ public final class Checkpoint {
 
     private static final String KEY_PREFIX = "checkpoint:";
 
-    private static final String VERSION = "1";
+    private static final String VERSION = "2";
+
+    /** The format before {@link #at}: {@code 1|chapter|ms|url}, read with the time unknown. */
+    private static final String VERSION_1 = "1";
 
     @NonNull
     public final String bookUrl;
@@ -26,10 +29,19 @@ public final class Checkpoint {
 
     public final long positionMs;
 
+    /** When the place was reached (epoch ms, 0 unknown): of two places of a book, a cloud sync keeps the later. */
+    public final long at;
+
+    /** The place, reached now. */
     public Checkpoint(@NonNull String bookUrl, int chapterIndex, long positionMs) {
+        this(bookUrl, chapterIndex, positionMs, System.currentTimeMillis());
+    }
+
+    public Checkpoint(@NonNull String bookUrl, int chapterIndex, long positionMs, long at) {
         this.bookUrl = bookUrl;
         this.chapterIndex = Math.max(0, chapterIndex);
         this.positionMs = Math.max(0, positionMs);
+        this.at = Math.max(0, at);
     }
 
     /** Preference key of the checkpoint of {@code bookUrl}. */
@@ -40,7 +52,7 @@ public final class Checkpoint {
 
     @NonNull
     public String serialize() {
-        return VERSION + "|" + chapterIndex + "|" + positionMs + "|" + bookUrl;
+        return VERSION + "|" + chapterIndex + "|" + positionMs + "|" + at + "|" + bookUrl;
     }
 
     /** @return the checkpoint, or null when {@code raw} is absent or not a valid record. */
@@ -49,17 +61,20 @@ public final class Checkpoint {
         if (raw == null) {
             return null;
         }
-        String[] parts = raw.split("\\|", 4);
-        if (parts.length != 4 || !VERSION.equals(parts[0]) || parts[3].isEmpty()) {
+        boolean current = raw.startsWith(VERSION + "|");
+        int fields = current ? 5 : 4; // the URL is the rest, whatever it holds
+        String[] parts = raw.split("\\|", fields);
+        if (parts.length != fields || !current && !VERSION_1.equals(parts[0]) || parts[fields - 1].isEmpty()) {
             return null;
         }
         try {
             int index = Integer.parseInt(parts[1]);
             long position = Long.parseLong(parts[2]);
-            if (index < 0 || position < 0) {
+            long at = current ? Long.parseLong(parts[3]) : 0;
+            if (index < 0 || position < 0 || at < 0) {
                 return null;
             }
-            return new Checkpoint(parts[3], index, position);
+            return new Checkpoint(parts[fields - 1], index, position, at);
         } catch (NumberFormatException e) {
             return null;
         }
@@ -80,14 +95,15 @@ public final class Checkpoint {
     @NonNull
     public Checkpoint clampTo(int chapterCount) {
         if (chapterCount <= 0) {
-            return new Checkpoint(bookUrl, 0, 0);
+            return new Checkpoint(bookUrl, 0, 0, at);
         }
         if (chapterIndex < chapterCount) {
             return this;
         }
-        return new Checkpoint(bookUrl, chapterCount - 1, 0);
+        return new Checkpoint(bookUrl, chapterCount - 1, 0, at);
     }
 
+    /** The same place of the same book; {@link #at} is no part of it. */
     @Override
     public boolean equals(Object o) {
         if (!(o instanceof Checkpoint)) {

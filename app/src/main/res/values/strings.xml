@@ -761,7 +761,7 @@
     <string name="settings_library">Избранное и история</string>
     <string name="settings_library_summary">Сортировка, поиск, импорт избранного</string>
     <string name="settings_data">Резервное копирование</string>
-    <string name="settings_data_summary">Резервная копия, восстановление, очистка данных</string>
+    <string name="settings_data_summary">Облачная синхронизация, резервная копия, восстановление, очистка данных</string>
     <string name="settings_general">Общие</string>
     <string name="settings_general_summary">Раздел при запуске, последняя книга, буфер, число источников, деление файла на разделы, отчёты об ошибках, автообновление, родительский контроль</string>
     <string name="error_reports">Отчеты об ошибках</string>

@@ -305,6 +305,14 @@
         android:summary="@string/settings_data_summary"
         android:title="@string/settings_data">
 
+        <!-- the cloud sync module's own screen (androidx.preference opens android:fragment by itself) -->
+        <Preference
+            android:fragment="com.fanok.audiobooks.sync.SyncSettingsFragment"
+            android:icon="@drawable/ic_backup"
+            android:key="sync"
+            android:summary="@string/sync_summary"
+            android:title="@string/sync_service" />
+
         <Preference
             android:icon="@drawable/ic_backup"
             android:key="backup"

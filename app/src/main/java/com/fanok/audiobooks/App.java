@@ -211,6 +211,7 @@ public class App extends Application {
         }
         instance = this;
         com.fanok.audiobooks.search.SourceHealth.checkIfDue(this); // at most daily, delayed, unmetered only
+        com.fanok.audiobooks.sync.CloudSync.install(this); // the cloud sync module: its one entry point
 
         registerActivityLifecycleCallbacks(new ActivityLifecycleCallbacks() {
             @Override

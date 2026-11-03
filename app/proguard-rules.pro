@@ -11,6 +11,11 @@
 # the last search, read back with Gson
 -keep class com.fanok.audiobooks.search.SearchSnapshot { *; }
 -keep class com.fanok.audiobooks.search.SearchSnapshot$* { *; }
+# the cloud sync file, written and read with Gson; its screens, made by name (preferences.xml, a restored dialog)
+-keep class com.fanok.audiobooks.sync.Snapshot { *; }
+-keep class com.fanok.audiobooks.sync.Snapshot$* { *; }
+-keep class com.fanok.audiobooks.sync.SyncSettingsFragment { public <init>(); }
+-keep class com.fanok.audiobooks.sync.CodeDialog { public <init>(); }
 
 # Media3 & ExoPlayer
 -keep class androidx.media3.** { *; }

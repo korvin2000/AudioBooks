@@ -19,11 +19,28 @@ public class CheckpointTest {
     }
 
     @Test
+    public void serializeAndParse_keepTheTimeOutsideEquality() {
+        Checkpoint checkpoint = Checkpoint.parse(new Checkpoint(BOOK, 7, 123_456L, 1_700_000_000_000L).serialize());
+        assertEquals(1_700_000_000_000L, checkpoint.at);
+        assertEquals(BOOK, checkpoint.bookUrl);
+        assertEquals(new Checkpoint(BOOK, 7, 123_456L, 5), checkpoint);
+    }
+
+    @Test
+    public void parse_readsTheFormerFormatWithTheTimeUnknown() {
+        Checkpoint checkpoint = Checkpoint.parse("1|7|123456|" + BOOK);
+        assertEquals(new Checkpoint(BOOK, 7, 123_456L), checkpoint);
+        assertEquals(0, checkpoint.at);
+    }
+
+    @Test
     public void parse_rejectsAbsentMalformedAndNegativeRecords() {
         assertNull(Checkpoint.parse(null));
         assertNull(Checkpoint.parse(""));
         assertNull(Checkpoint.parse("1|3|1000"));
-        assertNull(Checkpoint.parse("2|3|1000|" + BOOK));
+        assertNull(Checkpoint.parse("3|3|1000|0|" + BOOK));
+        assertNull(Checkpoint.parse("2|3|1000|" + BOOK)); // no time
+        assertNull(Checkpoint.parse("2|3|1000|-1|" + BOOK));
         assertNull(Checkpoint.parse("1|x|1000|" + BOOK));
         assertNull(Checkpoint.parse("1|-1|1000|" + BOOK));
         assertNull(Checkpoint.parse("1|3|-5|" + BOOK));
