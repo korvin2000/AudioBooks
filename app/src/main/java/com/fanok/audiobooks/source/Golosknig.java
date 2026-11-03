@@ -69,8 +69,6 @@ public final class Golosknig implements SourceParser {
 
     /** The player's passphrase (pl2.js), the one akniga's player uses too. */
     private static final String PASSPHRASE = "EKxtcg46V";
-    /** The playlist's answer to a key of another session. */
-    private static final String HACKING = "Hacking attemp";
     /** Bound of the genre list's pages (two now). */
     private static final int MAX_GENRE_PAGES = 5;
     private static final List<Sort.Entry> MENU = Sort.menu(Sort.NEW, Sort.POPULAR);
@@ -182,13 +180,13 @@ public final class Golosknig implements SourceParser {
 
     /**
      * The playlist in the session the page came from. A page of another session (a copy the app kept) gets
-     * {@link #HACKING}: a fresh page carries this session's key.
+     * {@link Akniga#HACKING}: a fresh page carries this session's key.
      */
     @Override
     public ArrayList<AudioPOJO> tracks(Document page, String base) throws IOException {
         String bid = bid(page, base);
         String answer = playlist(page, bid);
-        if (answer.startsWith(HACKING)) {
+        if (answer.startsWith(Akniga.HACKING)) {
             answer = playlist(SiteHttp.get(base), bid);
         }
         return parseTracks(answer, title(page), base);

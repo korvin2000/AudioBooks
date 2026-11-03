@@ -75,6 +75,8 @@ public final class Akniga implements SourceParser {
 
     /** Passphrase reverse-engineered from akniga's obfuscated player script. */
     private static final String PASSPHRASE = "EKxtcg46V";
+    /** LiveStreet's answer to a key of another session (akniga's player token, golosknig's playlist). */
+    static final String HACKING = "Hacking attemp";
     private static final Pattern SECURITY_KEY
             = Pattern.compile("LIVESTREET_SECURITY_KEY\\s*=\\s*['\"]([^'\"]+)['\"]");
     private static final Pattern FEED_ID = Pattern.compile("#comment(\\d+)$");
@@ -270,24 +272,43 @@ public final class Akniga implements SourceParser {
         return parseRecommendations(page);
     }
 
-    /** Page → token → book JSON with an encrypted HLS URL. */
+    /**
+     * Page → token → book JSON with an encrypted HLS URL, in the session the page came from. A page of another session
+     * gets {@link #HACKING} instead of the token: a copy the app kept, or a page whose session cookie a parallel first
+     * request of the site replaced (at a cold start the jar is empty, so each such request opens its own session). A
+     * fresh page carries the key of the session the jar holds now.
+     */
     @Override
     public ArrayList<AudioPOJO> tracks(Document doc, String url) throws IOException {
-        String key = securityKey(doc);
-        String bid = bid(doc);
+        String answer = tokenAnswer(doc, url);
+        if (answer != null && answer.startsWith(HACKING)) {
+            doc = SiteHttp.get(url);
+            answer = tokenAnswer(doc, url);
+        }
         String book = null;
-        if (!key.isEmpty() && !bid.isEmpty()) {
-            String token = string(object(SiteHttp.body(post(url, "/ajax/player/token")
-                    .data("security_ls_key", key)
-                    .data("bid", bid)
-                    .data("ts", String.valueOf(System.currentTimeMillis())))), "token");
+        if (answer != null) {
+            String bid = bid(doc);
             book = SiteHttp.body(post(url, "/ajax/b/" + bid)
-                    .data("security_ls_key", key)
+                    .data("security_ls_key", securityKey(doc))
                     .data("bid", bid)
-                    .data("token", token)
+                    .data("token", string(object(answer), "token"))
                     .data("hls", "true"));
         }
         return parseTracks(doc, book, url);
+    }
+
+    /** The player token's answer for the page's key and book; null when the page has neither. */
+    @Nullable
+    private static String tokenAnswer(Document doc, String url) throws IOException {
+        String key = securityKey(doc);
+        String bid = bid(doc);
+        if (key.isEmpty() || bid.isEmpty()) {
+            return null;
+        }
+        return SiteHttp.body(post(url, "/ajax/player/token")
+                .data("security_ls_key", key)
+                .data("bid", bid)
+                .data("ts", String.valueOf(System.currentTimeMillis())));
     }
 
     /** The series block of the page, else the page itself when it is a series, else the linked series page. */
