@@ -10,7 +10,8 @@ import com.fanok.audiobooks.service.Checkpoint;
 import com.google.gson.Gson;
 
 public class StorageUtil {
-    private final String STORAGE = "STORAGE";
+    /** The preferences file of the checkpoints, speed and equalizer. */
+    public static final String STORAGE = "STORAGE";
 
     /** Keys through which the player once received the chapter list and play state; dropped on the next checkpoint. */
     private static final String[] LEGACY_PLAYBACK_KEYS = {"audioArrayList", "audioIndex", "urlBook", "imageUrl", "timeStart"};
@@ -26,7 +27,9 @@ public class StorageUtil {
 
     /** Writes the checkpoint as one record, under its book and as the latest one. */
     public void storeCheckpoint(@NonNull Checkpoint checkpoint, boolean synchronous) {
-        String value = checkpoint.serialize();
+        Checkpoint stored = loadCheckpoint(checkpoint.bookUrl);
+        // a pause or stop at the same place keeps when it was reached: it must not outrank a later place elsewhere
+        String value = (checkpoint.equals(stored) ? stored : checkpoint).serialize();
         SharedPreferences.Editor editor = preferences.edit()
                 .putString(Checkpoint.key(checkpoint.bookUrl), value)
                 .putString(Checkpoint.KEY_LAST, value);

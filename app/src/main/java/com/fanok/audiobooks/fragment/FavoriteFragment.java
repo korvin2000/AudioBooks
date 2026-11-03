@@ -7,8 +7,10 @@ import static com.fanok.audiobooks.Consts.setColorPrimeriTextInIconItemMenu;
 
 import android.annotation.SuppressLint;
 import android.app.Activity;
+import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
+import android.content.IntentFilter;
 import android.content.SharedPreferences;
 import android.content.res.Configuration;
 import android.graphics.Canvas;
@@ -34,6 +36,7 @@ import androidx.annotation.NonNull;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.widget.PopupMenu;
 import androidx.appcompat.widget.SearchView;
+import androidx.core.content.ContextCompat;
 import androidx.core.view.MenuHost;
 import androidx.core.view.MenuProvider;
 import androidx.fragment.app.Fragment;
@@ -62,6 +65,7 @@ import com.fanok.audiobooks.policy.DefaultCover;
 import com.fanok.audiobooks.policy.ParentalControl;
 import com.fanok.audiobooks.presenter.FavoritePresenter;
 import com.fanok.audiobooks.search.Provider;
+import com.fanok.audiobooks.sync.CloudSync;
 import com.google.android.material.bottomsheet.BottomSheetDialog;
 import com.google.android.material.navigation.NavigationView;
 import com.google.android.material.snackbar.BaseTransientBottomBar;
@@ -684,9 +688,25 @@ public class FavoriteFragment extends MvpAppCompatFragment implements FavoriteVi
         return mPresenter;
     }
 
+    /** A cloud sync changed the lists behind this screen. */
+    private final BroadcastReceiver synced = new BroadcastReceiver() {
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            mPresenter.loadBooks();
+        }
+    };
+
+    @Override
+    public void onPause() {
+        requireContext().unregisterReceiver(synced);
+        super.onPause();
+    }
+
     @Override
     public void onResume() {
         super.onResume();
+        ContextCompat.registerReceiver(requireContext(), synced, new IntentFilter(CloudSync.ACTION_CHANGED),
+                ContextCompat.RECEIVER_NOT_EXPORTED);
         long parentalVersion = ParentalControl.version(requireContext());
         if (parentalVersion != mParentalVersion && mAddapterBooks != null) {
             mAddapterBooks.refreshItem();

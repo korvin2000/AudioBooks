@@ -382,6 +382,37 @@ public final class FavoritePeople {
         }
     }
 
+    /**
+     * A cloud sync's changes in one transaction on the write thread, then {@link #reload}: {@code put} rows are added
+     * with their URLs and addedAt (a person already here stays as is), {@code gone} rows are removed. Blocking.
+     */
+    public void sync(List<FavoritePersonPOJO> put, List<FavoritePersonPOJO> gone)
+            throws ExecutionException, InterruptedException {
+        mWrites.submit(() -> mDb.runInTransaction(() -> {
+            for (FavoritePersonPOJO row : gone) {
+                String key = key(row.getName());
+                if (key != null) {
+                    delete(row.getKind(), key);
+                }
+            }
+            for (FavoritePersonPOJO row : put) {
+                String key = key(row.getName());
+                if (key == null || row.getKind() != AUTHOR && row.getKind() != READER
+                        || mDao.get(row.getKind(), key) != null) {
+                    continue;
+                }
+                FavoritePersonEntity e = new FavoritePersonEntity();
+                e.kind = row.getKind();
+                e.name = row.getName().trim();
+                e.personKey = key;
+                e.urls = joinUrls(row.getUrls(), null);
+                e.addedAt = row.getAddedAt();
+                mDao.insert(e);
+            }
+        })).get();
+        reload();
+    }
+
     /** Forgets the in-memory keys (the table was replaced behind this class, as by a restore) and tells the listeners. */
     public void reload() {
         synchronized (this) {

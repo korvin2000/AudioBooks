@@ -21,14 +21,18 @@ public interface HistoryDao {
     @Query("DELETE FROM history")
     void deleteAll();
 
-    @Query("SELECT * FROM history ORDER BY id")
+    /**
+     * Oldest opened first. By the time, not the row id: a cloud sync adds books opened on another device at their
+     * own time; undated rows (0: older versions, restored ones) come first, in the order they were added.
+     */
+    @Query("SELECT * FROM history ORDER BY opened_at, id")
     List<HistoryEntity> getAll();
 
     /** The books whose page was opened at {@code since} or later (epoch ms), oldest first like {@link #getAll}. */
-    @Query("SELECT * FROM history WHERE opened_at >= :since ORDER BY id")
+    @Query("SELECT * FROM history WHERE opened_at >= :since ORDER BY opened_at, id")
     List<HistoryEntity> getSince(long since);
 
-    @Query("SELECT * FROM history ORDER BY id DESC LIMIT 1")
+    @Query("SELECT * FROM history ORDER BY opened_at DESC, id DESC LIMIT 1")
     HistoryEntity getLast();
 
     @Query("SELECT * FROM history WHERE url_book = :url")

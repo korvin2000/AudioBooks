@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="sync_service">Облачная синхронизация</string>
+    <string name="sync_off">Выключена</string>
+    <string name="sync_google">Google Диск</string>
+    <string name="sync_yandex">Яндекс Диск</string>
+    <string name="sync_now">Синхронизировать сейчас</string>
+    <string name="sync_summary">Избранное, история, авторы и чтецы, позиции прослушивания и настройки — на всех ваших устройствах</string>
+    <string name="sync_started">Синхронизация…</string>
+    <string name="sync_last">Последняя синхронизация: %1$s</string>
+    <string name="sync_never">ещё не было</string>
+    <string name="sync_failed">Ошибка синхронизации: %1$s</string>
+    <string name="sync_sign_in_again">войдите в облако заново (выберите его в «Облачной синхронизации»)</string>
+    <string name="sync_offline">нет подключения к сети</string>
+    <string name="sync_update_app">файл в облаке записан более новой версией приложения, обновите приложение</string>
+    <string name="sync_sign_in_failed">Не удалось подключить облако: %1$s</string>
+    <string name="sync_off_confirm">Отключить облачную синхронизацию? Данные в облаке останутся.</string>
+    <string name="sync_yandex_code">В открывшемся браузере войдите в Яндекс и разрешите доступ, затем введите здесь показанный код.</string>
+    <string name="sync_no_browser">Не найден браузер для входа в Яндекс</string>
+</resources>
