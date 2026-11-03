@@ -18,8 +18,8 @@
 
 Вход: экран модуля в `onCreate` связывает вход каждого облака (`CloudService.signIn` регистрирует свои activity
 results), запуск — по выбору. `CloudSync.choose` запоминает выбранное облако (`sync_chosen`): вход, закончившийся после
-выбора другого облака или «Выключена», отбрасывается. Код Яндекса вводится в `CodeDialog` (DialogFragment + Fragment
-Result API): диалог с PKCE-верификатором переживает пересоздание экрана, пока пользователь в браузере.
+выбора другого облака или «Выключена», отбрасывается. Яндекс — официальный LoginSDK (`authsdk` 3.3.0, свой
+ActivityResultContract), Google — AuthorizationClient; оба возвращаются в экран по activity result.
 
 Внутри `sync` (пакет; всё, кроме фасада и экрана, package-private):
 | Класс | Роль |
@@ -28,7 +28,6 @@ Result API): диалог с PKCE-верификатором переживае�
 | `CloudService` | облако как фабрика: id, название, доступно ли, `open` → `Cloud`, `signIn` → действие входа |
 | `Cloud`, `CloudAccount` | транспорт файла синхронизации; аккаунт (имя для показа, токен) |
 | `GoogleDrive`, `YandexDisk` | по файлу на облако: транспорт + вложенный `Service` (вход) |
-| `CodeDialog` | ввод кода со страницы входа в браузере |
 | `SyncRun` | одна синхронизация: облако, база, слияние, применение, загрузка |
 | `DeviceState` | состояние устройства: чтение и применение книг, истории, людей, позиций |
 | `SyncedSettings` | белый список настроек, типы, проверка, применение |
@@ -119,7 +118,7 @@ Result API): диалог с PKCE-верификатором переживае�
 
 **Google Диск** (`play-services-auth:22.0.0`). `Identity.getAuthorizationClient(ctx).authorize(drive.appdata)`; первый раз — UI через `StartIntentSenderForResult`, дальше в фоне тот же вызов без UI (`Tasks.await`). Email — `GET drive/v3/about?fields=user(emailAddress)`, далее `setAccount`. 401 → `clearToken`, повтор один раз; `hasResolution()` в фоне → «переподключите». Файл: `GET /drive/v3/files?spaces=appDataFolder&q=name='…'&orderBy=createdTime&fields=files(id,version)` — всегда берётся старейший (дубликаты от одновременного создания сходятся к нему, не удаляются); `GET files/{id}?alt=media`; создание `POST /upload/drive/v3/files?uploadType=multipart` (`multipart/related`); запись `PATCH /upload/drive/v3/files/{id}?uploadType=media`. Без Google Play services пункт скрыт. Идентификаторов в коде нет — Android-клиент OAuth сопоставляется по пакету и SHA-1.
 
-**Яндекс Диск** (REST, `Authorization: OAuth <token>`). Вход: внешний браузер `https://oauth.yandex.ru/authorize?response_type=code&client_id=<CID>&code_challenge=<S256>&code_challenge_method=S256` → страница показывает 7-значный код → пользователь вводит его в диалоге → `POST https://oauth.yandex.ru/token` (`grant_type=authorization_code`, `code`, `client_id`, `code_verifier`; секрет не нужен — PKCE, задокументировано). Логин для статуса — `GET https://login.yandex.ru/info?format=json` (необязательно). Файл: `GET /v1/disk/resources?path=app:/…&fields=md5` (тег; 404 — нет файла); `GET /resources/download?path=…` → `href` → `GET`; `GET /resources/upload?path=…&overwrite=true` → `href` → `PUT` без `Authorization`, 201/202 — успех. 401 → «войдите снова» (токен ≥ 1 года). `client_id` — `YANDEX_CLIENT_ID` в `gradle.properties` → `BuildConfig`; пусто — пункт скрыт. WebDAV не подходит: с 22.06.2026 только для Яндекс 360.
+**Яндекс Диск** (REST, `Authorization: OAuth <token>`). Вход: Yandex LoginSDK — приложение Яндекса, иначе вкладка браузера, иначе WebView; возврат в приложение по App Link `yx<CID>.oauth.yandex.ru/auth/finish`, выданный Яндексом по платформе «Android-приложение» (пакет + SHA-256). (Первый вариант — код со страницы `verification_code`, вводимый вручную, — отвергнут владельцем как неудобный.) Файл: `GET /v1/disk/resources?path=app:/…&fields=md5` (тег; 404 — нет файла); `GET /resources/download?path=…` → `href` → `GET`; `GET /resources/upload?path=…&overwrite=true` → `href` → `PUT` без `Authorization`, 201/202 — успех. 401 → «войдите снова» (токен ≥ 1 года, refresh-токена у SDK нет). `client_id` — `YANDEX_CLIENT_ID` в `gradle.properties` → `BuildConfig`; пусто — пункт скрыт. WebDAV не подходит: с 22.06.2026 только для Яндекс 360.
 
 ## 8. Интерфейс
 

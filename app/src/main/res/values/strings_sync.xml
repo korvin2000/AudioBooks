@@ -14,9 +14,9 @@
     <string name="sync_failed">Ошибка синхронизации: %1$s</string>
     <string name="sync_sign_in_again">войдите в облако заново (выберите его в «Облачной синхронизации»)</string>
     <string name="sync_offline">нет подключения к сети</string>
+    <string name="sync_google_unregistered">Google не узнаёт приложение (код 10). В Google Cloud нужен Android-клиент OAuth для пакета com.fanok.books и SHA-1 ключа, которым подписан этот APK, и включённый Google Drive API</string>
+    <string name="sync_yandex_no_disk">у этого Яндекс ID нет Диска: он зарегистрирован с почтой другого сервиса. Завершите регистрацию в Яндекс ID (логин и телефон) или войдите другим аккаунтом Яндекса</string>
     <string name="sync_update_app">файл в облаке записан более новой версией приложения, обновите приложение</string>
     <string name="sync_sign_in_failed">Не удалось подключить облако: %1$s</string>
     <string name="sync_off_confirm">Отключить облачную синхронизацию? Данные в облаке останутся.</string>
-    <string name="sync_yandex_code">В открывшемся браузере войдите в Яндекс и разрешите доступ, затем введите здесь показанный код.</string>
-    <string name="sync_no_browser">Не найден браузер для входа в Яндекс</string>
 </resources>

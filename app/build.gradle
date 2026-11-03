@@ -53,7 +53,9 @@ android {
         // the search suggestion authority follows the application id, so another install of the app never clashes with it
         resValue "string", "suggestion_authority", applicationId + ".MySuggestionProvider"
         // cloud sync with Yandex Disk: the app registered at oauth.yandex.ru (gradle.properties); empty hides the option
-        buildConfigField "String", "YANDEX_CLIENT_ID", "\"${(findProperty('YANDEX_CLIENT_ID') ?: '').toString().trim()}\""
+        def yandexClientId = (findProperty('YANDEX_CLIENT_ID') ?: '').toString().trim()
+        buildConfigField "String", "YANDEX_CLIENT_ID", "\"$yandexClientId\""
+        manifestPlaceholders += [YANDEX_CLIENT_ID: yandexClientId] // the Yandex LoginSDK's redirect back to the app
         minSdkVersion 24 // 24+: network_security_config trust anchors (ISRG Root X1) work without bundling Conscrypt
         targetSdkVersion 34
         versionCode 107
@@ -146,6 +148,8 @@ dependencies {
     implementation 'com.google.android.play:review:2.0.2'
     // cloud sync with Google Drive: AuthorizationClient (drive.appdata), the Drive REST calls go through OkHttp
     implementation 'com.google.android.gms:play-services-auth:22.0.0'
+    // cloud sync with Yandex Disk: Yandex's own sign-in (Yandex app, else a browser tab), back with a token
+    implementation 'com.yandex.android:authsdk:3.3.0'
 
     implementation 'com.github.lzyzsd:circleprogress:1.2.1'
     implementation 'com.h6ah4i.android.widget.verticalseekbar:verticalseekbar:1.0.0'

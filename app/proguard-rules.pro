@@ -11,11 +11,12 @@
 # the last search, read back with Gson
 -keep class com.fanok.audiobooks.search.SearchSnapshot { *; }
 -keep class com.fanok.audiobooks.search.SearchSnapshot$* { *; }
-# the cloud sync file, written and read with Gson; its screens, made by name (preferences.xml, a restored dialog)
+# the cloud sync file, written and read with Gson; its screen, made by name from preferences.xml
 -keep class com.fanok.audiobooks.sync.Snapshot { *; }
 -keep class com.fanok.audiobooks.sync.Snapshot$* { *; }
 -keep class com.fanok.audiobooks.sync.SyncSettingsFragment { public <init>(); }
--keep class com.fanok.audiobooks.sync.CodeDialog { public <init>(); }
+# the Yandex LoginSDK ships no rules; minified 3.1 lost its options on Android 13 (its issue #17)
+-keep class com.yandex.authsdk.** { *; }
 
 # Media3 & ExoPlayer
 -keep class androidx.media3.** { *; }
