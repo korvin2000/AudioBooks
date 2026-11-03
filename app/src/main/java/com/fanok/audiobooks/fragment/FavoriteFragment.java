@@ -59,13 +59,13 @@ import com.fanok.audiobooks.adapter.BookSheetPeople;
 import com.fanok.audiobooks.adapter.BooksListAddapter;
 import com.fanok.audiobooks.databinding.FragmentFavoriteBinding;
 import com.fanok.audiobooks.interface_pacatge.favorite.FavoriteView;
+import com.fanok.audiobooks.model.BooksDBModel;
 import com.fanok.audiobooks.model.HistoryFilter;
 import com.fanok.audiobooks.pojo.BookPOJO;
 import com.fanok.audiobooks.policy.DefaultCover;
 import com.fanok.audiobooks.policy.ParentalControl;
 import com.fanok.audiobooks.presenter.FavoritePresenter;
 import com.fanok.audiobooks.search.Provider;
-import com.fanok.audiobooks.sync.CloudSync;
 import com.google.android.material.bottomsheet.BottomSheetDialog;
 import com.google.android.material.navigation.NavigationView;
 import com.google.android.material.snackbar.BaseTransientBottomBar;
@@ -688,8 +688,8 @@ public class FavoriteFragment extends MvpAppCompatFragment implements FavoriteVi
         return mPresenter;
     }
 
-    /** A cloud sync changed the lists behind this screen. */
-    private final BroadcastReceiver synced = new BroadcastReceiver() {
+    /** The lists changed behind this screen while it shows them. */
+    private final BroadcastReceiver changed = new BroadcastReceiver() {
         @Override
         public void onReceive(Context context, Intent intent) {
             mPresenter.loadBooks();
@@ -698,14 +698,14 @@ public class FavoriteFragment extends MvpAppCompatFragment implements FavoriteVi
 
     @Override
     public void onPause() {
-        requireContext().unregisterReceiver(synced);
+        requireContext().unregisterReceiver(changed);
         super.onPause();
     }
 
     @Override
     public void onResume() {
         super.onResume();
-        ContextCompat.registerReceiver(requireContext(), synced, new IntentFilter(CloudSync.ACTION_CHANGED),
+        ContextCompat.registerReceiver(requireContext(), changed, new IntentFilter(BooksDBModel.ACTION_CHANGED),
                 ContextCompat.RECEIVER_NOT_EXPORTED);
         long parentalVersion = ParentalControl.version(requireContext());
         if (parentalVersion != mParentalVersion && mAddapterBooks != null) {

@@ -1,10 +1,16 @@
 package com.fanok.audiobooks.sync;
 
+import android.content.ActivityNotFoundException;
+import android.content.Context;
+import android.content.Intent;
 import android.net.Uri;
 import android.util.Base64;
+import android.widget.Toast;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.fragment.app.Fragment;
 import com.fanok.audiobooks.BuildConfig;
+import com.fanok.audiobooks.R;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParseException;
@@ -15,6 +21,8 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
+import java.util.concurrent.Callable;
+import java.util.function.Consumer;
 import okhttp3.FormBody;
 import okhttp3.HttpUrl;
 import okhttp3.MediaType;
@@ -41,9 +49,54 @@ final class YandexDisk implements Cloud {
         this.http = http;
     }
 
-    /** False when the build has no registered OAuth app. */
-    static boolean available() {
-        return !BuildConfig.YANDEX_CLIENT_ID.isEmpty();
+    /**
+     * Yandex Disk for the sync: offered when the build has a registered OAuth app (YANDEX_CLIENT_ID). The user
+     * allows the access in the browser, whose page then shows a code to type in here.
+     */
+    static final class Service implements CloudService {
+
+        /** The fragment result of the code the user typed in. */
+        private static final String CODE_KEY = "yandex-code";
+
+        @NonNull
+        @Override
+        public String id() {
+            return "yandex";
+        }
+
+        @Override
+        public int title() {
+            return R.string.sync_yandex;
+        }
+
+        @Override
+        public boolean available(@NonNull Context context) {
+            return !BuildConfig.YANDEX_CLIENT_ID.isEmpty();
+        }
+
+        @NonNull
+        @Override
+        public Runnable signIn(@NonNull Fragment host, @NonNull Consumer<Callable<CloudAccount>> finish) {
+            host.getChildFragmentManager().setFragmentResultListener(CODE_KEY, host, (key, result) -> {
+                String code = result.getString(CodeDialog.CODE, ""), verifier = result.getString(CodeDialog.STATE, "");
+                finish.accept(() -> new CloudAccount(null, token(CloudSync.http(), code, verifier)));
+            });
+            return () -> {
+                String verifier = verifier();
+                CodeDialog.ask(host, CODE_KEY, R.string.sync_yandex, R.string.sync_yandex_code, verifier);
+                try {
+                    host.startActivity(new Intent(Intent.ACTION_VIEW, authUrl(verifier)));
+                } catch (ActivityNotFoundException e) {
+                    Toast.makeText(host.requireContext(), R.string.sync_no_browser, Toast.LENGTH_LONG).show();
+                }
+            };
+        }
+
+        @NonNull
+        @Override
+        public Cloud open(@NonNull Context app, @NonNull CloudAccount account, @NonNull OkHttpClient http) {
+            return new YandexDisk(account.token != null ? account.token : "", http);
+        }
     }
 
     /** A new PKCE code verifier, kept until the user enters the code. */

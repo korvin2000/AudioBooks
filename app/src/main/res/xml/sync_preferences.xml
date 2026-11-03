@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- SyncSettingsFragment: the clouds are filled in from CloudSync.SERVICES; the choice is stored by CloudSync -->
+<PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <ListPreference
+        android:icon="@drawable/ic_backup"
+        android:key="cloud"
+        android:persistent="false"
+        android:title="@string/sync_cloud" />
+
+    <Preference
+        android:icon="@drawable/ic_refresh"
+        android:key="now"
+        android:title="@string/sync_now" />
+
+</PreferenceScreen>

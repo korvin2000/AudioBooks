@@ -21,14 +21,10 @@ import android.os.Environment;
 import android.os.PowerManager;
 import android.provider.SearchRecentSuggestions;
 import android.util.Log;
-import android.text.InputType;
 import android.text.format.Formatter;
-import android.widget.EditText;
-import android.widget.FrameLayout;
 import android.widget.Toast;
 
 import androidx.activity.result.ActivityResultLauncher;
-import androidx.activity.result.IntentSenderRequest;
 import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AlertDialog;
@@ -67,7 +63,6 @@ import com.fanok.audiobooks.pojo.StorageUtil;
 import com.fanok.audiobooks.presenter.FavoritePresenter;
 import com.fanok.audiobooks.search.Provider;
 import com.fanok.audiobooks.search.Sources;
-import com.fanok.audiobooks.sync.CloudSync;
 import com.fanok.audiobooks.update.Updater;
 import com.fanok.audiobooks.util.DownloadStorageHelper;
 
@@ -186,12 +181,6 @@ public class SettingsFragment extends PreferenceFragmentCompat implements
                     }).start();
                 }
             });
-
-    /** Google's consent screen of the cloud sync; CloudSync connects the account once it is given. */
-    private final ActivityResultLauncher<IntentSenderRequest> googleConsent = registerForActivityResult(
-            new ActivityResultContracts.StartIntentSenderForResult(), result -> CloudSync.googleConsented(
-                    requireContext(),
-                    result.getResultCode() == android.app.Activity.RESULT_OK ? result.getData() : null));
 
     private final DialogInterface.OnClickListener mOnClickListener = (dialogInterface, i) -> {
         try {
@@ -328,7 +317,6 @@ public class SettingsFragment extends PreferenceFragmentCompat implements
                 .registerOnSharedPreferenceChangeListener(this);
         ProxyFinder.get(requireContext()).addListener(proxyListener);
         updateProxySummary();
-        updateSync();
 
         MainActivity activity = (MainActivity) getActivity();
         if (activity != null) {
@@ -351,92 +339,6 @@ public class SettingsFragment extends PreferenceFragmentCompat implements
         getPreferenceScreen().getSharedPreferences()
                 .unregisterOnSharedPreferenceChangeListener(this);
         ProxyFinder.get(requireContext()).removeListener(proxyListener);
-    }
-
-    /** The clouds this device can sync with; the entries are hidden when there is none. */
-    private void fillSync() {
-        ListPreference service = findPreference(CloudSync.PREF_SERVICE);
-        Preference now = findPreference("sync_now");
-        if (service == null || now == null) {
-            return;
-        }
-        // the connected one stays, so it can be switched off even when it could not be connected anew
-        String connected = PreferenceManager.getDefaultSharedPreferences(requireContext())
-                .getString(CloudSync.PREF_SERVICE, "");
-        List<CharSequence> titles = new ArrayList<>(), values = new ArrayList<>();
-        titles.add(getString(R.string.sync_off));
-        values.add("");
-        if (CloudSync.available(requireContext(), CloudSync.GOOGLE) || CloudSync.GOOGLE.equals(connected)) {
-            titles.add(getString(R.string.sync_google));
-            values.add(CloudSync.GOOGLE);
-        }
-        if (CloudSync.available(requireContext(), CloudSync.YANDEX) || CloudSync.YANDEX.equals(connected)) {
-            titles.add(getString(R.string.sync_yandex));
-            values.add(CloudSync.YANDEX);
-        }
-        service.setEntries(titles.toArray(new CharSequence[0]));
-        service.setEntryValues(values.toArray(new CharSequence[0]));
-        service.setVisible(values.size() > 1);
-        now.setVisible(values.size() > 1);
-        updateSync();
-    }
-
-    /** The connected cloud and the sync's status, as CloudSync stored them. */
-    private void updateSync() {
-        ListPreference service = findPreference(CloudSync.PREF_SERVICE);
-        Preference now = findPreference("sync_now");
-        if (service == null || now == null || getContext() == null) {
-            return;
-        }
-        String cloud = PreferenceManager.getDefaultSharedPreferences(getContext())
-                .getString(CloudSync.PREF_SERVICE, "");
-        service.setValue(cloud);
-        service.setSummary(service.getEntry());
-        now.setEnabled(!cloud.isEmpty());
-        now.setSummary(cloud.isEmpty() ? getString(R.string.sync_summary) : CloudSync.status(getContext()));
-    }
-
-    private void chooseSync(String cloud) {
-        Context context = requireContext();
-        if (cloud.equals(PreferenceManager.getDefaultSharedPreferences(context)
-                .getString(CloudSync.PREF_SERVICE, "")) && CloudSync.working(context)) {
-            return; // connecting a working one anew would only forget what was agreed with it
-        }
-        if (CloudSync.GOOGLE.equals(cloud)) {
-            CloudSync.signInGoogle(context, consent -> {
-                if (isAdded()) {
-                    googleConsent.launch(new IntentSenderRequest.Builder(consent).build());
-                }
-            });
-        } else if (CloudSync.YANDEX.equals(cloud)) {
-            signInYandex(context);
-        } else {
-            showAllert(context, R.string.sync_off_confirm, (dialog, which) -> CloudSync.disconnect(context));
-        }
-    }
-
-    /** Yandex shows a code in the browser once the user allows the access; the user types it in here. */
-    private void signInYandex(Context context) {
-        String secret = CloudSync.yandexSecret();
-        EditText code = new EditText(context);
-        code.setInputType(InputType.TYPE_CLASS_NUMBER);
-        FrameLayout box = new FrameLayout(context);
-        int margin = (int) (20 * getResources().getDisplayMetrics().density);
-        box.setPadding(margin, 0, margin, 0);
-        box.addView(code);
-        new AlertDialog.Builder(context)
-                .setTitle(R.string.sync_yandex)
-                .setMessage(R.string.sync_yandex_code)
-                .setView(box)
-                .setPositiveButton(R.string.ok, (dialog, which) ->
-                        CloudSync.signInYandex(context, code.getText().toString().trim(), secret))
-                .setNegativeButton(R.string.cancel, null)
-                .show();
-        try {
-            startActivity(new Intent(Intent.ACTION_VIEW, CloudSync.yandexPage(secret)));
-        } catch (ActivityNotFoundException e) {
-            Toast.makeText(context, R.string.sync_no_browser, Toast.LENGTH_LONG).show();
-        }
     }
 
     /** The proxy entry's summary follows the mode and the automatic search while the settings are visible. */
@@ -476,7 +378,6 @@ public class SettingsFragment extends PreferenceFragmentCompat implements
                 false);
         fillSources(); // before the summaries: the source list's summary is its chosen entry
         fillSourcesMax();
-        fillSync();
         initSummary(getPreferenceScreen());
         initSourcesEntry();
         if (savedInstanceState == null && getArguments() != null && getArguments().getBoolean(ARG_OPEN_SOURCES)
@@ -651,17 +552,6 @@ public class SettingsFragment extends PreferenceFragmentCompat implements
                         return true;
                     });
         }
-
-        preferenceChangeListner(CloudSync.PREF_SERVICE, (preference, newValue) -> {
-            chooseSync(newValue.toString());
-            return false; // CloudSync stores it once signed in
-        });
-
-        preferenceClickListner("sync_now", preference -> {
-            CloudSync.now(requireContext());
-            Toast.makeText(requireContext(), R.string.sync_started, Toast.LENGTH_SHORT).show();
-            return true;
-        });
 
         preferenceClickListner("restore", preference -> {
             try {
@@ -907,9 +797,6 @@ public class SettingsFragment extends PreferenceFragmentCompat implements
             String key) {
         if (AppProxy.PREF_MODE.equals(key)) {
             updateProxySummary();
-        }
-        if (key != null && key.startsWith(CloudSync.PREF_PREFIX)) {
-            updateSync();
         }
         if (Updater.PREF.equals(key) && sharedPreferences.getBoolean(key, true) && getContext() != null) {
             Updater.check(getContext(), null); // switched on: the first check now, not at the next period

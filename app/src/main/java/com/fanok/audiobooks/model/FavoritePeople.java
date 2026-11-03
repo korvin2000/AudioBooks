@@ -383,19 +383,19 @@ public final class FavoritePeople {
     }
 
     /**
-     * A cloud sync's changes in one transaction on the write thread, then {@link #reload}: {@code put} rows are added
-     * with their URLs and addedAt (a person already here stays as is), {@code gone} rows are removed. Blocking.
+     * Changes made elsewhere (a cloud sync), in one transaction on the write thread, then {@link #reload}: {@code added}
+     * rows come with their URLs and addedAt (a person already here stays as is), {@code removed} rows go. Blocking.
      */
-    public void sync(List<FavoritePersonPOJO> put, List<FavoritePersonPOJO> gone)
+    public void update(List<FavoritePersonPOJO> added, List<FavoritePersonPOJO> removed)
             throws ExecutionException, InterruptedException {
         mWrites.submit(() -> mDb.runInTransaction(() -> {
-            for (FavoritePersonPOJO row : gone) {
+            for (FavoritePersonPOJO row : removed) {
                 String key = key(row.getName());
                 if (key != null) {
                     delete(row.getKind(), key);
                 }
             }
-            for (FavoritePersonPOJO row : put) {
+            for (FavoritePersonPOJO row : added) {
                 String key = key(row.getName());
                 if (key == null || row.getKind() != AUTHOR && row.getKind() != READER
                         || mDao.get(row.getKind(), key) != null) {

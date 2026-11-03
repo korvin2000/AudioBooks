@@ -68,11 +68,6 @@ public class App extends Application {
     /** The app's activities from creation to destruction (main thread only). */
     private static final java.util.Set<android.app.Activity> LIVE_ACTIVITIES = new java.util.LinkedHashSet<>();
 
-    /** Activities started and not yet stopped (main thread only): none means the app is in the background. */
-    private static int startedActivities;
-    /** The last activity stopped to be recreated (rotation, theme): its successor's start is no return to the app. */
-    private static boolean recreating;
-
     /** Closes every screen of the app; its tasks stay in the recent apps. Main thread only. */
     public static void finishActivities() {
         for (android.app.Activity activity : new java.util.ArrayList<>(LIVE_ACTIVITIES)) {
@@ -216,6 +211,7 @@ public class App extends Application {
         }
         instance = this;
         com.fanok.audiobooks.search.SourceHealth.checkIfDue(this); // at most daily, delayed, unmetered only
+        com.fanok.audiobooks.sync.CloudSync.install(this); // the cloud sync module: its one entry point
 
         registerActivityLifecycleCallbacks(new ActivityLifecycleCallbacks() {
             @Override
@@ -225,11 +221,6 @@ public class App extends Application {
             @Override
             public void onActivityStarted(@androidx.annotation.NonNull android.app.Activity activity) {
                 currentActivityName = activity.getClass().getSimpleName();
-                if (startedActivities++ == 0 && !recreating) {
-                    // in the foreground: what the other devices did since
-                    com.fanok.audiobooks.sync.CloudSync.request(activity, 0);
-                }
-                recreating = false;
             }
             @Override
             public void onActivityResumed(@androidx.annotation.NonNull android.app.Activity activity) {
@@ -238,13 +229,7 @@ public class App extends Application {
             @Override
             public void onActivityPaused(@androidx.annotation.NonNull android.app.Activity activity) {}
             @Override
-            public void onActivityStopped(@androidx.annotation.NonNull android.app.Activity activity) {
-                recreating = activity.isChangingConfigurations();
-                if (--startedActivities == 0 && !recreating) {
-                    // in the background: what was done here, before the process may be gone
-                    com.fanok.audiobooks.sync.CloudSync.request(activity, 0);
-                }
-            }
+            public void onActivityStopped(@androidx.annotation.NonNull android.app.Activity activity) {}
             @Override
             public void onActivitySaveInstanceState(@androidx.annotation.NonNull android.app.Activity activity, @androidx.annotation.NonNull android.os.Bundle outState) {}
             @Override

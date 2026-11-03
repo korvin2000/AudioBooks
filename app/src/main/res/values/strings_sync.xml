@@ -1,7 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="sync_service">Облачная синхронизация</string>
+    <string name="sync_cloud">Облако</string>
     <string name="sync_off">Выключена</string>
+    <string name="sync_unavailable">На этом устройстве нет доступных облаков</string>
     <string name="sync_google">Google Диск</string>
     <string name="sync_yandex">Яндекс Диск</string>
     <string name="sync_now">Синхронизировать сейчас</string>

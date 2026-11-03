@@ -17,6 +17,12 @@ import java.util.List;
 import org.jetbrains.annotations.NotNull;
 
 public class BooksDBModel extends BooksDBAbstract implements BooksDBHelperInterfase {
+    /**
+     * Broadcast in this app (setPackage) when the book lists changed behind the screens that show them, as by a
+     * cloud sync: a screen showing them reloads.
+     */
+    public static final String ACTION_CHANGED = "com.fanok.audiobooks.LISTS_CHANGED";
+
     private static final String TAG = "BookDBModel";
 
     private int mSkippedRows;

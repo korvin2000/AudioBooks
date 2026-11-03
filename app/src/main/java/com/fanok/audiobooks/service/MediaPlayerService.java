@@ -115,7 +115,6 @@ import com.fanok.audiobooks.policy.ParentalControl;
 import com.fanok.audiobooks.presenter.BookPresenter;
 import com.fanok.audiobooks.presenter.SleepTimerPresenter;
 import com.fanok.audiobooks.room.BooksAudioEntity;
-import com.fanok.audiobooks.sync.CloudSync;
 import com.fanok.audiobooks.util.DeletionPlanner;
 import com.fanok.audiobooks.util.DownloadStorageHelper;
 import com.fanok.audiobooks.util.DownloadUtil;
@@ -249,6 +248,24 @@ public class MediaPlayerService extends MediaBrowserServiceCompat {
         sessionListener = listener;
     }
 
+    @Nullable
+    private static volatile CheckpointListener checkpointListener;
+
+    /**
+     * Told on the main thread each time the service stores where its book is, for an in-process follower such as a
+     * cloud sync. The service names no follower: one registers itself at process start.
+     */
+    public interface CheckpointListener {
+
+        /** @param playing whether the user wants the book to play on (false once paused or stopped) */
+        void onCheckpoint(@NonNull Checkpoint checkpoint, boolean playing);
+    }
+
+    /** The one listener; null removes it. */
+    public static void setCheckpointListener(@Nullable CheckpointListener listener) {
+        checkpointListener = listener;
+    }
+
     /** What to play. Handed to the service in-process by {@link #start}, never through preferences. */
     public static final class Request {
         @Nullable
@@ -351,10 +368,10 @@ public class MediaPlayerService extends MediaBrowserServiceCompat {
     /** elapsedRealtime of the pause, 0 for "long ago" (a freshly loaded book), -1 while not paused. */
     private long pausedAt = -1;
     private long lastCheckpointAt;
-    /** The checkpoint this service last stored: a stored one that differs was written by a cloud sync. */
+    /** The checkpoint this service last stored: a stored one that differs was written by another writer. */
     @Nullable
     private Checkpoint written;
-    /** The synced place Play last reloaded the book at. */
+    /** The place of another writer that Play last reloaded the book at. */
     @Nullable
     private Checkpoint adopted;
     private int shownIcon;
@@ -711,10 +728,10 @@ public class MediaPlayerService extends MediaBrowserServiceCompat {
             publishState();
             return;
         }
-        Checkpoint moved = resolving || restoring ? null : movedBySync(snapshot());
+        Checkpoint moved = resolving || restoring ? null : movedByOther(snapshot());
         if (moved != null && !moved.equals(adopted)) {
-            //listened to further on another device: the book is read again at that place, and plays; tried once,
-            //so a book that cannot be read again plays on where it stands
+            //moved on elsewhere (listened to further on another device): the book is read again at that place, and
+            //plays; tried once, so a book that cannot be read again plays on where it stands
             adopted = moved;
             restoreBook(bookUrl);
             publishState();
@@ -1614,12 +1631,12 @@ public class MediaPlayerService extends MediaBrowserServiceCompat {
     }
 
     /**
-     * The book's stored place when a cloud sync moved it (it was listened to further on another device) while this
-     * player stood still at {@code here}, its last stored place; else null. Such a place is neither overwritten
+     * The book's stored place when another writer (a cloud sync of a place reached on another device) moved it while
+     * this player stood still at {@code here}, its last stored place; else null. Such a place is neither overwritten
      * with the old one nor ignored: Play resumes from it.
      */
     @Nullable
-    private Checkpoint movedBySync(@Nullable Checkpoint here) {
+    private Checkpoint movedByOther(@Nullable Checkpoint here) {
         if (here == null || !here.equals(written)) {
             return null;
         }
@@ -1634,14 +1651,17 @@ public class MediaPlayerService extends MediaBrowserServiceCompat {
 
     private void checkpointNow(boolean synchronous) {
         Checkpoint checkpoint = snapshot();
-        if (checkpoint == null || movedBySync(checkpoint) != null) {
+        if (checkpoint == null || movedByOther(checkpoint) != null) {
             return;
         }
         storage.storeCheckpoint(checkpoint, synchronous);
         written = checkpoint;
         adopted = null;
         lastCheckpointAt = SystemClock.elapsedRealtime();
-        CloudSync.positionSaved(this, wantPlaying);
+        CheckpointListener listener = checkpointListener;
+        if (listener != null) {
+            listener.onCheckpoint(checkpoint, wantPlaying);
+        }
         //legacy book-level seconds, written for the book lists only
         final String url = checkpoint.bookUrl;
         final int seconds = (int) (checkpoint.positionMs / 1000);

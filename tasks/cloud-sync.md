@@ -1,5 +1,44 @@
 # Облачная синхронизация (Google Диск / Яндекс Диск) — проект v2
 
+## 0. Модульность (рефакторинг v3)
+
+Цель: приложение не знает ни о синхронизации, ни о конкретных облаках; модуль `sync` подключается и убирается
+хирургически. Зависимости только в одну сторону: `sync` → приложение.
+
+Точки подключения в коде приложения (и только они):
+- `App.onCreate`: `CloudSync.install(this)` — корень композиции; триггеры (передний план / фон, сохранение позиции
+  плеером) модуль ставит сам: `ActivityLifecycleCallbacks` и `MediaPlayerService.setCheckpointListener` (хук плеера по
+  образцу его `SessionListener`; наблюдение за prefs не годится: пауза на том же месте не меняет значение).
+- `preferences.xml`: один пункт `android:fragment="…sync.SyncSettingsFragment"` (androidx.preference 1.2.1 открывает
+  его сам: `PreferenceFragmentCompat.onPreferenceTreeClick` → `replace(parent, fragment).addToBackStack`).
+Возможности приложения, которыми модуль пользуется и которые о нём не знают: `Checkpoint.at`, `StorageUtil.STORAGE`,
+порядок `HistoryDao` по времени, `FavoritePeople.update(added, removed)`, событие `BooksDBModel.ACTION_CHANGED`
+(список перечитывается `FavoriteFragment`), `MediaPlayerService`: место, сдвинутое другим писателем, не затирается,
+`CheckpointListener`.
+
+Вход: экран модуля в `onCreate` связывает вход каждого облака (`CloudService.signIn` регистрирует свои activity
+results), запуск — по выбору. `CloudSync.choose` запоминает выбранное облако (`sync_chosen`): вход, закончившийся после
+выбора другого облака или «Выключена», отбрасывается. Код Яндекса вводится в `CodeDialog` (DialogFragment + Fragment
+Result API): диалог с PKCE-верификатором переживает пересоздание экрана, пока пользователь в браузере.
+
+Внутри `sync` (пакет; всё, кроме фасада и экрана, package-private):
+| Класс | Роль |
+|---|---|
+| `CloudSync` | фасад: `install`, планировщик, подключение (облако, аккаунт, статус), реестр облаков `SERVICES` |
+| `CloudService` | облако как фабрика: id, название, доступно ли, `open` → `Cloud`, `signIn` → действие входа |
+| `Cloud`, `CloudAccount` | транспорт файла синхронизации; аккаунт (имя для показа, токен) |
+| `GoogleDrive`, `YandexDisk` | по файлу на облако: транспорт + вложенный `Service` (вход) |
+| `CodeDialog` | ввод кода со страницы входа в браузере |
+| `SyncRun` | одна синхронизация: облако, база, слияние, применение, загрузка |
+| `DeviceState` | состояние устройства: чтение и применение книг, истории, людей, позиций |
+| `SyncedSettings` | белый список настроек, типы, проверка, применение |
+| `Snapshot` | формат файла и слияние (чистая Java) |
+| `SyncSettingsFragment` + `res/xml/sync_preferences.xml` | экран: выбор облака, «Синхронизировать сейчас», статус |
+
+Новое облако = один файл с `Cloud` + `Service` и строка в `CloudSync.SERVICES`. Убрать модуль = удалить пакет,
+строку в `App`, пункт в `preferences.xml`, `strings_sync.xml`, зависимость `play-services-auth`.
+Граница проверяется JVM-тестом `SyncBoundaryTest`: на `com.fanok.audiobooks.sync` ссылается только `App.java`.
+
 Статус: проект после ревью Fable (t6) и Codex (gpt-6-astra); кода нет. Пути — относительно `app/src/main/java/com/fanok/audiobooks/`.
 
 ## 1. Что синхронизируется

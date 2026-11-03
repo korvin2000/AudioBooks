@@ -6,8 +6,34 @@
 стартовый экран). Не синхронизируются скачанные книги и список глав, пути, прокси и маршруты, cookies, PIN
 родительского контроля, служебные кэши.
 
-Код: `app/src/main/java/com/fanok/audiobooks/sync/` (`CloudSync` — цикл и интеграция, `Snapshot` — формат и слияние,
-`GoogleDrive`, `YandexDisk` — транспорты). Проект и решения: `tasks/cloud-sync.md`.
+## Модуль
+
+Весь код — пакет `app/src/main/java/com/fanok/audiobooks/sync/`; приложение о нём знает в двух местах:
+`App.onCreate` → `CloudSync.install(this)` и пункт `preferences.xml` с `android:fragment=…sync.SyncSettingsFragment`
+(тест `SyncBoundaryTest` следит, чтобы других ссылок не появилось). Модуль пользуется возможностями приложения, которые
+о нём не знают: `MediaPlayerService.setCheckpointListener`, `BooksDBModel.ACTION_CHANGED`, `FavoritePeople.update`,
+время в `Checkpoint`.
+
+| Класс | Роль |
+|---|---|
+| `CloudSync` | фасад: `install`, когда синхронизировать, подключение и статус, реестр облаков `SERVICES` |
+| `CloudService` | облако как фабрика: id, название, доступно ли, вход (`signIn`), файл аккаунта (`open` → `Cloud`) |
+| `Cloud`, `CloudAccount` | транспорт файла синхронизации; аккаунт (имя для статуса, токен) |
+| `GoogleDrive`, `YandexDisk` | облака: транспорт и вложенный `Service` с входом |
+| `CodeDialog` | ввод кода со страницы входа (переживает пересоздание экрана) |
+| `SyncRun` | одна синхронизация: облако, база, слияние, применение, загрузка |
+| `DeviceState` | книги, история, люди и позиции устройства: чтение и применение |
+| `SyncedSettings` | синхронизируемые настройки: белый список, типы, проверка |
+| `Snapshot` | формат файла и трёхстороннее слияние |
+| `SyncSettingsFragment` | экран «Облачная синхронизация» (`res/xml/sync_preferences.xml`) |
+
+**Новое облако**: класс, реализующий `Cloud` (чтение/запись файла и тег версии), с вложенным `Service implements
+CloudService` (id, название, `available`, `signIn`, `open`), строка в `CloudSync.SERVICES`, название в
+`strings_sync.xml`. **Убрать облако**: удалить класс и строку; у пользователей, подключивших его, синхронизация
+считается выключенной. **Убрать модуль**: удалить пакет `sync`, строку в `App`, пункт в `preferences.xml`,
+`strings_sync.xml`, `sync_preferences.xml`, зависимость `play-services-auth`, `YANDEX_CLIENT_ID` и keep-правила `sync`.
+
+Проект и решения: `tasks/cloud-sync.md`.
 
 ## Google Диск — разовая настройка владельцем
 

@@ -1,9 +1,16 @@
 package com.fanok.audiobooks.sync;
 
 import android.accounts.Account;
+import android.app.Activity;
 import android.content.Context;
+import android.content.Intent;
+import androidx.activity.result.ActivityResultLauncher;
+import androidx.activity.result.IntentSenderRequest;
+import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.fragment.app.Fragment;
+import com.fanok.audiobooks.R;
 import com.google.android.gms.auth.api.identity.AuthorizationRequest;
 import com.google.android.gms.auth.api.identity.AuthorizationResult;
 import com.google.android.gms.auth.api.identity.ClearTokenRequest;
@@ -21,9 +28,11 @@ import com.google.gson.JsonParser;
 import java.io.IOException;
 import java.io.InterruptedIOException;
 import java.util.Collections;
+import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.function.Consumer;
 import okhttp3.HttpUrl;
 import okhttp3.MediaType;
 import okhttp3.MultipartBody;
@@ -60,8 +69,65 @@ final class GoogleDrive implements Cloud {
         this.http = http;
     }
 
-    static boolean available(Context context) {
-        return GoogleApiAvailability.getInstance().isGooglePlayServicesAvailable(context) == ConnectionResult.SUCCESS;
+    /** Google Drive for the sync: offered with Google Play services; the user signs in on Google's consent screen. */
+    static final class Service implements CloudService {
+
+        @NonNull
+        @Override
+        public String id() {
+            return "google";
+        }
+
+        @Override
+        public int title() {
+            return R.string.sync_google;
+        }
+
+        @Override
+        public boolean available(@NonNull Context context) {
+            return GoogleApiAvailability.getInstance().isGooglePlayServicesAvailable(context)
+                    == ConnectionResult.SUCCESS;
+        }
+
+        @NonNull
+        @Override
+        public Runnable signIn(@NonNull Fragment host, @NonNull Consumer<Callable<CloudAccount>> finish) {
+            ActivityResultLauncher<IntentSenderRequest> consent = host.registerForActivityResult(
+                    new ActivityResultContracts.StartIntentSenderForResult(), result -> {
+                        Intent data = result.getData();
+                        if (result.getResultCode() == Activity.RESULT_OK && data != null) { // else cancelled
+                            Context app = host.requireContext().getApplicationContext();
+                            finish.accept(() -> account(
+                                    Identity.getAuthorizationClient(app).getAuthorizationResultFromIntent(data)));
+                        }
+                    });
+            return () -> authorize(host.requireContext(), null)
+                    .addOnSuccessListener(result -> {
+                        if (!result.hasResolution() || result.getPendingIntent() == null) {
+                            finish.accept(() -> account(result)); // granted before
+                        } else if (host.isAdded()) {
+                            consent.launch(new IntentSenderRequest.Builder(result.getPendingIntent()).build());
+                        }
+                    })
+                    .addOnFailureListener(e -> finish.accept(() -> {
+                        throw e;
+                    }));
+        }
+
+        @NonNull
+        @Override
+        public Cloud open(@NonNull Context app, @NonNull CloudAccount account, @NonNull OkHttpClient http) {
+            return new GoogleDrive(app, account.name != null ? account.name : "", http);
+        }
+
+        /** The account of a grant: the grant does not name it, the Drive does. */
+        private static CloudAccount account(AuthorizationResult result) throws IOException {
+            String token = result.getAccessToken();
+            if (token == null) {
+                throw new IOException("No access granted");
+            }
+            return new CloudAccount(email(CloudSync.http(), token), null);
+        }
     }
 
     /** Drive access for {@code email}, or for an account the user picks when it is null. */
