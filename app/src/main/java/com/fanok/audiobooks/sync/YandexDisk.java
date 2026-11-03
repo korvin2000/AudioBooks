@@ -17,10 +17,12 @@ import com.google.gson.JsonParseException;
 import com.google.gson.JsonParser;
 import java.io.IOException;
 import java.io.InterruptedIOException;
+import java.math.BigInteger;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
+import java.util.Locale;
 import java.util.concurrent.Callable;
 import java.util.function.Consumer;
 import okhttp3.FormBody;
@@ -206,13 +208,10 @@ final class YandexDisk implements Cloud {
         }
     }
 
+    /** Lower-case hex, as the Disk reports it. */
     private static String md5(byte[] data) {
         try {
-            StringBuilder hex = new StringBuilder();
-            for (byte b : MessageDigest.getInstance("MD5").digest(data)) {
-                hex.append(Integer.toHexString((b & 0xff) | 0x100).substring(1));
-            }
-            return hex.toString();
+            return String.format(Locale.ROOT, "%032x", new BigInteger(1, MessageDigest.getInstance("MD5").digest(data)));
         } catch (NoSuchAlgorithmException e) {
             throw new IllegalStateException(e);
         }

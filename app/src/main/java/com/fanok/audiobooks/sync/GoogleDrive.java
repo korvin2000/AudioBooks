@@ -55,6 +55,8 @@ final class GoogleDrive implements Cloud {
     private static final MediaType JSON = MediaType.get("application/json; charset=UTF-8");
 
     private final Context app;
+    /** The account's email; null leaves the account to Play services (an empty name it would not take). */
+    @Nullable
     private final String email;
     private final OkHttpClient http;
     @Nullable
@@ -63,7 +65,7 @@ final class GoogleDrive implements Cloud {
     @Nullable
     private String id;
 
-    GoogleDrive(Context context, String email, OkHttpClient http) {
+    GoogleDrive(Context context, @Nullable String email, OkHttpClient http) {
         this.app = context.getApplicationContext();
         this.email = email;
         this.http = http;
@@ -117,7 +119,7 @@ final class GoogleDrive implements Cloud {
         @NonNull
         @Override
         public Cloud open(@NonNull Context app, @NonNull CloudAccount account, @NonNull OkHttpClient http) {
-            return new GoogleDrive(app, account.name != null ? account.name : "", http);
+            return new GoogleDrive(app, account.name, http);
         }
 
         /** The account of a grant: the grant does not name it, the Drive does. */
@@ -134,7 +136,7 @@ final class GoogleDrive implements Cloud {
     static Task<AuthorizationResult> authorize(Context context, @Nullable String email) {
         AuthorizationRequest.Builder request = AuthorizationRequest.builder()
                 .setRequestedScopes(Collections.singletonList(new Scope(SCOPE)));
-        if (email != null) {
+        if (email != null && !email.isEmpty()) {
             request.setAccount(new Account(email, "com.google"));
         }
         return Identity.getAuthorizationClient(context).authorize(request.build());
@@ -249,7 +251,7 @@ final class GoogleDrive implements Cloud {
             if (cause instanceof ApiException) {
                 int status = ((ApiException) cause).getStatusCode();
                 if (status == CommonStatusCodes.SIGN_IN_REQUIRED || status == CommonStatusCodes.INVALID_ACCOUNT) {
-                    throw new AuthException("Google account " + email + " is not available: connect again");
+                    throw new AuthException("Google account is not available: connect again");
                 }
             }
             throw new IOException("Google authorization failed: " + cause.getMessage(), cause);

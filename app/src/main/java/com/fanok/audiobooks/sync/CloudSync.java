@@ -17,7 +17,6 @@ import androidx.annotation.Nullable;
 import androidx.preference.PreferenceManager;
 import com.fanok.audiobooks.R;
 import com.fanok.audiobooks.service.MediaPlayerService;
-import java.io.IOException;
 import java.net.Proxy;
 import java.util.Arrays;
 import java.util.Collections;
@@ -130,29 +129,34 @@ public final class CloudSync {
         if (service == null) {
             return;
         }
-        ConnectivityManager network = app.getSystemService(ConnectivityManager.class);
-        String error = "";
-        try {
-            if (network == null || network.getActiveNetwork() == null) {
-                throw new IOException(app.getString(R.string.sync_offline));
-            }
-            CloudAccount account = new CloudAccount(prefs.getString(PREF_ACCOUNT, null),
-                    prefs.getString(PREF_TOKEN, null));
-            SyncRun.run(app, service.open(app, account, http()));
-        } catch (Cloud.AuthException e) {
-            error = app.getString(R.string.sync_sign_in_again);
-        } catch (Snapshot.NewerException e) {
-            error = app.getString(R.string.sync_update_app);
-        } catch (Exception e) {
-            Log.w(TAG, "Sync failed", e);
-            error = e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName();
-        }
+        String error = sync(app, service, prefs);
         if (connected(app) == service) { // not disconnected meanwhile
             SharedPreferences.Editor edit = prefs.edit().putString(PREF_ERROR, error);
             if (error.isEmpty()) {
                 edit.putLong(PREF_AT, System.currentTimeMillis());
             }
             edit.apply();
+        }
+    }
+
+    /** "" once the sync went through, else why it did not, for the status. */
+    private static String sync(Context app, CloudService service, SharedPreferences prefs) {
+        ConnectivityManager network = app.getSystemService(ConnectivityManager.class);
+        if (network == null || network.getActiveNetwork() == null) {
+            return app.getString(R.string.sync_offline);
+        }
+        try {
+            CloudAccount account = new CloudAccount(prefs.getString(PREF_ACCOUNT, null),
+                    prefs.getString(PREF_TOKEN, null));
+            SyncRun.run(app, service.open(app, account, http()));
+            return "";
+        } catch (Cloud.AuthException e) {
+            return app.getString(R.string.sync_sign_in_again);
+        } catch (Snapshot.NewerException e) {
+            return app.getString(R.string.sync_update_app);
+        } catch (Exception e) {
+            Log.w(TAG, "Sync failed", e);
+            return e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName();
         }
     }
 

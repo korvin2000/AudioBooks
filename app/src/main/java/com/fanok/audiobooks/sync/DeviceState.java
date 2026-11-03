@@ -87,8 +87,8 @@ final class DeviceState {
     private static boolean applyBooks(Context app, Snapshot mine, Snapshot merged, Snapshot kept) {
         AppDatabase db = AppDatabase.getDatabase(app);
         BooksDBModel books = new BooksDBModel(app);
-        boolean[] changed = {false};
-        db.runInTransaction(() -> {
+        return db.runInTransaction(() -> {
+            boolean changed = false;
             List<String> added = new ArrayList<>();
             for (String url : merged.fav.keySet()) {
                 if (!mine.fav.containsKey(url)) {
@@ -102,13 +102,13 @@ final class DeviceState {
                     unapplied(kept.fav, mine.fav, url);
                 } else if (!books.inFavorite(url)) {
                     books.addFavorite(book);
-                    changed[0] = true;
+                    changed = true;
                 }
             }
             for (String url : mine.fav.keySet()) {
                 if (!merged.fav.containsKey(url) && books.inFavorite(url)) {
                     books.removeFavorite(mine.books.get(url));
-                    changed[0] = true;
+                    changed = true;
                 }
             }
             for (Map.Entry<String, Long> e : merged.hist.entrySet()) {
@@ -123,7 +123,7 @@ final class DeviceState {
                     unapplied(kept.hist, mine.hist, url);
                 } else if (Objects.equals(now == null ? null : now.openedAt, was)) {
                     books.addHistory(book, e.getValue());
-                    changed[0] = true;
+                    changed = true;
                 }
             }
             for (Map.Entry<String, Long> e : mine.hist.entrySet()) {
@@ -131,11 +131,11 @@ final class DeviceState {
                         : db.historyDao().getByUrl(e.getKey());
                 if (now != null && now.openedAt == e.getValue()) {
                     books.removeHistory(mine.books.get(e.getKey()));
-                    changed[0] = true;
+                    changed = true;
                 }
             }
+            return changed;
         });
-        return changed[0];
     }
 
     /** The favourite people, through FavoritePeople's own write thread; whether any row changed. */
@@ -171,6 +171,8 @@ final class DeviceState {
     private static void applyPlaces(Context app, Snapshot mine, Snapshot merged, Snapshot kept) {
         SharedPreferences storage = storage(app);
         SharedPreferences.Editor places = storage.edit();
+        // the database waits until the places are written: a place the player saves between this loop's check
+        // and the apply would be overwritten, so that window stays as short as the loop
         Map<String, Snapshot.Pos> moved = new HashMap<>();
         for (Map.Entry<String, Snapshot.Pos> e : merged.pos.entrySet()) {
             String url = e.getKey();
