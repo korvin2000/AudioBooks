@@ -24,6 +24,18 @@ public class SessionExtrasTest {
     }
 
     @Test
+    public void chapterDurationMs_secondsToMsWithoutOverflow() {
+        assertEquals(6_480_000L, SessionExtras.chapterDurationMs(6480));
+        assertEquals(2_147_483_647_000L, SessionExtras.chapterDurationMs(Integer.MAX_VALUE));
+    }
+
+    @Test
+    public void chapterDurationMs_unknownIsZero() {
+        assertEquals(0L, SessionExtras.chapterDurationMs(0));
+        assertEquals(0L, SessionExtras.chapterDurationMs(-1));
+    }
+
+    @Test
     public void bookKey_noUrlNoKey() {
         assertNull(SessionExtras.bookKey(null));
         assertNull(SessionExtras.bookKey(""));

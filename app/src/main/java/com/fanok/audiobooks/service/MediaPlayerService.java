@@ -210,6 +210,7 @@ public class MediaPlayerService extends MediaBrowserServiceCompat {
             | PlaybackStateCompat.ACTION_PLAY_FROM_MEDIA_ID
             | PlaybackStateCompat.ACTION_PLAY_FROM_SEARCH
             | PlaybackStateCompat.ACTION_SET_PLAYBACK_SPEED
+            | PlaybackStateCompat.ACTION_SKIP_TO_QUEUE_ITEM
             | PlaybackStateCompat.ACTION_STOP;
 
     // Published for in-process readers; written on the main thread only.
@@ -907,6 +908,7 @@ public class MediaPlayerService extends MediaBrowserServiceCompat {
         if (mediaSession != null) {
             mediaSession.setActive(false);
             publishMetadata();
+            publishQueue();
         }
         publishState();
         removeNotification();
@@ -980,6 +982,7 @@ public class MediaPlayerService extends MediaBrowserServiceCompat {
         int index = Math.max(0, Math.min(request.index, chapters.size() - 1));
         if (mediaSession != null) {
             mediaSession.setActive(true);
+            publishQueue();
         }
         if (!isForeground) {
             //a browser client bound the service and asked to play: become a started foreground service
@@ -1410,6 +1413,7 @@ public class MediaPlayerService extends MediaBrowserServiceCompat {
                         return;
                     }
                     chapters = new ArrayList<>(fresh);
+                    publishQueue();
                     //where the chapter is now: a seek during the fetch moved the idle player
                     loadChapter(index, currentPositionMs(), false);
                     holdRetryWakeLock(HANDOVER_WAKE_MS);
@@ -1817,6 +1821,35 @@ public class MediaPlayerService extends MediaBrowserServiceCompat {
         tellListener();
     }
 
+    /**
+     * The playing list as the session's queue, queue id = chapter index: the chapter list of Android Auto, and a
+     * launcher widget's time left in the book from the known lengths. Set when the list changes, not with the state.
+     */
+    private void publishQueue() {
+        if (mediaSession == null) {
+            return;
+        }
+        if (!hasBook()) {
+            mediaSession.setQueue(null);
+            return;
+        }
+        List<MediaSessionCompat.QueueItem> queue = new ArrayList<>(chapters.size());
+        for (int i = 0; i < chapters.size(); i++) {
+            AudioPOJO chapter = chapters.get(i);
+            MediaDescriptionCompat.Builder description = new MediaDescriptionCompat.Builder()
+                    .setMediaId(Integer.toString(i))
+                    .setTitle(chapter.getName());
+            long durationMs = SessionExtras.chapterDurationMs(chapter.getTime());
+            if (durationMs > 0) {
+                Bundle extras = new Bundle();
+                extras.putLong(SessionExtras.CHAPTER_DURATION_MS, durationMs);
+                description.setExtras(extras);
+            }
+            queue.add(new MediaSessionCompat.QueueItem(description.build(), i));
+        }
+        mediaSession.setQueue(queue);
+    }
+
     /** Hands the listener the session's last metadata and state together; its failure never reaches playback. */
     private void tellListener() {
         SessionListener listener = sessionListener;
@@ -2122,6 +2155,14 @@ public class MediaPlayerService extends MediaBrowserServiceCompat {
                 BookPresenter.setSpeedWithoutBroadcast(value);
                 new StorageUtil(MediaPlayerService.this).storeSpeed(value);
                 setSpeed(value);
+            }
+
+            /** A chapter from the queue (Android Auto, a launcher widget) plays from its start. */
+            @Override
+            public void onSkipToQueueItem(long id) {
+                if (id == (int) id) {
+                    select((int) id, true);
+                }
             }
 
             /** The playback state's custom actions carry the notification action names. */
