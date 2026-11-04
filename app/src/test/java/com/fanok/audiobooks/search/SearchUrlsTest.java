@@ -48,6 +48,12 @@ public class SearchUrlsTest {
         PAGE_FORMAT.put(Provider.BOOKISH, "search_start=%d&");
         PAGE_FORMAT.put(Provider.GOLOSKNIG, "/page%d/");
         PAGE_FORMAT.put(Provider.GOLOSOM, "&page=%d");
+        PAGE_FORMAT.put(Provider.YAKNIGA, "&page=%d");
+        PAGE_FORMAT.put(Provider.AUDIO_KNIGA_BIZ, "&page=%d");
+        PAGE_FORMAT.put(Provider.BAZA_KNIG_INFO, "&page=%d");
+        PAGE_FORMAT.put(Provider.BOOKINFO, "&page=%d");
+        PAGE_FORMAT.put(Provider.FOUR_READ, "&search_start=%d&");
+        PAGE_FORMAT.put(Provider.AKNIGA_ME, "&page=%d");
     }
 
     private static String pageToken(Provider provider, Category category, int page) {
@@ -166,8 +172,11 @@ public class SearchUrlsTest {
                         int from = path.indexOf("p.title=") + "p.title=".length();
                         decoded = path.substring(from, path.indexOf("/v.litres_buy", from));
                     } else {
-                        String name = provider == Provider.ABMP3 ? "text"
+                        String name = provider == Provider.ABMP3 || provider == Provider.AUDIO_KNIGA_BIZ
+                                || provider == Provider.BAZA_KNIG_INFO ? "text"
                                 : provider == Provider.AKNIGI24 && category != Category.BOOKS ? "search"
+                                : provider == Provider.BOOKINFO
+                                        ? (category == Category.BOOKS ? "search[title]" : "search[name]")
                                 : HttpUrl.parse(url).queryParameter("story") != null ? "story" : "q";
                         decoded = HttpUrl.parse(url).queryParameter(name);
                     }

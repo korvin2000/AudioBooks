@@ -70,6 +70,7 @@ import com.fanok.audiobooks.policy.ParentalControl;
 import com.fanok.audiobooks.presenter.SearchbalePresenter;
 import com.fanok.audiobooks.search.Genre;
 import com.fanok.audiobooks.search.Provider;
+import com.fanok.audiobooks.source.SourceParser;
 import com.fanok.audiobooks.search.SearchGrouper.Group;
 import com.fanok.audiobooks.search.SearchGrouper.Narration;
 import com.fanok.audiobooks.search.SearchGrouper.Offer;
@@ -1466,8 +1467,9 @@ public class SearchableActivity extends MvpAppCompatActivity implements Searchab
     @Override
     public void startBookActivity(@NotNull @NonNull BookPOJO bookPOJO) {
 
-        if (Url.isHost(bookPOJO.getUrl(), Url.SERVER_ABMP3)) {
-            // ABMP3 search cards carry only title and URL: load the full description first
+        SourceParser parser = Provider.parserOf(bookPOJO.getUrl());
+        if (parser != null && parser.searchHitsNeedBook()) {
+            // the site's search cards carry only title and URL (ABMP3's engine): load the full description first
             Intent intent = new Intent(this, LoadBook.class);
             intent.putExtra("url", bookPOJO.getUrl());
             startActivity(intent);

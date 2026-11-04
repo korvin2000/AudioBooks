@@ -1,0 +1,29 @@
+{
+ "tagline": "Второй путь к каталогу AudioBook-mp3",
+ "about": "Сайт на том же движке, что AudioBook-mp3, но со своим хранилищем аудио: тот же формат карточек, авторы, исполнители, серии и Топ-100, и есть книги, которых на AudioBook-mp3 нет. Украинский адрес audioknigi.com.ua открывает тот же каталог.",
+ "updates": null,
+ "books": null,
+ "booksAt": null,
+ "country": "MD",
+ "cdn": null,
+ "since": "2023-12",
+ "blocked": [],
+ "fragments": null,
+ "takedowns": null,
+ "mirrors": [
+  "audioknigi.com.ua"
+ ],
+ "related": [
+  "abmp3"
+ ],
+ "added": "8.3",
+ "accent": "#1E9BD7",
+ "pluses": [
+  "Авторы, исполнители и серии",
+  "Отдельное хранилище аудио",
+  "Работает из России и Украины"
+ ],
+ "minuses": [
+  "Каталог во многом повторяет AudioBook-mp3"
+ ]
+}

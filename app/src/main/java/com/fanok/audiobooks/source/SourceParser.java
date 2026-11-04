@@ -53,6 +53,16 @@ public interface SourceParser {
         return Collections.emptySet();
     }
 
+    /**
+     * Hosts that other sites use too (a shared CDN, each with its subdomains) whose requests need {@link #referer}
+     * when they carry none, e.g. hotlink-guarded covers. Unlike {@link #hosts} they keep the global proxy route and
+     * never make a request or a link the site's; the first site naming a host gives it its Referer
+     * ({@link com.fanok.audiobooks.search.Provider#refererOf}). Empty by default.
+     */
+    default Set<String> refererHosts() {
+        return Collections.emptySet();
+    }
+
     /** The read timeout of the site's pages; raise it only for a site whose server is known to be slow. */
     default int timeoutMs() {
         return SiteHttp.TIMEOUT_MS;
@@ -218,6 +228,14 @@ public interface SourceParser {
     /** One page of book search results; by default the page is a listing of its own URL, as on most sites. */
     default ProviderPage<BookPOJO> searchResults(Document page, int pageNo) {
         return listing(page, page.location(), pageNo);
+    }
+
+    /**
+     * True when a book search card carries too little to open the book page from it (a title and a link only): the
+     * search then opens the book by its URL, loading its card first. False by default.
+     */
+    default boolean searchHitsNeedBook() {
+        return false;
     }
 
     /** One page of author or reader search results. */

@@ -111,7 +111,8 @@ public class ProviderTest {
 
     /**
      * Knigoblud, Otrubin, Biblus and Golosom carry Izibuk's catalog (one server, one markup, the same new books), uKnig
-     * Poleknig's, Golosknig akniga's; every other site is unique.
+     * Poleknig's, Golosknig akniga's, baza-knig.info baza-knig.top's (the same new books, another engine and audio
+     * store); every other site is unique.
      */
     @Test
     public void mirrorsAreTheOtherSitesWithTheSameCatalog() {
@@ -125,6 +126,8 @@ public class ProviderTest {
         assertEquals(Collections.singletonList(Provider.AKNIGA), Provider.GOLOSKNIG.mirrors());
         assertEquals(Collections.singletonList(Provider.UKNIG), Provider.POLEKNIG.mirrors());
         assertEquals(Collections.singletonList(Provider.POLEKNIG), Provider.UKNIG.mirrors());
+        assertEquals(Collections.singletonList(Provider.BAZA_KNIG_INFO), Provider.BAZA_KNIG.mirrors());
+        assertSame(Provider.BAZA_KNIG, Provider.BAZA_KNIG_INFO.original());
         assertSame(Provider.IZIBUK, Provider.GOLOSOM.original());
         assertSame(Provider.IZIBUK, Provider.KNIGOBLUD.original());
         assertSame(Provider.IZIBUK, Provider.IZIBUK.original());
@@ -135,7 +138,8 @@ public class ProviderTest {
         assertFalse(Provider.UKNIG.isMirrorOf(Provider.KNIGOBLUD));
         assertFalse(Provider.GOLOSOM.isMirrorOf(null));
         Set<Provider> mirrored = EnumSet.of(Provider.IZIBUK, Provider.KNIGOBLUD, Provider.OTRUB, Provider.BIBLUS,
-                Provider.GOLOSOM, Provider.AKNIGA, Provider.GOLOSKNIG, Provider.POLEKNIG, Provider.UKNIG);
+                Provider.GOLOSOM, Provider.AKNIGA, Provider.GOLOSKNIG, Provider.POLEKNIG, Provider.UKNIG,
+                Provider.BAZA_KNIG, Provider.BAZA_KNIG_INFO);
         for (Provider p : Provider.values()) {
             assertEquals(p.name(), mirrored.contains(p), p.hasMirrors());
             if (!mirrored.contains(p)) {
@@ -184,5 +188,20 @@ public class ProviderTest {
         assertSame(Provider.OTRUB.parser, Provider.parserOf("http://m.otrub.in/popular/?period=month&p=1"));
         assertNull(Provider.ofUrl("https://m.otrub.in.evil.com/book/1"));
         assertNull(Provider.ofUrl("https://mob.knigoblud.club.evil.com/e87cc048"));
+    }
+
+    /**
+     * A shared CDN gets a Referer from the first site that names it in refererHosts (redirectto.cc answers 403 without
+     * one of its family), but stays nobody's for the proxy route; a site's own host keeps its own Referer.
+     */
+    @Test
+    public void aSharedCdnBorrowsTheRefererOfTheSiteThatNamesIt() {
+        assertNull(Provider.ofNetworkHost("9giiu0g54k8c.redirectto.cc"));
+        assertEquals("https://audio-kniga.biz/", Provider.refererOf("9giiu0g54k8c.redirectto.cc"));
+        assertEquals("https://audio-kniga.biz/", Provider.refererOf("redirectto.cc"));
+        assertEquals("https://baza-knig.info/", Provider.refererOf("baza-knig.info"));
+        assertNull("audiobook-mp3.com sends no Referer of its own", Provider.refererOf("audiobook-mp3.com"));
+        assertNull(Provider.refererOf("example.com"));
+        assertNull(Provider.refererOf(null));
     }
 }

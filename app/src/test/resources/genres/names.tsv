@@ -435,3 +435,87 @@ Westerns	ADVENTURE	ADVENTURE
 ВОВ	WAR	WAR
 Бояръ-аниме	SF_FANTASY	SF_FANTASY
 русские рассказы	PROSE	PROSE
+# six new sources (2026-11-04)
+# yakniga.org
+Темпоральная фантастика	SF_FANTASY	SF_FANTASY
+Родителям и детям	KIDS	KIDS
+Развивающая детская литература	KIDS	KIDS
+Детские стихи/проза/литература	KIDS	PROSE,KIDS
+Романы, стихи, проза	PROSE	PROSE,POETRY
+Экология	SCIENCE	SCIENCE
+Новогодние книги	-	-
+Eve online	SF_FANTASY	SF_FANTASY
+# bookinfo.net
+Warhammer 40,000	SF_FANTASY	SF_FANTASY
+Бизнес-книги	BUSINESS	BUSINESS
+Биографии и Мемуары	BIOGRAPHY	BIOGRAPHY
+Боевики, остросюжетная литература	ACTION	DETECTIVE,ACTION
+Детские книги	KIDS	KIDS
+Зомби-апокалипсис	HORROR	HORROR
+Классическая литература	CLASSIC	CLASSIC
+Книги по психологии	PSYCHOLOGY	PSYCHOLOGY
+Компьютерная литература	SCIENCE	SCIENCE
+Красота и здоровье	HEALTH	HEALTH
+Наука и образование	SCIENCE	SCIENCE,EDUCATION
+Повести, рассказы	PROSE	PROSE
+Поэзия и драматургия	POETRY	PROSE,POETRY
+Путешествия и география	ADVENTURE	ADVENTURE
+Самиздат, сетевая литература	PROSE	PROSE
+Фанфик	-	-
+Эротика и секс	EROTICA	EROTICA
+Юмористическая литература	HUMOR	HUMOR
+# 4read.org (Ukrainian; 'Драмa' ends in a Latin a)
+Казки	KIDS	KIDS
+Дитячі	KIDS	KIDS
+Колискові	KIDS	KIDS
+Детективи	DETECTIVE	DETECTIVE
+Романи	PROSE	PROSE
+Фентезі	SF_FANTASY	SF_FANTASY
+Саморозвиток	PSYCHOLOGY	PSYCHOLOGY
+Історична проза	HISTORY	HISTORY
+Сучасна проза	PROSE	PROSE
+Пригоди	ADVENTURE	ADVENTURE
+Про кохання	ROMANCE	ROMANCE
+Оповідання	PROSE	PROSE
+Вірші	POETRY	POETRY
+Містика	HORROR	HORROR
+Жахи	HORROR	HORROR
+Біографії	BIOGRAPHY	BIOGRAPHY
+Аудіовистави	PERFORMANCE	PERFORMANCE
+Про війну	WAR	WAR
+Про бізнес	BUSINESS	BUSINESS
+П'єси	-	-
+Інше	OTHER	OTHER
+Українська література	PROSE	PROSE
+Зарубіжна література	PROSE	PROSE
+Антиутопія	SF_FANTASY	SF_FANTASY
+Гумор	HUMOR	HUMOR
+АудіоКазка	KIDS	KIDS
+Повісті й оповідання	PROSE	PROSE
+Драмa	PROSE	PROSE
+Світова література	PROSE	PROSE
+П'єса	-	-
+Книги про бізнес	BUSINESS	BUSINESS
+Біографія	BIOGRAPHY	BIOGRAPHY
+Книги про війну	WAR	WAR
+Любовні романи	ROMANCE	ROMANCE
+Дитяча література	KIDS	KIDS
+# akniga.me
+Стихи для детей	KIDS	KIDS
+Художественная литература	PROSE	PROSE
+Про любовь	ROMANCE	ROMANCE
+Про историю	HISTORY	HISTORY
+Приключения и экшн	ADVENTURE	ACTION,ADVENTURE
+Драматургия	PROSE	PROSE
+Книги для детей и подростков	KIDS	KIDS,TEENS
+Нон-фикшн	SCIENCE	SCIENCE
+Общество и философия	PSYCHOLOGY	PSYCHOLOGY
+О бизнесе	BUSINESS	BUSINESS
+О технологиях	SCIENCE	SCIENCE
+О здоровом образе жизни	HEALTH	HEALTH
+О саморазвитии	PSYCHOLOGY	PSYCHOLOGY
+Психология и воспитание	PSYCHOLOGY	PSYCHOLOGY
+О духовном	RELIGION	RELIGION
+Популярно о науке	SCIENCE	SCIENCE
+Аудиокниги на иностранном языке	FOREIGN	FOREIGN
+На английском	-	-

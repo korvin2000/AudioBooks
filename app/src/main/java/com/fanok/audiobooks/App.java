@@ -266,9 +266,7 @@ public class App extends Application {
                     requestBuilder.header("User-Agent", Consts.USER_AGENT);
                 }
                 if (original.header("Referer") == null) {
-                    String url = original.url().toString();
-                    Provider provider = Provider.ofNetworkHost(Url.hostOf(url));
-                    String referer = provider == null ? null : provider.parser.referer();
+                    String referer = Provider.refererOf(Url.hostOf(original.url().toString()));
                     if (referer != null) {
                         requestBuilder.header("Referer", referer);
                     }
