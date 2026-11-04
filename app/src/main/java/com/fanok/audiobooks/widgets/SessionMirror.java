@@ -3,6 +3,7 @@ package com.fanok.audiobooks.widgets;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
 import android.os.Handler;
 import android.os.Looper;
@@ -15,6 +16,7 @@ import android.util.Log;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.preference.PreferenceManager;
+import com.fanok.audiobooks.Hourglass;
 import com.fanok.audiobooks.pojo.StorageUtil;
 import com.fanok.audiobooks.service.Checkpoint;
 import com.fanok.audiobooks.service.MediaPlayerService;
@@ -22,14 +24,14 @@ import java.io.ByteArrayOutputStream;
 
 /**
  * Mirrors what the player's session shows into the {@link NowPlaying} the provider serves, keeps it for a cold start
- * and tells the trusted launchers when it changes. Without the user's consent it only follows the session in memory
- * (a few fields per publication): no cover, no disk, no broadcast. Main thread; binder threads only read
- * {@link #allowed}, {@link #ready} and {@link #current}.
+ * and tells the trusted launchers when it changes. Without the user's consent or an installed launcher it only follows
+ * the session in memory (a few fields per publication): no cover, no disk, no broadcast; it never uses the network.
+ * Main thread; binder threads only read {@link #allowed}, {@link #ready} and {@link #current}.
  */
 final class SessionMirror implements MediaPlayerService.SessionListener,
         SharedPreferences.OnSharedPreferenceChangeListener {
 
-    /** Settings → General: the user's consent, off until they turn it on. */
+    /** Settings → General: the user's consent, given until they take it back (a hobby app's book, nothing private). */
     static final String PREF = "external_widgets";
 
     private static final String TAG = "ExternalWidgets";
@@ -65,6 +67,9 @@ final class SessionMirror implements MediaPlayerService.SessionListener,
     private float speed = 1f;
     @Nullable
     private int[] seconds;
+    @Nullable
+    private Hourglass sleepTimer;
+    private int sleepMinutes;
     private boolean rebuildPosted, changedPosted, restoreStarted;
 
     SessionMirror(@NonNull Context context) {
@@ -73,7 +78,7 @@ final class SessionMirror implements MediaPlayerService.SessionListener,
         saved = this.context.getSharedPreferences("external_widgets", Context.MODE_PRIVATE);
         savedCover = this.context.getSharedPreferences("external_widgets_cover", Context.MODE_PRIVATE);
         settings.registerOnSharedPreferenceChangeListener(this);
-        allowed = settings.getBoolean(PREF, false);
+        allowed = settings.getBoolean(PREF, true);
         if (allowed) {
             restore();
         }
@@ -81,11 +86,13 @@ final class SessionMirror implements MediaPlayerService.SessionListener,
 
     @Override
     public void onSession(@Nullable MediaMetadataCompat metadata, @NonNull PlaybackStateCompat state, float speed,
-            @Nullable int[] seconds) {
+            @Nullable int[] seconds, @Nullable Hourglass sleepTimer, int sleepMinutes) {
         this.metadata = metadata;
         this.state = state;
         this.speed = speed;
         this.seconds = seconds;
+        this.sleepTimer = sleepTimer;
+        this.sleepMinutes = sleepMinutes;
         postRebuild();
     }
 
@@ -94,7 +101,7 @@ final class SessionMirror implements MediaPlayerService.SessionListener,
         if (!PREF.equals(key)) {
             return;
         }
-        allowed = prefs.getBoolean(PREF, false);
+        allowed = prefs.getBoolean(PREF, true);
         if (allowed) {
             restore();
             postRebuild();
@@ -118,40 +125,63 @@ final class SessionMirror implements MediaPlayerService.SessionListener,
         try {
             long now = SystemClock.elapsedRealtime();
             NowPlaying last = current;
-            if (metadata == null) {
-                //the book left the session (stop, end of the service): the widget keeps it where it stopped
-                if (last != null) {
-                    publish(last.paused(now));
-                }
-                return;
+            boolean wanted = allowed && launcherInstalled();
+            //the book left the session (stop, end of the service): the widget keeps it where it stopped
+            NowPlaying shown = metadata != null ? shown(metadata, state, wanted)
+                    : last != null ? last.paused(now) : null;
+            if (shown != null) {
+                sleep(shown, now);
+                publish(shown, wanted);
             }
-            NowPlaying shown = new NowPlaying();
-            shown.title = NowPlaying.title(metadata.getString(MediaMetadataCompat.METADATA_KEY_ALBUM));
-            shown.chapter = NowPlaying.text(metadata.getString(MediaMetadataCompat.METADATA_KEY_TITLE));
-            shown.credits = NowPlaying.credits(metadata.getString(MediaMetadataCompat.METADATA_KEY_ARTIST),
-                    metadata.getString(MediaMetadataCompat.METADATA_KEY_COMPOSER));
-            shown.chapterIndex = (int) metadata.getLong(MediaMetadataCompat.METADATA_KEY_TRACK_NUMBER) - 1;
-            shown.chapterCount = (int) metadata.getLong(MediaMetadataCompat.METADATA_KEY_NUM_TRACKS);
-            shown.durationMs = metadata.getLong(MediaMetadataCompat.METADATA_KEY_DURATION);
-            shown.playing = state.getState() == PlaybackStateCompat.STATE_PLAYING;
-            shown.positionMs = Math.max(0, state.getPosition());
-            shown.sampledAtMs = state.getLastPositionUpdateTime();
-            shown.speed = speed > 0 ? speed : 1f;
-            shown.lengths(seconds);
-            shown.coverUri = metadata.getString(MediaMetadataCompat.METADATA_KEY_ART_URI);
-            shown.cover = allowed ? cover(shown.coverUri, metadata) : null;
-            shown.bookUrl = MediaPlayerService.currentBookUrl();
-            publish(shown);
         } catch (RuntimeException e) {
             //a fault here must never reach the player's thread
             Log.e(TAG, "rebuild failed", e);
         }
     }
 
-    private void publish(@NonNull NowPlaying shown) {
+    @NonNull
+    private NowPlaying shown(@NonNull MediaMetadataCompat metadata, @NonNull PlaybackStateCompat state,
+            boolean wanted) {
+        NowPlaying shown = new NowPlaying();
+        shown.title = NowPlaying.title(metadata.getString(MediaMetadataCompat.METADATA_KEY_ALBUM));
+        shown.chapter = NowPlaying.text(metadata.getString(MediaMetadataCompat.METADATA_KEY_TITLE));
+        shown.credits = NowPlaying.credits(metadata.getString(MediaMetadataCompat.METADATA_KEY_ARTIST),
+                metadata.getString(MediaMetadataCompat.METADATA_KEY_COMPOSER));
+        shown.chapterIndex = (int) metadata.getLong(MediaMetadataCompat.METADATA_KEY_TRACK_NUMBER) - 1;
+        shown.chapterCount = (int) metadata.getLong(MediaMetadataCompat.METADATA_KEY_NUM_TRACKS);
+        shown.durationMs = metadata.getLong(MediaMetadataCompat.METADATA_KEY_DURATION);
+        shown.playing = state.getState() == PlaybackStateCompat.STATE_PLAYING;
+        shown.positionMs = Math.max(0, state.getPosition());
+        shown.sampledAtMs = state.getLastPositionUpdateTime();
+        shown.speed = speed > 0 ? speed : 1f;
+        shown.lengths(seconds);
+        shown.coverUri = metadata.getString(MediaMetadataCompat.METADATA_KEY_ART_URI);
+        shown.cover = wanted ? cover(shown.coverUri, metadata) : null;
+        shown.bookUrl = MediaPlayerService.currentBookUrl();
+        return shown;
+    }
+
+    /**
+     * The player's sleep timer as the widget shows it (level 3): a countdown counts only while the book plays, so a
+     * paused one has no deadline; an end-of-chapter one has no minutes.
+     */
+    private void sleep(@NonNull NowPlaying shown, long now) {
+        Hourglass timer = sleepTimer;
+        shown.timerOn = timer != null && timer.isRunning();
+        shown.timerChapter = shown.timerOn && timer.isEndOfChapter();
+        shown.timerPaused = shown.timerOn && timer.isPaused();
+        shown.timerRemainingMs = shown.timerOn && !shown.timerChapter ? timer.getTimeRemaining() : 0;
+        shown.timerDeadlineMs = shown.timerOn && !shown.timerPaused && !shown.timerChapter
+                ? now + shown.timerRemainingMs : 0;
+        //a timer set to a clock time has no length of its own: the minutes left stand for it
+        shown.timerMinutes = !shown.timerOn || shown.timerChapter ? 0
+                : sleepMinutes > 0 ? sleepMinutes : (int) ((shown.timerRemainingMs + 59_999) / 60_000);
+    }
+
+    private void publish(@NonNull NowPlaying shown, boolean wanted) {
         current = shown;
         ready = true;
-        if (!allowed) {
+        if (!wanted) {
             return;
         }
         save(shown.paused(SystemClock.elapsedRealtime()));
@@ -166,9 +196,25 @@ final class SessionMirror implements MediaPlayerService.SessionListener,
         }
     }
 
+    /**
+     * A launcher that reads the snapshot is installed. The consent is on by default: without one, keeping the book and
+     * encoding its cover would be work for nobody.
+     */
+    private boolean launcherInstalled() {
+        for (String launcher : ExternalWidgetsProvider.LAUNCHERS) {
+            try {
+                context.getPackageManager().getPackageInfo(launcher, 0);
+                return true;
+            } catch (PackageManager.NameNotFoundException e) {
+                //not this one
+            }
+        }
+        return false;
+    }
+
     private void sendChanged() {
         String action = context.getPackageName() + ExternalWidgetsProvider.SUFFIX + ".CHANGED";
-        for (String launcher : ExternalWidgetsProvider.TRUSTED.keySet()) {
+        for (String launcher : ExternalWidgetsProvider.LAUNCHERS) {
             context.sendBroadcast(new Intent(action).setPackage(launcher));
         }
     }

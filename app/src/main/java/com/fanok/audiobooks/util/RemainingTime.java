@@ -64,19 +64,24 @@ public final class RemainingTime {
         if (!known) {
             return new Line(CHAPTER, 0, (int) (1000L * chapter / n), chapter + 1, n);
         }
-        long behind = starts[chapter] + Math.min(positionMs / 1000, starts[chapter + 1] - starts[chapter]);
-        long rest = starts[n] - behind;
-        if (rest < DONE_SEC) {
+        //in ms down to the whole second, as a launcher widget counts the time left: both show the same minute
+        long behindMs = starts[chapter] * 1000 + Math.min(Math.max(0, positionMs),
+                (starts[chapter + 1] - starts[chapter]) * 1000);
+        long restMs = starts[n] * 1000 - behindMs;
+        if (restMs < DONE_SEC * 1000) {
             return new Line(DONE, 0, 1000, chapter + 1, n);
         }
-        double real = speed > 0 ? rest / (double) speed : rest;
-        return new Line(LEFT, (long) Math.ceil(real), (int) (1000 * behind / starts[n]), chapter + 1, n);
+        double real = speed > 0 ? restMs / (double) speed : restMs;
+        return new Line(LEFT, (long) (real / 1000), (int) (behindMs / starts[n]), chapter + 1, n);
     }
 
-    /** "5 ч. 12 мин.", "48 мин.", "2 ч.": as Consts.formatTimeDisplay writes a book's length, minutes rounded up. */
+    /**
+     * "5 ч. 12 мин.", "48 мин.", "2 ч.": whole minutes, as the sites write a book's length and launcher widgets the
+     * time left in it, so the book screen and a widget show the same.
+     */
     @NonNull
     public static String format(long seconds) {
-        long minutes = (Math.max(0, seconds) + 59) / 60;
+        long minutes = Math.max(0, seconds) / 60;
         long hours = minutes / 60;
         minutes %= 60;
         if (hours > 0 && minutes > 0) {

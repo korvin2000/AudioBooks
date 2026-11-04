@@ -238,9 +238,11 @@ public class MediaPlayerService extends MediaBrowserServiceCompat {
          * @param state    the session's state; its speed is 0 unless playing
          * @param speed    the player's speed
          * @param seconds  the chapters' lengths in seconds (0 = unknown) when they are the whole book, else null
+         * @param sleepTimer   the running sleep timer, or null; read on the main thread only
+         * @param sleepMinutes a countdown's length in minutes, else 0 (to a clock time, to the chapter's end)
          */
         void onSession(@Nullable MediaMetadataCompat metadata, @NonNull PlaybackStateCompat state, float speed,
-                @Nullable int[] seconds);
+                @Nullable int[] seconds, @Nullable Hourglass sleepTimer, int sleepMinutes);
     }
 
     /** The one listener; null removes it. */
@@ -1911,7 +1913,8 @@ public class MediaPlayerService extends MediaBrowserServiceCompat {
         }
         try {
             listener.onSession(shownMetadata, shownState,
-                    player != null ? player.getPlaybackParameters().speed : currentSpeed(), shownSeconds);
+                    player != null ? player.getPlaybackParameters().speed : currentSpeed(), shownSeconds, sleepTimer,
+                    sleepMode == SleepTimerPresenter.MODE_COUNTDOWN ? (int) (sleepDurationMs / 60_000L) : 0);
         } catch (RuntimeException e) {
             Log.e(TAG, "session listener failed", e);
         }
@@ -2666,6 +2669,7 @@ public class MediaPlayerService extends MediaBrowserServiceCompat {
         stopSleepWarning();
         sleepTimer.extend(ms);
         sendSleepTimerState(sleepTimer.getTimeRemaining());
+        tellListener(); //a widget's countdown follows
     }
 
     /** A shake during the warning gives the timer its time back; within the wake window it plays on and re-arms. */
