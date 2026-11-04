@@ -77,6 +77,19 @@ public class ExternalWidgetsTest {
     }
 
     @Test
+    public void sleepTimerCommandsAreMinutesTheChaptersEndOrOff() {
+        assertTrue(ExternalWidgetsProvider.timerCommand("minutes", 15));
+        assertTrue(ExternalWidgetsProvider.timerCommand("minutes", 1440));
+        assertFalse(ExternalWidgetsProvider.timerCommand("minutes", 0));
+        assertFalse(ExternalWidgetsProvider.timerCommand("minutes", 1441));
+        assertTrue(ExternalWidgetsProvider.timerCommand("end_of_chapter", 0));
+        assertTrue(ExternalWidgetsProvider.timerCommand("off", 0));
+        assertFalse(ExternalWidgetsProvider.timerCommand("off", 5));
+        assertFalse(ExternalWidgetsProvider.timerCommand("duration", 15));
+        assertFalse(ExternalWidgetsProvider.timerCommand(null, 0));
+    }
+
+    @Test
     public void admitsFourRequestsInAnySecond() {
         long[] times = new long[ExternalWidgetsProvider.RATE];
         for (int i = 0; i < 4; i++) {

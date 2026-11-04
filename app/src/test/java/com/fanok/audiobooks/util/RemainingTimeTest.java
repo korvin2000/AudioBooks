@@ -22,14 +22,16 @@ public class RemainingTimeTest {
     @Test
     public void leftCountsTheChaptersBehindAndThePositionAtTheSpeed() {
         RemainingTime time = new RemainingTime(BOOK);
-        RemainingTime.Line line = time.at(1, 300_500, 1f); //600 + 300 behind
+        RemainingTime.Line line = time.at(1, 300_500, 1f); //600 + 300.5 behind
         assertEquals(RemainingTime.LEFT, line.state);
-        assertEquals(2700, line.left);
+        assertEquals(2699, line.left);
         assertEquals(250, line.permille);
         assertEquals(2, line.chapter);
         assertEquals(3, line.chapters);
         assertEquals(1800, time.at(1, 300_000, 1.5f).left);
         assertEquals(1350, time.at(1, 300_000, 2f).left);
+        //as GENESIS LAUNCHER's (bookDurationMs - bookPositionMs) / speed: 2 399 000 / 2 = 1 199.5 s, 19 min, not 20
+        assertEquals(1199, time.at(1, 601_000, 2f).left);
     }
 
     @Test
@@ -63,14 +65,16 @@ public class RemainingTimeTest {
     }
 
     @Test
-    public void formatWritesHoursAndMinutesRoundedUp() {
+    public void formatWritesWholeHoursAndMinutes() {
+        //as GENESIS LAUNCHER writes the time left: 3:04:59 left is "3 h 04 min"
         assertEquals("0 мин.", RemainingTime.format(0));
-        assertEquals("1 мин.", RemainingTime.format(1));
+        assertEquals("0 мин.", RemainingTime.format(59));
         assertEquals("1 мин.", RemainingTime.format(60));
-        assertEquals("2 мин.", RemainingTime.format(61));
+        assertEquals("1 мин.", RemainingTime.format(119));
         assertEquals("1 ч.", RemainingTime.format(3600));
-        assertEquals("1 ч. 1 мин.", RemainingTime.format(3601));
-        assertEquals("5 ч. 12 мин.", RemainingTime.format(5 * 3600 + 12 * 60));
+        assertEquals("1 ч.", RemainingTime.format(3659));
+        assertEquals("3 ч. 4 мин.", RemainingTime.format(3 * 3600 + 4 * 60 + 59));
+        assertEquals("8 ч. 41 мин.", RemainingTime.format(8 * 3600 + 41 * 60 + 8));
     }
 
     @Test

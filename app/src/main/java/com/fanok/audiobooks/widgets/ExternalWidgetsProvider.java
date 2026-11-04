@@ -1,47 +1,48 @@
 package com.fanok.audiobooks.widgets;
 
-import android.annotation.SuppressLint;
 import android.content.ContentProvider;
 import android.content.ContentValues;
-import android.content.pm.PackageManager;
-import android.content.pm.Signature;
+import android.content.Context;
+import android.content.Intent;
 import android.database.Cursor;
 import android.net.Uri;
-import android.os.Build;
 import android.os.Bundle;
 import android.os.SystemClock;
 import android.util.Log;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.preference.PreferenceManager;
+import com.fanok.audiobooks.presenter.SleepTimerPresenter;
 import com.fanok.audiobooks.service.MediaPlayerService;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Set;
 
 /**
- * The book being played, for launcher widgets the user allowed (Settings → General): level 2 of the GENESIS LAUNCHER
- * contract (genesis_launcher/integration.txt §4, the one "Аудиокниги Nova" serves), found by the launcher at
- * {@code <package>.externalwidgets}. Display data only: commands go through the media session. The integration is
- * this package, the provider and {@code <queries>} entries of the manifest, the setting and strings_widgets.xml;
- * the player only offers {@link MediaPlayerService.SessionListener}.
+ * The book being played, for launcher widgets the user allowed (Settings → General): levels 2 and 3 of the GENESIS
+ * LAUNCHER contract (genesis_launcher/integration_updated.txt §5, §7; "Аудиокниги Nova" serves the same), found by the
+ * launcher at {@code <package>.externalwidgets}. Display data and the sleep timer only: playback goes through the
+ * media session. The integration is this package, the provider and {@code <queries>} entries of the manifest, the
+ * setting and strings_widgets.xml; the player only offers {@link MediaPlayerService.SessionListener}.
  */
 public final class ExternalWidgetsProvider extends ContentProvider {
 
     static final String SUFFIX = ".externalwidgets";
 
-    /** Launchers by package, with the SHA-256 of their signing certificate; each needs a manifest {@code <queries>}. */
-    static final Map<String, String> TRUSTED = Collections.singletonMap("ru.genesis.launcher",
-            "9A86D6167BC916F8FF9433C5F10FFDA301F2507370A6C6E8A125473B24F3ADC0");
+    /** The launchers asked and told: each also needs a manifest {@code <queries>} entry for its CHANGED. */
+    static final Set<String> LAUNCHERS = Collections.singleton("ru.genesis.launcher");
 
     /** Requests a caller may make in any second; more are answered "later". */
     static final int RATE = 4;
 
+    /** One sleep timer command per this many ms (integration_updated.txt §5.5). */
+    private static final long TIMER_COMMAND_MS = 250;
+
     private static final String TAG = "ExternalWidgets";
 
     private final Map<String, long[]> calls = new HashMap<>();
+    private long lastTimerCommand;
     private SessionMirror mirror;
 
     @Override
@@ -54,15 +55,18 @@ public final class ExternalWidgetsProvider extends ContentProvider {
 
     @Override
     public Bundle call(@NonNull String method, @Nullable String arg, @Nullable Bundle extras) {
-        if (!"snapshot".equals(method)) {
+        if (!"snapshot".equals(method) && !"sleepTimer".equals(method)) {
             throw new IllegalArgumentException("unsupported: " + method);
         }
         try {
             String caller = getCallingPackage();
-            if (!mirror.allowed || caller == null || !trusted(caller)) {
+            if (!mirror.allowed || !LAUNCHERS.contains(caller)) {
                 throw new SecurityException("not allowed");
             }
             long now = SystemClock.elapsedRealtime();
+            if ("sleepTimer".equals(method)) {
+                return sleepTimer(extras, now);
+            }
             boolean admitted;
             synchronized (calls) {
                 long[] times = calls.get(caller);
@@ -71,13 +75,13 @@ public final class ExternalWidgetsProvider extends ContentProvider {
                 }
                 admitted = admit(times, now);
             }
-            return admitted && mirror.ready ? snapshot(mirror.current, now) : later();
-        } catch (SecurityException e) {
+            return admitted && mirror.ready ? snapshot(mirror.current, now) : later(500);
+        } catch (SecurityException | IllegalArgumentException e) {
             throw e;
         } catch (RuntimeException e) {
             //only some exceptions cross the binder, any other one would end the app: this one reads "unavailable"
-            Log.e(TAG, "snapshot failed", e);
-            throw new IllegalStateException("snapshot failed");
+            Log.e(TAG, method + " failed", e);
+            throw new IllegalStateException(method + " failed");
         }
     }
 
@@ -96,32 +100,48 @@ public final class ExternalWidgetsProvider extends ContentProvider {
         return true;
     }
 
-    /** A launcher of {@link #TRUSTED} signed with its certificate (on API 28+ also an earlier one it rotated from). */
-    @SuppressLint("PackageManagerGetSignatures") // below 28: exactly one signer, compared in full
-    @SuppressWarnings("deprecation")
-    private boolean trusted(@NonNull String pkg) {
-        String hex = TRUSTED.get(pkg);
-        if (hex == null) {
-            return false;
+    /**
+     * The widget sets the player's own sleep timer (§5.5): the command the app's timer screen sends, with the
+     * user's warning options for minutes. Accepted is not applied: the player applies it, and CHANGED follows.
+     */
+    @NonNull
+    private Bundle sleepTimer(@Nullable Bundle extras, long now) {
+        String mode = extras != null ? extras.getString("mode") : null;
+        int minutes = extras != null ? extras.getInt("minutes", 0) : 0;
+        if (!timerCommand(mode, minutes)) {
+            throw new IllegalArgumentException("sleepTimer " + mode + " " + minutes);
         }
-        byte[] sha = new byte[hex.length() / 2];
-        for (int i = 0; i < sha.length; i++) {
-            sha[i] = (byte) Integer.parseInt(hex.substring(2 * i, 2 * i + 2), 16);
+        synchronized (this) {
+            if (now - lastTimerCommand < TIMER_COMMAND_MS) {
+                Bundle later = later(TIMER_COMMAND_MS);
+                later.putBoolean("accepted", false);
+                return later;
+            }
+            lastTimerCommand = now;
         }
-        PackageManager pm = getContext().getPackageManager();
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-            return pm.hasSigningCertificate(pkg, sha, PackageManager.CERT_INPUT_SHA256);
+        Bundle answer = new Bundle();
+        //the command neither starts the player nor restores a book: without one there is nothing to time
+        boolean target = MediaPlayerService.currentBookUrl() != null;
+        answer.putBoolean("accepted", target);
+        if (target) {
+            Context context = getContext();
+            Intent command = "minutes".equals(mode)
+                    ? SleepTimerPresenter.quickStart(PreferenceManager.getDefaultSharedPreferences(context))
+                            .putExtra("time", minutes * 60_000L)
+                    : new Intent(SleepTimerPresenter.Broadcast_SleepTimer).putExtra("start", "end_of_chapter".equals(mode))
+                            .putExtra("endOfChapter", true);
+            context.sendBroadcast(command.setPackage(context.getPackageName()));
         }
-        try {
-            Signature[] signers = pm.getPackageInfo(pkg, PackageManager.GET_SIGNATURES).signatures;
-            return signers != null && signers.length == 1
-                    && Arrays.equals(sha, MessageDigest.getInstance("SHA-256").digest(signers[0].toByteArray()));
-        } catch (PackageManager.NameNotFoundException | NoSuchAlgorithmException e) {
-            return false;
-        }
+        return answer;
     }
 
-    /** integration.txt §4.2: the keys and their exact types. */
+    /** A command §5.5 allows: minutes for 1..1440 of them, the chapter's end or off without any. */
+    static boolean timerCommand(@Nullable String mode, int minutes) {
+        return "minutes".equals(mode) ? minutes >= 1 && minutes <= 1440
+                : ("end_of_chapter".equals(mode) || "off".equals(mode)) && minutes == 0;
+    }
+
+    /** integration_updated.txt §7.2 and §5.4: the keys and their exact types. */
     @NonNull
     private static Bundle snapshot(@Nullable NowPlaying shown, long now) {
         Bundle b = new Bundle();
@@ -144,17 +164,29 @@ public final class ExternalWidgetsProvider extends ContentProvider {
         b.putInt("bookPercent", shown.bookPercent(now));
         b.putBoolean("bookPercentApproximate", shown.approximate());
         b.putLong("sampledAtElapsedMs", shown.sampledAtMs);
+        if (shown.bookMs > 0) {
+            //§3.3 way A, only with every chapter's length: the book's time, the position paired with positionMs
+            b.putLong("bookDurationMs", shown.bookMs);
+            b.putLong("bookPositionMs", shown.chapterStartMs + shown.positionMs);
+        }
         if (shown.cover != null) {
             b.putByteArray("coverPng", shown.cover);
         }
+        b.putBoolean("sleepTimerSupported", true);
+        b.putBoolean("sleepTimerEnabled", shown.timerOn);
+        b.putString("sleepTimerMode", !shown.timerOn ? "off" : shown.timerChapter ? "end_of_chapter" : "minutes");
+        b.putBoolean("sleepTimerPaused", shown.timerPaused);
+        b.putLong("sleepTimerRemainingMs", shown.timerRemainingMs);
+        b.putLong("sleepTimerDeadlineElapsedMs", shown.timerDeadlineMs);
+        b.putInt("sleepTimerDurationMinutes", shown.timerMinutes);
         return b;
     }
 
     @NonNull
-    private static Bundle later() {
+    private static Bundle later(long ms) {
         Bundle b = new Bundle();
         b.putString("error", "retry_later");
-        b.putLong("retryAfterMs", 500L);
+        b.putLong("retryAfterMs", ms);
         return b;
     }
 

@@ -37,6 +37,14 @@ final class NowPlaying implements Cloneable {
     @Nullable
     String bookUrl;
 
+    /** The player's sleep timer (level 3): on, to the chapter's end, stopped with the book. */
+    boolean timerOn, timerChapter, timerPaused;
+
+    /** Its time left, the elapsedRealtime it runs out at (0 while it does not count) and its length in minutes. */
+    long timerRemainingMs, timerDeadlineMs;
+
+    int timerMinutes;
+
     /** Where the chapter is at {@code now}: it runs on at the speed while playing, up to a known end. */
     long positionAt(long now) {
         if (!playing) {

@@ -2,5 +2,5 @@
 <resources>
     <!-- Настройки → Общие: consent for widgets.ExternalWidgetsProvider -->
     <string name="external_widgets">Виджеты лаунчеров</string>
-    <string name="external_widgets_desc">Разрешить передачу данных о текущей книге (название, глава, обложка, прогресс) виджетам GENESIS LAUNCHER</string>
+    <string name="external_widgets_desc">Разрешить передачу данных о текущей книге (название, глава, обложка, прогресс) и управление таймером сна виджетам GENESIS LAUNCHER</string>
 </resources>
