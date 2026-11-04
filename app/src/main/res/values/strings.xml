@@ -630,6 +630,7 @@
     <string name="equalizer_balance">Баланс</string>
     <string name="equalizer_balance_left">Л</string>
     <string name="equalizer_balance_right">П</string>
+    <string name="equalizer_night">Ночной режим</string>
     <string name="download_state_partial">Скачано частично</string>
     <string name="download_state_full">Скачано полностью</string>
     <string name="cookies_site">Cookies сайта</string>

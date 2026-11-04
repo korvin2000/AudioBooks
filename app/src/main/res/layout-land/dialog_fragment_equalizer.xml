@@ -124,6 +124,17 @@
                     android:textSize="16sp" />
             </LinearLayout>
 
+            <!-- night sound is the app's own, like the balance: independent of the switch above -->
+            <androidx.appcompat.widget.SwitchCompat
+                android:id="@+id/equalizer_night"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:minHeight="48dp"
+                android:paddingLeft="16dp"
+                android:paddingRight="16dp"
+                android:text="@string/equalizer_night"
+                android:textSize="16sp" />
+
             <Spinner
                 android:id="@+id/equalizer_preset_spinner"
                 android:layout_width="match_parent"

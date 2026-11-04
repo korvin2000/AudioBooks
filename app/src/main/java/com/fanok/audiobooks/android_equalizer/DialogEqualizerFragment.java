@@ -247,6 +247,12 @@ public class DialogEqualizerFragment extends DialogFragment {
         presetSpinner = view.findViewById(R.id.equalizer_preset_spinner);
         presetSpinner.getBackground().setColorFilter(textColor, PorterDuff.Mode.SRC_ATOP);
         bindBalance(view);
+        // night sound, like the balance, is the sink's: heard at once, with the equalizer switch off too
+        SwitchCompat nightSwitch = view.findViewById(R.id.equalizer_night);
+        nightSwitch.setTextColor(textColor);
+        nightSwitch.setChecked(Settings.nightSound);
+        nightSwitch.setOnCheckedChangeListener((buttonView, isChecked) ->
+                BalanceAudioProcessor.setNightSound(Settings.nightSound = isChecked));
 
         chart = view.findViewById(R.id.lineChart);
         Paint paint = new Paint();

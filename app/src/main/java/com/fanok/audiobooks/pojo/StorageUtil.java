@@ -6,6 +6,7 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import com.fanok.audiobooks.android_equalizer.EqualizerModel;
 import com.fanok.audiobooks.android_equalizer.Settings;
+import com.fanok.audiobooks.service.BalanceAudioProcessor;
 import com.fanok.audiobooks.service.Checkpoint;
 import com.google.gson.Gson;
 
@@ -117,6 +118,7 @@ public class StorageUtil {
             settings.seekbarpos = Settings.equalizerModel.getSeekbarpos();
             settings.equalizerEnabled = Settings.isEqualizerEnabled;
             settings.balance = Settings.balance;
+            settings.nightSound = Settings.nightSound;
 
             Gson gson = new Gson();
             preferences.edit()
@@ -147,6 +149,10 @@ public class StorageUtil {
         Settings.reverbPreset = settings.reverbPreset;
         Settings.seekbarpos = settings.seekbarpos;
         Settings.balance = settings.balance;
+        Settings.nightSound = settings.nightSound;
         Settings.equalizerModel = model;
+        //the sink's own sound plays what was loaded at once, with the equalizer off too: what the dialog shows is heard
+        BalanceAudioProcessor.setBalance(settings.balance);
+        BalanceAudioProcessor.setNightSound(settings.nightSound);
     }
 }

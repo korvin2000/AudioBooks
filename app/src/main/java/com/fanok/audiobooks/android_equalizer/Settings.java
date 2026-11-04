@@ -14,6 +14,8 @@ public class Settings {
     public static short reverbPreset = -1, bassStrength = -1;
     /** Left/right balance, -100 (left) to 100 (right), 0 centre; played regardless of {@link #isEqualizerEnabled}. */
     public static int balance;
+    /** Night sound (an even, quiet level), played regardless of {@link #isEqualizerEnabled} like the balance. */
+    public static boolean nightSound;
     public static EqualizerModel equalizerModel;
     public static double ratio = 1.0;
     public static boolean isEditing = false;
