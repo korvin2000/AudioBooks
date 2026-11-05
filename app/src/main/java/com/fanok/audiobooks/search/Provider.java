@@ -10,7 +10,9 @@ import com.fanok.audiobooks.Url;
 import com.fanok.audiobooks.source.Abmp3;
 import com.fanok.audiobooks.source.AknigXyz;
 import com.fanok.audiobooks.source.Akniga;
+import com.fanok.audiobooks.source.AknigaMe;
 import com.fanok.audiobooks.source.Aknigi24;
+import com.fanok.audiobooks.source.AudioKnigaBiz;
 import com.fanok.audiobooks.source.Audioboo;
 import com.fanok.audiobooks.source.AudioknigaLife;
 import com.fanok.audiobooks.source.AudioknigaOne;
@@ -18,8 +20,11 @@ import com.fanok.audiobooks.source.AudioknigaOnline;
 import com.fanok.audiobooks.source.AudioknigiFun;
 import com.fanok.audiobooks.source.AudioknigiPro;
 import com.fanok.audiobooks.source.BazaKnig;
+import com.fanok.audiobooks.source.BazaKnigInfo;
 import com.fanok.audiobooks.source.Biblus;
+import com.fanok.audiobooks.source.Bookinfo;
 import com.fanok.audiobooks.source.Bookish;
+import com.fanok.audiobooks.source.FourRead;
 import com.fanok.audiobooks.source.Golosknig;
 import com.fanok.audiobooks.source.Golosom;
 import com.fanok.audiobooks.source.Izibuk;
@@ -31,6 +36,7 @@ import com.fanok.audiobooks.source.Poleknig;
 import com.fanok.audiobooks.source.SlushatKnigi;
 import com.fanok.audiobooks.source.SourceParser;
 import com.fanok.audiobooks.source.Uknig;
+import com.fanok.audiobooks.source.Yakniga;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -101,7 +107,21 @@ public enum Provider {
             Golosknig.INDEX, Golosknig.GENRES, Golosknig.AUTHORS, Golosknig.READERS, new Golosknig(), AKNIGA),
     GOLOSOM(Golosom.SERVER, "Голосом", "golosom", "search_golosom", 22, "Golosom",
             Golosom.INDEX, Golosom.GENRES, Golosom.SERVER + PeopleIndex.AUTHORS,
-            Golosom.SERVER + PeopleIndex.READERS, new Golosom(), KNIGOBLUD);
+            Golosom.SERVER + PeopleIndex.READERS, new Golosom(), KNIGOBLUD),
+    YAKNIGA(Yakniga.SERVER, "ЯКнига", "yakniga", "search_yakniga", 23, "Yakniga",
+            Yakniga.INDEX, Yakniga.GENRES, Yakniga.AUTHORS, Yakniga.READERS, new Yakniga()),
+    BOOKINFO(Bookinfo.SERVER, "BookInfo", "bookinfo", "search_bookinfo", 24, "Bookinfo",
+            Bookinfo.INDEX, Bookinfo.GENRES, Bookinfo.AUTHORS, Bookinfo.READERS, new Bookinfo()),
+    AUDIO_KNIGA_BIZ(AudioKnigaBiz.SERVER, "Audio-kniga.biz", "audio_kniga_biz", "search_audio_kniga_biz", 25,
+            "AudioKnigaBiz", AudioKnigaBiz.INDEX, AudioKnigaBiz.GENRES, AudioKnigaBiz.AUTHORS, AudioKnigaBiz.READERS,
+            new AudioKnigaBiz()),
+    BAZA_KNIG_INFO(BazaKnigInfo.SERVER, "База Книг (info)", "baza_knig_info", "search_baza_knig_info", 26,
+            "BazaKnigInfo", BazaKnigInfo.INDEX, BazaKnigInfo.GENRES, BazaKnigInfo.AUTHORS, BazaKnigInfo.READERS,
+            new BazaKnigInfo(), BAZA_KNIG),
+    FOUR_READ(FourRead.SERVER, "4Read", "four_read", "search_four_read", 27, "FourRead",
+            FourRead.INDEX, FourRead.GENRES, FourRead.AUTHORS, FourRead.READERS, new FourRead()),
+    AKNIGA_ME(AknigaMe.SERVER, "Akniga.me", "akniga_me", "search_akniga_me", 28, "AknigaMe",
+            AknigaMe.INDEX, AknigaMe.GENRES, AknigaMe.AUTHORS, AknigaMe.READERS, new AknigaMe());
 
     /** {@code https://host} without a trailing slash. */
     public final String server;
@@ -224,6 +244,33 @@ public enum Provider {
             for (String own : p.parser.hosts()) {
                 if (isUnder(current, own)) {
                     return p;
+                }
+            }
+        }
+        return null;
+    }
+
+    /**
+     * The Referer a request to {@code host} gets when it carries none: its own site's {@link SourceParser#referer}
+     * ({@link #ofNetworkHost}), else that of the first site naming the host among its
+     * {@link SourceParser#refererHosts} (a shared, hotlink-guarded CDN); null for none.
+     */
+    public static String refererOf(String host) {
+        Provider own = ofNetworkHost(host);
+        if (own != null) {
+            return own.parser.referer();
+        }
+        if (host == null || host.isEmpty()) {
+            return null;
+        }
+        for (Provider p : values()) {
+            String referer = p.parser.referer();
+            if (referer == null) {
+                continue;
+            }
+            for (String shared : p.parser.refererHosts()) {
+                if (isUnder(host, shared)) {
+                    return referer;
                 }
             }
         }

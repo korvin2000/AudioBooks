@@ -13,7 +13,9 @@
  "fragments": "some",
  "takedowns": true,
  "mirrors": [],
- "related": [],
+ "related": [
+  "baza_knig_info"
+ ],
  "added": null,
  "accent": "#0099D6",
  "pluses": [

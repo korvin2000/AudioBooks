@@ -45,6 +45,13 @@ public final class BookPageFixtures {
                     "https://bookish.site/145424-revizor-vozvrashchenie-v-sssr-65-vinterkei-serzh-shumilin-artem.html"},
             {"golosknig/book.html", "https://golosknig.com/yacheyka-21-hellstrem-roslund"},
             {"golosom/book.html", "https://golosom.org/book/master-i-margarita"},
+            {"yakniga/book.json", "https://yakniga.org/duglas-adams/avtostopom-po-galaktike"},
+            {"bookinfo/book.json", "https://bookinfo.net/fentezi/robbi-makniven/patent-na-smert"},
+            {"audio-kniga-biz/book.html", "https://audio-kniga.biz/audio-97246-silantev-vadim-zasada"},
+            {"baza-knig-info/book.html", "https://baza-knig.info/audio-125174-princessa-v-akademii-kniga-2-kak-razljubit-"
+                    + "v-akademii-lda-i-ognja-julija-hanevskaja"},
+            {"4read/book-hls.html", "https://4read.org/8628-klub-otello-dzhej-di-pennington.html"},
+            {"akniga-me/book.json", "https://akniga.me/book/ryadom-s-toboy"},
     };
 
     private BookPageFixtures() {

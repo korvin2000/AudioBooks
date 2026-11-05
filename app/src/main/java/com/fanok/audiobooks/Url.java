@@ -118,6 +118,8 @@ public class Url {
         HOST_ALIASES.put("mob.knigoblud.club", "knigoblud.club");
         HOST_ALIASES.put("m.biblus.org", "biblus.org");
         HOST_ALIASES.put("sweetbook.net", "golosknig.com");
+        // the Ukrainian address of audio-kniga.biz: the same catalog, ids and slugs (blocked from Russia)
+        HOST_ALIASES.put("audioknigi.com.ua", "audio-kniga.biz");
     }
 
     /** Lower-case host of {@code url} without a leading {@code www.}; empty when unparsable. */

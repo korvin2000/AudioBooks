@@ -241,6 +241,20 @@
                 <data android:host="sweetbook.net" />
                 <data android:host="golosom.org" />
                 <data android:host="www.golosom.org" />
+                <data android:host="yakniga.org" />
+                <data android:host="www.yakniga.org" />
+                <data android:host="bookinfo.net" />
+                <data android:host="www.bookinfo.net" />
+                <data android:host="audio-kniga.biz" />
+                <data android:host="www.audio-kniga.biz" />
+                <data android:host="audioknigi.com.ua" />
+                <data android:host="www.audioknigi.com.ua" />
+                <data android:host="baza-knig.info" />
+                <data android:host="www.baza-knig.info" />
+                <data android:host="4read.org" />
+                <data android:host="www.4read.org" />
+                <data android:host="akniga.me" />
+                <data android:host="www.akniga.me" />
             </intent-filter>
             <!-- a text shared from another app (Telegram, a browser): its first link to a site of the app opens -->
             <intent-filter>

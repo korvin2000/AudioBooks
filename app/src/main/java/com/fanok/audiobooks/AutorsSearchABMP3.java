@@ -10,7 +10,7 @@ import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
 import org.jsoup.select.Elements;
 
-/** The author block of ABMP3's one-page search, sliced into pages of {@link #PAGE_SIZE}. */
+/** The author block of the one-page search of ABMP3 and its engine's sites, sliced into pages of {@link #PAGE_SIZE}. */
 public class AutorsSearchABMP3 {
 
     public static final int PAGE_SIZE = 40;
@@ -20,6 +20,11 @@ public class AutorsSearchABMP3 {
     }
 
     public static ProviderPage<GenrePOJO> parse(Document doc, int page) {
+        return parse(doc, page, Url.SERVER_ABMP3);
+    }
+
+    /** {@link #parse(Document, int)} of a site of the same engine on {@code server}. */
+    public static ProviderPage<GenrePOJO> parse(Document doc, int page, String server) {
         Elements hits = new Elements();
         for (Element item : doc.getElementsByClass("b-statictop-search")) {
             Element title = item.selectFirst(".b-statictop__title");
@@ -40,7 +45,7 @@ public class AutorsSearchABMP3 {
                 }
                 GenrePOJO genrePOJO = new GenrePOJO();
                 if (!aTag.attr("href").isEmpty()) {
-                    genrePOJO.setUrl(Url.SERVER_ABMP3 + aTag.attr("href") + "?page=");
+                    genrePOJO.setUrl(server + aTag.attr("href") + "?page=");
                 }
                 if (!aTag.text().trim().isEmpty()) {
                     genrePOJO.setName(aTag.text().trim());
