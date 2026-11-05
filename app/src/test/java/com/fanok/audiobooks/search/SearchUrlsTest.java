@@ -129,7 +129,7 @@ public class SearchUrlsTest {
         assertNull(SearchUrls.url(Provider.BAZA_KNIG, Category.AUTHORS, "x", 1));
         assertNull(SearchUrls.url(Provider.KNIGOBLUD, Category.PERFORMERS, "x", 1));
         assertNull(SearchUrls.url(Provider.AUDIOBOO, Category.AUTHORS, "x", 1));
-        assertNull(SearchUrls.url(Provider.OTRUB, Category.AUTHORS, "x", 1));
+        assertNull(SearchUrls.url(Provider.BIBLUS, Category.AUTHORS, "x", 1));
         assertNull(SearchUrls.url(Provider.POLEKNIG, Category.PERFORMERS, "x", 1));
     }
 

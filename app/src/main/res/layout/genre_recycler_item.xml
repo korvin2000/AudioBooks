@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="@dimen/recycler_item_height_genre"
@@ -44,6 +45,18 @@
                 tools:text="Фантастика" />
         </LinearLayout>
 
+        <!-- a reader with a narrator's card on fantlab.ru opens it (GenreListAddapter, search.Narrators) -->
+        <ImageButton
+            android:id="@+id/card"
+            android:layout_width="40dp"
+            android:layout_height="match_parent"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:contentDescription="@string/narrator_card"
+            android:scaleType="center"
+            android:src="@drawable/ic_narrator_card"
+            android:visibility="gone"
+            app:tint="?android:attr/textColorSecondary"
+            tools:visibility="visible" />
 
         <TextView
             android:id="@+id/reting"

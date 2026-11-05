@@ -3,6 +3,7 @@ package com.fanok.audiobooks.search;
 import androidx.annotation.NonNull;
 import com.fanok.audiobooks.R;
 import com.fanok.audiobooks.pojo.GenrePOJO;
+import java.text.CollationKey;
 import java.text.Collator;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -56,8 +57,12 @@ public enum GenreSort {
         ArrayList<GenrePOJO> list = new ArrayList<>(genres);
         if (this == NAME || this == NAME_DESC) {
             Collator collator = Collator.getInstance(new Locale("ru"));
+            Map<GenrePOJO, CollationKey> keys = new IdentityHashMap<>(); // a key per name: a list may hold 30 000
+            for (GenrePOJO genre : list) {
+                keys.put(genre, collator.getCollationKey(genre.getName()));
+            }
             int sign = this == NAME ? 1 : -1;
-            Collections.sort(list, (a, b) -> sign * collator.compare(a.getName(), b.getName()));
+            Collections.sort(list, (a, b) -> sign * keys.get(a).compareTo(keys.get(b)));
         } else if (this == COUNT) {
             Collections.sort(list, (a, b) -> Integer.compare(count(b), count(a)));
         } else if (this == FAVORITE) {

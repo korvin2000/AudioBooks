@@ -90,6 +90,8 @@ public class Url {
     public static final String SERVER_OTRUB = "https://otrub.in";
     public static final String INDEX_OTRUB = SERVER_OTRUB + "/?p=";
     public static final String SECTIONS_OTRUB = SERVER_OTRUB + "/genres.html";
+    public static final String AUTHORS_OTRUB = SERVER_OTRUB + "/authors.html?p=";
+    public static final String PERFORMERS_OTRUB = SERVER_OTRUB + "/readers.html?p=";
     public static final String NEW_BOOK_OTRUB = SERVER_OTRUB + "/?p=";
     public static final String BEST_WEEK_OTRUB = SERVER_OTRUB + "/popular/?period=week&p=";
     public static final String BEST_MONTH_OTRUB = SERVER_OTRUB + "/popular/?period=month&p=";
@@ -98,6 +100,7 @@ public class Url {
     public static final String SERVER_POLEKNIG = "https://poleknig.com";
     public static final String INDEX_POLEKNIG = SERVER_POLEKNIG + "/?p=";
     public static final String SECTIONS_POLEKNIG = SERVER_POLEKNIG + "/genres";
+    public static final String PERFORMERS_POLEKNIG = SERVER_POLEKNIG + "/readers";
     public static final String NEW_BOOK_POLEKNIG = SERVER_POLEKNIG + "/books/novelties?p=";
     public static final String BEST_POLEKNIG = SERVER_POLEKNIG + "/books/popular?p=";
 

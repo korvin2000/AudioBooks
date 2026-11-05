@@ -4,6 +4,7 @@ import static org.junit.Assume.assumeTrue;
 
 import com.fanok.audiobooks.net.JsonPage;
 import com.fanok.audiobooks.search.ListingFilters;
+import com.fanok.audiobooks.search.PeopleIndex;
 import com.fanok.audiobooks.search.Provider;
 import com.fanok.audiobooks.search.ProviderPage;
 import com.fanok.audiobooks.search.SearchUrls;
@@ -225,7 +226,7 @@ public class LiveDumpTest {
 
     private void people(Provider p, String what, String url, boolean performers) {
         line("== " + what + " " + url);
-        if (url == null) {
+        if (url == null || PeopleIndex.isBuiltIn(url)) {
             return;
         }
         SourceParser site = p.parser;

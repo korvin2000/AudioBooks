@@ -64,6 +64,7 @@ import com.fanok.audiobooks.presenter.BooksPresenter;
 import com.fanok.audiobooks.search.GenreSort;
 import com.fanok.audiobooks.search.ListingFilters;
 import com.fanok.audiobooks.search.ListingFilters.Duration;
+import com.fanok.audiobooks.search.PeopleIndex;
 import com.fanok.audiobooks.search.Provider;
 import com.fanok.audiobooks.search.Sources;
 import com.fanok.audiobooks.source.Sort;
@@ -252,6 +253,9 @@ public class BooksFragment extends MvpAppCompatFragment implements BooksView {
                     setGenreSearch(menu.findItem(R.id.app_bar_search));
                 } else if (modelID == Consts.MODEL_AUTOR || modelID == Consts.MODEL_ARTIST) {
                     fillGenreSortMenu(menu);
+                    if (PeopleIndex.isBuiltIn(mUrl)) {
+                        setGenreSearch(menu.findItem(R.id.app_bar_search)); // the whole list is here
+                    }
                 } else if (modelID != Consts.MODEL_BOOKS || noSort) {
                     MenuItem orderItem = menu.findItem(R.id.order);
                     if (orderItem != null) orderItem.setVisible(false);

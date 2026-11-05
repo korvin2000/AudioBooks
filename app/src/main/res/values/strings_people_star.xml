@@ -2,6 +2,12 @@
 <!-- The favourite star of a person: the site's Авторы/Исполнители rows and the book long-press sheet. -->
 <resources>
     <string name="people_star_add">Добавить в избранное</string>
+    <!-- a reader's card on fantlab.ru (activity.NarratorActivity) -->
+    <string name="narrator_card">Карточка чтеца</string>
+    <string name="narrator_bio">Биография</string>
+    <string name="narrator_books">Аудиокниги (%d)</string>
+    <string name="narrator_open">Открыть на FantLab</string>
+    <string name="narrator_failed">Не удалось загрузить карточку чтеца с fantlab.ru</string>
     <string name="people_star_remove">Убрать из избранного</string>
     <!-- the sheet's star toggles the first person of the field: the tooltip names them -->
     <string name="people_star_add_name">Добавить в избранное: %1$s</string>

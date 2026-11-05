@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="@dimen/recycler_item_height_genre"
@@ -44,6 +45,19 @@
                 tools:text="Фантастика" />
         </LinearLayout>
 
+        <!-- a reader with a narrator's card on fantlab.ru opens it (GenreListAddapter, search.Narrators) -->
+        <ImageButton
+            android:id="@+id/card"
+            android:layout_width="48dp"
+            android:layout_height="match_parent"
+            android:background="@drawable/focusable"
+            android:contentDescription="@string/narrator_card"
+            android:focusable="true"
+            android:scaleType="center"
+            android:src="@drawable/ic_narrator_card"
+            android:visibility="gone"
+            app:tint="?android:attr/textColorSecondary"
+            tools:visibility="visible" />
 
         <TextView
             android:id="@+id/reting"
@@ -58,7 +72,7 @@
             tools:text="1840" />
 
         <!-- the row keeps focus and its D-pad click; GenreListAddapter's key listeners move focus
-         to the star on D-pad right and back on D-pad left -->
+         to the card and the star on D-pad right and back on D-pad left -->
         <ImageButton
             android:id="@+id/star"
             android:layout_width="48dp"

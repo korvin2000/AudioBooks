@@ -50,7 +50,7 @@ Java sources are under `app/src/main/java/com/fanok/audiobooks/`.
 | `activity/`, `fragment/`, `adapter/` | Screens, lists, and settings UI |
 | `presenter/`, `model/`, `interface_pacatge/` | MVP layer (Moxy): presenters, models that hand each page to the site's adapter, view contracts |
 | `source/` | One adapter per audiobook site (`SourceParser`) and the toolkit they share: `Html`, `Players`, `Dle`, `Sort` |
-| `search/` | `Provider` (the site registry), multi-source search sessions, paged listings, filters, `SourceProbe` (availability check) and `SourceHealth` (its kept results; a daily check on unmetered networks) |
+| `search/` | `Provider` (the site registry), multi-source search sessions, paged listings, filters, `SourceProbe` (availability check) and `SourceHealth` (its kept results; a daily check on unmetered networks), `PeopleIndex` (the built-in authors and readers lists, `assets/people/people.bin`, built by `tools/people`) and `Narrators` (readers with a narrator's card on fantlab.ru, shown by `activity/NarratorActivity`) |
 | `net/` | `SiteHttp` (page and JSON fetching, cookies, challenge detection), `AppProxy` (proxy, per-site route), cookie jar |
 | `service/` | `MediaPlayerService` (playback, media session, notification, sleep timer), `ExoDownloadService`, playback error policies |
 | `widgets/` | Launcher widgets (GENESIS LAUNCHER levels 2 and 3, `integration_updated.txt` §5, §7): `ExternalWidgetsProvider` serves the book being played, with the book's exact time, and takes the widget's sleep timer commands, for the launchers it lists while Settings → General → «Виджеты лаунчеров» is on (the default); `SessionMirror` follows `MediaPlayerService.SessionListener`. Removable with its manifest entries, the setting and `strings_widgets.xml` |
@@ -86,7 +86,9 @@ hide them meanwhile.
    page for it, add only a field the card has and the page lacks (AknigXyz's rating).
 3. **Register.** Add the `Provider` row: server, title, `prefValue`, `prefKey`, a new unique `sourceId` (never reuse or
    renumber one: users' settings store it), the download folder (a new CamelCase name; never rename one: saved books
-   are found by it), the drawer URLs (`null` for a section the site lacks) and `new <Site>()`; a mirror (another
+   are found by it), the drawer URLs (`null` for a section the site lacks; authors or readers the site has no index
+   of come from the app's built-in list, `SERVER + PeopleIndex.AUTHORS` / `READERS`, collected by
+   `tools/people/scrape.py` and packed by `tools/people/build_people.py`) and `new <Site>()`; a mirror (another
    site with the same catalog) also names the row it mirrors, declared above it (`Provider.mirrors()`,
    `original()`, `isMirrorOf`). Keep the site's
    `SERVER`, `INDEX`, `GENRES`, ... as constants of its adapter. Existing users get the new site inactive, at the end

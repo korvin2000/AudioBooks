@@ -135,9 +135,10 @@ public final class BazaKnig implements SourceParser {
         return listing(listingPage(url), url, pageNo);
     }
 
+    /** The app's listings end in {@code page/}; a person of the built-in lists is the site's own link. */
     @Override
     public String pageUrl(String url, int page) {
-        return url + page + "/";
+        return url.endsWith("page/") ? url + page + "/" : Dle.pageUrl(url, page);
     }
 
     /** Author, reader and series listings are not re-sorted. */
