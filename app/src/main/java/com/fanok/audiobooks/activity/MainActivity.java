@@ -770,7 +770,7 @@ public class MainActivity extends MvpAppCompatActivity
     }
 
     /**
-     * «Автозагрузка последней книги»: the book played last (the player's, else the last checkpoint's) opens paused over
+     * «Загрузка последней книги»: the book played last (the player's, else the last checkpoint's) opens paused over
      * the start screen, so Back leads to it; nothing when there is none.
      */
     private void openLastBook() {

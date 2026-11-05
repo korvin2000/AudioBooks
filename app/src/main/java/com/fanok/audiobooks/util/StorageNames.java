@@ -12,7 +12,7 @@ public final class StorageNames {
     /** Keeps "NNN - title.ext" well below the 255-byte limit of FAT/ext4 and SAF providers. */
     static final int MAX_NAME_BYTES = 120;
 
-    /** Keeps a book's flat folder "Title - Author (Reader)" well below the same 255-byte limit. */
+    /** Keeps a book's flat folder "Author - Title (Reader)" well below the same 255-byte limit. */
     static final int MAX_FOLDER_BYTES = 150;
 
     private static final String RESERVED = "\\/:*?\"<>|";
@@ -79,18 +79,20 @@ public final class StorageNames {
     }
 
     /**
-     * A book's one folder in the flat layout: "Title - Author (Reader)", the reader left out when empty or the same
-     * as the author. One safe path segment, never hidden (no leading dot), at most {@link #MAX_FOLDER_BYTES} UTF-8
-     * bytes: the reader is dropped first, then the author, and the title is cut last; "Unknown" for no usable title.
+     * A book's one folder in the flat layout: "Author - Title (Reader)", as catalogues order books; the author left
+     * out when empty, the reader when empty or the same as the author. One safe path segment, never hidden (no
+     * leading dot), at most {@link #MAX_FOLDER_BYTES} UTF-8 bytes: the reader is dropped first, then the author, and
+     * the title is cut last; "Unknown" for no usable title.
      */
     public static String bookFolderName(String title, String author, String reader) {
         String name = trimLeadingDotsAndSpaces(safeName(title == null ? "" : title));
         // the cut may leave trailing dots or spaces, or a DOS device name
         name = safeName(truncateUtf8(name, MAX_FOLDER_BYTES));
         if (name.isEmpty()) name = "Unknown";
-        String safeAuthor = author == null ? "" : safeName(author);
+        // the author leads the name, so it must not hide the folder either
+        String safeAuthor = author == null ? "" : trimLeadingDotsAndSpaces(safeName(author));
         String safeReader = reader == null ? "" : safeName(reader);
-        String withAuthor = safeAuthor.isEmpty() ? name : name + " - " + safeAuthor;
+        String withAuthor = safeAuthor.isEmpty() ? name : safeAuthor + " - " + name;
         String full = safeReader.isEmpty() || safeReader.equalsIgnoreCase(safeAuthor)
                 ? withAuthor : withAuthor + " (" + safeReader + ")";
         if (utf8Length(full) <= MAX_FOLDER_BYTES) return full;

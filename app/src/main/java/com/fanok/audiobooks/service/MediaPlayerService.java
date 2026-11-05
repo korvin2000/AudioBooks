@@ -505,6 +505,7 @@ public class MediaPlayerService extends MediaBrowserServiceCompat {
                 pausedAt = SystemClock.elapsedRealtime();
                 checkpointNow(false);
             }
+            updateFlip();
             publishState();
         }
 
@@ -549,10 +550,15 @@ public class MediaPlayerService extends MediaBrowserServiceCompat {
     private final Runnable notifyTask = this::postNotification;
 
     private final Runnable focusLossWatchdog = this::onLongFocusLoss;
-    /** A new seek step redraws the notification's and the session's seek buttons (held: prefs keep it weakly). */
-    private final SharedPreferences.OnSharedPreferenceChangeListener seekStepListener = (prefs, key) -> {
+    /**
+     * A new seek step redraws the notification's and the session's seek buttons; the face-down pause switched on or
+     * off takes effect at once (held: prefs keep it weakly).
+     */
+    private final SharedPreferences.OnSharedPreferenceChangeListener prefListener = (prefs, key) -> {
         if (SeekStep.PREF.equals(key)) {
             publishState();
+        } else if (PREF_FLIP_PAUSE.equals(key)) {
+            updateFlip();
         }
     };
 
@@ -562,7 +568,7 @@ public class MediaPlayerService extends MediaBrowserServiceCompat {
         running = true;
         storage = new StorageUtil(getApplicationContext());
         mPreferences = PreferenceManager.getDefaultSharedPreferences(this);
-        mPreferences.registerOnSharedPreferenceChangeListener(seekStepListener);
+        mPreferences.registerOnSharedPreferenceChangeListener(prefListener);
         mAudioDBModel = new AudioDBModel(this);
         createNotificationChannel();
         initMediaSession();
@@ -580,8 +586,10 @@ public class MediaPlayerService extends MediaBrowserServiceCompat {
         checkpointNow(true);
 
         //2. timers, handlers, artwork
-        mPreferences.unregisterOnSharedPreferenceChangeListener(seekStepListener);
+        mPreferences.unregisterOnSharedPreferenceChangeListener(prefListener);
         releaseSleepTimer();
+        closeFlipWindow();
+        listenForFlip(false);
         SleepTimerPresenter.setTimerStarted(false);
         unregisterNetworkCallback();
         cancelRetry();
@@ -792,6 +800,7 @@ public class MediaPlayerService extends MediaBrowserServiceCompat {
     public void pause() {
         //also before the book or the player exists: a pending restore or resolution reads this when it lands
         resumeOnSkip = false;
+        resetFlip(); //a pause ends the face-down countdown and resume, even with the player already paused
         wantPlaying = false;
         cancelRetry();
         if (pausedAt < 0) {
@@ -930,6 +939,8 @@ public class MediaPlayerService extends MediaBrowserServiceCompat {
             SleepTimerPresenter.setTimerStarted(false);
             sendInternal(new Intent(bradcast_FinishTimer));
         }
+        closeFlipWindow();
+        listenForFlip(false);
         resolving = false;
         restoring = false;
         failedKind = null;
@@ -995,6 +1006,7 @@ public class MediaPlayerService extends MediaBrowserServiceCompat {
             //a wake window belongs to the book the timer paused: a shake must not start another one
             closeWakeWindow();
             wakeWindowBook = null;
+            resetFlip(); //nor does a face-down pause carry over to another book
         }
         book = request.book;
         bookUrl = request.bookUrl;
@@ -2779,23 +2791,30 @@ public class MediaPlayerService extends MediaBrowserServiceCompat {
     }
 
     private void holdWakeWindowLock(boolean hold) {
+        wakeWindowLock = holdLock(wakeWindowLock, "audiobooks:sleepTimer", hold ? SLEEP_WAKE_WINDOW_MS + 5_000 : 0);
+    }
+
+    /** Acquires {@code lock} (made on first use) for {@code ms}, or releases it for 0; returns it, null if none. */
+    @Nullable
+    private PowerManager.WakeLock holdLock(@Nullable PowerManager.WakeLock lock, @NonNull String tag, long ms) {
         try {
-            if (hold) {
-                if (wakeWindowLock == null) {
+            if (ms > 0) {
+                if (lock == null) {
                     PowerManager power = (PowerManager) getSystemService(Context.POWER_SERVICE);
                     if (power == null) {
-                        return;
+                        return null;
                     }
-                    wakeWindowLock = power.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "audiobooks:sleepTimer");
-                    wakeWindowLock.setReferenceCounted(false);
+                    lock = power.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, tag);
+                    lock.setReferenceCounted(false);
                 }
-                wakeWindowLock.acquire(SLEEP_WAKE_WINDOW_MS + 5_000);
-            } else if (wakeWindowLock != null && wakeWindowLock.isHeld()) {
-                wakeWindowLock.release();
+                lock.acquire(ms);
+            } else if (lock != null && lock.isHeld()) {
+                lock.release();
             }
         } catch (RuntimeException e) {
-            Log.w(TAG, "sleep timer wake lock", e);
+            Log.w(TAG, tag, e);
         }
+        return lock;
     }
 
     private boolean hasAccelerometer() {
@@ -2819,6 +2838,129 @@ public class MediaPlayerService extends MediaBrowserServiceCompat {
         } else {
             sensors.unregisterListener(shakeListener);
             shakeListening = false;
+        }
+    }
+
+    // ---------------------------------------------------------------------------------------------------------
+    // Face-down pause: laid screen down while playing, the book pauses after FLIP_PAUSE_MS; turned back (screen up
+    // or picked up) within FLIP_RESUME_MS, it plays on
+
+    public static final String PREF_FLIP_PAUSE = "flip_pause";
+    private static final long FLIP_PAUSE_MS = 4_000;
+    private static final long FLIP_RESUME_MS = 120_000;
+    /** Gravity's z below this: screen down within ~37° of flat; above the second: turned back (past ~72°). */
+    private static final float FACE_DOWN_Z = -0.8f * SensorManager.GRAVITY_EARTH;
+    private static final float FACE_UP_Z = -0.3f * SensorManager.GRAVITY_EARTH;
+
+    private boolean flipListening;
+    /** Seen turned up since listening began: a phone lying face down as playback starts does not pause it. */
+    private boolean flipArmed;
+    private boolean faceDownPending;
+    /** The book the face-down pause stopped while turning the phone back can still play it on; null otherwise. */
+    @Nullable
+    private String flipBook;
+    @Nullable
+    private PowerManager.WakeLock flipLock;
+    private final Runnable faceDownPause = this::onFaceDown;
+    private final Runnable flipWindowEnd = () -> {
+        closeFlipWindow();
+        updateFlip();
+    };
+    private final SensorEventListener flipListener = new SensorEventListener() {
+        @Override
+        public void onSensorChanged(SensorEvent event) {
+            float z = event.values[2];
+            if (z > FACE_UP_Z) {
+                flipArmed = true;
+                if (flipBook != null) {
+                    boolean same = flipBook.equals(bookUrl);
+                    closeFlipWindow();
+                    if (same && !wantPlaying) {
+                        play();
+                    }
+                    updateFlip();
+                }
+            }
+            if (z >= FACE_DOWN_Z) {
+                cancelFaceDown();
+            } else if (flipArmed && !faceDownPending) {
+                faceDownPending = true;
+                handler.postDelayed(faceDownPause, FLIP_PAUSE_MS);
+            }
+        }
+
+        @Override
+        public void onAccuracyChanged(Sensor sensor, int accuracy) {
+        }
+    };
+
+    /** Face down for FLIP_PAUSE_MS: the pause, then FLIP_RESUME_MS awake listening for the phone to turn back. */
+    private void onFaceDown() {
+        faceDownPending = false;
+        if (!wantPlaying || bookUrl == null) {
+            return;
+        }
+        pause(); //resets: the window opened below is the only one
+        flipBook = bookUrl;
+        flipLock = holdLock(flipLock, "audiobooks:flipPause", FLIP_RESUME_MS + 5_000);
+        handler.postDelayed(flipWindowEnd, FLIP_RESUME_MS);
+        updateFlip();
+    }
+
+    private void cancelFaceDown() {
+        faceDownPending = false;
+        handler.removeCallbacks(faceDownPause);
+    }
+
+    /** A pause or another book: no countdown, no resume window, and the phone must be seen turned up again. */
+    private void resetFlip() {
+        cancelFaceDown();
+        closeFlipWindow();
+        flipArmed = false;
+        updateFlip();
+    }
+
+    private void closeFlipWindow() {
+        if (flipBook == null) {
+            return;
+        }
+        flipBook = null;
+        handler.removeCallbacks(flipWindowEnd);
+        flipLock = holdLock(flipLock, "audiobooks:flipPause", 0);
+    }
+
+    /**
+     * The accelerometer runs, with the setting on, while the player is meant to play or a face-down pause can still
+     * be undone; playing again by any means, or the setting off, ends that chance.
+     */
+    private void updateFlip() {
+        boolean enabled = mPreferences.getBoolean(PREF_FLIP_PAUSE, false);
+        boolean playing = player != null && player.getPlayWhenReady();
+        if (!enabled || playing) {
+            closeFlipWindow();
+        }
+        listenForFlip(enabled && (playing || flipBook != null));
+    }
+
+    private void listenForFlip(boolean listen) {
+        if (!listen) {
+            cancelFaceDown();
+        }
+        if (listen == flipListening) {
+            return;
+        }
+        SensorManager sensors = (SensorManager) getSystemService(Context.SENSOR_SERVICE);
+        if (sensors == null) {
+            return;
+        }
+        if (listen) {
+            flipArmed = false;
+            Sensor accelerometer = sensors.getDefaultSensor(Sensor.TYPE_ACCELEROMETER);
+            flipListening = accelerometer != null
+                    && sensors.registerListener(flipListener, accelerometer, SensorManager.SENSOR_DELAY_NORMAL);
+        } else {
+            sensors.unregisterListener(flipListener);
+            flipListening = false;
         }
     }
 

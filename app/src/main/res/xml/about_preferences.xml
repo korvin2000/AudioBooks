@@ -152,13 +152,12 @@
         android:key="open_telegram"
         android:title="@string/open_telegram" />
 
-    <!-- the region of the connection (AppRegion; not the key "region", that is AppRegion.PREF_REGION); its summary
-         keeps the CC BY 4.0 credit of the IP-to-region table (assets/region, tools/region/build_ip_regions.py) -->
+    <!-- the region of the connection (AppRegion; not the key "region", that is AppRegion.PREF_REGION); a click opens
+         db-ip.com, the source of the IP-to-region table (assets/region, tools/region/build_ip_regions.py) -->
     <Preference
         android:icon="@drawable/ic_location"
         android:key="about_region"
-        android:persistent="false"
-        android:summary="@string/about_region_summary" />
+        android:persistent="false" />
 
 
 </PreferenceScreen>

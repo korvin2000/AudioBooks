@@ -46,7 +46,7 @@ public class DownloadStorageHelperTest {
         String flat = DownloadStorageHelper.exportRelativeDir("https://akniga.org/x", "Война/мир: том 1", "Козий",
                 "Толстой", true);
 
-        assertEquals("Войнамир том 1 - Толстой (Козий)", flat);
+        assertEquals("Толстой - Войнамир том 1 (Козий)", flat);
         assertFalse(flat.contains("/"));
         assertEquals(StorageNames.bookFolderName("Мастер и Маргарита", "Булгаков", "Козий Владимир"),
                 DownloadStorageHelper.exportRelativeDir("https://akniga.org/x", "Мастер и Маргарита",

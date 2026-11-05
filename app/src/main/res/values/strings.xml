@@ -446,7 +446,6 @@
     <string name="open_github">Открыть на GitHub</string>
     <string name="open_telegram">Группа в Telegram</string>
     <string name="about_region">Регион: %1$s</string>
-    <string name="about_region_summary">По IP-адресу подключения · IP Geolocation by DB-IP (CC BY 4.0)</string>
     <string name="dowland_delete">Скачать/Удалить</string>
     <string name="delete_complite">Удаление завершено</string>
     <string name="delete_result">Удалено %1$d из %2$d</string>
@@ -507,7 +506,7 @@
     <string name="rewind">Перемотка</string>
     <string name="rewind_desc">Перемотка назад во время долгой паузы</string>
     <string name="source">Источник</string>
-    <string name="buffer_size">Размер буфера в секундах (макс 999с)</string>
+    <string name="buffer_size">Размер буфера в секундах</string>
     <string name="rewind_back">Перемотка назад</string>
     <string name="fast_forward">Перемотка вперёд</string>
     <string name="source_search">Источники поиска</string>
@@ -588,7 +587,7 @@
     <string name="playback_error_skip">Эту главу не удаётся воспроизвести. Нажмите «Следующий», чтобы пропустить её</string>
     <string name="multithreading">Многопоточность</string>
     <string name="cutting_file">Разделить файл на разделы</string>
-    <string name="cutting_file_desc">Разделять книги источника, в котором данные залиты одним файлом, на главы</string>
+    <string name="cutting_file_desc">Делить книгу из одного файла на главы</string>
     <string name="thanks">Спасибо!</string>
     <string name="hls_download_channel_name">HLS Downloads</string>
     <string name="open_rustore">RuStore</string>
@@ -764,11 +763,13 @@
     <string name="settings_data">Резервное копирование</string>
     <string name="settings_data_summary">Облачная синхронизация, резервная копия, восстановление, очистка данных</string>
     <string name="settings_general">Общие</string>
-    <string name="settings_general_summary">Раздел при запуске, последняя книга, буфер, число источников, деление файла на разделы, отчёты об ошибках, автообновление, родительский контроль</string>
+    <string name="settings_general_summary">Запуск, обновления, родительский контроль, автопауза</string>
     <string name="error_reports">Отчеты об ошибках</string>
     <string name="error_reports_desc">Показывать подробный отчет об ошибке в диалоге</string>
     <string name="auto_update">Автообновление</string>
     <string name="auto_update_desc">Проверка автообновлений</string>
+    <string name="flip_pause">Пауза экраном вниз</string>
+    <string name="flip_pause_desc">Экраном вниз — пауза через 4 с, перевернули в течение 2 мин — воспроизведение продолжится</string>
     <string name="update_title">Доступно обновление</string>
     <string name="update_ready">Доступна новая версия %1$s (установлена %2$s). Установить её сейчас?</string>
     <string name="update_forum">Доступна новая версия %1$s (установлена %2$s). Сейчас её можно скачать только с 4pda: GitHub и зеркало не отвечают. Для скачивания файла нужно войти на форум.</string>

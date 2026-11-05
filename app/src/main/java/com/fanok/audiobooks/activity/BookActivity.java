@@ -142,7 +142,7 @@ public class BookActivity extends MvpAppCompatActivity implements Activity {
     }
 
     private static final String ARG_BOOK = "arg_book";
-    /** The book opens paused whatever «Автовоспроизведение» says (MainActivity: «Автозагрузка последней книги»). */
+    /** The book opens paused whatever «Автовоспроизведение» says (MainActivity: «Загрузка последней книги»). */
     private static final String ARG_PAUSED = "arg_paused";
     /** Far beyond the system long press (~500 ms), so a slow tap never switches books by accident. */
     private static final long SWITCH_BOOK_HOLD_MS = 2500;

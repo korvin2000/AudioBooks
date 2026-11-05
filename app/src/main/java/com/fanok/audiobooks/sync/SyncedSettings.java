@@ -42,7 +42,7 @@ final class SyncedSettings {
             "toolbar_speed", "toolbar_download", "toolbar_sleep_timer", "toolbar_equalizer", "toolbar_settings",
             "toolbar_open_site", "toolbar_main_screen", "toolbar_refresh", "autoPlayPref", "reproductionPref",
             "seekButtonsPref", "seekToPausePref", "rewind_back", "safeNavigationPref", "scrollToSelectedPref",
-            "search_pref", "pref_autoload_last_book"));
+            "search_pref", "pref_autoload_last_book", "flip_pause"));
     /** Settings of the {@link StorageUtil#STORAGE} file: a float and a JSON text. */
     private static final String SPEED = "speed", EQUALIZER = "equalizer";
 

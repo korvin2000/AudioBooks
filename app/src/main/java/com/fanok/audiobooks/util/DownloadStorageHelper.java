@@ -56,7 +56,7 @@ public class DownloadStorageHelper {
     /** "nested" (the default): "source/book/reader" below the download folder; "flat": one folder per book. */
     public static final String PREF_FOLDER_LAYOUT = "folder_layout";
 
-    /** Whether a book without exported chapters yet is exported into one folder "Title - Author (Reader)". */
+    /** Whether a book without exported chapters yet is exported into one folder "Author - Title (Reader)". */
     static boolean flatFolders(@NonNull Context context) {
         return "flat".equals(PreferenceManager.getDefaultSharedPreferences(context)
                 .getString(PREF_FOLDER_LAYOUT, "nested"));
@@ -255,7 +255,7 @@ public class DownloadStorageHelper {
     /**
      * Exports, on the storage worker, every completed download of the given books whose chapter has no copy yet, as
      * "NNN - title.ext" into the book's folder below the download folder: that of its existing copies, else
-     * "source/book/reader" or, with the "folder_layout" setting "flat", one folder "Title - Author (Reader)"
+     * "source/book/reader" or, with the "folder_layout" setting "flat", one folder "Author - Title (Reader)"
      * ({@link #exportRelativeDir}). Each is a file any player opens: a single-file
      * chapter as it was downloaded, a chapter clipped out of a stream (HLS, or one file shared by several chapters) cut
      * out of it without re-encoding ({@link ChapterExtractor}), so every copy is exactly its chapter. A chapter's
@@ -893,7 +893,7 @@ public class DownloadStorageHelper {
 
     /**
      * Where below the download root the exporter writes the chapters of a book without copies yet:
-     * "source/book/reader", or with {@code flat} one folder "Title - Author (Reader)"
+     * "source/book/reader", or with {@code flat} one folder "Author - Title (Reader)"
      * ({@link StorageNames#bookFolderName}).
      */
     @NonNull
@@ -1022,7 +1022,7 @@ public class DownloadStorageHelper {
     /**
      * What the scan must not import as separate books: the copies recorded for online books (local_uri, or a local
      * url_audio written before local_uri existed) and the export folders of every saved online book, as absolute
-     * paths or, for a SAF scan, as "source/book/reader" (and "Title - Author (Reader)" while the flat layout is chosen:
+     * paths or, for a SAF scan, as "source/book/reader" (and "Author - Title (Reader)" while the flat layout is chosen:
      * a user's own folder of that name stays importable otherwise) below the tree.
      */
     @NonNull

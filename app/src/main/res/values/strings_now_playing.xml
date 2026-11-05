@@ -2,6 +2,6 @@
 <resources>
     <string name="menu_now_playing">Сейчас играет</string>
     <!-- Настройки → Общие: the book played last opens paused at start (MainActivity.openLastBook) -->
-    <string name="autoload_last_book">Автозагрузка последней книги</string>
-    <string name="autoload_last_book_desc">При запуске открывать последнюю прослушанную книгу, не включая воспроизведение</string>
+    <string name="autoload_last_book">Загрузка последней книги</string>
+    <string name="autoload_last_book_desc">При запуске открывать последнюю книгу без воспроизведения</string>
 </resources>
