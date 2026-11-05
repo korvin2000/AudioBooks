@@ -25,7 +25,7 @@ import java.util.regex.Pattern;
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
 import okhttp3.Response;
-import okhttp3.ResponseBody;
+import okio.BufferedSource;
 
 /**
  * fantlab.ru's narrators («дикторы»): which readers have a card there (the FANTLAB list of {@link PeopleIndex}, a
@@ -44,6 +44,8 @@ public final class Narrators {
      * FALSE the device's own; null until then. Kept in memory only, so each start of the app checks again.
      */
     private static volatile Boolean viaProxy;
+    /** Held while the run's first card finds the route; never during {@link #card} (the readers lists wait on that). */
+    private static final Object ROUTE = new Object();
 
     /** fantlab's own markup left in a title: "[work=414771]Циркезонье[/work]". */
     private static final Pattern BB_CODE = Pattern.compile("\\[/?[a-z]+(=[^\\]]*)?]");
@@ -107,27 +109,40 @@ public final class Narrators {
      */
     public static Card load(String url) throws IOException {
         if (!AppProxy.proxyUsable()) {
-            return load(url, false);
+            return load(url, true); // the app's route is then the device's own, with its fallbacks
         }
         Boolean known = viaProxy;
-        boolean proxy = known != null && known;
-        try {
-            Card card = load(url, proxy);
-            if (known == null) {
-                viaProxy = proxy;
+        if (known == null) {
+            synchronized (ROUTE) { // the check runs once: a card opened meanwhile waits for its answer
+                known = viaProxy;
+                if (known == null) {
+                    return firstCard(url);
+                }
             }
+        }
+        try {
+            return load(url, known);
+        } catch (IOException | CookesExeption e) {
+            Log.w(TAG, (known ? "through the proxy " : "direct ") + url, e);
+            return load(url, !known);
+        }
+    }
+
+    /** The run's first card: direct, else through the proxy; the route that served it is kept ({@link #viaProxy}). */
+    private static Card firstCard(String url) throws IOException {
+        try {
+            Card card = load(url, false);
+            viaProxy = false;
             return card;
         } catch (IOException | CookesExeption e) {
-            Log.w(TAG, (proxy ? "through the proxy " : "direct ") + url, e);
+            Log.w(TAG, "direct " + url, e);
         }
-        Card card = load(url, !proxy);
-        if (known == null) {
-            viaProxy = !proxy;
-        }
+        Card card = load(url, true);
+        viaProxy = true;
         return card;
     }
 
-    /** The card at {@code url} and its photo through the app's proxy, or else the device's own route. */
+    /** The card at {@code url} and its photo on the app's route (its proxy, when on), or else the device's own. */
     private static Card load(String url, boolean viaProxy) throws IOException {
         Connection page = SiteHttp.connect(url);
         OkHttpClient client = App.getOkHttpClient();
@@ -145,12 +160,12 @@ public final class Narrators {
     /** The photo at {@code url}, or null: fantlab's stand-in, too large, or not come (the card stands without it). */
     private static byte[] picture(OkHttpClient client, String url) {
         try (Response photo = client.newCall(new Request.Builder().url(url).build()).execute()) {
-            ResponseBody body = photo.body();
-            if (!photo.isSuccessful() || body.contentLength() > MAX_PHOTO_BYTES) {
-                return null;
+            BufferedSource body = photo.body().source();
+            if (!photo.isSuccessful() || body.request(MAX_PHOTO_BYTES + 1L)) {
+                return null; // an error, or larger than a photo: read no further
             }
-            byte[] bytes = body.bytes();
-            return bytes.length == NO_PHOTO || bytes.length > MAX_PHOTO_BYTES ? null : bytes;
+            byte[] bytes = body.readByteArray();
+            return bytes.length == NO_PHOTO ? null : bytes;
         } catch (IOException e) {
             Log.w(TAG, "photo " + url, e);
             return null;
