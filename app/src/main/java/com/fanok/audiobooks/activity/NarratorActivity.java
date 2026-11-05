@@ -82,10 +82,10 @@ public class NarratorActivity extends AppCompatActivity {
 
     private void show(Narrators.Card card) {
         findViewById(R.id.narratorProgress).setVisibility(View.GONE);
-        if (!card.photo.isEmpty()) {
+        if (card.picture != null) { // fetched with the card, on the route that served it
             ImageView photo = findViewById(R.id.narratorPhoto);
             photo.setVisibility(View.VISIBLE);
-            Glide.with(photo).load(card.photo).into(photo);
+            Glide.with(photo).load(card.picture).into(photo);
         }
         text(R.id.narratorFacts, TextUtils.join("\n", card.facts));
         text(R.id.narratorBio, card.bio);

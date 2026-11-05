@@ -368,6 +368,27 @@ public final class AppProxy {
         return routes;
     }
 
+    /**
+     * The device's own route to {@code url} (the selector before ours: what the phone's browser takes). For a site that
+     * is no source (fantlab.ru), which no setting sends direct.
+     */
+    @NonNull
+    public static Proxy deviceProxy(@NonNull String url) {
+        ProxySelector device = system;
+        try {
+            List<Proxy> proxies = device == null ? null : device.select(URI.create(url));
+            return proxies == null || proxies.isEmpty() ? Proxy.NO_PROXY : proxies.get(0);
+        } catch (IllegalArgumentException e) {
+            return Proxy.NO_PROXY;
+        }
+    }
+
+    /** {@code client} on the device's own route for every host ({@link #deviceProxy}). */
+    @NonNull
+    public static okhttp3.OkHttpClient deviceClient(@NonNull okhttp3.OkHttpClient client) {
+        return onDeviceRoute(client, system);
+    }
+
     /** {@code client} with the device's own route ({@code device}, the selector before ours) for every host. */
     @NonNull
     static okhttp3.OkHttpClient onDeviceRoute(@NonNull okhttp3.OkHttpClient client, @Nullable ProxySelector device) {
