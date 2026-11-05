@@ -2,6 +2,7 @@ package com.fanok.audiobooks.model;
 
 import android.content.Context;
 import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 import com.fanok.audiobooks.interface_pacatge.books.AudioListDBHelperInterfase;
 import com.fanok.audiobooks.interface_pacatge.books.BooksDBAbstract;
 import com.fanok.audiobooks.pojo.AudioListPOJO;
@@ -15,6 +16,7 @@ import java.util.HashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 
 public class AudioListDBModel extends BooksDBAbstract implements AudioListDBHelperInterfase {
@@ -74,9 +76,38 @@ public class AudioListDBModel extends BooksDBAbstract implements AudioListDBHelp
     }
 
     /**
+     * Records the length the player found for a chapter the site gave none (time 0): the books' percent
+     * ({@link ListeningProgress}) counts the chapters' lengths. A known length is kept.
+     */
+    public void learnTime(@NonNull String urlBook, int ordinal, @Nullable String name, int seconds) {
+        BooksAudioEntity row = seconds > 0 ? chapterRow(getRows(urlBook), ordinal, name) : null;
+        if (row != null) {
+            getDatabase().booksAudioDao().setTimeIfUnknown(row.id, seconds);
+        }
+    }
+
+    /**
+     * The row of chapter {@code ordinal} named {@code name} among a book's {@code rows} (in {@link #getRows} order),
+     * else the row at that position with that name (imported books record no ordinal, a book restored from its rows
+     * numbers them by position), else null.
+     */
+    @Nullable
+    static BooksAudioEntity chapterRow(@NonNull List<BooksAudioEntity> rows, int ordinal, @Nullable String name) {
+        for (BooksAudioEntity row : rows) {
+            if (row.ordinal == ordinal && Objects.equals(row.nameAudio, name)) {
+                return row;
+            }
+        }
+        if (ordinal >= 0 && ordinal < rows.size() && Objects.equals(rows.get(ordinal).nameAudio, name)) {
+            return rows.get(ordinal);
+        }
+        return null;
+    }
+
+    /**
      * Upserts the parsed chapter list of an online book in one transaction. Existing rows are matched by download id,
-     * then by position, and keep local_uri and their time columns; rows no longer listed are deleted only when they
-     * record no exported copy. A row kept that way leaves the ordinals of the list: it gets the unique ordinal
+     * then by position, and keep local_uri and their time columns (an unknown length takes the parsed one); rows no
+     * longer listed are deleted only when they record no exported copy. A row kept that way leaves the ordinals of the list: it gets the unique ordinal
      * -(id)-1 (never -1, which means "not recorded"), so its download identity is its legacy URL alone and no listed
      * chapter takes its position.
      */
@@ -129,6 +160,8 @@ public class AudioListDBModel extends BooksDBAbstract implements AudioListDBHelp
                     row.time = chapter.getTime();
                     row.timeStart = chapter.getTimeStart();
                     row.timeEnd = chapter.getTimeEnd();
+                } else if (row.time <= 0) {
+                    row.time = chapter.getTime();
                 }
                 row.booksName = chapter.getBookName();
                 row.nameAudio = chapter.getAudioName();

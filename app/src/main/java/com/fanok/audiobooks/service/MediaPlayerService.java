@@ -347,6 +347,8 @@ public class MediaPlayerService extends MediaBrowserServiceCompat {
     private long recoveredAtMs = C.TIME_UNSET;
     /** The chapter was ended where its audio ended early, short of an end Media3 never reached: Play replays. */
     private boolean finishedEarly;
+    /** The load ({@link #gen}) whose chapter length is recorded or known: READY again after a seek writes nothing. */
+    private int lengthKnownGen = -1;
     /** The error being shown, or retried while {@link #retryTask}/{@link #refreshTask} is pending. */
     @Nullable
     private PlaybackErrorPolicy.Kind failedKind;
@@ -468,6 +470,7 @@ public class MediaPlayerService extends MediaBrowserServiceCompat {
         @Override
         public void onPlaybackStateChanged(int playbackState) {
             if (playbackState == Player.STATE_ENDED) {
+                recordChapterLength();
                 onChapterEnded();
                 return;
             }
@@ -475,6 +478,7 @@ public class MediaPlayerService extends MediaBrowserServiceCompat {
                 //READY never changes the intent and never seeks: the start position went with the source
                 errorPolicy.reset();
                 failedKind = null;
+                recordChapterLength();
                 publishMetadata();
             }
             publishState();
@@ -1688,6 +1692,38 @@ public class MediaPlayerService extends MediaBrowserServiceCompat {
                 storage.storeCountAudioListneredForRating(count);
             }
         }
+    }
+
+    /**
+     * The length the player found for a chapter the site gave none, written to its row once per load: the books'
+     * percent and the history's status (ListeningProgress) count the chapters' lengths, and without any stay at 0.
+     */
+    private void recordChapterLength() {
+        if (resolving || !hasBook() || player == null || lengthKnownGen == gen) {
+            return;
+        }
+        final AudioPOJO chapter = chapters.get(chapterIndex);
+        long durationMs = player.getDuration();
+        if (chapter.getTime() > 0) {
+            lengthKnownGen = gen;
+            return;
+        }
+        if (durationMs == C.TIME_UNSET || durationMs < 1000) {
+            return;
+        }
+        lengthKnownGen = gen;
+        final String url = bookUrl;
+        final int ordinal = ordinalOf(chapterIndex);
+        final String name = chapter.getName();
+        final int seconds = (int) (durationMs / 1000);
+        final Context app = getApplicationContext();
+        execDb(() -> {
+            try {
+                new AudioListDBModel(app).learnTime(url, ordinal, name, seconds);
+            } catch (RuntimeException e) {
+                Log.e(TAG, "cannot record the chapter's length", e);
+            }
+        });
     }
 
     /** The "rewind after a long pause" preference: 10 s after 10 s of pause, 30 s after 30 s. */

@@ -38,6 +38,10 @@ public interface BooksAudioDao {
     @Query("UPDATE books_audio SET local_uri = :localUri WHERE id = :id")
     int updateLocalUriById(int id, String localUri);
 
+    /** Sets the length of a chapter whose length is unknown (0); a known one is kept. */
+    @Query("UPDATE books_audio SET time = :seconds WHERE id = :id AND time <= 0")
+    int setTimeIfUnknown(int id, int seconds);
+
     @Query("SELECT * FROM books_audio")
     List<BooksAudioEntity> getAll();
 }
