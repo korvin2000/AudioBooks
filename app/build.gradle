@@ -59,7 +59,7 @@ android {
         minSdkVersion 24 // 24+: network_security_config trust anchors (ISRG Root X1) work without bundling Conscrypt
         targetSdkVersion 34
         versionCode 107
-        versionName "8.2.0"
+        versionName "8.2"
         // the app speaks Russian only: the libraries' other translations would be dead weight in every APK
         resourceConfigurations += ['ru']
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
