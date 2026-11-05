@@ -149,7 +149,7 @@ public final class Izibuk implements SourceParser {
 
     @Override
     public ProviderPage<GenrePOJO> people(Document page, String url, int pageNo, boolean performers) {
-        return parsePeople(page, pageNo);
+        return parsePeople(page, pageNo, Url.SERVER_IZIBUK, "?p=");
     }
 
     @Override
@@ -171,7 +171,7 @@ public final class Izibuk implements SourceParser {
 
     @Override
     public ProviderPage<GenrePOJO> searchPeople(Document page, int pageNo, boolean performers) {
-        return parsePeople(page, pageNo);
+        return parsePeople(page, pageNo, Url.SERVER_IZIBUK, "?p=");
     }
 
     @Override
@@ -372,8 +372,11 @@ public final class Izibuk implements SourceParser {
         }), false);
     }
 
-    /** The author or reader index and their search. */
-    public static ProviderPage<GenrePOJO> parsePeople(Document doc, int page) {
+    /**
+     * The author or reader index and their search, on this engine's sites (izib.uk, otrub.in): a person's listing is
+     * {@code server + href + suffix}. A person with "нет книг" on the site is left out (its listing is empty).
+     */
+    public static ProviderPage<GenrePOJO> parsePeople(Document doc, int page, String server, String suffix) {
         boolean hasMore = lastPage(doc.select(
                 "#authors_list__pn a[data-page], #readers_list__pn a[data-page]")) > page;
         Element itemParent = doc.getElementById("authors_list");
@@ -385,14 +388,17 @@ public final class Izibuk implements SourceParser {
         }
         return ProviderPage.of(rows(itemParent.children(), item -> {
             GenrePOJO genrePOJO = new GenrePOJO();
-            genrePOJO.setUrl(Url.SERVER_IZIBUK + item.attr("href") + "?p=");
+            genrePOJO.setUrl(server + item.attr("href") + suffix);
             Elements children = item.children();
             if (children.size() == 3) {
+                if (children.last().text().startsWith("нет")) {
+                    return null;
+                }
                 genrePOJO.setName(children.get(1).text());
                 genrePOJO.setDescription(children.last().text());
             }
             return genrePOJO;
-        }), hasMore);
+        }), hasMore, itemParent.children().size());
     }
 
     public static DescriptionPOJO parseDescription(Document document) {

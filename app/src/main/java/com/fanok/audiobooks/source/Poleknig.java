@@ -40,6 +40,8 @@ public final class Poleknig implements SourceParser {
     private static final List<Sort.Entry> GENRE_MENU = Sort.menu(Sort.NEW, Sort.POPULAR);
     private static final Pattern GENRE =
             Pattern.compile("^" + Pattern.quote(Url.SERVER_POLEKNIG) + "/genres/\\d+(?=[/?#]|$)");
+    /** The readers index is uknig's engine: {@link Uknig#people} reads several site pages a list page. */
+    private static final Uknig ENGINE = new Uknig();
 
     // ---------------------------------------------------------------- SourceParser
 
@@ -55,7 +57,16 @@ public final class Poleknig implements SourceParser {
 
     @Override
     public String pageUrl(String url, int page) {
+        if (url.equals(Url.PERFORMERS_POLEKNIG)) {
+            return ENGINE.pageUrl(url, page);
+        }
         return url.contains("?") ? url + page : url + "?p=" + page;
+    }
+
+    @Override
+    public ProviderPage<GenrePOJO> people(Document page, String url, int pageNo, boolean performers)
+            throws IOException {
+        return ENGINE.people(page, url, pageNo, performers);
     }
 
     /** Author, reader, series, year and tag listings are not re-sorted. */

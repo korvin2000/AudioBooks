@@ -38,6 +38,7 @@ import com.fanok.audiobooks.search.GenrePicks;
 import com.fanok.audiobooks.search.GenreSort;
 import com.fanok.audiobooks.search.ListingCursor;
 import com.fanok.audiobooks.search.ListingFilters;
+import com.fanok.audiobooks.search.PeopleIndex;
 import com.fanok.audiobooks.search.Provider;
 import com.fanok.audiobooks.search.Sources;
 import com.fanok.audiobooks.source.Sort;
@@ -51,6 +52,7 @@ import io.reactivex.schedulers.Schedulers;
 import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Collections;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
@@ -242,17 +244,18 @@ public class BooksPresenter extends MvpPresenter<BooksView> implements
     /** The loaded genres in the chosen order, narrowed to the search. */
     private void showGenres() {
         mPicks = GenrePicks.all(mContext);
-        genre = mGenreSort.sorted(mGenreCursor.items(), mPicks);
-        if (!mGenreQuery.isEmpty()) {
+        List<GenrePOJO> shown = mGenreCursor.items();
+        if (!mGenreQuery.isEmpty()) { // narrowed before it is sorted: a built-in list holds tens of thousands
             ArrayList<GenrePOJO> matching = new ArrayList<>();
-            for (GenrePOJO item : genre) {
+            for (GenrePOJO item : shown) {
                 String name = item.getName();
                 if (name != null && name.toLowerCase(Locale.ROOT).replace('ё', 'е').contains(mGenreQuery)) {
                     matching.add(item);
                 }
             }
-            genre = matching;
+            shown = matching;
         }
+        genre = mGenreSort.sorted(shown, mPicks);
         getViewState().showDataGenres(genre);
     }
 
@@ -401,9 +404,9 @@ public class BooksPresenter extends MvpPresenter<BooksView> implements
         return Calendar.getInstance();
     }
 
-    /** The listing URL of {@code page} in the provider's own scheme; genre lists have a single page. */
+    /** The listing URL of {@code page} in the provider's own scheme; genre and built-in people lists have one page. */
     private String pageUrl(int page) {
-        if (mModelId == Consts.MODEL_GENRE) {
+        if (mModelId == Consts.MODEL_GENRE || PeopleIndex.isBuiltIn(mUrl)) {
             return mUrl;
         }
         // an unknown host lists nothing

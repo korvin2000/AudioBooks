@@ -14,6 +14,7 @@ import android.widget.TextView;
 import androidx.annotation.NonNull;
 import androidx.recyclerview.widget.RecyclerView;
 import com.fanok.audiobooks.R;
+import com.fanok.audiobooks.activity.NarratorActivity;
 import com.fanok.audiobooks.model.FavoritePeople;
 import com.fanok.audiobooks.pojo.GenrePOJO;
 import com.google.android.material.snackbar.Snackbar;
@@ -119,6 +120,8 @@ public class GenreListAddapter extends RecyclerView.Adapter<GenreListAddapter.My
 
         private final ImageButton mStar;
 
+        private final ImageButton mCard;
+
         MyHolder(@NonNull final View itemView) {
             super(itemView);
 
@@ -126,6 +129,13 @@ public class GenreListAddapter extends RecyclerView.Adapter<GenreListAddapter.My
             mReting = itemView.findViewById(R.id.reting);
             mDescription = itemView.findViewById(R.id.desc);
             mStar = itemView.findViewById(R.id.star);
+            mCard = itemView.findViewById(R.id.card);
+            mCard.setOnClickListener(view -> {
+                GenrePOJO person = getItem(getBindingAdapterPosition());
+                if (person != null && person.getCard() != null) {
+                    NarratorActivity.start(view.getContext(), person.getName(), person.getCard());
+                }
+            });
             mStar.setOnClickListener(view -> {
                 int position = getBindingAdapterPosition();
                 GenrePOJO person = getItem(position);
@@ -143,12 +153,18 @@ public class GenreListAddapter extends RecyclerView.Adapter<GenreListAddapter.My
                     listner.onClickItem(itemView, position);
                 }
             });
-            // TV: the star is the row's last child, so the focus search never picks it for D-pad right
+            // TV: the row keeps focus, so the focus search never picks its buttons; D-pad goes row → card → star
             itemView.setOnKeyListener((view, keyCode, event) -> keyCode == KeyEvent.KEYCODE_DPAD_RIGHT
-                    && event.getAction() == KeyEvent.ACTION_DOWN
-                    && mStar.getVisibility() == View.VISIBLE && mStar.requestFocus());
+                    && event.getAction() == KeyEvent.ACTION_DOWN && (focus(mCard) || focus(mStar)));
+            mCard.setOnKeyListener((view, keyCode, event) -> event.getAction() == KeyEvent.ACTION_DOWN
+                    && (keyCode == KeyEvent.KEYCODE_DPAD_RIGHT ? focus(mStar)
+                    : keyCode == KeyEvent.KEYCODE_DPAD_LEFT && itemView.requestFocus()));
             mStar.setOnKeyListener((view, keyCode, event) -> keyCode == KeyEvent.KEYCODE_DPAD_LEFT
-                    && event.getAction() == KeyEvent.ACTION_DOWN && itemView.requestFocus());
+                    && event.getAction() == KeyEvent.ACTION_DOWN && (focus(mCard) || itemView.requestFocus()));
+        }
+
+        private boolean focus(View view) {
+            return view.getVisibility() == View.VISIBLE && view.requestFocus();
         }
 
         void bind(GenrePOJO book) {
@@ -166,6 +182,7 @@ public class GenreListAddapter extends RecyclerView.Adapter<GenreListAddapter.My
                 mReting.setVisibility(View.GONE);
             }
             mDescription.setText(description);
+            mCard.setVisibility(book.getCard() == null ? View.GONE : View.VISIBLE);
             bindStar(book);
         }
 

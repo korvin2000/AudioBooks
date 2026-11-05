@@ -10,6 +10,8 @@ public class GenrePOJO {
     private String url;
     private int reting = 0;
     private String description = "";
+    /** The url of the person's card elsewhere (a narrator's on fantlab.ru, search.Narrators); null for none. */
+    private String card;
 
     public GenrePOJO(final String name, final String url) {
         this.name = name;
@@ -59,6 +61,14 @@ public class GenrePOJO {
     public void setReting(int reting) {
         //if (reting < 0) throw new IllegalArgumentException("Value must be more 0");
         this.reting = reting;
+    }
+
+    public String getCard() {
+        return card;
+    }
+
+    public void setCard(String card) {
+        this.card = card;
     }
 
     public boolean isNull() {

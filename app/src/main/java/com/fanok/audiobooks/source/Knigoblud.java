@@ -80,11 +80,15 @@ public final class Knigoblud implements SourceParser {
         return url.contains("?") ? url + page : url + "/" + page;
     }
 
-    /** Author, reader and series listings ({@code /<uuid>} like the genres, but not one of them) are not re-sorted. */
+    /**
+     * Author, reader and series listings ({@code /<uuid>} like the genres, but not one of them) and a search (a person
+     * of the built-in lists) are not re-sorted.
+     */
     @Override
     public List<Sort.Entry> sorts(String url) {
         boolean noSort = url.contains("reader") || url.contains("author") || url.contains("serie")
-                || url.contains("cikl") || (UUID_LISTING.matcher(url).matches() && genreOf(url) == null);
+                || url.contains("/search?") || url.contains("cikl")
+                || (UUID_LISTING.matcher(url).matches() && genreOf(url) == null);
         if (noSort) {
             return Collections.<Sort.Entry>emptyList();
         }

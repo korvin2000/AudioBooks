@@ -157,10 +157,25 @@ public final class Otrub implements SourceParser {
         }), false);
     }
 
+    /** The author and reader indexes are izib.uk's engine. */
+    @Override
+    public ProviderPage<GenrePOJO> people(Document page, String url, int pageNo, boolean performers) {
+        return Izibuk.parsePeople(page, pageNo, Url.SERVER_OTRUB, "");
+    }
+
+    @Override
+    public ProviderPage<GenrePOJO> searchPeople(Document page, int pageNo, boolean performers) {
+        return Izibuk.parsePeople(page, pageNo, Url.SERVER_OTRUB, "");
+    }
+
     @Override
     public String searchUrl(SearchUrls.Category category, String query, int page) {
-        return category == SearchUrls.Category.BOOKS
-                ? Url.SERVER_OTRUB + "/search?q=" + SearchUrls.enc(query) + "&p=" + page : null;
+        String q = SearchUrls.enc(query) + "&p=" + page;
+        switch (category) {
+            case AUTHORS: return Url.SERVER_OTRUB + "/authors.html?q=" + q;
+            case PERFORMERS: return Url.SERVER_OTRUB + "/readers.html?q=" + q;
+            default: return Url.SERVER_OTRUB + "/search?q=" + q;
+        }
     }
 
     @Override

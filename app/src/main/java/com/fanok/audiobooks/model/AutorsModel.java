@@ -1,6 +1,8 @@
 package com.fanok.audiobooks.model;
 
 import com.fanok.audiobooks.pojo.GenrePOJO;
+import com.fanok.audiobooks.search.Narrators;
+import com.fanok.audiobooks.search.PeopleIndex;
 import com.fanok.audiobooks.search.Provider;
 import com.fanok.audiobooks.search.ProviderPage;
 import com.fanok.audiobooks.search.SearchUrls;
@@ -25,12 +27,16 @@ public class AutorsModel extends GenreModel {
         if (url == null) {
             return ProviderPage.empty();
         }
-        return provider.parser.searchPeople(provider.parser.fetch(url), page,
-                category == SearchUrls.Category.PERFORMERS);
+        boolean readers = category == SearchUrls.Category.PERFORMERS;
+        ProviderPage<GenrePOJO> found = provider.parser.searchPeople(provider.parser.fetch(url), page, readers);
+        return readers ? Narrators.mark(found) : found;
     }
 
+    /** The site's own list, or the one built into the app for a site without one ({@link PeopleIndex}). */
     @Override
     protected ProviderPage<GenrePOJO> loadParser(SourceParser parser, String url, int page) throws IOException {
-        return parser.loadPeople(url, page, mPerformerMode, mPeopleCursor);
+        ProviderPage<GenrePOJO> people = PeopleIndex.isBuiltIn(url) ? PeopleIndex.load(url)
+                : parser.loadPeople(url, page, mPerformerMode, mPeopleCursor);
+        return mPerformerMode ? Narrators.mark(people) : people; // the readers fantlab has a card of
     }
 }

@@ -5,6 +5,7 @@ import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 
+import com.fanok.audiobooks.Url;
 import com.fanok.audiobooks.pojo.BookPOJO;
 import com.fanok.audiobooks.pojo.DescriptionPOJO;
 import com.google.gson.Gson;
@@ -107,7 +108,8 @@ public class IzibukSelectorsTest {
             }
             assertSameResult(name + " parseGenres", () -> Izibuk.parseGenres(saved), () -> Izibuk.parseGenres(rebuilt));
             assertSameResult(name + " parsePeople",
-                    () -> Izibuk.parsePeople(saved, 1), () -> Izibuk.parsePeople(rebuilt, 1));
+                    () -> Izibuk.parsePeople(saved, 1, Url.SERVER_IZIBUK, "?p="),
+                    () -> Izibuk.parsePeople(rebuilt, 1, Url.SERVER_IZIBUK, "?p="));
             assertSameResult(name + " parseDescription",
                     () -> Izibuk.parseDescription(saved), () -> Izibuk.parseDescription(rebuilt));
             String bookUrl = base + "art1";
