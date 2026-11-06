@@ -35,7 +35,7 @@ import okhttp3.Response;
 /** The sync file in the app folder of Yandex Disk, through the REST API with the user's OAuth token. */
 final class YandexDisk implements Cloud {
 
-    private static final String DISK = "https://cloud-api.yandex.net/v1/disk", API = DISK + "/resources";
+    private static final String API = "https://cloud-api.yandex.net/v1/disk/resources";
     private static final String PATH = "app:/" + FILE;
     private static final MediaType OCTETS = MediaType.get("application/octet-stream");
 
@@ -96,17 +96,13 @@ final class YandexDisk implements Cloud {
         }
 
         /**
-         * The account behind {@code token}, named by its login, once its Disk answers: a Yandex ID without a Disk is
-         * turned away here rather than failing every sync.
+         * The account behind {@code token}, once the app folder answers: a Yandex ID without a Disk is turned away
+         * here rather than failing every sync. Only the app folder: the Disk's own info (/v1/disk, with the login)
+         * needs a permission the app does not ask for, and answers 403 to this token.
          */
         private static CloudAccount account(Context app, String token) throws IOException {
-            YandexDisk disk = new YandexDisk(app, token, CloudSync.http());
-            try (Response response = disk.call(new Request.Builder().url(DISK))) {
-                disk.check(response);
-                JsonElement user = json(response).get("user");
-                return new CloudAccount(user != null && user.isJsonObject() ? string(user.getAsJsonObject(), "login")
-                        : null, token);
-            }
+            new YandexDisk(app, token, CloudSync.http()).tag();
+            return new CloudAccount(null, token);
         }
 
         @NonNull
