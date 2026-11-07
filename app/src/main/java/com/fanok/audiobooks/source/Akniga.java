@@ -918,10 +918,14 @@ public final class Akniga implements SourceParser {
     public static ArrayList<AudioPOJO> parseTracks(Document doc, String bookJson, String bookUrl) {
         String bookName = Html.text(doc.selectFirst(".caption__article-main"));
         Chapters chapters = new Chapters(bookName, bookUrl);
+        String why = ""; // what the site answered instead, for the report; "" when the page had no player key
         if (bookJson != null) {
             JsonObject book = object(bookJson);
             JsonElement hres = book.get("hres");
             String hls = hres == null ? "" : decryptHres(hres.isJsonPrimitive() ? hres.getAsString() : hres.toString());
+            // {"error":true,"error_reason":"token"}: the player token refused, which the site's own player asks again
+            why = book.has("error") ? ", refused: " + string(book, "error_reason")
+                    : hres != null && hls.isEmpty() ? ", hres not decryptable" : "";
             if (!hls.isEmpty()) {
                 JsonElement items = book.get("items");
                 if (items != null && items.isJsonPrimitive()) {
@@ -967,7 +971,7 @@ public final class Akniga implements SourceParser {
                 }
             }
         }
-        return chapters.done("akniga book");
+        return chapters.done("akniga book" + why);
     }
 
     /**
