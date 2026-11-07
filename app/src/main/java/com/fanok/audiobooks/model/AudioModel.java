@@ -9,6 +9,7 @@ import com.fanok.audiobooks.net.SiteHttp;
 import com.fanok.audiobooks.pojo.AudioPOJO;
 import com.fanok.audiobooks.search.Provider;
 import com.fanok.audiobooks.source.SourceParser;
+import com.google.gson.JsonParseException;
 import io.reactivex.Observable;
 
 import java.io.IOException;
@@ -26,8 +27,8 @@ import org.jsoup.nodes.Document;
  * {@code parseXxx} takes already-fetched content, calls no Android API and runs in JVM tests.
  * Failures are errors, never fake chapters: an unknown host, a page without the player or a page
  * that yields no playable chapter make {@link #getAudio} emit {@code onError}, so the caller can
- * fall back to offline chapters. One malformed chapter is skipped and counted, not fatal. A load the network broke
- * is repeated once ({@link #loadRetrying}).
+ * fall back to offline chapters. One malformed chapter is skipped and counted, not fatal. A load the network broke,
+ * or whose page proved unusable, is repeated once ({@link #loadRetrying}).
  */
 public class AudioModel implements AudioModelInterfece {
 
@@ -69,19 +70,26 @@ public class AudioModel implements AudioModelInterfece {
     }
 
     /**
-     * {@link #load}, once more after {@link #retryPauseMs} when the network broke it (no answer in time, a reset, a cut
-     * body). An HTTP status, a challenge or a page without chapters is the site's answer: a repeat gets the same.
+     * {@link #load}, once more: after {@link #retryPauseMs} when the network broke it (no answer in time, a reset, a cut
+     * body); at once, from a fresh page ({@link BookPages#forget}), when what came was not usable — a copy of the page
+     * with the key of a session the site no longer holds, a player token the site refused (akniga), an answer that is
+     * no JSON. An HTTP status, a challenge or a book taken down is the site's answer: a repeat gets the same.
      */
     static ArrayList<AudioPOJO> loadRetrying(String url, PageSource pages) throws IOException, InterruptedException {
         try {
             return load(url, pages);
+        } catch (IllegalStateException | JsonParseException e) {
+            if (e instanceof BookRemovedException) {
+                throw e;
+            }
+            BookPages.forget(Url.canonical(url));
         } catch (IOException | UncheckedIOException e) {
             if (!isTransient(e)) {
                 throw e;
             }
             Thread.sleep(retryPauseMs);
-            return load(url, pages);
         }
+        return load(url, pages);
     }
 
     /** Pure: the network failed, not the site's answer (an HTTP status, a rate limit, an unknown host never is). */

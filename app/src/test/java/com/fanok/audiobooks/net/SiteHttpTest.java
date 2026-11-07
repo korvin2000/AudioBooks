@@ -31,6 +31,7 @@ public class SiteHttpTest {
         assertTrue(SiteHttp.isChallenge(null, "DDoS-Guard"));
         assertTrue(SiteHttp.isChallenge(null, "Attention Required! | Cloudflare"));
         assertTrue(SiteHttp.isChallenge(null, "Security Verification"));
+        assertTrue(SiteHttp.isChallenge(null, "Проверка безопасности")); // DDoS-Guard's captcha (akniga, Russia)
     }
 
     @Test

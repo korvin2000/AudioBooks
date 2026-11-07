@@ -16,6 +16,7 @@ import org.jsoup.nodes.Document;
 import okhttp3.HttpUrl;
 
 import java.io.IOException;
+import java.io.InterruptedIOException;
 import java.net.URL;
 import java.util.Collections;
 import java.util.Locale;
@@ -209,6 +210,7 @@ public final class SiteHttp {
         if (response.bodyAsBytes().length >= MAX_BODY_BYTES) {
             throw new IOException("Response larger than " + MAX_BODY_BYTES + " bytes: " + url);
         }
+        requireWhole(url);
         String body = response.body();
         if (!looksLikeJson(body)) {
             parse(response); // a challenge or an HTTP error throws its own exception
@@ -296,6 +298,7 @@ public final class SiteHttp {
             throwForStatus(response); // a rate limit, whatever page it comes with: the same request goes through later
         }
         Document document = response.parse();
+        requireWhole(url); // after the parse: jsoup reads even buffered bytes through its interruptible stream
         if (isChallenge(response.header("cf-mitigated"), document.title())) {
             throw new CookesExeption(url);
         }
@@ -303,7 +306,21 @@ public final class SiteHttp {
         return document;
     }
 
-    /** Pure: Cloudflare marks every challenge with {@code cf-mitigated}; older walls are known by title. */
+    /**
+     * jsoup ends a body quietly when the reading thread is interrupted (a load disposed mid-page, e.g. its screen
+     * closed): what it read is then a cut page — the title there, akniga's player key not — that must never be parsed
+     * or shared ({@code BookPages}) as the whole one.
+     */
+    private static void requireWhole(String url) throws InterruptedIOException {
+        if (Thread.currentThread().isInterrupted()) {
+            throw new InterruptedIOException("interrupted reading " + url);
+        }
+    }
+
+    /**
+     * Pure: Cloudflare marks every challenge with {@code cf-mitigated}; older walls are known by title (DDoS-Guard's
+     * captcha says "Проверка безопасности" in Russia).
+     */
     static boolean isChallenge(String cfMitigated, String title) {
         if (cfMitigated != null) {
             return true;
@@ -311,6 +328,6 @@ public final class SiteHttp {
         String t = title == null ? "" : title.toLowerCase(Locale.ROOT);
         return t.contains("just a moment") || t.contains("attention required")
                 || t.contains("ddos-guard") || t.contains("checking your browser")
-                || t.contains("security verification");
+                || t.contains("security verification") || t.contains("проверка безопасности");
     }
 }

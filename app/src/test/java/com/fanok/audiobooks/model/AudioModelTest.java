@@ -146,6 +146,15 @@ public class AudioModelTest {
     }
 
     @Test
+    public void aknigaRefusalIsNamedInTheError() {
+        // live answer of /ajax/b to a token of another session, or one older than a minute
+        IllegalStateException e = assertThrows(IllegalStateException.class, () -> Akniga.parseTracks(Jsoup.parse(""),
+                "{\"error\":true,\"error_reason\":\"token\",\"sMsgTitle\":\"\",\"sMsg\":\"\",\"bStateError\":false}",
+                AKNIGA));
+        assertTrue(e.getMessage(), e.getMessage().contains("in akniga book, refused: token (0 skipped)"));
+    }
+
+    @Test
     public void bazaKnigFixture() throws IOException {
         List<AudioPOJO> chapters = BazaKnig.parseTracks(page("bazaknig", BAZA_KNIG), BAZA_KNIG);
         assertEquals(22, chapters.size());
@@ -315,9 +324,26 @@ public class AudioModelTest {
         int[] calls = {0};
         AudioModel.audio(KNIGAVUHE, url -> {
             calls[0]++;
-            return Jsoup.parse("<h1>Книга</h1>", url); // the page without a player
-        }).test().assertError(IllegalStateException.class);
+            return Jsoup.parse("<h1>Книга</h1><p>Удалено правообладателем.</p>", url); // a book taken down
+        }).test().assertError(BookRemovedException.class);
         assertEquals(1, calls[0]);
+    }
+
+    @Test
+    public void anUnusablePageIsReadOnceMoreFromAFreshCopy() {
+        // a page without a player may be a cut copy or one with the key of a session the site no longer holds: the
+        // one repeat reads a fresh page, not the copy BookPages shares for a minute, then the error stands
+        int[] calls = {0};
+        AudioModel.audio(KNIGAVUHE, url -> {
+            calls[0]++;
+            return Jsoup.parse("<h1>Книга</h1>", url);
+        }).test().assertError(e -> e instanceof IllegalStateException && !(e instanceof BookRemovedException));
+        assertEquals(2, calls[0]);
+        calls[0] = 0;
+        AudioModel.audio(KNIGAVUHE, page -> BookPages.get(page,
+                url -> calls[0]++ == 0 ? Jsoup.parse("<h1>Книга</h1>", url) : page("knigavuhe", url)))
+                .test().assertValueCount(1).assertComplete();
+        assertEquals(2, calls[0]);
     }
 
     @Test

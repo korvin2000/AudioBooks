@@ -5,11 +5,19 @@ import static org.junit.Assert.assertNotSame;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
+import com.fanok.audiobooks.net.SiteHttp;
+
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.junit.Test;
 
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.net.InetAddress;
+import java.net.ServerSocket;
+import java.net.Socket;
+import java.nio.charset.StandardCharsets;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -143,6 +151,89 @@ public class BookPagesTest {
             assertEquals(2, calls.get());
         } finally {
             pool.shutdownNow();
+        }
+    }
+
+    /**
+     * The screen whose load fetches the shared page goes away mid-page (Rx disposes it: its thread is interrupted).
+     * jsoup then ends the body quietly; that cut page, still with its title but without what comes later (akniga's
+     * player key), must not reach the chapter list that waits for the same page: it fetches the page itself.
+     */
+    @Test
+    public void aPageCutByAnInterruptIsNotShared() throws Exception {
+        CountDownLatch halfSent = new CountDownLatch(1);
+        CountDownLatch rest = new CountDownLatch(1);
+        String head = "<html><head><title>Книга</title></head><body><h1>Книга</h1>" + pad(20_000);
+        String middle = pad(20_000);
+        String end = "<script>var LIVESTREET_SECURITY_KEY = 'k';</script><div id=end></div></body></html>";
+        AtomicInteger requests = new AtomicInteger();
+        try (ServerSocket server = new ServerSocket(0, 8, InetAddress.getLoopbackAddress())) {
+            Thread serving = new Thread(() -> {
+                while (!server.isClosed()) {
+                    try (Socket client = server.accept()) {
+                        readHead(client.getInputStream());
+                        byte[][] parts = {head.getBytes(StandardCharsets.UTF_8), middle.getBytes(StandardCharsets.UTF_8),
+                                end.getBytes(StandardCharsets.UTF_8)};
+                        OutputStream out = client.getOutputStream();
+                        out.write(("HTTP/1.1 200 OK\r\nContent-Type: text/html; charset=UTF-8\r\nContent-Length: "
+                                + (parts[0].length + parts[1].length + parts[2].length)
+                                + "\r\nConnection: close\r\n\r\n").getBytes(StandardCharsets.ISO_8859_1));
+                        out.write(parts[0]);
+                        out.flush();
+                        if (requests.incrementAndGet() == 1) { // the first reader gets the rest slowly
+                            halfSent.countDown();
+                            rest.await(30, TimeUnit.SECONDS);
+                            out.write(parts[1]);
+                            out.flush();
+                            Thread.sleep(300);
+                        } else {
+                            out.write(parts[1]);
+                        }
+                        out.write(parts[2]);
+                        out.flush();
+                    } catch (IOException e) {
+                        // the cut reader closed its end: serve the next one
+                    } catch (InterruptedException e) {
+                        return;
+                    }
+                }
+            });
+            serving.start();
+            String url = "http://127.0.0.1:" + server.getLocalPort() + "/book-cut";
+            ExecutorService pool = Executors.newFixedThreadPool(2);
+            // as on Android, where jsoup reads through HttpURLConnection (the JVM's HttpClient fails such a read)
+            System.setProperty("jsoup.useHttpClient", "false");
+            try {
+                Future<Document> description = pool.submit(() -> BookPages.get(url, SiteHttp::get));
+                assertTrue(halfSent.await(5, TimeUnit.SECONDS));
+                Future<Document> chapters = pool.submit(() -> BookPages.get(url, SiteHttp::get));
+                Thread.sleep(200); // the chapter list now waits for the description's fetch
+                assertTrue(description.cancel(true)); // the description's screen is gone mid-page
+                rest.countDown();
+                Document page = chapters.get(10, TimeUnit.SECONDS);
+                assertEquals("the whole page, not the cut one", 1, page.select("#end").size());
+                assertEquals("the chapter list fetched the page itself", 2, requests.get());
+            } finally {
+                System.clearProperty("jsoup.useHttpClient");
+                pool.shutdownNow();
+            }
+        }
+    }
+
+    private static String pad(int length) {
+        StringBuilder text = new StringBuilder("<p>");
+        while (text.length() < length) {
+            text.append("Глава. ");
+        }
+        return text.append("</p>").toString();
+    }
+
+    private static void readHead(InputStream in) throws IOException {
+        for (int last = 0, c; (c = in.read()) != -1; ) {
+            last = (last << 8 | c) & 0xFFFFFFFF;
+            if (last == 0x0D0A0D0A) {
+                return;
+            }
         }
     }
 }
