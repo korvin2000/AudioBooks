@@ -66,6 +66,7 @@ import com.fanok.audiobooks.search.GenreSort;
 import com.fanok.audiobooks.search.ListingFilters;
 import com.fanok.audiobooks.search.ListingFilters.Duration;
 import com.fanok.audiobooks.search.PeopleIndex;
+import com.fanok.audiobooks.activity.ActivityCookies;
 import com.fanok.audiobooks.search.Provider;
 import com.fanok.audiobooks.search.Sources;
 import com.fanok.audiobooks.source.Sort;
@@ -195,6 +196,15 @@ public class BooksFragment extends MvpAppCompatFragment implements BooksView {
 
 
     }
+
+    /** The browser check of a site that refused the list: passed, the list loads again. */
+    private final ActivityResultLauncher<Intent> siteCheckLauncher = registerForActivityResult(
+            new ActivityResultContracts.StartActivityForResult(),
+            result -> {
+                if (result.getResultCode() == Activity.RESULT_OK && mPresenter != null) {
+                    mPresenter.onRefresh();
+                }
+            });
 
     private final ActivityResultLauncher<Intent> searchActivityLauncher = registerForActivityResult(
             new ActivityResultContracts.StartActivityForResult(),
@@ -444,10 +454,7 @@ public class BooksFragment extends MvpAppCompatFragment implements BooksView {
     @Override
     public void recreate() {
         if (getActivity() == null) return;
-        Intent intent = new Intent(getActivity(), MainActivity.class);
-        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
-        getActivity().startActivity(intent);
-        getActivity().finish();
+        MainActivity.restartOnCatalog(getActivity());
     }
 
     @Override
@@ -571,6 +578,24 @@ public class BooksFragment extends MvpAppCompatFragment implements BooksView {
                         if (event != DISMISS_EVENT_ACTION) {
                             getPresenter().onRouteOfferDismissed();
                         }
+                    }
+                });
+        mRouteOffer.show();
+    }
+
+    @Override
+    public void showSiteCheckOffer(@NonNull Provider site) {
+        if (binding == null) {
+            return;
+        }
+        if (mRouteOffer != null) {
+            mRouteOffer.dismiss();
+        }
+        mRouteOffer = Snackbar.make(binding.getRoot(), getString(R.string.site_check_offer, site.title),
+                        Snackbar.LENGTH_INDEFINITE)
+                .setAction(R.string.site_check_action, v -> {
+                    if (isAdded()) {
+                        siteCheckLauncher.launch(ActivityCookies.intent(requireContext(), site));
                     }
                 });
         mRouteOffer.show();

@@ -108,20 +108,35 @@ public class BookDescriptionPresenter extends MvpPresenter<Description> implemen
                 .observeOn(AndroidSchedulers.mainThread())
                 .subscribe(saved -> {
                             if (!offline) {
-                                getViewState().showToast(errorMessage(e));
+                                tell(e);
                             } else if (saved.getDescription() == null || saved.getDescription().isEmpty()) {
                                 getViewState().showToast(R.string.offline_description);
                             }
                             showDescription(saved);
                         },
                         error -> {
-                            getViewState().showToast(errorMessage(e));
+                            tell(e);
                             showDescription(fallback);
                         },
                         () -> {
-                            getViewState().showToast(offline ? R.string.offline_description : errorMessage(e));
+                            if (offline) {
+                                getViewState().showToast(R.string.offline_description);
+                            } else {
+                                tell(e);
+                            }
                             showDescription(fallback);
                         }));
+    }
+
+    /** The failure's message; a site that refused the app but lets a browser in offers its check instead. */
+    private void tell(Throwable e) {
+        Throwable cause = e instanceof UncheckedIOException && e.getCause() != null ? e.getCause() : e;
+        com.fanok.audiobooks.search.Provider site = com.fanok.audiobooks.search.Provider.ofUrl(mBookPOJO.getUrl());
+        if (cause instanceof CookesExeption && com.fanok.audiobooks.activity.ActivityCookies.passes(site)) {
+            getViewState().showSiteCheckOffer(site);
+        } else {
+            getViewState().showToast(errorMessage(e));
+        }
     }
 
     private void showDescription(DescriptionPOJO descriptionPOJO) {

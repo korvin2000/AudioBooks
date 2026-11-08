@@ -1,6 +1,8 @@
 package com.fanok.audiobooks.activity;
 
 import android.annotation.SuppressLint;
+import android.content.Context;
+import android.content.Intent;
 import android.content.SharedPreferences;
 import android.os.Bundle;
 import android.util.Log;
@@ -20,7 +22,10 @@ import com.fanok.audiobooks.Consts;
 import com.fanok.audiobooks.R;
 import com.fanok.audiobooks.Url;
 import com.fanok.audiobooks.databinding.ActivityCookiesBinding;
+import com.fanok.audiobooks.net.AppProxy;
 import com.fanok.audiobooks.net.SiteHttp;
+import com.fanok.audiobooks.search.Provider;
+import com.fanok.audiobooks.source.Audioboo;
 import com.r0adkll.slidr.Slidr;
 import io.reactivex.Single;
 import io.reactivex.android.schedulers.AndroidSchedulers;
@@ -30,10 +35,16 @@ import org.jsoup.Connection;
 
 
 /**
- * Lets the user pass the site's browser check; the session cookie is kept only once a real request with it
- * returns a normal page (UI-17). Leaving early never touches the stored session.
+ * Lets the user pass the site's browser check in a real browser; the session is kept only once a real request of the
+ * app with it returns a normal page (UI-17). Leaving early never touches the stored session. baza-knig (the settings'
+ * default): its session cookie. audioboo: Cloudflare's clearance, bound to the browser's own User-Agent, which the
+ * app then sends to that site ({@link Audioboo#setClearance}). Opened by a list the site refused
+ * ({@link #EXTRA_PROVIDER}), it closes itself once the session is accepted, so the list loads again.
  */
 public class ActivityCookies extends AppCompatActivity {
+
+    /** The {@link Provider} name of the site; without it baza-knig, as the settings open it. */
+    public static final String EXTRA_PROVIDER = "provider";
 
     private static final String TAG = "ActivityCookies";
     private static final String SESSION_COOKIE = "PHPSESSID";
@@ -42,7 +53,20 @@ public class ActivityCookies extends AppCompatActivity {
     private Disposable verification;
     private String lastTried = "";
     private boolean verified;
+    /** audioboo: the clearance and the browser's User-Agent, not baza-knig's session. */
+    private boolean clearance;
+    private String server;
+    private boolean proxyHinted;
 
+    /** Whether the browser check of {@code provider} can be passed here, so a list it refused offers it. */
+    public static boolean passes(@Nullable Provider provider) {
+        return provider == Provider.AUDIOBOO || provider == Provider.BAZA_KNIG;
+    }
+
+    @NonNull
+    public static Intent intent(@NonNull Context context, @NonNull Provider provider) {
+        return new Intent(context, ActivityCookies.class).putExtra(EXTRA_PROVIDER, provider.name());
+    }
 
     @SuppressLint("SetJavaScriptEnabled")
     @Override
@@ -55,8 +79,10 @@ public class ActivityCookies extends AppCompatActivity {
         setContentView(view);
         Slidr.attach(this);
 
+        clearance = Provider.AUDIOBOO.name().equals(getIntent().getStringExtra(EXTRA_PROVIDER));
+        server = clearance ? Audioboo.SERVER + "/" : Url.SERVER_BAZA_KNIG;
         setSupportActionBar(binding.toolbar);
-        setTitle(Url.hostOf(Url.SERVER_BAZA_KNIG));
+        setTitle(Url.hostOf(server));
         ActionBar actionBar = getSupportActionBar();
         if (actionBar != null) {
             actionBar.setHomeButtonEnabled(true);
@@ -72,23 +98,32 @@ public class ActivityCookies extends AppCompatActivity {
         });
         binding.webView.getSettings().setLoadsImagesAutomatically(true);
         binding.webView.getSettings().setJavaScriptEnabled(true);
-        binding.webView.getSettings().setUserAgentString(Consts.USER_AGENT);
+        if (!clearance) {
+            binding.webView.getSettings().setUserAgentString(Consts.USER_AGENT);
+        } // audioboo: the browser as it is; the app takes its User-Agent, to which the clearance is bound
         binding.webView.setScrollBarStyle(View.SCROLLBARS_INSIDE_OVERLAY);
-        binding.webView.loadUrl(Url.SERVER_BAZA_KNIG);
+        binding.webView.loadUrl(server);
     }
 
-    /** Checks the WebView's current session once per distinct value: one GET of the home page through SiteHttp. */
+    /** Checks the WebView's current session once per distinct value: one request of the app's own to the site. */
     private void verifyCurrentSession() {
-        final String session = sessionCookie(CookieManager.getInstance().getCookie(Url.SERVER_BAZA_KNIG));
-        if (session.isEmpty() || session.equals(lastTried) || session.equals(Consts.getBazaKnigCookies())) {
+        final String name = clearance ? Audioboo.CLEARANCE_COOKIE : SESSION_COOKIE;
+        final String session = cookie(CookieManager.getInstance().getCookie(server), name);
+        // a clearance equal to the stored one is checked too: the site may refuse it to the app now (a new address)
+        if (session.isEmpty() || session.equals(lastTried)
+                || !clearance && session.equals(Consts.getBazaKnigCookies())) {
             return;
         }
+        final String agent = binding.webView.getSettings().getUserAgentString();
         lastTried = session;
         if (verification != null) {
             verification.dispose();
         }
         verification = Single.fromCallable(() -> {
-                    Connection connection = SiteHttp.connect(Url.SERVER_BAZA_KNIG).cookie(SESSION_COOKIE, session);
+                    Connection connection = SiteHttp.connect(server).cookie(name, session);
+                    if (clearance) {
+                        connection.userAgent(agent);
+                    }
                     SiteHttp.parse(SiteHttp.execute(connection)); // a challenge page throws
                     return session;
                 })
@@ -96,19 +131,43 @@ public class ActivityCookies extends AppCompatActivity {
                 .observeOn(AndroidSchedulers.mainThread())
                 .subscribe(ok -> {
                     SharedPreferences pref = PreferenceManager.getDefaultSharedPreferences(this);
-                    pref.edit().putString("cookes_baza_knig", ok).apply();
-                    Consts.setBazaKnigCookies(ok);
+                    if (clearance) {
+                        pref.edit().putString(Audioboo.PREF_CLEARANCE, ok).putString(Audioboo.PREF_AGENT, agent)
+                                .apply();
+                        SiteHttp.forget(server, name); // a former clearance the site issued must not shadow it
+                        Audioboo.setClearance(ok, agent);
+                    } else {
+                        pref.edit().putString("cookes_baza_knig", ok).apply();
+                        Consts.setBazaKnigCookies(ok);
+                    }
                     verified = true;
                     Toast.makeText(this, R.string.cookies_loaded, Toast.LENGTH_SHORT).show();
+                    if (getIntent().hasExtra(EXTRA_PROVIDER)) {
+                        setResult(RESULT_OK);
+                        finish();
+                    }
                 }, e -> {
                     Log.i(TAG, "Session not accepted yet: " + e);
                     lastTried = ""; // the next page load may try again
+                    if (clearance && !proxyHinted && !AppProxy.MODE_OFF.equals(AppProxy.mode())
+                            && !AppProxy.isDirect(Provider.AUDIOBOO)) {
+                        // this browser goes out directly while the app reaches the site through the proxy: the
+                        // clearance is bound to the address it was issued to
+                        proxyHinted = true;
+                        Toast.makeText(this, R.string.site_check_proxy, Toast.LENGTH_LONG).show();
+                    }
                 });
     }
 
     /** The value of {@code PHPSESSID} in a {@code Cookie} header string, or "" when absent or malformed. */
     @NonNull
     static String sessionCookie(@Nullable String cookieHeader) {
+        return cookie(cookieHeader, SESSION_COOKIE);
+    }
+
+    /** The value of the cookie {@code name} in a {@code Cookie} header string, or "" when absent or malformed. */
+    @NonNull
+    static String cookie(@Nullable String cookieHeader, @NonNull String name) {
         if (cookieHeader == null) {
             return "";
         }
@@ -117,7 +176,7 @@ public class ActivityCookies extends AppCompatActivity {
             if (eq <= 0) {
                 continue;
             }
-            if (SESSION_COOKIE.equals(pair.substring(0, eq).trim())) {
+            if (name.equals(pair.substring(0, eq).trim())) {
                 return pair.substring(eq + 1).trim();
             }
         }

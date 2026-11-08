@@ -68,6 +68,14 @@
             app:iconTint="?attr/colorItemMenu"
             app:showAsAction="never" />
 
+        <!-- «Режим авто»: the player for the road (CarModeActivity) -->
+        <item
+            android:id="@+id/car_mode"
+            android:icon="@drawable/ic_car_mode"
+            android:title="@string/car_mode"
+            app:iconTint="?attr/colorItemMenu"
+            app:showAsAction="never" />
+
         <item
             android:id="@+id/equalizer"
             android:icon="@drawable/ic_equalizer"

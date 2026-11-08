@@ -52,9 +52,16 @@ public final class DefaultCover {
         return Provider.ofUrl(photo) == Provider.AUDIOBOO;
     }
 
-    /** The default cover of the book {@code key} (its page URL, else its cover URL). */
+    /**
+     * The default cover of the book {@code key} (its page URL, else its cover URL), or its cover read from its audio
+     * ({@link EmbeddedCover}) once there is one.
+     */
     @NonNull
     public static Drawable drawable(@NonNull Context context, @Nullable String key) {
+        android.graphics.Bitmap embedded = EmbeddedCover.cached(context, key);
+        if (embedded != null) {
+            return new android.graphics.drawable.BitmapDrawable(context.getResources(), embedded);
+        }
         GradientDrawable background = new GradientDrawable(GradientDrawable.Orientation.TL_BR,
                 PALETTES[paletteOf(key)]);
         Drawable overlay = ContextCompat.getDrawable(context, R.drawable.default_cover_overlay);

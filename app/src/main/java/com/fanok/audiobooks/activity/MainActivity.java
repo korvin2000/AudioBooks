@@ -9,6 +9,7 @@ import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.core.content.ContextCompat;
 import android.app.UiModeManager;
+import android.app.Activity;
 import android.content.ActivityNotFoundException;
 import android.content.Context;
 import android.content.Intent;
@@ -158,6 +159,17 @@ public class MainActivity extends MvpAppCompatActivity
         Intent intent = new Intent(context, MainActivity.class);
         intent.putExtra(EXSTRA_FRAGMENT, fragment);
         context.startActivity(intent);
+    }
+
+    /**
+     * The app anew on the catalog source's "Аудиокниги", in place of {@code activity}'s task: after the source was
+     * switched or switched off. Not a launch, so «Загрузка последней книги» does not open the book over it.
+     */
+    public static void restartOnCatalog(@NonNull Activity activity) {
+        activity.startActivity(new Intent(activity, MainActivity.class)
+                .putExtra(EXSTRA_FRAGMENT, Consts.FRAGMENT_AUDIOBOOK)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK));
+        activity.finish();
     }
 
     public ArrayList<TextView> getTextViewArrayList() {
@@ -319,6 +331,9 @@ public class MainActivity extends MvpAppCompatActivity
         String url = intent.getStringExtra(EXSTRA_URL);
         if (url != null && !url.isEmpty() && fragment != -1) {
             mPresenter.startFragment(fragment, url);
+        } else if (fragment != -1) {
+            // a section asked for by name (restartOnCatalog after a source switch): it, never the last book over it
+            mPresenter.startFragment(fragment, true);
         } else {
             SharedPreferences pref = PreferenceManager
                     .getDefaultSharedPreferences(this);

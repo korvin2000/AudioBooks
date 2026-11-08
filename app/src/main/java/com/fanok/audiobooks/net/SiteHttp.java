@@ -65,6 +65,10 @@ public final class SiteHttp {
             // a newer one the site issued (in the jar) wins
             Map<String, String> own = Url.isHost(url, provider.server)
                     ? provider.parser.cookies() : Collections.<String, String>emptyMap();
+            String agent = Url.isHost(url, provider.server) ? provider.parser.userAgent() : null;
+            if (agent != null) {
+                connection.userAgent(agent); // the browser's whose session the site's own cookies carry
+            }
             for (Map.Entry<String, String> cookie : own.entrySet()) {
                 if (cookies == null || !cookies.containsKey(cookie.getKey())) {
                     connection.cookie(cookie.getKey(), cookie.getValue());
@@ -72,6 +76,14 @@ public final class SiteHttp {
             }
         }
         return connection;
+    }
+
+    /** Drops the cookie {@code name} the host of {@code url} issued, so the site's own one (a new session) is sent. */
+    public static void forget(String url, String name) {
+        Map<String, String> cookies = JAR.get(Url.hostOf(url));
+        if (cookies != null) {
+            cookies.remove(name);
+        }
     }
 
     /** GET {@code url} and parse it; the document's base URI is the final URL, so {@code absUrl} works. */
