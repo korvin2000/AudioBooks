@@ -39,6 +39,7 @@ import androidx.fragment.app.Fragment;
 import androidx.fragment.app.FragmentManager;
 import androidx.fragment.app.FragmentTransaction;
 import androidx.preference.PreferenceManager;
+import androidx.recyclerview.widget.RecyclerView;
 import com.arellomobile.mvp.MvpAppCompatActivity;
 import com.arellomobile.mvp.presenter.InjectPresenter;
 import com.arellomobile.mvp.presenter.ProvidePresenter;
@@ -46,6 +47,7 @@ import com.fanok.audiobooks.AppThemes;
 import com.fanok.audiobooks.BuildConfig;
 import com.fanok.audiobooks.Consts;
 import com.fanok.audiobooks.R;
+import com.fanok.audiobooks.adapter.ListFocus;
 import com.fanok.audiobooks.fragment.BooksFragment;
 import com.fanok.audiobooks.fragment.FavoriteFragment;
 import com.fanok.audiobooks.fragment.SettingsFragment;
@@ -99,6 +101,11 @@ public class MainActivity extends MvpAppCompatActivity
     }
 
     private ArrayList<TextView> mTextViewArrayList;
+
+    /** The side-menu entry chosen last (TV) and the screen it opened, until that screen's list takes the focus. */
+    private View mSectionFrom;
+
+    private Fragment mSectionFor;
 
     @InjectPresenter
     MainPresenter mPresenter;
@@ -258,6 +265,20 @@ public class MainActivity extends MvpAppCompatActivity
                     }
                 })
                 .show();
+    }
+
+    /**
+     * For the screen of the side-menu entry chosen last (TV), when its rows come: true once, if that entry still holds
+     * the focus (the remote has not moved on meanwhile), and the screen's first row should take it.
+     */
+    public boolean takeSectionFocus(@NonNull Fragment screen) {
+        if (screen != mSectionFor) {
+            return false;
+        }
+        View from = mSectionFrom;
+        mSectionFrom = null;
+        mSectionFor = null;
+        return from != null && from.isFocused();
     }
 
     /** Marks the permanent drawer's entry {@code layoutId} (a tablet in landscape) as the section on screen. */
@@ -521,8 +542,8 @@ public class MainActivity extends MvpAppCompatActivity
             if(keyCode == KeyEvent.KEYCODE_DPAD_RIGHT) {
                 if (currentFocus.getId()==R.id.layout_nav_audiobooks||currentFocus.getId()==R.id.toolbar) {
                     View menuItem = findViewById(R.id.app_bar_search);
-                    if (menuItem != null) {
-                        menuItem.requestFocus();
+                    if (menuItem != null && menuItem.requestFocus()) {
+                        return true; // handled: unhandled, the key would move the focus on past the search
                     }
                 }
             }
@@ -608,7 +629,10 @@ public class MainActivity extends MvpAppCompatActivity
                                 textView.setBackgroundResource(outValue.resourceId);
                             }
                             view1.setBackgroundResource(SelectedValue.resourceId);
+                            mSectionFrom = view1; // showFragment ties it to the screen opened
+                            mSectionFor = null;
                             mPresenter.onItemSelected(view1.getId());
+                            mSectionFrom = mSectionFor == null ? null : mSectionFrom;
                         });
 
                     }
@@ -691,7 +715,17 @@ public class MainActivity extends MvpAppCompatActivity
         // the same tag on another URL (a filter-bar period rewrote the current one) is a different listing
         if (current != null && tag.equals(current.getTag()) && !tag.equals("searchebleBooks")
                 && Objects.equals(urlArg(current), urlArg(fragment))) {
+            // the side-menu entry of the section on screen, chosen again with a TV remote: into its list, at the top
+            View list = mSectionFrom != null && mSectionFrom.isFocused() && current.getView() != null
+                    ? current.getView().findViewById(R.id.list) : null;
+            if (list instanceof RecyclerView && ((RecyclerView) list).getAdapter() != null
+                    && ((RecyclerView) list).getAdapter().getItemCount() > 0) {
+                ListFocus.focusFirst((RecyclerView) list);
+            }
             return;
+        }
+        if (mSectionFrom != null) {
+            mSectionFor = fragment;
         }
         fragmentManager.popBackStackImmediate(tag, FragmentManager.POP_BACK_STACK_INCLUSIVE);
         Fragment top = fragmentManager.findFragmentById(R.id.container);

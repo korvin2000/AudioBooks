@@ -57,6 +57,7 @@ import com.fanok.audiobooks.activity.MainActivity;
 import com.fanok.audiobooks.activity.SearchableActivity;
 import com.fanok.audiobooks.adapter.BookSheetPeople;
 import com.fanok.audiobooks.adapter.BooksListAddapter;
+import com.fanok.audiobooks.adapter.ListFocus;
 import com.fanok.audiobooks.databinding.FragmentFavoriteBinding;
 import com.fanok.audiobooks.interface_pacatge.favorite.FavoriteView;
 import com.fanok.audiobooks.model.BooksDBModel;
@@ -89,6 +90,9 @@ public class FavoriteFragment extends MvpAppCompatFragment implements FavoriteVi
     FavoritePresenter mPresenter;
 
     private BooksListAddapter mAddapterBooks;
+
+    /** A TV remote's row, kept across reloads (the history moves the book just played to the top). */
+    private final ListFocus mListFocus = new ListFocus();
     /** The parental-control version the visible covers were bound with. */
     private long mParentalVersion;
 
@@ -158,6 +162,7 @@ public class FavoriteFragment extends MvpAppCompatFragment implements FavoriteVi
     public View onCreateView(@NonNull LayoutInflater inflater, ViewGroup container,
             Bundle savedInstanceState) {
         binding = FragmentFavoriteBinding.inflate(inflater, container, false);
+        mListFocus.attach(ListFocus.isTv(requireContext()), savedInstanceState);
 
         MenuHost menuHost = requireActivity();
         menuHost.addMenuProvider(new MenuProvider() {
@@ -364,7 +369,14 @@ public class FavoriteFragment extends MvpAppCompatFragment implements FavoriteVi
     }
 
     @Override
+    public void onSaveInstanceState(@NonNull Bundle outState) {
+        super.onSaveInstanceState(outState);
+        mListFocus.onSaveInstanceState(outState);
+    }
+
+    @Override
     public void onDestroyView() {
+        mListFocus.onDestroyView();
         if (bookMenu != null) {
             bookMenu.dismiss();
             bookMenu = null;
@@ -393,7 +405,11 @@ public class FavoriteFragment extends MvpAppCompatFragment implements FavoriteVi
 
     @Override
     public void showData(@NonNull ArrayList<BookPOJO> bookPOJOS) {
-        if (mAddapterBooks != null) {
+        if (mAddapterBooks != null && binding != null) {
+            String focused = mListFocus.beforeUpdate(binding.list);
+            mAddapterBooks.setItem(bookPOJOS);
+            mListFocus.afterUpdate(binding.list, focused, this);
+        } else if (mAddapterBooks != null) {
             mAddapterBooks.setItem(bookPOJOS);
         }
         if (binding != null) {
@@ -700,11 +716,13 @@ public class FavoriteFragment extends MvpAppCompatFragment implements FavoriteVi
     public void onPause() {
         requireContext().unregisterReceiver(changed);
         super.onPause();
+        mListFocus.onPause(binding == null ? null : binding.list);
     }
 
     @Override
     public void onResume() {
         super.onResume();
+        mListFocus.onResume(true); // loadBooks below
         ContextCompat.registerReceiver(requireContext(), changed, new IntentFilter(BooksDBModel.ACTION_CHANGED),
                 ContextCompat.RECEIVER_NOT_EXPORTED);
         long parentalVersion = ParentalControl.version(requireContext());

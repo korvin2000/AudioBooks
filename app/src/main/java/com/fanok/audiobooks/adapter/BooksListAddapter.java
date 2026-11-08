@@ -17,6 +17,7 @@ import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 import androidx.annotation.OptIn;
 import androidx.core.content.ContextCompat;
 import androidx.media3.common.util.UnstableApi;
@@ -43,7 +44,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 /** @noinspection ClassEscapesDefinedScope*/
-public class BooksListAddapter extends RecyclerView.Adapter<BooksListAddapter.MyHolder> {
+public class BooksListAddapter extends RecyclerView.Adapter<BooksListAddapter.MyHolder> implements ListFocus.Keyed {
 
     private ArrayList<BookPOJO> mModel;
 
@@ -336,6 +337,23 @@ public class BooksListAddapter extends RecyclerView.Adapter<BooksListAddapter.My
         return mModel == null || position < 0 || position >= mModel.size() ? null : mModel.get(position);
     }
 
+    @Nullable
+    @Override
+    public String keyAt(int position) {
+        BookPOJO book = getItem(position);
+        return book == null ? null : book.getUrl();
+    }
+
+    @Override
+    public int positionOf(@NonNull String key) {
+        for (int i = 0; mModel != null && i < mModel.size(); i++) {
+            if (key.equals(mModel.get(i).getUrl())) {
+                return i;
+            }
+        }
+        return -1;
+    }
+
     @UnstableApi
     @Override
     public void onBindViewHolder(@NonNull MyHolder myHolder, int i) {
@@ -365,12 +383,22 @@ public class BooksListAddapter extends RecyclerView.Adapter<BooksListAddapter.My
         return new MyHolder(view);
     }
 
+    /**
+     * A new list. On a TV a list already shown changes by URL (a page more is an insertion, a book moved in the
+     * history a move), so the rows that stay are not rebuilt and the remote's focus stays on its row; a full rebuild
+     * would remove the focused row and the focus would go to the side menu. Touch devices rebuild, as before.
+     */
     @SuppressLint("NotifyDataSetChanged")
     public void setItem(ArrayList<BookPOJO> newModel) {
+        final ArrayList<BookPOJO> before = mModel;
         // a copy: the presenter keeps appending to its own list, the adapter must not see that
         mModel = newModel == null ? new ArrayList<>() : new ArrayList<>(newModel);
         preloadStatuses(mModel);
-        notifyDataSetChanged();
+        if (before == null || before.isEmpty() || !ListFocus.isTv()) {
+            notifyDataSetChanged();
+        } else {
+            diffByUrl(before, mModel, mSourceLabels, mSourceLabels, mNotes, mNotes).dispatchUpdatesTo(this);
+        }
     }
 
     @SuppressLint("NotifyDataSetChanged")
@@ -393,32 +421,8 @@ public class BooksListAddapter extends RecyclerView.Adapter<BooksListAddapter.My
         final java.util.Map<String, String> notesBefore = mNotes;
         final java.util.Map<String, String> notesAfter = notes == null
                 ? java.util.Collections.<String, String>emptyMap() : new java.util.HashMap<>(notes);
-        androidx.recyclerview.widget.DiffUtil.DiffResult diff = androidx.recyclerview.widget.DiffUtil.calculateDiff(
-                new androidx.recyclerview.widget.DiffUtil.Callback() {
-                    @Override
-                    public int getOldListSize() {
-                        return before.size();
-                    }
-
-                    @Override
-                    public int getNewListSize() {
-                        return after.size();
-                    }
-
-                    @Override
-                    public boolean areItemsTheSame(int o, int n) {
-                        return java.util.Objects.equals(before.get(o).getUrl(), after.get(n).getUrl());
-                    }
-
-                    @Override
-                    public boolean areContentsTheSame(int o, int n) {
-                        BookPOJO a = before.get(o);
-                        BookPOJO b = after.get(n);
-                        return sameCard(a, b) && java.util.Objects.equals(labelsBefore.get(a.getUrl()),
-                                labelsAfter.get(b.getUrl()))
-                                && java.util.Objects.equals(notesBefore.get(a.getUrl()), notesAfter.get(b.getUrl()));
-                    }
-                });
+        androidx.recyclerview.widget.DiffUtil.DiffResult diff = diffByUrl(before, after, labelsBefore, labelsAfter,
+                notesBefore, notesAfter);
         mModel = after;
         mSourceLabels = labelsAfter;
         mNotes = notesAfter;
@@ -481,6 +485,37 @@ public class BooksListAddapter extends RecyclerView.Adapter<BooksListAddapter.My
             }
         }
         return best;
+    }
+
+    /** Rows matched by URL; a row changes when its card, its source caption or its note does. */
+    private static androidx.recyclerview.widget.DiffUtil.DiffResult diffByUrl(final ArrayList<BookPOJO> before,
+            final ArrayList<BookPOJO> after, final java.util.Map<String, String> labelsBefore,
+            final java.util.Map<String, String> labelsAfter, final java.util.Map<String, String> notesBefore,
+            final java.util.Map<String, String> notesAfter) {
+        return androidx.recyclerview.widget.DiffUtil.calculateDiff(new androidx.recyclerview.widget.DiffUtil.Callback() {
+            @Override
+            public int getOldListSize() {
+                return before.size();
+            }
+
+            @Override
+            public int getNewListSize() {
+                return after.size();
+            }
+
+            @Override
+            public boolean areItemsTheSame(int o, int n) {
+                return java.util.Objects.equals(before.get(o).getUrl(), after.get(n).getUrl());
+            }
+
+            @Override
+            public boolean areContentsTheSame(int o, int n) {
+                BookPOJO a = before.get(o);
+                BookPOJO b = after.get(n);
+                return sameCard(a, b) && java.util.Objects.equals(labelsBefore.get(a.getUrl()), labelsAfter.get(b.getUrl()))
+                        && java.util.Objects.equals(notesBefore.get(a.getUrl()), notesAfter.get(b.getUrl()));
+            }
+        });
     }
 
     private static boolean sameCard(BookPOJO a, BookPOJO b) {

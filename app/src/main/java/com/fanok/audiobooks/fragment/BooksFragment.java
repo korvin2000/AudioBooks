@@ -52,6 +52,7 @@ import com.fanok.audiobooks.activity.MainActivity;
 import com.fanok.audiobooks.activity.SearchableActivity;
 import com.fanok.audiobooks.activity.SourceActivity;
 import com.fanok.audiobooks.adapter.BooksListAddapter;
+import com.fanok.audiobooks.adapter.ListFocus;
 import com.fanok.audiobooks.adapter.GenreListAddapter;
 import com.fanok.audiobooks.databinding.DialogDurationFilterBinding;
 import com.fanok.audiobooks.databinding.FragmentBooksBinding;
@@ -111,6 +112,9 @@ public class BooksFragment extends MvpAppCompatFragment implements BooksView {
     private String mUrl;
 
     private boolean isTelevision;
+
+    /** A TV remote's row, kept across reloads and back from the screens this list opens. */
+    private final ListFocus mListFocus = new ListFocus();
 
     private MenuProvider mMenuProvider;
 
@@ -212,6 +216,7 @@ public class BooksFragment extends MvpAppCompatFragment implements BooksView {
 
         UiModeManager uiModeManager = (UiModeManager) requireContext().getSystemService(UI_MODE_SERVICE);
         isTelevision = (uiModeManager != null && uiModeManager.getCurrentModeType() == Configuration.UI_MODE_TYPE_TELEVISION);
+        mListFocus.attach(isTelevision, savedInstanceState);
 
 
         MenuHost menuHost = requireActivity();
@@ -409,7 +414,20 @@ public class BooksFragment extends MvpAppCompatFragment implements BooksView {
 
 
     @Override
+    public void onPause() {
+        super.onPause();
+        mListFocus.onPause(binding == null ? null : binding.list);
+    }
+
+    @Override
+    public void onSaveInstanceState(@NonNull Bundle outState) {
+        super.onSaveInstanceState(outState);
+        mListFocus.onSaveInstanceState(outState);
+    }
+
+    @Override
     public void onDestroyView() {
+        mListFocus.onDestroyView();
         if (mRouteOffer != null) {
             mRouteOffer.dismiss(); // it would outlive the screen on the activity's layout
             mRouteOffer = null;
@@ -475,7 +493,9 @@ public class BooksFragment extends MvpAppCompatFragment implements BooksView {
     @Override
     public void showDataBooks(@NonNull ArrayList<BookPOJO> books) {
         if (mAddapterBooks != null) {
-            mAddapterBooks.setItem(books); // Используем setData, который мы ранее исправили
+            String focused = mListFocus.beforeUpdate(binding.list);
+            mAddapterBooks.setItem(books);
+            mListFocus.afterUpdate(binding.list, focused, this);
             // after the layout: a page that added no card (all filtered out, or an empty page) moves no visible
             // range, so no scroll event asks for the next one
             binding.list.post(this::fillScreen);
@@ -489,7 +509,9 @@ public class BooksFragment extends MvpAppCompatFragment implements BooksView {
     @Override
     public void showDataGenres(@NonNull ArrayList<GenrePOJO> genres) {
         if (mAddapterGenre != null) {
+            String focused = mListFocus.beforeUpdate(binding.list);
             mAddapterGenre.setItem(genres);
+            mListFocus.afterUpdate(binding.list, focused, this);
         } else {
             showToast(R.string.error_display_data);
         }
@@ -783,9 +805,14 @@ public class BooksFragment extends MvpAppCompatFragment implements BooksView {
             // on the fragment's view: a collapsed action view is not attached, so it would never run its own posts
             requireView().post(() -> {
                 if (isResumed()) {
+                    View focused = requireActivity().getCurrentFocus();
                     item.expandActionView();
                     searchView.setQuery(query, false);
                     searchView.clearFocus();
+                    // cleared focus goes to the first focusable view, on a TV the side menu: the remote keeps its place
+                    if (isTelevision && focused != null && focused.isAttachedToWindow()) {
+                        focused.requestFocus();
+                    }
                 }
             });
         }
@@ -943,6 +970,7 @@ public class BooksFragment extends MvpAppCompatFragment implements BooksView {
     @Override
     public void onResume() {
         super.onResume();
+        mListFocus.onResume(false);
         if (getPresenter().isInactiveSourceRoot()) {
             // its site was switched off (in the settings, maybe opened from a book): the app opens on the selected one
             recreate();

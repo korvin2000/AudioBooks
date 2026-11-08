@@ -12,6 +12,7 @@ import android.view.ViewGroup;
 import android.widget.ImageButton;
 import android.widget.TextView;
 import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 import androidx.recyclerview.widget.RecyclerView;
 import com.fanok.audiobooks.R;
 import com.fanok.audiobooks.activity.NarratorActivity;
@@ -22,7 +23,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 /** @noinspection ClassEscapesDefinedScope*/
-public class GenreListAddapter extends RecyclerView.Adapter<GenreListAddapter.MyHolder> {
+public class GenreListAddapter extends RecyclerView.Adapter<GenreListAddapter.MyHolder> implements ListFocus.Keyed {
 
     /** Payload of a rebind that only re-reads the star. */
     private static final Object STAR = new Object();
@@ -51,10 +52,48 @@ public class GenreListAddapter extends RecyclerView.Adapter<GenreListAddapter.My
         this.listner = listner;
     }
 
+    /**
+     * A new list. On a TV a page added after the rows shown is an insertion, so they are not rebuilt and the remote's
+     * focus stays on its row (touch devices rebuild, as before); anything else (a sorted list takes a page in between; people lists run to tens of thousands,
+     * too many for a diff) is rebuilt, and ListFocus brings the focus back.
+     */
     @SuppressLint("NotifyDataSetChanged")
     public void setItem(ArrayList<GenrePOJO> newModel) {
+        ArrayList<GenrePOJO> before = mModel;
         mModel = newModel == null ? new ArrayList<>() : new ArrayList<>(newModel);
-        notifyDataSetChanged();
+        int old = before == null ? 0 : before.size();
+        if (ListFocus.isTv() && old > 0 && mModel.size() > old && startsWith(mModel, before)) {
+            notifyItemRangeInserted(old, mModel.size() - old);
+        } else {
+            notifyDataSetChanged();
+        }
+    }
+
+    /** The same entries (a page appended to the presenter's list keeps them): none of them changed. */
+    private static boolean startsWith(ArrayList<GenrePOJO> list, ArrayList<GenrePOJO> start) {
+        for (int i = 0; i < start.size(); i++) {
+            if (list.get(i) != start.get(i)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    @Nullable
+    @Override
+    public String keyAt(int position) {
+        GenrePOJO entry = getItem(position);
+        return entry == null ? null : entry.getUrl();
+    }
+
+    @Override
+    public int positionOf(@NonNull String key) {
+        for (int i = 0; mModel != null && i < mModel.size(); i++) {
+            if (key.equals(mModel.get(i).getUrl())) {
+                return i;
+            }
+        }
+        return -1;
     }
 
     public void clearItem() {
