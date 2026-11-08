@@ -9,7 +9,11 @@ import static com.fanok.audiobooks.source.Html.text;
 
 import android.util.Log;
 
+import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
+
 import com.fanok.audiobooks.Url;
+import com.fanok.audiobooks.model.BookPages;
 import com.fanok.audiobooks.model.ComentsModel;
 import com.fanok.audiobooks.model.OtherArtistModel;
 import com.fanok.audiobooks.model.OtherSourceModel;
@@ -37,6 +41,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 import okhttp3.HttpUrl;
@@ -75,6 +80,30 @@ public final class Audioboo implements SourceParser {
     /** The query parameter a sorted listing's URL carries its sort form value in; never sent ({@link #loadListing}). */
     static final String SORT_PARAM = "xs_value";
 
+    /** Cloudflare's clearance, issued to the browser in which the user passed the site's check (ActivityCookies). */
+    public static final String CLEARANCE_COOKIE = "cf_clearance";
+    /** Where the accepted clearance and the browser's User-Agent it is bound to are kept. */
+    public static final String PREF_CLEARANCE = "cookies_audioboo";
+    public static final String PREF_AGENT = "user_agent_audioboo";
+
+    /**
+     * The accepted clearance and its User-Agent, published together; empty until the user passes the check, so the
+     * requests stay as they were.
+     */
+    private static volatile String[] session = {"", ""};
+
+    /** The clearance the user's browser got and the app's request with it was let through with, and its User-Agent. */
+    public static void setClearance(@Nullable String value, @Nullable String userAgent) {
+        boolean both = value != null && !value.isEmpty() && userAgent != null && !userAgent.isEmpty();
+        session = both ? new String[]{value, userAgent} : new String[]{"", ""};
+    }
+
+    /** The clearance in use, or "". */
+    @NonNull
+    public static String clearance() {
+        return session[0];
+    }
+
     // ---------------------------------------------------------------- SourceParser
 
     /** The book search goes out as the DLE search form (its query POSTed); every other page as {@link SiteHttp#get}. */
@@ -92,6 +121,21 @@ public final class Audioboo implements SourceParser {
     @Override
     public boolean postsPages() {
         return true;
+    }
+
+    /** The clearance the user's browser got, once the site took it from the app too; none before. */
+    @Override
+    public Map<String, String> cookies() {
+        String value = session[0];
+        return value.isEmpty() ? Collections.<String, String>emptyMap()
+                : Collections.singletonMap(CLEARANCE_COOKIE, value);
+    }
+
+    /** The browser's User-Agent while its clearance is used: Cloudflare binds the clearance to it. */
+    @Override
+    public String userAgent() {
+        String[] current = session;
+        return current[0].isEmpty() ? null : current[1];
     }
 
     @Override
@@ -211,7 +255,8 @@ public final class Audioboo implements SourceParser {
 
     @Override
     public ArrayList<ComentsPOJO> comments(String bookUrl, BooleanSupplier cancelled) throws Exception {
-        ComentsModel.Parsed parsed = parseComments(fetch(bookUrl));
+        // the page the description and the chapters were read from, not a second request to the site
+        ComentsModel.Parsed parsed = parseComments(BookPages.get(bookUrl, this::fetch));
         if (parsed.skipped > 0) {
             Log.w(TAG, "skipped " + parsed.skipped + " malformed comments on " + bookUrl);
         }

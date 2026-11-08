@@ -84,6 +84,11 @@ public interface SourceParser {
         return Collections.emptyMap();
     }
 
+    /** The User-Agent of the page requests to the site itself, when it must be another than the app's; null by default. */
+    default String userAgent() {
+        return null;
+    }
+
     // ---------------------------------------------------------------- listings
 
     /** One page of the listing at {@code url}: the index, a genre, an author/reader/series page or a {@link #sortUrl}. */

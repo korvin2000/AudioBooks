@@ -165,11 +165,12 @@ public class BookActivity extends MvpAppCompatActivity implements Activity {
     private static final int SEEK_COMMIT_TOLERANCE_MS = 1500;
     /** Menu items that can be toolbar icons, in toolbar order, and the setting of each; the favourite pair shares one. */
     private static final int[] TOOLBAR_ITEMS = {R.id.addFavorite, R.id.favoriteAuthor, R.id.favoriteReader, R.id.share,
-            R.id.playbackSpeed, R.id.download_delete, R.id.sleep_timer, R.id.equalizer, R.id.settings, R.id.openSite,
-            R.id.addMainScreen, R.id.refresh};
+            R.id.playbackSpeed, R.id.download_delete, R.id.sleep_timer, R.id.car_mode, R.id.equalizer, R.id.settings,
+            R.id.openSite, R.id.addMainScreen, R.id.refresh};
     private static final String[] TOOLBAR_KEYS = {"toolbar_favorite", "toolbar_favorite_author",
             "toolbar_favorite_reader", "toolbar_share", "toolbar_speed", "toolbar_download", "toolbar_sleep_timer",
-            "toolbar_equalizer", "toolbar_settings", "toolbar_open_site", "toolbar_main_screen", "toolbar_refresh"};
+            "toolbar_car_mode", "toolbar_equalizer", "toolbar_settings", "toolbar_open_site", "toolbar_main_screen",
+            "toolbar_refresh"};
     /**
      * Widths in the book toolbar: the back arrow, an action icon (styles.xml Widget.App.ActionButton), the speed as
      * text (action_book_speed), the overflow.
@@ -999,6 +1000,7 @@ public class BookActivity extends MvpAppCompatActivity implements Activity {
             if (mNotificationClick) {
                 Intent intent = new Intent(this, MainActivity.class);
                 intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
+                intent.putExtra("notificationClick", true); // as Back does: not a launch, no last book over it
                 startActivity(intent);
             } else {
                 finish();

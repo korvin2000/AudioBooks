@@ -697,6 +697,10 @@ public class BooksPresenter extends MvpPresenter<BooksView> implements
                     routeFailed(tried, result);
                 } else if (mRoute != null && mRoute.deferred) {
                     return; // the accepted offer retries below, on the other route
+                } else if (result.status == ProviderPage.Status.BLOCKED
+                        && com.fanok.audiobooks.activity.ActivityCookies.passes(mProvider)) {
+                    // the site lets a browser in: the user passes its check there, the app then uses that session
+                    getViewState().showSiteCheckOffer(mProvider);
                 } else if (!offerRoute(result)) {
                     showFailure(result);
                 }
@@ -872,6 +876,9 @@ public class BooksPresenter extends MvpPresenter<BooksView> implements
         }
         if (result.status == ProviderPage.Status.RATE_LIMITED) {
             getViewState().showToast(rateLimited(result));
+        } else if (result.status == ProviderPage.Status.BLOCKED
+                && com.fanok.audiobooks.activity.ActivityCookies.passes(mProvider)) {
+            getViewState().showSiteCheckOffer(mProvider);
         } else if (result.status == ProviderPage.Status.BLOCKED) {
             getViewState().showToast(CookesExeption.messageFor(mUrl)); // the cookie hint is what can help
         } else {

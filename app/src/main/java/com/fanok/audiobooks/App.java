@@ -191,6 +191,13 @@ public class App extends Application {
 
     public static okhttp3.OkHttpClient okHttpClientInstance;
 
+    /** A path of an image file, by its extension. */
+    static boolean isImage(@androidx.annotation.NonNull String path) {
+        String lower = path.toLowerCase(java.util.Locale.ROOT);
+        return lower.endsWith(".jpg") || lower.endsWith(".jpeg") || lower.endsWith(".png") || lower.endsWith(".gif")
+                || lower.endsWith(".webp");
+    }
+
     /** Cookies of the shared client: response cookies are resent to their host for the process lifetime. */
     public static MemoryCookieJar getCookieJar() {
         return COOKIE_JAR;
@@ -256,6 +263,20 @@ public class App extends Application {
 
         try {
             okhttp3.OkHttpClient.Builder builder = new okhttp3.OkHttpClient.Builder().cookieJar(COOKIE_JAR);
+
+            // the images of a site whose covers are never requested (DefaultCover.replaces: audioboo, whose bot
+            // protection then refuses the app's pages too) are answered here, never by the site: a cover, an
+            // artwork or a saved cover.jpg asked for anywhere fails as it did there, with no request
+            builder.addInterceptor(chain -> {
+                okhttp3.Request request = chain.request();
+                if ("GET".equals(request.method()) && isImage(request.url().encodedPath())
+                        && com.fanok.audiobooks.policy.DefaultCover.replaces(request.url().toString())) {
+                    return new okhttp3.Response.Builder().request(request).protocol(okhttp3.Protocol.HTTP_1_1)
+                            .code(404).message("Not requested")
+                            .body(okhttp3.ResponseBody.create(new byte[0], null)).build();
+                }
+                return chain.proceed(request);
+            });
 
             // Application interceptor (runs before OkHttp adds its own User-Agent): fills in defaults
             // only, never overrides a header the caller or the DownloadUtil resolver already set.
@@ -327,6 +348,9 @@ public class App extends Application {
         AppThemes.applyNightMode(this);
 
         Consts.setBazaKnigCookies(pref.getString("cookes_baza_knig", ""));
+        com.fanok.audiobooks.source.Audioboo.setClearance(
+                pref.getString(com.fanok.audiobooks.source.Audioboo.PREF_CLEARANCE, ""),
+                pref.getString(com.fanok.audiobooks.source.Audioboo.PREF_AGENT, ""));
 
 
         BookPresenter.setSpeedWithoutBroadcast(new StorageUtil(getBaseContext()).loadSpeed());

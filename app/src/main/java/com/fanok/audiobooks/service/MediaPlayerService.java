@@ -111,6 +111,8 @@ import com.fanok.audiobooks.model.BooksDBModel;
 import com.fanok.audiobooks.pojo.AudioPOJO;
 import com.fanok.audiobooks.pojo.BookPOJO;
 import com.fanok.audiobooks.pojo.StorageUtil;
+import com.fanok.audiobooks.policy.DefaultCover;
+import com.fanok.audiobooks.policy.EmbeddedCover;
 import com.fanok.audiobooks.policy.ParentalControl;
 import com.fanok.audiobooks.presenter.BookPresenter;
 import com.fanok.audiobooks.presenter.SleepTimerPresenter;
@@ -575,6 +577,7 @@ public class MediaPlayerService extends MediaBrowserServiceCompat {
         initPlayer();
         registerCommandReceiver();
         registerNetworkCallback();
+        EmbeddedCover.listen(embeddedCover);
         publishState();
     }
 
@@ -595,6 +598,7 @@ public class MediaPlayerService extends MediaBrowserServiceCompat {
         cancelRetry();
         handler.removeCallbacksAndMessages(null);
         cancelArtwork();
+        EmbeddedCover.unlisten(embeddedCover);
 
         //3. effects, player, session
         stopEqualizer();
@@ -1908,7 +1912,8 @@ public class MediaPlayerService extends MediaBrowserServiceCompat {
                 metadata.putString(MediaMetadataCompat.METADATA_KEY_DISPLAY_DESCRIPTION, book.getArtist());
             }
         }
-        if (!imageUrl.isEmpty()) {
+        if (!imageUrl.isEmpty() && !DefaultCover.replaces(imageUrl)) {
+            // not a cover of a site whose images are never requested: another app showing the session might ask
             metadata.putString(MediaMetadataCompat.METADATA_KEY_ART_URI, imageUrl);
         }
         if (image != null) {
@@ -2149,6 +2154,20 @@ public class MediaPlayerService extends MediaBrowserServiceCompat {
             return;
         }
         final String url = imageUrl;
+        if (DefaultCover.replaces(url)) {
+            // its site's covers are never requested (its bot protection would then refuse the app's pages): the cover
+            // in its audio, at once when it was read before, else when EmbeddedCover has read it (embeddedCover)
+            artworkFailedUrl = url;
+            image = EmbeddedCover.cached(this, bookUrl);
+            if (image != null) {
+                publishMetadata();
+                handler.removeCallbacks(notifyTask);
+                handler.post(notifyTask);
+            } else if (chapters != null && !chapters.isEmpty()) {
+                EmbeddedCover.fetch(this, bookUrl, chapters.get(0).getUrl());
+            }
+            return;
+        }
         artworkTarget = new Target() {
             @Override
             public void onBitmapLoaded(Bitmap bitmap, Picasso.LoadedFrom from) {
@@ -2184,6 +2203,16 @@ public class MediaPlayerService extends MediaBrowserServiceCompat {
             artworkFailedUrl = url;
         }
     }
+
+    /** The cover read from the audio of the book in the player, when its site's own is never requested. */
+    private final EmbeddedCover.Listener embeddedCover = (key, cover) -> {
+        if (image == null && EmbeddedCover.isOf(key, bookUrl) && DefaultCover.replaces(imageUrl)) {
+            image = cover;
+            publishMetadata();
+            handler.removeCallbacks(notifyTask);
+            handler.post(notifyTask);
+        }
+    };
 
     private void cancelArtwork() {
         if (artworkTarget != null) {

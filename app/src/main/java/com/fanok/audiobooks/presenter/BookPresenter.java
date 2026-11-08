@@ -33,9 +33,12 @@ import com.arellomobile.mvp.InjectViewState;
 import com.arellomobile.mvp.MvpPresenter;
 import com.fanok.audiobooks.BookRemovedException;
 import com.fanok.audiobooks.Consts;
+import com.fanok.audiobooks.policy.DefaultCover;
+import com.fanok.audiobooks.policy.EmbeddedCover;
 import com.fanok.audiobooks.EncodingExeption;
 import com.fanok.audiobooks.R;
 import com.fanok.audiobooks.Url;
+import com.fanok.audiobooks.activity.CarModeActivity;
 import com.fanok.audiobooks.activity.SleepTimerActivity;
 import com.fanok.audiobooks.adapter.ListFocus;
 import com.fanok.audiobooks.interface_pacatge.book_content.Activity;
@@ -360,6 +363,13 @@ public class BookPresenter extends MvpPresenter<Activity> implements ActivityPre
         } else if (itemId == R.id.sleep_timer) {
             Intent sleepIntent = new Intent(mContext, SleepTimerActivity.class);
             getViewState().activityStart(sleepIntent);
+        } else if (itemId == R.id.car_mode) {
+            //it drives the player, so the player must hold a book (this screen loads its own into it)
+            if (MediaPlayerService.currentBook() == null) {
+                getViewState().showToast(R.string.car_mode_no_book);
+            } else {
+                getViewState().activityStart(new Intent(mContext, CarModeActivity.class));
+            }
         } else if (itemId == R.id.equalizer) {
             Intent breadCast = new Intent(Broadcast_Equalizer);
             getViewState().broadcastSend(breadCast);
@@ -777,6 +787,10 @@ public class BookPresenter extends MvpPresenter<Activity> implements ActivityPre
                     public void onNext(@NotNull ArrayList<AudioPOJO> bookPOJOS) {
                         mAudioPOJO = bookPOJOS;
                         mOrdinals = null;
+                        if (DefaultCover.replaces(mBookPOJO.getUrl()) && !bookPOJOS.isEmpty()) {
+                            // its site's covers are never requested: the one in its audio, in the background
+                            EmbeddedCover.fetch(mContext, mBookPOJO.getUrl(), bookPOJOS.get(0).getUrl());
+                        }
                         feedChapters(secondsOf(mAudioPOJO));
                         getViewState().showData(mAudioPOJO, mBookPOJO.getUrl(), mAudioPOJO.size());
                         error = false;

@@ -55,6 +55,7 @@ import com.fanok.audiobooks.pojo.DescriptionPOJO;
 import com.fanok.audiobooks.pojo.OtherArtistPOJO;
 import com.fanok.audiobooks.pojo.StorageUtil;
 import com.fanok.audiobooks.policy.DefaultCover;
+import com.fanok.audiobooks.policy.EmbeddedCover;
 import com.fanok.audiobooks.presenter.BookDescriptionPresenter;
 import com.fanok.audiobooks.presenter.BookPresenter;
 import com.fanok.audiobooks.search.GenrePicks;
@@ -81,6 +82,13 @@ public class DescriptionBookFragment extends MvpAppCompatFragment
 
     private TextView mTitle;
     private ImageView mImageView;
+    /** The default cover is shown: the one read from the book's audio replaces it when it comes. */
+    private boolean mDefaultCoverShown;
+    private final EmbeddedCover.Listener mEmbeddedCover = (key, cover) -> {
+        if (mDefaultCoverShown && mImageView != null && EmbeddedCover.isOf(key, bookUrl())) {
+            mImageView.setImageBitmap(cover);
+        }
+    };
     private TextView mReting;
     private TextView mGenre;
     private TextView mTime;
@@ -422,6 +430,7 @@ public class DescriptionBookFragment extends MvpAppCompatFragment
 
         mTitle = view.findViewById(R.id.title);
         mImageView = view.findViewById(R.id.imageView);
+        EmbeddedCover.listen(mEmbeddedCover);
         mReting = view.findViewById(R.id.reting);
         mGenre = view.findViewById(R.id.genre);
         mTime = view.findViewById(R.id.time);
@@ -559,6 +568,31 @@ public class DescriptionBookFragment extends MvpAppCompatFragment
         bindFavorites();
     }
 
+    /** The browser check of the book's site, which refused the app: passed, the book screen loads again. */
+    private final androidx.activity.result.ActivityResultLauncher<android.content.Intent> mSiteCheck =
+            registerForActivityResult(new androidx.activity.result.contract.ActivityResultContracts
+                    .StartActivityForResult(), result -> {
+                if (result.getResultCode() == android.app.Activity.RESULT_OK && getActivity() instanceof BookActivity) {
+                    ((BookActivity) getActivity()).refreshActivity();
+                }
+            });
+
+    @Override
+    public void showSiteCheckOffer(com.fanok.audiobooks.search.Provider site) {
+        View root = getView();
+        if (root == null) {
+            return;
+        }
+        com.google.android.material.snackbar.Snackbar.make(root, getString(R.string.site_check_offer, site.title),
+                        com.google.android.material.snackbar.Snackbar.LENGTH_INDEFINITE)
+                .setAction(R.string.site_check_action, v -> {
+                    if (isAdded()) {
+                        mSiteCheck.launch(com.fanok.audiobooks.activity.ActivityCookies.intent(requireContext(), site));
+                    }
+                })
+                .show();
+    }
+
     @Override
     public void onDestroyView() {
         // the presenter outlives this view: drop every reference to the destroyed tree (UI-12)
@@ -574,6 +608,8 @@ public class DescriptionBookFragment extends MvpAppCompatFragment
         if (mImageView != null) {
             Picasso.get().cancelRequest(mImageView);
         }
+        EmbeddedCover.unlisten(mEmbeddedCover);
+        mDefaultCoverShown = false;
         mTitle = null;
         mImageView = null;
         mReting = null;
@@ -639,6 +675,7 @@ public class DescriptionBookFragment extends MvpAppCompatFragment
             if (localCover != null && !localCover.isEmpty()) {
                 poster = localCover;
             }
+            mDefaultCoverShown = poster != null && DefaultCover.replaces(poster);
             if (poster != null && !poster.trim().isEmpty()) {
                 if (DefaultCover.replaces(poster)) {
                     Picasso.get().cancelRequest(mImageView);

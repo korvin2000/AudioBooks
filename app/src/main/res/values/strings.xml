@@ -572,6 +572,9 @@
     <string name="vpn_zaborona_europe_value" translatable="false">zaborona_europe</string>
     <string name="vpn_ukrane_value" translatable="false">vpn_ukrane</string>
     <string name="cookes_baza_knig_exeption">Сайт требует проверку в браузере. Откройте его в настройках (Cookies сайта) или попробуйте позже</string>
+    <string name="site_check_offer">%1$s просит пройти проверку в браузере</string>
+    <string name="site_check_action">Пройти</string>
+    <string name="site_check_proxy">Сайт идёт через прокси, а проверка — напрямую. Переключите сайт на «Напрямую» в его карточке и пройдите проверку снова</string>
     <string name="site_challenge">Сайт временно не пускает приложение (защита от ботов или перегрузка). Попробуйте позже</string>
     <string name="site_rate_limited">Сайт просит не так часто: слишком много запросов подряд. Повторите чуть позже</string>
     <string name="site_rate_limited_site">%s просит не так часто: слишком много запросов подряд. Повторите чуть позже</string>
@@ -584,6 +587,9 @@
     <string name="end_chapter">Конец главы</string>
     <string name="sleep_timer_started">Таймер сна запущен, обратній отчет пойдет после того как книга будет снята с паузы</string>
     <string name="sleep_timer_no_playback">Сначала откройте книгу: таймер сна работает с плеером</string>
+    <string name="car_mode">Режим авто</string>
+    <string name="car_mode_close">Закрыть режим авто</string>
+    <string name="car_mode_no_book">Режим авто управляет плеером, а в нём пока нет книги</string>
     <string name="playback_error_retry">Не удалось загрузить главу. Нажмите «Воспроизвести», чтобы повторить</string>
     <string name="playback_stalled">Нет данных от сети. Воспроизведение продолжится само</string>
     <string name="playback_stalled_title">Загрузка… %1$s</string>

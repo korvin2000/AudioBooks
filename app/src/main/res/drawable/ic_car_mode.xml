@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- «Режим авто»: a car seen from the front (windshield, mirrors, headlights, wheels) -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path
+        android:fillColor="?attr/colorItemMenu"
+        android:pathData="M7.5,4H16.5C17.36,4 18.12,4.55 18.4,5.36L19.75,9H21C21.55,9 22,9.45 22,10V11H20.5L21.42,12.38C21.8,12.95 22,13.62 22,14.3V19C22,19.55 21.55,20 21,20H20C19.45,20 19,19.55 19,19V18H5V19C5,19.55 4.55,20 4,20H3C2.45,20 2,19.55 2,19V14.3C2,13.62 2.2,12.95 2.58,12.38L3.5,11H2V10C2,9.45 2.45,9 3,9H4.25L5.6,5.36C5.88,4.55 6.64,4 7.5,4ZM7.5,6L5.75,11H18.25L16.5,6ZM5,13C4.45,13 4,13.45 4,14C4,14.55 4.45,15 5,15H7C7.55,15 8,14.55 8,14C8,13.45 7.55,13 7,13ZM17,13C16.45,13 16,13.45 16,14C16,14.55 16.45,15 17,15H19C19.55,15 20,14.55 20,14C20,13.45 19.55,13 19,13Z" />
+</vector>

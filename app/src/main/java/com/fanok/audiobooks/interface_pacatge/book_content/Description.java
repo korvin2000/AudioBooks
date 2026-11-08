@@ -2,6 +2,7 @@ package com.fanok.audiobooks.interface_pacatge.book_content;
 
 import com.arellomobile.mvp.MvpView;
 import com.arellomobile.mvp.viewstate.strategy.AddToEndSingleStrategy;
+import com.arellomobile.mvp.viewstate.strategy.OneExecutionStateStrategy;
 import com.arellomobile.mvp.viewstate.strategy.SkipStrategy;
 import com.arellomobile.mvp.viewstate.strategy.StateStrategyType;
 import com.fanok.audiobooks.pojo.BookPOJO;
@@ -24,4 +25,8 @@ public interface Description extends MvpView {
 
     @StateStrategyType(SkipStrategy.class)
     void showToast(int id);
+
+    /** Offers to pass the browser check of the book's site, which refused the app; the book loads again once passed. */
+    @StateStrategyType(OneExecutionStateStrategy.class)
+    void showSiteCheckOffer(com.fanok.audiobooks.search.Provider site);
 }

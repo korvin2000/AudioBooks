@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- «Режим авто»: the big round play button -->
+<ripple xmlns:android="http://schemas.android.com/apk/res/android"
+    android:color="?attr/carPress">
+    <item>
+        <shape android:shape="oval">
+            <solid android:color="?attr/carPlay" />
+        </shape>
+    </item>
+</ripple>

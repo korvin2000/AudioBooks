@@ -97,7 +97,14 @@ public class SeriesListAddapter extends RecyclerView.Adapter<SeriesListAddapter.
             mLine.setText(book.getNumber());
             mText.setText(book.getName());
             if (mImage != null) {
-                if (book.getPhoto() != null && !book.getPhoto().isEmpty()) {
+                if (com.fanok.audiobooks.policy.DefaultCover.replaces(book.getPhoto())) {
+                    // its site's covers are never requested: the one read from its audio, else none, as before
+                    Bitmap embedded = com.fanok.audiobooks.policy.EmbeddedCover.cached(itemView.getContext(),
+                            book.getUrl());
+                    Glide.with(itemView.getContext()).clear(mImage);
+                    mImage.setImageBitmap(embedded);
+                    mImage.setVisibility(embedded != null ? View.VISIBLE : View.GONE);
+                } else if (book.getPhoto() != null && !book.getPhoto().isEmpty()) {
                     Glide.with(itemView.getContext())
                             .asBitmap()
                             .load(com.fanok.audiobooks.net.Covers.glide(book.getPhoto()))

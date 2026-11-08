@@ -108,6 +108,11 @@
             android:configChanges="locale|uiMode"
             android:label="@string/sleep_timer"
             android:theme="@style/AppTheme.SwipeOnClose" />
+        <!-- «Режим авто»: the player for the road; both orientations, its own theme set in onCreate -->
+        <activity
+            android:name=".activity.CarModeActivity"
+            android:exported="false"
+            android:label="@string/car_mode" />
         <activity
             android:name=".activity.ParentalControlActivity"
             android:configChanges="locale|uiMode"
