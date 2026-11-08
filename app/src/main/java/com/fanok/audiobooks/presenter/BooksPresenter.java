@@ -21,6 +21,7 @@ import com.fanok.audiobooks.Consts;
 import com.fanok.audiobooks.CookesExeption;
 import com.fanok.audiobooks.R;
 import com.fanok.audiobooks.Url;
+import com.fanok.audiobooks.adapter.BookSheetDownload;
 import com.fanok.audiobooks.adapter.BookSheetPeople;
 import com.fanok.audiobooks.fragment.BooksFragment;
 import com.fanok.audiobooks.interface_pacatge.books.BooksView;
@@ -539,6 +540,7 @@ public class BooksPresenter extends MvpPresenter<BooksView> implements
                     "seriesBooks");
         });
         BookSheetPeople.bind(layout, books.get(position));
+        BookSheetDownload.bind(layout, books.get(position), dialog);
         dialog.show();
     }
 

@@ -409,10 +409,21 @@ public class DownloadUtil {
     /**
      * Queues the downloads of the chosen chapters of {@code book}. A progressive chapter is one download keyed by its
      * chapter id; HLS chapters sharing a stream URL are one download of that stream. Completed ones are skipped.
+     * Returns the number of downloads queued.
      */
-    public static void addDownloads(@NonNull Context context, @NonNull BookPOJO book, @NonNull List<AudioPOJO> chapters,
-                                    @NonNull Collection<String> chosenUrls) {
-        if (book.getUrl() == null || book.getUrl().isEmpty()) return;
+    public static int addDownloads(@NonNull Context context, @NonNull BookPOJO book, @NonNull List<AudioPOJO> chapters,
+                                   @NonNull Collection<String> chosenUrls) {
+        return addDownloads(context, book, chapters, chosenUrls, false);
+    }
+
+    /**
+     * As above; {@code foreground}: the download service starts in the foreground, for a caller off the screen it was
+     * started from (the list's download prepares for a few seconds): where Android no longer allows that, the start
+     * throws here, at once, instead of the service failing to go to the foreground later.
+     */
+    public static int addDownloads(@NonNull Context context, @NonNull BookPOJO book, @NonNull List<AudioPOJO> chapters,
+                                   @NonNull Collection<String> chosenUrls, boolean foreground) {
+        if (book.getUrl() == null || book.getUrl().isEmpty()) return 0;
         List<String> urls = new ArrayList<>(chapters.size());
         for (AudioPOJO chapter : chapters) urls.add(chapter.getUrl());
         List<DownloadIds.Entry> entries = entriesFor(context, book.getUrl(), urls);
@@ -425,6 +436,7 @@ public class DownloadUtil {
         }
         byte[] data = new Gson().toJson(book).getBytes(StandardCharsets.UTF_8);
         Set<String> queued = new HashSet<>();
+        int added = 0;
         DownloadIndex index = getDownloadManager().getDownloadIndex();
         for (int i = 0; i < urls.size(); i++) {
             String url = urls.get(i);
@@ -437,8 +449,10 @@ public class DownloadUtil {
                     .setMimeType(entry.hls ? MimeTypes.APPLICATION_M3U8 : null)
                     .setData(data)
                     .build();
-            DownloadService.sendAddDownload(context, ExoDownloadService.class, request, false);
+            DownloadService.sendAddDownload(context, ExoDownloadService.class, request, foreground);
+            added++;
         }
+        return added;
     }
 
     // ---------------------------------------------------------------- playback

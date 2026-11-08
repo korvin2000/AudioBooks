@@ -6,6 +6,8 @@ import androidx.annotation.Nullable;
 import com.fanok.audiobooks.interface_pacatge.books.AudioListDBHelperInterfase;
 import com.fanok.audiobooks.interface_pacatge.books.BooksDBAbstract;
 import com.fanok.audiobooks.pojo.AudioListPOJO;
+import com.fanok.audiobooks.pojo.AudioPOJO;
+import com.fanok.audiobooks.pojo.BookPOJO;
 import com.fanok.audiobooks.room.BooksAudioDao;
 import com.fanok.audiobooks.room.BooksAudioEntity;
 import com.fanok.audiobooks.util.DeletionPlanner;
@@ -102,6 +104,23 @@ public class AudioListDBModel extends BooksDBAbstract implements AudioListDBHelp
             return rows.get(ordinal);
         }
         return null;
+    }
+
+    /** The chapters of {@code book} as parsed from its page, as rows: the book screen and the list's download. */
+    public void syncChapters(@NonNull BookPOJO book, @NonNull List<AudioPOJO> audio) {
+        ArrayList<AudioListPOJO> chapters = new ArrayList<>(audio.size());
+        for (AudioPOJO chapter : audio) {
+            AudioListPOJO row = new AudioListPOJO();
+            row.setBookUrl(book.getUrl());
+            row.setBookName(book.getName());
+            row.setAudioName(chapter.getName());
+            row.setAudioUrl(chapter.getUrl());
+            row.setTime(chapter.getTime());
+            row.setTimeStart(chapter.getTimeStart());
+            row.setTimeEnd(chapter.getTimeFinish());
+            chapters.add(row);
+        }
+        syncChapters(book.getUrl(), chapters);
     }
 
     /**

@@ -736,6 +736,12 @@
     <string name="download_notification_failed">Загрузка не удалась</string>
     <string name="download_notification_removing">Удаление загрузок</string>
     <string name="download_menu_status">Скачать/Удалить · %1$s</string>
+    <!-- the book menu of a list (BookSheetDownload, BookDownloader) -->
+    <string name="download_book">Скачать аудиокнигу</string>
+    <string name="download_book_preparing">Получаем список глав для скачивания…</string>
+    <string name="download_book_started">Скачивание началось: «%1$s»</string>
+    <string name="download_book_nothing">Все главы уже скачаны</string>
+    <string name="download_book_background">Скачивание не началось: приложение было свёрнуто. Повторите</string>
     <string name="download_chapter_queued">В очереди на скачивание</string>
     <string name="download_chapter_progress">Скачивается</string>
     <string name="listened_label">прослушано</string>

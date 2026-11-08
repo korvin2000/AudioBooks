@@ -387,19 +387,7 @@ public class BookPresenter extends MvpPresenter<Activity> implements ActivityPre
             }
             Log.d(TAG, "onComplete");
             if (!error && !mIsOfflineFallback) {
-                ArrayList<AudioListPOJO> chapters = new ArrayList<>();
-                for (int i = 0; i < mAudioPOJO.size(); i++) {
-                    AudioListPOJO audioListPOJO = new AudioListPOJO();
-                    audioListPOJO.setBookUrl(mBookPOJO.getUrl());
-                    audioListPOJO.setBookName(mBookPOJO.getName());
-                    audioListPOJO.setAudioName(mAudioPOJO.get(i).getName());
-                    audioListPOJO.setAudioUrl(mAudioPOJO.get(i).getUrl());
-                    audioListPOJO.setTime(mAudioPOJO.get(i).getTime());
-                    audioListPOJO.setTimeStart(mAudioPOJO.get(i).getTimeStart());
-                    audioListPOJO.setTimeEnd(mAudioPOJO.get(i).getTimeFinish());
-                    chapters.add(audioListPOJO);
-                }
-                mAudioListDBModel.syncChapters(mBookPOJO.getUrl(), chapters);
+                mAudioListDBModel.syncChapters(mBookPOJO, mAudioPOJO);
             }
 
             if (mBookPOJO.getUrl().equals(MediaPlayerService.currentBookUrl())) {
