@@ -1,0 +1,11 @@
+<!-- the book listing's site sections (Новинки, Популярные, Рейтинг, ...: Sort): one catalog branching into sections;
+     unlike ic_sort, which stays for a real local sort -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path
+        android:fillColor="?attr/prefIconColor"
+        android:pathData="M16,2H21V7H16V5.5H5V11H16V9.5H21V14.5H16V13H5V18.5H16V17H21V22H16V20.5H3V3.5H16Z" />
+</vector>

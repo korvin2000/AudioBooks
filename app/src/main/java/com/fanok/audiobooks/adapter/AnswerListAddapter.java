@@ -58,6 +58,7 @@ public class AnswerListAddapter extends RecyclerView.Adapter<AnswerListAddapter.
             mReting = itemView.findViewById(R.id.reting);
             mParentName = itemView.findViewById(R.id.parentName);
             mBorderBottom = itemView.findViewById(R.id.border);
+            mText.setOnClickListener(v -> ExpandableText.tapToggle(mReadMore));
 
             ViewGroup.LayoutParams layoutParams = mImageView.getLayoutParams();
             height = (int) (layoutParams.height * 1.33);

@@ -745,12 +745,6 @@ public class DescriptionBookFragment extends MvpAppCompatFragment
             if (mCopyDesc != null) {
                 mCopyDesc.setOnClickListener(view1 -> copy("description", text));
             }
-            // a tap anywhere on the text toggles it too, whenever there is something to toggle
-            mDesc.setOnClickListener(view1 -> {
-                if (mShowMore != null && mShowMore.getVisibility() == View.VISIBLE) {
-                    mShowMore.performClick();
-                }
-            });
             if (text == null || text.isEmpty()) {
                 mDescLine.setVisibility(View.GONE);
             }

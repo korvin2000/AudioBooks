@@ -745,7 +745,7 @@ public class BooksFragment extends MvpAppCompatFragment implements BooksView {
             sub.add(R.id.genre_sort_group, GENRE_SORT_ITEM_BASE + sort.ordinal(), Menu.NONE, title);
         }
         sub.setGroupCheckable(R.id.genre_sort_group, true, true);
-        order.setVisible(true);
+        order.setIcon(R.drawable.ic_sort).setTitle(R.string.order).setVisible(true);
         setColorPrimeriTextInIconItemMenu(order, requireContext());
     }
 

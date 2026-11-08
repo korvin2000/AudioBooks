@@ -22,6 +22,7 @@
     <string name="error_display_data">Ошибка отображения данных</string>
     <string name="search">Поиск</string>
     <string name="order">Сортировка</string>
+    <string name="site_sections">Разделы сайта</string>
     <string name="new_data">Новое</string>
     <string name="reting">Рейтинг</string>
     <string name="all_time">За все время</string>

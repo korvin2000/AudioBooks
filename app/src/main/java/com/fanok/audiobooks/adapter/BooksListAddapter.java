@@ -58,6 +58,9 @@ public class BooksListAddapter extends RecyclerView.Adapter<BooksListAddapter.My
     private final java.util.Map<String, Integer> downloadCache = new java.util.concurrent.ConcurrentHashMap<>();
     /** Source captions that replace the site's name, by book URL ("5 сайтов" for a group in the search). */
     private java.util.Map<String, String> mSourceLabels = java.util.Collections.emptyMap();
+
+    /** Leading and trailing white space, Unicode spaces included (String.trim() keeps U+00A0, U+2003). */
+    private static final java.util.regex.Pattern EDGE_SPACES = java.util.regex.Pattern.compile("^[\\s\\p{Z}]+|[\\s\\p{Z}]+$");
     /** Lines shown in place of the genre, by book URL ("3 озвучки · совпал чтец"); the genre itself stays the book's. */
     private java.util.Map<String, String> mNotes = java.util.Collections.emptyMap();
     /** A row that stands for several books (a group in the search): their URLs, whose best marks it shows. */
@@ -219,7 +222,8 @@ public class BooksListAddapter extends RecyclerView.Adapter<BooksListAddapter.My
             } else {
                 mAutor.setVisibility(View.GONE);
             }
-            mArtist.setText(book.getArtist());
+            // readers come with trailing spaces (an em space too), which would keep the reader off the row's end
+            mArtist.setText(book.getArtist() == null ? null : EDGE_SPACES.matcher(book.getArtist()).replaceAll(""));
             if (book.getTime() != null && !book.getTime().isEmpty()) {
                 mTime.setText(Consts.formatTimeDisplay(book.getTime()));
                 mTime.setVisibility(View.VISIBLE);
@@ -227,14 +231,7 @@ public class BooksListAddapter extends RecyclerView.Adapter<BooksListAddapter.My
                 mTime.setVisibility(View.GONE);
             }
             if (book.getSeries() != null && !book.getSeries().isEmpty()) {
-                android.text.SpannableStringBuilder ssb = new android.text.SpannableStringBuilder(" \u00A0 " + book.getSeries());
-                android.graphics.drawable.Drawable drawable = androidx.core.content.ContextCompat.getDrawable(itemView.getContext(), R.drawable.ic_book);
-                if (drawable != null) {
-                    drawable.setBounds(0, 0, (int)mSiresle.getTextSize(), (int)mSiresle.getTextSize());
-                    android.text.style.ImageSpan imageSpan = new android.text.style.ImageSpan(drawable, android.text.style.ImageSpan.ALIGN_BOTTOM);
-                    ssb.setSpan(imageSpan, 0, 1, android.text.Spanned.SPAN_INCLUSIVE_EXCLUSIVE);
-                }
-                mSiresle.setText(ssb);
+                mSiresle.setText(book.getSeries()); // its book icon is the layout's drawableStart, as for the author
                 mSiresle.setVisibility(View.VISIBLE);
             } else {
                 mSiresle.setVisibility(View.GONE);
