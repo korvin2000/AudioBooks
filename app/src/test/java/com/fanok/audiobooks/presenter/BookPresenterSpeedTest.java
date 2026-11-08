@@ -8,7 +8,7 @@ import com.fanok.audiobooks.service.PlaybackSettings;
 import java.util.Arrays;
 import org.junit.Test;
 
-/** The book screen's speed as text and on the dialog's slider, and the chapter data fed to BookProgress. */
+/** The book screen's speed as text, on the slider (touch) and by minus / plus (TV), and the chapter data fed to BookProgress. */
 public class BookPresenterSpeedTest {
 
     @Test
@@ -42,6 +42,29 @@ public class BookPresenterSpeedTest {
         assertEquals(1.5f, BookPresenter.speedAt(BookPresenter.speedStep(1.5f)), 0f);
         // a speed kept by the old dialog (tenths) is still a position of the slider
         assertEquals(1.1f, BookPresenter.speedAt(BookPresenter.speedStep(1.1f)), 0f);
+    }
+
+    @Test
+    public void minusAndPlusMoveByATenth() {
+        assertEquals(1.1f, BookPresenter.speedStepped(1f, 1), 1e-6f);
+        assertEquals(0.9f, BookPresenter.speedStepped(1f, -1), 1e-6f);
+        assertEquals(1.6f, BookPresenter.speedStepped(1.5f, 1), 1e-6f);
+    }
+
+    @Test
+    public void aSpeedBetweenTenthsGoesToTheNextTenth() {
+        // kept by the old slider (0.05x steps)
+        assertEquals(1.3f, BookPresenter.speedStepped(1.25f, 1), 1e-6f);
+        assertEquals(1.2f, BookPresenter.speedStepped(1.25f, -1), 1e-6f);
+    }
+
+    @Test
+    public void bothEndsOfThePlayersRangeAreReachedAndKept() {
+        assertEquals(PlaybackSettings.MIN_SPEED, BookPresenter.speedStepped(0.3f, -1), 0f);
+        assertEquals(PlaybackSettings.MIN_SPEED, BookPresenter.speedStepped(PlaybackSettings.MIN_SPEED, -1), 0f);
+        assertEquals(0.3f, BookPresenter.speedStepped(PlaybackSettings.MIN_SPEED, 1), 1e-6f);
+        assertEquals(PlaybackSettings.MAX_SPEED, BookPresenter.speedStepped(2.4f, 1), 1e-6f);
+        assertEquals(PlaybackSettings.MAX_SPEED, BookPresenter.speedStepped(PlaybackSettings.MAX_SPEED, 1), 0f);
     }
 
     @Test

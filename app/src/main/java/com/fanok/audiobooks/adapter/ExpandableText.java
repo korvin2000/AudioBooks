@@ -39,6 +39,7 @@ public final class ExpandableText {
             toggle.setTextAlignment(expanded ? View.TEXT_ALIGNMENT_VIEW_END : View.TEXT_ALIGNMENT_CENTER);
         }
         showToggle(toggle, companion, expanded, expanded);
+        text.setOnClickListener(v -> tapToggle(toggle)); // a tap on the text toggles it too, as the toggle does
         int boundMaxLines = text.getMaxLines();
         text.post(() -> {
             if (text.getMaxLines() != boundMaxLines) {
@@ -50,6 +51,13 @@ public final class ExpandableText {
                     || (layout.getLineCount() == maxLines && layout.getEllipsisCount(maxLines - 1) > 0));
             showToggle(toggle, companion, expanded, overflows);
         });
+    }
+
+    /** Clicks {@code toggle} when it is shown: a short text, with no toggle, has nothing to toggle. */
+    public static void tapToggle(@NonNull View toggle) {
+        if (toggle.getVisibility() == View.VISIBLE) {
+            toggle.performClick();
+        }
     }
 
     private static void showToggle(@NonNull View toggle, @Nullable View companion, boolean expanded,

@@ -13,6 +13,7 @@ import android.net.Uri;
 import android.os.IBinder;
 import android.util.Log;
 import android.view.Gravity;
+import android.view.LayoutInflater;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
@@ -36,6 +37,7 @@ import com.fanok.audiobooks.EncodingExeption;
 import com.fanok.audiobooks.R;
 import com.fanok.audiobooks.Url;
 import com.fanok.audiobooks.activity.SleepTimerActivity;
+import com.fanok.audiobooks.adapter.ListFocus;
 import com.fanok.audiobooks.interface_pacatge.book_content.Activity;
 import com.fanok.audiobooks.interface_pacatge.book_content.ActivityPresenter;
 import com.fanok.audiobooks.interface_pacatge.book_content.AudioModelInterfece;
@@ -121,7 +123,7 @@ public class BookPresenter extends MvpPresenter<Activity> implements ActivityPre
 
     private static float speed = 1;
 
-    /** The speed dialog's slider moves by 0.05x, from PlaybackSettings.MIN_SPEED to MAX_SPEED. */
+    /** The speed dialog's slider (touch screens) moves by 0.05x, from PlaybackSettings.MIN_SPEED to MAX_SPEED. */
     private static final int SPEED_STEPS_PER_UNIT = 20;
     /** A D-pad press on the slider: 0.25x. */
     private static final int SPEED_KEY_STEPS = 5;
@@ -259,6 +261,16 @@ public class BookPresenter extends MvpPresenter<Activity> implements ActivityPre
     static float speedAt(int step) {
         float value = PlaybackSettings.MIN_SPEED + (float) step / SPEED_STEPS_PER_UNIT;
         return PlaybackSettings.clampSpeed(Math.round(value * 100) / 100f);
+    }
+
+    /**
+     * The speed one press of the dialog's minus ({@code direction} -1) or plus (+1) away: the next tenth below or above
+     * (1,25× goes to 1,2× or 1,3×), within the player's range.
+     */
+    static float speedStepped(float value, int direction) {
+        int hundredths = Math.round(PlaybackSettings.clampSpeed(value) * 100);
+        int tenths = direction > 0 ? hundredths / 10 + 1 : (hundredths + 9) / 10 - 1;
+        return PlaybackSettings.clampSpeed(tenths / 10f);
     }
 
     /** Plays at this speed without keeping it: the speed dialog lets it be heard before OK. */
@@ -438,8 +450,9 @@ public class BookPresenter extends MvpPresenter<Activity> implements ActivityPre
     }
 
     /**
-     * The speed is heard while the slider moves; only OK keeps it. Cancel, back or a tap outside return to the
-     * speed the dialog opened with.
+     * The speed is heard while it changes; only OK keeps it. Cancel, back or a tap outside return to the speed the
+     * dialog opened with. A TV gets minus and plus buttons (a remote moves a slider in big jumps), a touch screen the
+     * slider.
      */
     @Override
     public void buttonSpeedClick(View view) {
@@ -450,44 +463,10 @@ public class BookPresenter extends MvpPresenter<Activity> implements ActivityPre
         dismissSpeedDialog();
 
         final AlertDialog.Builder popDialog = new AlertDialog.Builder(view.getContext());
-        final LinearLayout linearLayout = new LinearLayout(view.getContext());
-        linearLayout.setOrientation(LinearLayout.VERTICAL);
-        final TextView textView = new TextView(view.getContext());
-        textView.setGravity(Gravity.CENTER_HORIZONTAL);
-        textView.setText(speedText(speed));
-        textView.setTextColor(getAttributeColor(textView.getContext(), R.attr.colorPrimaryText));
-        linearLayout.addView(textView);
-        final SeekBar seek = new SeekBar(view.getContext());
-        //no SeekBar.setMin below API 26: position 0 is PlaybackSettings.MIN_SPEED, the end MAX_SPEED
-        seek.setMax(speedStep(PlaybackSettings.MAX_SPEED));
-        seek.setKeyProgressIncrement(SPEED_KEY_STEPS);
-        seek.setProgress(speedStep(speed));
-        seek.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
-            @Override
-            public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
-                chosen[0] = speedAt(progress);
-                textView.setText(speedText(chosen[0]));
-                if (fromUser) {
-                    playAtSpeed(chosen[0]);
-                }
-            }
-
-            @Override
-            public void onStartTrackingTouch(SeekBar seekBar) {
-
-            }
-
-            @Override
-            public void onStopTrackingTouch(SeekBar seekBar) {
-
-            }
-        });
-
-        linearLayout.addView(seek);
-
         popDialog.setIcon(R.drawable.ic_speedometer);
         popDialog.setTitle(view.getContext().getString(R.string.title_set_speed_popup));
-        popDialog.setView(linearLayout);
+        popDialog.setView(ListFocus.isTv(view.getContext()) ? speedButtons(view.getContext(), chosen)
+                : speedSlider(view.getContext(), chosen));
 
         popDialog.setPositiveButton(R.string.ok,
                 (dialog, which) -> {
@@ -511,6 +490,60 @@ public class BookPresenter extends MvpPresenter<Activity> implements ActivityPre
         });
 
         mSpeedDialog = popDialog.show();
+    }
+
+    /** The speed dialog's slider with the speed above it; {@code chosen[0]} follows it. */
+    private View speedSlider(Context context, final float[] chosen) {
+        final LinearLayout linearLayout = new LinearLayout(context);
+        linearLayout.setOrientation(LinearLayout.VERTICAL);
+        final TextView textView = new TextView(context);
+        textView.setGravity(Gravity.CENTER_HORIZONTAL);
+        textView.setText(speedText(chosen[0]));
+        textView.setTextColor(getAttributeColor(textView.getContext(), R.attr.colorPrimaryText));
+        linearLayout.addView(textView);
+        final SeekBar seek = new SeekBar(context);
+        //no SeekBar.setMin below API 26: position 0 is PlaybackSettings.MIN_SPEED, the end MAX_SPEED
+        seek.setMax(speedStep(PlaybackSettings.MAX_SPEED));
+        seek.setKeyProgressIncrement(SPEED_KEY_STEPS);
+        seek.setProgress(speedStep(chosen[0]));
+        seek.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+            @Override
+            public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
+                chosen[0] = speedAt(progress);
+                textView.setText(speedText(chosen[0]));
+                if (fromUser) {
+                    playAtSpeed(chosen[0]);
+                }
+            }
+
+            @Override
+            public void onStartTrackingTouch(SeekBar seekBar) {
+
+            }
+
+            @Override
+            public void onStopTrackingTouch(SeekBar seekBar) {
+
+            }
+        });
+        linearLayout.addView(seek);
+        return linearLayout;
+    }
+
+    /** The speed dialog's minus, speed and plus (TV): a press moves {@code chosen[0]} by 0.1x. */
+    private View speedButtons(Context context, final float[] chosen) {
+        final View content = LayoutInflater.from(context).inflate(R.layout.dialog_speed, null);
+        final TextView value = content.findViewById(R.id.speedValue);
+        value.setText(speedText(chosen[0]));
+        View.OnClickListener step = button -> {
+            chosen[0] = speedStepped(chosen[0], button.getId() == R.id.speedUp ? 1 : -1);
+            value.setText(speedText(chosen[0]));
+            playAtSpeed(chosen[0]);
+        };
+        // never disabled at an end: a focused button that turns disabled sends a TV remote's focus elsewhere
+        content.findViewById(R.id.speedDown).setOnClickListener(step);
+        content.findViewById(R.id.speedUp).setOnClickListener(step);
+        return content;
     }
 
     /** Closes the speed dialog as a cancel would (the screen is going): an unconfirmed speed is not kept playing. */

@@ -169,7 +169,7 @@
 
         <!-- SourcesDialogFragment: the order and the active ones (search.Sources), the route of each, availability -->
         <Preference
-            android:icon="@drawable/ic_check_sources"
+            android:icon="@drawable/ic_web"
             android:key="sources_dialog"
             android:persistent="false"
             android:title="@string/sources_entry" />
@@ -185,7 +185,7 @@
         <ListPreference
             android:defaultValue="@string/abook_value"
             android:dialogTitle="@string/sorce_books"
-            android:icon="@drawable/ic_web"
+            android:icon="@drawable/ic_check_sources"
             android:key="sorce_books"
             android:title="@string/sorce_books" />
 

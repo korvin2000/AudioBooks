@@ -43,6 +43,7 @@ import com.fanok.audiobooks.R;
 import com.fanok.audiobooks.activity.MainActivity;
 import com.fanok.audiobooks.activity.SearchableActivity;
 import com.fanok.audiobooks.adapter.FavoritePeopleAdapter;
+import com.fanok.audiobooks.adapter.ListFocus;
 import com.fanok.audiobooks.databinding.FragmentFavoriteBinding;
 import com.fanok.audiobooks.model.BooksDBModel;
 import com.fanok.audiobooks.model.FavoritePeople;
@@ -336,6 +337,7 @@ public class FavoritePeopleFragment extends Fragment implements FavoritePeople.L
         }
         ArrayList<Row> shown = mList.shown();
         mAdapter.setItems(shown);
+        ListFocus.afterSectionUpdate(binding.list, this); // opened from the TV's side menu: its first row
         if (empty) {
             boolean readers = kind == FavoritePeople.READER;
             showPlaceholder(readers ? R.string.favorite_people_empty_readers : R.string.favorite_people_empty_authors,

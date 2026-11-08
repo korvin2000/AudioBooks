@@ -93,7 +93,7 @@
                 android:layout_gravity="center_vertical"
                 android:background="?android:attr/selectableItemBackground"
                 android:clickable="true"
-                android:drawableStart="@drawable/ic_star"
+                android:drawableStart="@drawable/ic_star_outline"
                 android:drawablePadding="30dp"
                 android:focusable="true"
                 android:paddingStart="16dp"

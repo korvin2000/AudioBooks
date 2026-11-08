@@ -17,10 +17,11 @@
         app:showAsAction="always">
         <menu />
     </item>
+    <!-- the site's own listings (Sort); on genre and people lists a local sort: icon and title set there -->
     <item
         android:id="@+id/order"
-        android:icon="@drawable/ic_sort"
-        android:title="@string/order"
+        android:icon="@drawable/ic_site_sections"
+        android:title="@string/site_sections"
         app:showAsAction="always">
         <menu />
     </item>

@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The speed dialog on a TV (BookPresenter.buttonSpeedClick; touch screens keep the slider): minus, the speed,
+     plus; a press moves it by 0.1x, where a remote would move the slider in 0.25x jumps. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:gravity="center"
+    android:orientation="horizontal"
+    android:paddingTop="16dp"
+    android:paddingBottom="8dp"
+    tools:viewBindingIgnore="true">
+
+    <Button
+        android:id="@+id/speedDown"
+        android:layout_width="64dp"
+        android:layout_height="64dp"
+        android:contentDescription="@string/speed_down"
+        android:minWidth="0dp"
+        android:minHeight="0dp"
+        android:text="−"
+        android:textSize="28sp"
+        tools:ignore="HardcodedText" />
+
+    <TextView
+        android:id="@+id/speedValue"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:gravity="center"
+        android:minWidth="120dp"
+        android:textColor="?attr/colorPrimaryText"
+        android:textSize="32sp"
+        android:textStyle="bold"
+        tools:text="1,5×" />
+
+    <Button
+        android:id="@+id/speedUp"
+        android:layout_width="64dp"
+        android:layout_height="64dp"
+        android:contentDescription="@string/speed_up"
+        android:minWidth="0dp"
+        android:minHeight="0dp"
+        android:text="+"
+        android:textSize="28sp"
+        tools:ignore="HardcodedText" />
+</LinearLayout>

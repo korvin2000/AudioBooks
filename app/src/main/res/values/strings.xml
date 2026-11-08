@@ -22,6 +22,7 @@
     <string name="error_display_data">Ошибка отображения данных</string>
     <string name="search">Поиск</string>
     <string name="order">Сортировка</string>
+    <string name="site_sections">Разделы сайта</string>
     <string name="new_data">Новое</string>
     <string name="reting">Рейтинг</string>
     <string name="all_time">За все время</string>
@@ -82,6 +83,8 @@
     <string name="open_site">Открыть на сайте</string>
     <string name="worning_loading_not_finish">Данные загружены не до конца. Подождите.</string>
     <string name="title_set_speed_popup">Выберите скорость</string>
+    <string name="speed_down">Медленнее на 0,1</string>
+    <string name="speed_up">Быстрее на 0,1</string>
 
     <!--Settings -->
     <string name="setting_theme">Тема</string>
