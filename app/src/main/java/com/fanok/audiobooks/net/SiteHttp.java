@@ -36,8 +36,6 @@ public final class SiteHttp {
     static final int MAX_REDIRECTS = 5;
     public static final int MAX_BODY_BYTES = 4 * 1024 * 1024;
     private static final String REFERRER = "https://www.google.com/";
-    /** What a Russian browser sends; a request without it looks like a bot to some anti-bot walls. */
-    public static final String ACCEPT_LANGUAGE = BrowserHeaders.CHROME_LANGUAGE;
     private static final Map<String, Map<String, String>> JAR = new ConcurrentHashMap<>();
     /** Hosts that answered 429 with a {@code Retry-After}: until when (epoch millis) they are not asked. */
     private static final Map<String, Long> LIMITED_UNTIL = new ConcurrentHashMap<>();
@@ -99,6 +97,50 @@ public final class SiteHttp {
             connection.header(header.getKey(), header.getValue());
         }
         return connection;
+    }
+
+    /**
+     * A script's request (an XHR) to a site's AJAX endpoint (a playlist, a token) from the site's page {@code referer}.
+     * The adapter says here which kind of request it makes: an endpoint answers only an XHR, while the site's pages
+     * must look like a navigation ({@link #connect}). Goes out with {@code X-Requested-With} and an XHR's fetch
+     * metadata ({@link #asXhrIfAjax}).
+     */
+    public static Connection xhr(String url, String referer) {
+        return connect(url).referrer(referer).header("X-Requested-With", "XMLHttpRequest");
+    }
+
+    /**
+     * A request the caller marked as an XHR ({@code X-Requested-With}) is a script's request from the page in its
+     * Referer, so it carries an XHR's fetch metadata ({@link BrowserHeaders#xhr}) and {@code Accept}, not the
+     * navigation's that {@link #connect} set: a page's endpoint may refuse a navigation to it.
+     */
+    static void asXhrIfAjax(Connection.Request request) {
+        if (request.header("X-Requested-With") == null) {
+            return;
+        }
+        String referrer = request.header("Referer");
+        URL url = request.url();
+        boolean sameOrigin = false;
+        if (referrer != null) {
+            try {
+                URL from = new URL(referrer);
+                sameOrigin = from.getProtocol().equalsIgnoreCase(url.getProtocol())
+                        && from.getHost().equalsIgnoreCase(url.getHost())
+                        && (from.getPort() < 0 ? from.getDefaultPort() : from.getPort())
+                        == (url.getPort() < 0 ? url.getDefaultPort() : url.getPort());
+            } catch (java.net.MalformedURLException ignored) {
+                // an unreadable Referer: not this origin
+            }
+        }
+        for (String name : BrowserHeaders.NAVIGATION_ONLY) {
+            request.removeHeader(name);
+        }
+        for (Map.Entry<String, String> header : BrowserHeaders.xhr(sameOrigin).entrySet()) {
+            request.header(header.getKey(), header.getValue());
+        }
+        if (BrowserHeaders.isPageAccept(request.header("Accept"))) {
+            request.header("Accept", BrowserHeaders.ANY_ACCEPT);
+        }
     }
 
     /** Drops the cookie {@code name} the host of {@code url} issued, so the site's own one (a new session) is sent. */
@@ -202,6 +244,7 @@ public final class SiteHttp {
         if (wait > 0) {
             throw new RateLimitedException(url, wait); // the site asked not to be asked before then
         }
+        asXhrIfAjax(connection.request());
         Connection.Response response = connection.execute();
         if (response.statusCode() == RateLimitedException.STATUS) {
             long answered = System.currentTimeMillis(); // the wait counts from the answer, not from the ask

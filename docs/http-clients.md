@@ -35,6 +35,16 @@ user agent and fingerprint always describe the same browser.
 | `page(userAgent)` | `SiteHttp.asBrowser`, so every site page | `User-Agent`, `Accept` (HTML), `Accept-Language`, `Sec-Ch-Ua`, `Sec-Ch-Ua-Mobile`, `Sec-Ch-Ua-Platform`, `Sec-Fetch-Dest: document`, `Sec-Fetch-Mode: navigate`, `Sec-Fetch-Site: cross-site` (the app's referrer is a search engine), `Sec-Fetch-User: ?1`, `Upgrade-Insecure-Requests: 1` |
 | `resource(userAgent, image)` | The shared OkHttp client's defaults interceptor (`App.defaultHeaders`), `net/Covers.glide` | `Accept` (image or `*/*`), `Accept-Language`, the same client hints. No `User-Agent`: the caller sets it (it may be a site's own) |
 
+| `xhr(sameOrigin)` | `SiteHttp.xhr(url, referer)` (an adapter's playlist/AJAX call), applied by `SiteHttp.asXhrIfAjax` in `SiteHttp.executeOnce` to every request carrying `X-Requested-With` | Fetch metadata of a script's request: `Sec-Fetch-Dest: empty`, `Sec-Fetch-Mode: cors`, `Sec-Fetch-Site: same-origin` (Referer on the same origin) or `cross-site`; `Accept: */*` in place of the page's; `Sec-Fetch-User` and `Upgrade-Insecure-Requests` removed |
+
+**Page or XHR is decided per request, not per site.** One site serves both: its pages must look like a navigation (the
+anti-bot wall checks exactly that), its AJAX endpoints like a script's request — `audioknigi.pro`'s playlist answers a
+"navigation" with `403 {"error":"same_origin_required"}`. The source adapter declares the kind at the call: a page through
+`SiteHttp.connect`/`get`, an AJAX endpoint through `SiteHttp.xhr(url, referer)` (`AudioknigiPro.tracks`,
+`AudioknigiFun.tracks`, `Akniga.post`), which adds `X-Requested-With: XMLHttpRequest` and the page's Referer;
+`SiteHttp` derives the rest of the metadata from those two. A per-adapter switch would be wrong: the same adapter makes
+both kinds.
+
 `net/ProxyFinder.OkNetwork.site` uses `page(Consts.USER_AGENT)` too: a candidate proxy is judged by the request the
 app will actually make to that site, not by a bare-`User-Agent` probe that a wall may answer differently.
 

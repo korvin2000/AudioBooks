@@ -25,6 +25,33 @@ import org.junit.Test;
 public class SiteHttpTest {
 
     @Test
+    public void anXhrCarriesAnXhrsFetchMetadataNotANavigations() {
+        String page = "https://audioknigi.pro/audioknigi/72583-koscheevo-carstvo.html";
+        Connection.Request xhr = SiteHttp.xhr("https://audioknigi.pro/engine/ajax/controller.php?mod=a&id=1", page)
+                .request();
+        assertEquals("XMLHttpRequest", xhr.header("X-Requested-With"));
+        assertEquals(page, xhr.header("Referer"));
+        SiteHttp.asXhrIfAjax(xhr);
+        assertEquals("same-origin", xhr.header("Sec-Fetch-Site"));
+        assertEquals("cors", xhr.header("Sec-Fetch-Mode"));
+        assertEquals("empty", xhr.header("Sec-Fetch-Dest"));
+        assertEquals("*/*", xhr.header("Accept"));
+        assertFalse(xhr.hasHeader("Sec-Fetch-User"));
+        assertFalse(xhr.hasHeader("Upgrade-Insecure-Requests"));
+        assertTrue(xhr.hasHeader("Sec-Ch-Ua")); // still the same browser
+
+        Connection.Request other = SiteHttp.connect("https://s5.vozknig.com/list.json").referrer(page)
+                .header("X-Requested-With", "XMLHttpRequest").request();
+        SiteHttp.asXhrIfAjax(other);
+        assertEquals("cross-site", other.header("Sec-Fetch-Site"));
+
+        Connection.Request navigation = SiteHttp.connect(page).request();
+        SiteHttp.asXhrIfAjax(navigation);
+        assertEquals("navigate", navigation.header("Sec-Fetch-Mode"));
+        assertEquals("?1", navigation.header("Sec-Fetch-User"));
+    }
+
+    @Test
     public void challengeIsRecognisedByHeaderOrTitle() {
         assertTrue(SiteHttp.isChallenge("challenge", "Книга"));
         assertTrue(SiteHttp.isChallenge(null, "Just a moment..."));

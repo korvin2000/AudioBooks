@@ -124,7 +124,7 @@ differs writes its own lines or overrides the default, never a branch in the sha
 | A POST form, extra headers or cookies | override `fetch`; `SiteHttp.postForm`, `SiteHttp.connect(...)` with `SiteHttp.execute` and `SiteHttp.parse` |
 | DataLife Engine | `Dle`: sort forms (`Dle.Order`, `Dle.MENU`, `Dle.sorted(listing, order, key)` POSTed by `Dle.fetch`, the genre key from `Dle.categoryId(page)`), `/page/N/` paging, search URL, news ids. Which listings go out with an explicit sort (so the session's last sort does not leak into a plain one) is the adapter's policy, see AknigXyz and AudioknigiFun |
 | A player in a page script | `Players.playerScript` with `Players.Chapters`; XSPlayer `Players.xsPlaylist`; Playerjs `Players.loadPlayerjs` or `inlinePlayerjs` (folders, mirrors, obfuscated URLs) |
-| A playlist fetched by XHR | `SiteHttp.body(SiteHttp.connect(url).referrer(bookUrl).header(...))` |
+| A playlist or token fetched by XHR | `SiteHttp.body(SiteHttp.xhr(url, bookUrl))` (`.method(POST)` for a POST): the adapter declares the request an XHR, so it goes out with an XHR's fetch metadata, not a page's; never `SiteHttp.connect` + a hand-set `X-Requested-With` |
 | Sorts | `sorts(url)` returns the Order menu as data (`Sort.menu`, `Sort.submenu`); `sortUrl(Sort, url)` the listing. A new kind of sort is one row in `source/Sort.java` (menu id, title, subtitle label, back-stack tag) |
 | Sorts inside a genre | `genreOf` with `inGenre` (the server ranks the genre) or `cardGenre` (the cards are narrowed on the device) |
 | Ranking periods, a duration bound | `periods`, `periodOf`, `withPeriod`, `periodsAreDates`; `withDuration`; `listsDuration` false when cards carry no time |

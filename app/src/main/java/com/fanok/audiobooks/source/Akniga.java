@@ -429,12 +429,9 @@ public final class Akniga implements SourceParser {
 
     /** Session cookies of the book page come from the {@link SiteHttp} jar. */
     private static Connection post(String bookUrl, String path) {
-        return SiteHttp.connect(Url.SERVER_AKNIGA + path)
+        return SiteHttp.xhr(Url.SERVER_AKNIGA + path, bookUrl)
                 .method(Connection.Method.POST)
-                .referrer(bookUrl)
-                .header("X-Requested-With", "XMLHttpRequest")
-                .header("Origin", Url.SERVER_AKNIGA)
-                .header("Accept-Language", SiteHttp.ACCEPT_LANGUAGE);
+                .header("Origin", Url.SERVER_AKNIGA);
     }
 
     // ---------------------------------------------------------------- pure parsers

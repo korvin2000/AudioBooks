@@ -83,6 +83,26 @@ public final class BrowserHeaders {
         return headers;
     }
 
+    /** Headers a browser sends with a navigation only ({@link #page}), never with a script's request. */
+    static final String[] NAVIGATION_ONLY = {"Sec-Fetch-User", "Upgrade-Insecure-Requests"};
+
+    /**
+     * The fetch metadata of a script's request (an XHR) from a page: not a navigation. A site's endpoint may refuse a
+     * "navigation" to it ({@code audioknigi.pro}'s playlist answers 403 {@code same_origin_required}).
+     */
+    public static Map<String, String> xhr(boolean sameOrigin) {
+        Map<String, String> headers = new LinkedHashMap<>();
+        headers.put("Sec-Fetch-Dest", "empty");
+        headers.put("Sec-Fetch-Mode", "cors");
+        headers.put("Sec-Fetch-Site", sameOrigin ? "same-origin" : "cross-site");
+        return headers;
+    }
+
+    /** True for the {@code Accept} {@link #page} sends: a navigation's, which an XHR replaces. */
+    static boolean isPageAccept(String accept) {
+        return HTML_ACCEPT.equals(accept) || FIREFOX_HTML_ACCEPT.equals(accept);
+    }
+
     /** The {@code Accept-Language} of the browser {@code userAgent} (the Firefox one when that is a Firefox). */
     public static String language(String userAgent) {
         return isFirefox(userAgent) ? FIREFOX_LANGUAGE : CHROME_LANGUAGE;

@@ -161,8 +161,7 @@ public final class AudioknigiPro implements SourceParser {
     /** The playlist answers only an XHR with a Referer on the site; 204 when the book has none. */
     @Override
     public ArrayList<AudioPOJO> tracks(Document page, String base) throws IOException {
-        String answer = SiteHttp.body(SiteHttp.connect(playlistUrl(page, base)).referrer(base)
-                .header("X-Requested-With", "XMLHttpRequest"));
+        String answer = SiteHttp.body(SiteHttp.xhr(playlistUrl(page, base), base));
         if (answer.trim().isEmpty()) {
             throw unavailable(page, base);
         }

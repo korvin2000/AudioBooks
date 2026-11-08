@@ -60,10 +60,6 @@ public final class AudioknigiFun implements SourceParser {
     public static final String COLLECTIONS = SERVER + "/podborki/";
     public static final String TOP_100 = SERVER + "/top-100.html";
 
-    /** The playlist answers 403 without this header (and without a Referer on the site, e.g. the book page). */
-    public static final String AJAX_HEADER = "X-Requested-With";
-    public static final String AJAX_VALUE = "XMLHttpRequest";
-
     /** Series pages read at most (30 books each). */
     static final int MAX_SERIES_PAGES = 10;
 
@@ -167,7 +163,7 @@ public final class AudioknigiFun implements SourceParser {
             }
             throw new IllegalStateException("audioknigi.fun page has no full audio: " + base);
         }
-        return parseTracks(SiteHttp.body(SiteHttp.connect(playlist).referrer(base).header(AJAX_HEADER, AJAX_VALUE)),
+        return parseTracks(SiteHttp.body(SiteHttp.xhr(playlist, base)),
                 text(page.selectFirst("h1")));
     }
 
