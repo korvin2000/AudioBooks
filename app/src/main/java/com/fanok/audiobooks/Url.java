@@ -225,10 +225,15 @@ public class Url {
     /**
      * Page {@code page} of an audioboo listing: the index, a genre, an author, reader, tag or series link, with or
      * without a trailing {@code page/} or {@code page/N/}. Page 1 is the bare listing, page N adds {@code page/N/}.
+     * Page 1 of a single page ({@code .../top100.html}, {@code .../genres.html}) is that page as it is: the engine
+     * answers {@code top100.html/} with 404.
      */
     public static String audiobooListingPage(String url, int page) {
         String trimmed = url.trim();
         int end = pathEnd(trimmed);
+        if (page <= 1 && trimmed.substring(0, end).endsWith(".html")) {
+            return trimmed;
+        }
         String base = trimmed.substring(0, end).replaceFirst("/page(/\\d+)?/?$", "/");
         if (!base.endsWith("/")) {
             base += "/";

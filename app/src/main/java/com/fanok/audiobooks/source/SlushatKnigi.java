@@ -20,6 +20,7 @@ import com.fanok.audiobooks.search.SearchUrls;
 
 import io.reactivex.functions.BooleanSupplier;
 
+import org.jsoup.HttpStatusException;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
@@ -65,6 +66,8 @@ public final class SlushatKnigi implements SourceParser {
     public static final String RATING = SERVER + "/rating.html";
     /** The genres are the header menu of every page; this one (the advanced search) has no cards. */
     public static final String GENRES = SERVER + "/index.php?do=search&mode=advanced";
+
+    private static final Pattern SERIES_PAGE = Pattern.compile("https://slushat-knigi\\.com/xfsearch/series/([^/?#]+)/?");
 
     /** Bound of the series listing pages read for a book's series tab. */
     static final int MAX_SERIES_PAGES = 5;
@@ -143,13 +146,52 @@ public final class SlushatKnigi implements SourceParser {
                 parseDescription(page).getTitle());
     }
 
-    /** The series listing, oldest first (the site lists it newest first). */
+    /**
+     * A series page the site lacks: some series' own page answers 404 while their books link to it ("Целестиал").
+     * Page 1 of such a series is then the site search for its name, whose cards parse like a listing's; any other 404
+     * (a page past the end) stays one.
+     */
+    @Override
+    public Document fetch(String url) throws IOException {
+        try {
+            return SiteHttp.get(url);
+        } catch (HttpStatusException e) {
+            String name = missingSeriesName(url);
+            if (e.getStatusCode() != 404 || name == null) {
+                throw e;
+            }
+            return SiteHttp.get(searchUrl(SearchUrls.Category.BOOKS, name, 1));
+        }
+    }
+
+    /** The series name of page 1 of a series listing ({@code /xfsearch/series/<name>/}); null for any other URL. */
+    @Nullable
+    static String missingSeriesName(String url) {
+        Matcher m = SERIES_PAGE.matcher(url);
+        if (!m.matches()) {
+            return null;
+        }
+        try {
+            return java.net.URLDecoder.decode(m.group(1), "UTF-8");
+        } catch (java.io.UnsupportedEncodingException | IllegalArgumentException e) {
+            return null;
+        }
+    }
+
+    /**
+     * The series listing, oldest first (the site lists it newest first). A series without its own page comes from the
+     * site search ({@link #fetch}): only the books of this book's author are taken from it ({@link #seriesFromSearch}).
+     */
     @Override
     public ArrayList<SeriesPOJO> series(Document page, String bookUrl) throws IOException {
         ArrayList<SeriesPOJO> result = new ArrayList<>();
         String series = href(detail(page, "Серия"), "a");
         for (int no = 1; !series.isEmpty() && no <= MAX_SERIES_PAGES; no++) {
-            ProviderPage<BookPOJO> books = parseListing(fetch(pageUrl(series, no)), no);
+            Document listing = fetch(pageUrl(series, no));
+            if (no == 1 && listing.location().contains("do=search")) {
+                return seriesFromSearch(searchResults(listing, 1).items, parseDescription(page).getAutor());
+            }
+            ProviderPage<BookPOJO> books = parseListing(listing, no);
             result.addAll(seriesItems(books.items));
             if (!books.hasMore) {
                 break;
@@ -337,6 +379,22 @@ public final class SlushatKnigi implements SourceParser {
     /** One page of a series listing as series entries (no numbers on this site), in the page's order. */
     public static ArrayList<SeriesPOJO> parseSeries(Document doc) {
         return seriesItems(parseListing(doc, 1).items);
+    }
+
+    /**
+     * The books a search for a series' name found, as the series: those of the book's author when it names one (the
+     * site writes "-" for none), since the name may occur in other books' text.
+     */
+    static ArrayList<SeriesPOJO> seriesFromSearch(List<BookPOJO> found, @Nullable String author) {
+        String own = author == null ? "" : author.trim();
+        List<BookPOJO> books = new ArrayList<>();
+        for (BookPOJO book : found) {
+            if (own.isEmpty() || own.equals("-") || own.equalsIgnoreCase(
+                    book.getAutor() == null ? "" : book.getAutor().trim())) {
+                books.add(book);
+            }
+        }
+        return seriesItems(books);
     }
 
     private static ArrayList<SeriesPOJO> seriesItems(List<BookPOJO> books) {

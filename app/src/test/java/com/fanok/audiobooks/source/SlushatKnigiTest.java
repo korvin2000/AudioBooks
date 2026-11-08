@@ -499,4 +499,24 @@ public class SlushatKnigiTest {
         assertEquals("5 сентября 2025 00:36", second.get(0).getDate());
         assertTrue(second.get(0).getText().startsWith("Очень классная книга."));
     }
+
+    @Test
+    public void aSeriesWithoutItsPageIsFoundBySearchByTheBooksAuthor() {
+        BookPOJO own = new BookPOJO();
+        own.setUrl("https://slushat-knigi.com/1-a.html");
+        own.setName("A");
+        own.setAutor("Керрот Ред");
+        BookPOJO other = new BookPOJO();
+        other.setUrl("https://slushat-knigi.com/2-b.html");
+        other.setName("B");
+        other.setAutor("Другой Автор");
+        java.util.List<BookPOJO> found = java.util.Arrays.asList(own, other);
+        assertEquals(1, SlushatKnigi.seriesFromSearch(found, "Керрот Ред").size());
+        assertEquals("https://slushat-knigi.com/1-a.html", SlushatKnigi.seriesFromSearch(found, "Керрот Ред").get(0).getUrl());
+        assertEquals(2, SlushatKnigi.seriesFromSearch(found, "-").size()); // the site names no author
+        assertEquals("целестиал", SlushatKnigi.missingSeriesName(
+                "https://slushat-knigi.com/xfsearch/series/%D1%86%D0%B5%D0%BB%D0%B5%D1%81%D1%82%D0%B8%D0%B0%D0%BB/"));
+        assertNull(SlushatKnigi.missingSeriesName("https://slushat-knigi.com/xfsearch/series/x/page/2/")); // past the end
+        assertNull(SlushatKnigi.missingSeriesName("https://slushat-knigi.com/tags/x/"));
+    }
 }

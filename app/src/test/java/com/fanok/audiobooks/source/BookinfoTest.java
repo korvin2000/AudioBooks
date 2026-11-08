@@ -32,10 +32,11 @@ public class BookinfoTest {
     private static final String S = Bookinfo.SERVER;
     private static final String API = S + "/api/v1/";
     private static final String INDEX = Bookinfo.INDEX;
-    private static final String GENRE = INDEX + "&search%5Bgenre_alias%5D=fentezi";
-    private static final String AUTHOR = INDEX + "&search%5Bauthor_alias%5D=stiven-king";
-    private static final String READER = INDEX + "&search%5Breader_alias%5D=gidra";
-    private static final String SERIES = INDEX + "&search%5Bseries_alias%5D=master-trav&order=id";
+    private static final String CATALOG = Bookinfo.CATALOG;
+    private static final String GENRE = CATALOG + "&search%5Bgenre_alias%5D=fentezi";
+    private static final String AUTHOR = CATALOG + "&search%5Bauthor_alias%5D=stiven-king";
+    private static final String READER = CATALOG + "&search%5Breader_alias%5D=gidra";
+    private static final String SERIES = CATALOG + "&search%5Bseries_alias%5D=master-trav&order=id";
     private static final String BOOK = S + "/fentezi/robbi-makniven/patent-na-smert";
     private static final String CHAPTERS = S + "/fentezi/vanya-mordorskiy/master-trav-7";
 
@@ -60,7 +61,7 @@ public class BookinfoTest {
         assertEquals("Мастер Трав 7", first.getName());
         assertEquals(S + "/books/180933/cover.webp", first.getPhoto());
         assertEquals("Ваня Мордорский", first.getAutor());
-        assertEquals(INDEX + "&search%5Bauthor_alias%5D=vanya-mordorskiy", first.getUrlAutor());
+        assertEquals(CATALOG + "&search%5Bauthor_alias%5D=vanya-mordorskiy", first.getUrlAutor());
         assertEquals("Фэнтези", first.getGenre());
         assertEquals(GENRE, first.getUrlGenre());
         assertEquals("5.0", first.getReting());
@@ -160,7 +161,7 @@ public class BookinfoTest {
         ArrayList<GenrePOJO> genres = Bookinfo.parseGenres(json("genres.json", Bookinfo.GENRES));
         assertEquals("50 less Зомби-апокалипсис, which has no books", 49, genres.size());
         assertEquals("EVE online", genres.get(0).getName());
-        assertEquals(INDEX + "&search%5Bgenre_alias%5D=eve-online", genres.get(0).getUrl());
+        assertEquals(CATALOG + "&search%5Bgenre_alias%5D=eve-online", genres.get(0).getUrl());
         assertEquals(4, genres.get(0).getReting());
         GenrePOJO fantasy = genres.get(45);
         assertEquals("Фэнтези", fantasy.getName());
@@ -221,7 +222,7 @@ public class BookinfoTest {
         assertEquals("the nameless author is left out", 99, authors.items.size());
         assertTrue("621 pages", authors.hasMore);
         assertEquals("Неизвестный автор", authors.items.get(0).getName());
-        assertEquals(INDEX + "&search%5Bauthor_alias%5D=neizvestnyy-avtor", authors.items.get(0).getUrl());
+        assertEquals(CATALOG + "&search%5Bauthor_alias%5D=neizvestnyy-avtor", authors.items.get(0).getUrl());
         assertEquals("published books", 1709, authors.items.get(0).getReting());
         assertEquals("Стивен Кинг", authors.items.get(2).getName());
         assertEquals(AUTHOR, authors.items.get(2).getUrl());
@@ -235,7 +236,7 @@ public class BookinfoTest {
         assertEquals(100, readers.items.size());
         assertTrue("88 pages", readers.hasMore);
         assertEquals("Олег Булдаков", readers.items.get(0).getName());
-        assertEquals(INDEX + "&search%5Breader_alias%5D=oleg-buldakov", readers.items.get(0).getUrl());
+        assertEquals(CATALOG + "&search%5Breader_alias%5D=oleg-buldakov", readers.items.get(0).getUrl());
         assertEquals(1079, readers.items.get(0).getReting());
 
         String king = SITE.searchUrl(SearchUrls.Category.AUTHORS, "Кинг", 1);
@@ -251,7 +252,7 @@ public class BookinfoTest {
         ProviderPage<GenrePOJO> readersFound = SITE.searchPeople(json("people-readers-search.json", buldakov), 1,
                 true);
         assertEquals(2, readersFound.items.size());
-        assertEquals(INDEX + "&search%5Breader_alias%5D=buldakov-oleg", readersFound.items.get(1).getUrl());
+        assertEquals(CATALOG + "&search%5Breader_alias%5D=buldakov-oleg", readersFound.items.get(1).getUrl());
 
         ProviderPage<GenrePOJO> none = SITE.searchPeople(json("people-none.json",
                 SITE.searchUrl(SearchUrls.Category.AUTHORS, "zzzxqw", 1)), 1, false);
@@ -318,13 +319,13 @@ public class BookinfoTest {
         assertEquals("Патент на смерть", d.getTitle());
         assertEquals(S + "/books/180928/cover.webp", d.getPoster());
         assertEquals("Робби Макнивен", d.getAutor());
-        assertEquals(INDEX + "&search%5Bauthor_alias%5D=robbi-makniven", d.getAutorUrl());
+        assertEquals(CATALOG + "&search%5Bauthor_alias%5D=robbi-makniven", d.getAutorUrl());
         assertEquals("Gidra", d.getArtist());
         assertEquals(READER, d.getArtistUrl());
         assertEquals("Фэнтези", d.getGenre());
         assertEquals(GENRE, d.getGenreUrl());
         assertEquals("Warhammer 40000. Кархародоны (1)", d.getSeries());
-        assertEquals(INDEX + "&search%5Bseries_alias%5D=warhammer-40000-karharodony-2&order=id", d.getSeriesUrl());
+        assertEquals(CATALOG + "&search%5Bseries_alias%5D=warhammer-40000-karharodony-2&order=id", d.getSeriesUrl());
         assertEquals("4932 s", "1 ч. 22 мин.", d.getTime());
         assertEquals(BookPOJO.formatRating(5.0f, "13"), d.getReiting());
         assertTrue(d.getDescription(), d.getDescription().startsWith("На заброшенной луне, утопающей в джунглях"));
@@ -338,7 +339,7 @@ public class BookinfoTest {
         DescriptionPOJO many = SITE.description(json("book-fragment.json", API + "books/kak-chitat-knigi/monika-vud"),
                 S + "/roman-proza/monika-vud/kak-chitat-knigi");
         assertEquals("Алексей Багдасаров, Наталия Казначеева, Марина Лисовец", many.getArtist());
-        assertEquals(INDEX + "&search%5Breader_alias%5D=aleksey-bagdasarov", many.getArtistUrl());
+        assertEquals(CATALOG + "&search%5Breader_alias%5D=aleksey-bagdasarov", many.getArtistUrl());
         assertEquals("unrated", "", many.getReiting());
         assertEquals("no series", "", many.getSeries());
         assertEquals("", many.getSeriesUrl());

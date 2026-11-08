@@ -48,6 +48,9 @@ public class AknigXyzTest {
     @Test
     public void pageOneIsTheRootAndLaterPagesAppendPageN() {
         assertEquals(AknigXyz.INDEX, parser.pageUrl(AknigXyz.INDEX, 1));
+        // single pages as they are: the site answers top100.html/ and genres.html/ with 404
+        assertEquals(AknigXyz.TOP_100, parser.pageUrl(AknigXyz.TOP_100, 1));
+        assertEquals(AknigXyz.GENRES, parser.pageUrl(AknigXyz.GENRES, 1));
         assertEquals(AknigXyz.SERVER + "/page/3/", parser.pageUrl(AknigXyz.INDEX, 3));
         assertEquals(AknigXyz.SERVER + "/boeviki/", parser.pageUrl(AknigXyz.SERVER + "/boeviki/page/4/", 1));
         String author = AknigXyz.SERVER + "/xfsearch/author/%D0%B2%D0%B0%20%28%D0%B8%29/";

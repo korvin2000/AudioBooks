@@ -37,8 +37,10 @@ import org.jsoup.nodes.Document;
  * <li>books {@code /api/v1/books}: {@code {books, meta: {all, page, total_pages}}}, paged with {@code page=N} and
  * {@code per=N}; a card has no readers, no duration and no audio. Of the 86 thousand books about a third have no audio
  * and a seventh are LitRes trial fragments (one 600 s file): {@code search[feed]=home}, the site's own home feed,
- * keeps 36 thousand that all play in full (57 sampled, none a fragment or empty), so every book listing carries
- * it.</li>
+ * keeps 36 thousand that all play in full (57 sampled, none a fragment or empty). The home page and the search carry
+ * it; a genre, an author, a reader and a series are listed as the site's own pages list them, without it
+ * ({@link #CATALOG}): the feed leaves whole genres empty (S.T.A.L.K.E.R.: 0 of the site's 16 books, Фанфик: 1 of
+ * 470). A fragment or a book without audio opened from there is reported as such ({@link #tracks}).</li>
  * <li>filters {@code search[genre_alias|author_alias|reader_alias|series_alias|title]} (the title a substring, the
  * only search), combined with each other and with {@code order}: {@code -id} (the default, newest), {@code -rating},
  * {@code title}, {@code -updated_at} ({@code duration}, views and comments are refused). No periods.</li>
@@ -55,6 +57,8 @@ public final class Bookinfo implements SourceParser {
     static final String API = SERVER + "/api/v1/";
     /** Every book listing: the full books of the home feed, 20 a page. */
     public static final String INDEX = API + "books?search%5Bfeed%5D=home&per=20";
+    /** The books of a genre, author, reader or series: all the site's published ones, as its own pages show them. */
+    static final String CATALOG = API + "books?per=20";
     public static final String GENRES = API + "genres?per=100&order=title";
     public static final String AUTHORS = API + "authors?order=-books_count&per=100";
     public static final String READERS = API + "readers?order=-books_count&per=100";
@@ -193,20 +197,20 @@ public final class Bookinfo implements SourceParser {
     }
 
     static String genreUrl(String alias) {
-        return INDEX + "&" + GENRE + "=" + alias;
+        return CATALOG + "&" + GENRE + "=" + alias;
     }
 
     static String authorUrl(String alias) {
-        return alias.isEmpty() ? "" : INDEX + "&" + AUTHOR + "=" + alias;
+        return alias.isEmpty() ? "" : CATALOG + "&" + AUTHOR + "=" + alias;
     }
 
     static String readerUrl(String alias) {
-        return alias.isEmpty() ? "" : INDEX + "&" + READER + "=" + alias;
+        return alias.isEmpty() ? "" : CATALOG + "&" + READER + "=" + alias;
     }
 
     /** A series, by the order the books were added: its parts in turn. */
     static String seriesUrl(String alias) {
-        return alias.isEmpty() ? "" : INDEX + "&" + SERIES + "=" + alias + "&order=id";
+        return alias.isEmpty() ? "" : CATALOG + "&" + SERIES + "=" + alias + "&order=id";
     }
 
     /** The books API without a title search or a series. */
@@ -224,7 +228,7 @@ public final class Bookinfo implements SourceParser {
         return value.isEmpty() ? bare : bare + "&order=" + value;
     }
 
-    /** {@code url} without its query parameter {@code name} (never the first one: that is always the feed). */
+    /** {@code url} without its query parameter {@code name} (never the first one: the feed or {@code per}). */
     private static String without(String url, String name) {
         return url.replaceAll("&" + Pattern.quote(name) + "=[^&#]*", "");
     }

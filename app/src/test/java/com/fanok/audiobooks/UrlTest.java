@@ -77,6 +77,7 @@ public class UrlTest {
     public void audiobooListingPagesFollowTheSiteScheme() {
         assertEquals("https://audioboo.org/", Url.audiobooListingPage(Url.INDEX_AUDIOBOO, 1));
         assertEquals("https://audioboo.org/page/2/", Url.audiobooListingPage(Url.INDEX_AUDIOBOO, 2));
+        assertEquals("https://s2.aknig.xyz/top100.html", Url.audiobooListingPage("https://s2.aknig.xyz/top100.html", 1));
         assertEquals("https://audioboo.org/mistic/", Url.audiobooListingPage("https://audioboo.org/mistic/", 1));
         assertEquals("https://audioboo.org/mistic/page/3/", Url.audiobooListingPage("https://audioboo.org/mistic/page/", 3));
         assertEquals("https://audioboo.org/didiktiva/page/2/",
