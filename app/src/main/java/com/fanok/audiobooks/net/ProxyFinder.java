@@ -1319,7 +1319,12 @@ public final class ProxyFinder {
 
         @Override
         public long site(@NonNull ProxyCandidate candidate, @NonNull String page, int timeoutMs) throws IOException {
-            Request.Builder builder = new Request.Builder().url(page).header("User-Agent", Consts.USER_AGENT);
+            Request.Builder builder = new Request.Builder().url(page);
+            // the site is judged by the request the app will make: the same browser a page request of SiteHttp
+            // claims to be, headers and all (a User-Agent alone is what a bot wears)
+            for (Map.Entry<String, String> header : BrowserHeaders.page(Consts.USER_AGENT).entrySet()) {
+                builder.header(header.getKey(), header.getValue());
+            }
             Provider provider = Provider.ofUrl(page);
             if (provider != null && provider.parser.postsPages() && Url.isHost(page, provider.server)) {
                 // like SiteHttp: the site's wall answers a GET with a challenge, a POST passes

@@ -55,3 +55,4 @@ tools/region/*.csv.gz
 # tools/people: the crawl (250 MB) and its lists (33 MB) stay local; people.bin is built from them
 tools/people/raw/
 tools/people/lists/
+example/src/names/IndexBuilder.java

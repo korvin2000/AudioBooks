@@ -37,7 +37,7 @@ public final class SiteHttp {
     public static final int MAX_BODY_BYTES = 4 * 1024 * 1024;
     private static final String REFERRER = "https://www.google.com/";
     /** What a Russian browser sends; a request without it looks like a bot to some anti-bot walls. */
-    public static final String ACCEPT_LANGUAGE = "ru-RU,ru;q=0.8,en-US;q=0.5,en;q=0.3";
+    public static final String ACCEPT_LANGUAGE = BrowserHeaders.CHROME_LANGUAGE;
     private static final Map<String, Map<String, String>> JAR = new ConcurrentHashMap<>();
     /** Hosts that answered 429 with a {@code Retry-After}: until when (epoch millis) they are not asked. */
     private static final Map<String, Long> LIMITED_UNTIL = new ConcurrentHashMap<>();
@@ -47,33 +47,56 @@ public final class SiteHttp {
 
     /** A pre-configured connection for callers that need extra cookies, headers or the raw response. */
     public static Connection connect(String url) {
+        Provider provider = Provider.ofUrl(url);
         Connection connection = Jsoup.connect(url)
-                .userAgent(Consts.USER_AGENT)
                 .referrer(REFERRER)
-                .header("Accept-Language", ACCEPT_LANGUAGE)
                 .timeout(TIMEOUT_MS)
                 .maxBodySize(MAX_BODY_BYTES)
                 .ignoreHttpErrors(true);
+        asBrowser(connection, userAgentOf(url, provider));
         Map<String, String> cookies = JAR.get(Url.hostOf(url));
         if (cookies != null) {
             connection.cookies(cookies);
         }
-        Provider provider = Provider.ofUrl(url);
         if (provider != null) {
             connection.timeout(provider.parser.timeoutMs());
             // the site's own cookies (a session the user pasted in settings), to its own host only, never a former one;
             // a newer one the site issued (in the jar) wins
             Map<String, String> own = Url.isHost(url, provider.server)
                     ? provider.parser.cookies() : Collections.<String, String>emptyMap();
-            String agent = Url.isHost(url, provider.server) ? provider.parser.userAgent() : null;
-            if (agent != null) {
-                connection.userAgent(agent); // the browser's whose session the site's own cookies carry
-            }
             for (Map.Entry<String, String> cookie : own.entrySet()) {
                 if (cookies == null || !cookies.containsKey(cookie.getKey())) {
                     connection.cookie(cookie.getKey(), cookie.getValue());
                 }
             }
+        }
+        return connection;
+    }
+
+    /**
+     * The User-Agent of a request to {@code url}: the one of the browser whose session the site holds
+     * ({@link com.fanok.audiobooks.source.SourceParser#userAgent()}: Cloudflare binds its clearance to it), else the
+     * app's default ({@link Consts#USER_AGENT}).
+     */
+    static String userAgentOf(String url, Provider provider) {
+        if (provider != null && Url.isHost(url, provider.server)) {
+            String own = provider.parser.userAgent();
+            if (own != null && !own.isEmpty()) {
+                return own;
+            }
+        }
+        return Consts.USER_AGENT;
+    }
+
+    /**
+     * Tells the site what browser {@code userAgent} is: its {@code User-Agent} and every header that browser sends
+     * with a page ({@link BrowserHeaders#page}), replacing any of the same name. A request that claims to be a
+     * desktop Chrome without Chrome's {@code Accept}, client hints and {@code Sec-Fetch-*} is what an anti-bot wall
+     * looks for.
+     */
+    public static Connection asBrowser(Connection connection, String userAgent) {
+        for (Map.Entry<String, String> header : BrowserHeaders.page(userAgent).entrySet()) {
+            connection.header(header.getKey(), header.getValue());
         }
         return connection;
     }

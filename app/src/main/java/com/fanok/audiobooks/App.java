@@ -15,6 +15,7 @@ import androidx.preference.PreferenceManager;
 
 import com.fanok.audiobooks.download.DownloadMonitor;
 import com.fanok.audiobooks.net.AppProxy;
+import com.fanok.audiobooks.net.BrowserHeaders;
 import com.fanok.audiobooks.net.MemoryCookieJar;
 import com.fanok.audiobooks.pojo.StorageUtil;
 import com.fanok.audiobooks.presenter.BookPresenter;
@@ -191,6 +192,43 @@ public class App extends Application {
 
     public static okhttp3.OkHttpClient okHttpClientInstance;
 
+    /**
+     * Application interceptor (runs before OkHttp adds its own User-Agent) that fills in defaults only, never
+     * overriding a header the caller or the DownloadUtil resolver already set: the rest of the browser of the
+     * User-Agent in use ({@link BrowserHeaders#resource}) — derived from that agent, so a site's own one, a WebView's
+     * or {@code DownloadUtil.DESKTOP_UA}, gets its own — and the owning site's Referer. It names no route: every client
+     * made from the shared one
+     * ({@link AppProxy#mediaClient}, {@link AppProxy#updateRoutes}, the download client) carries the same headers,
+     * direct or through a proxy.
+     */
+    @androidx.annotation.NonNull
+    static okhttp3.Interceptor defaultHeaders() {
+        return chain -> {
+            okhttp3.Request original = chain.request();
+            okhttp3.Request.Builder requestBuilder = original.newBuilder();
+            String agent = original.header("User-Agent");
+            if (agent == null) {
+                agent = Consts.USER_AGENT;
+                requestBuilder.header("User-Agent", agent);
+            }
+            // the rest of the browser that User-Agent claims to be (a site's own too: a WebView Agent or
+            // DownloadUtil.DESKTOP_UA): a Chrome without client hints is what an anti-bot wall looks for
+            for (java.util.Map.Entry<String, String> header
+                    : BrowserHeaders.resource(agent, isImage(original.url().encodedPath())).entrySet()) {
+                if (original.header(header.getKey()) == null) {
+                    requestBuilder.header(header.getKey(), header.getValue());
+                }
+            }
+            if (original.header("Referer") == null) {
+                String referer = Provider.refererOf(Url.hostOf(original.url().toString()));
+                if (referer != null) {
+                    requestBuilder.header("Referer", referer);
+                }
+            }
+            return chain.proceed(requestBuilder.build());
+        };
+    }
+
     /** A path of an image file, by its extension. */
     static boolean isImage(@androidx.annotation.NonNull String path) {
         String lower = path.toLowerCase(java.util.Locale.ROOT);
@@ -278,22 +316,7 @@ public class App extends Application {
                 return chain.proceed(request);
             });
 
-            // Application interceptor (runs before OkHttp adds its own User-Agent): fills in defaults
-            // only, never overrides a header the caller or the DownloadUtil resolver already set.
-            builder.addInterceptor(chain -> {
-                okhttp3.Request original = chain.request();
-                okhttp3.Request.Builder requestBuilder = original.newBuilder();
-                if (original.header("User-Agent") == null) {
-                    requestBuilder.header("User-Agent", Consts.USER_AGENT);
-                }
-                if (original.header("Referer") == null) {
-                    String referer = Provider.refererOf(Url.hostOf(original.url().toString()));
-                    if (referer != null) {
-                        requestBuilder.header("Referer", referer);
-                    }
-                }
-                return chain.proceed(requestBuilder.build());
-            });
+            builder.addInterceptor(defaultHeaders());
 
             // OkHttp 5 tells the ProxySelector only of failed TCP connects; a refused tunnel or handshake through an
             // automatic proxy is reported here. The download client (newBuilder) inherits this listener.

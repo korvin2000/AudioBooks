@@ -120,10 +120,8 @@ public class ActivityCookies extends AppCompatActivity {
             verification.dispose();
         }
         verification = Single.fromCallable(() -> {
-                    Connection connection = SiteHttp.connect(server).cookie(name, session);
-                    if (clearance) {
-                        connection.userAgent(agent);
-                    }
+                    // Cloudflare binds the clearance to the browser's UA: the request must look like that browser
+                    Connection connection = SiteHttp.asBrowser(SiteHttp.connect(server), agent).cookie(name, session);
                     SiteHttp.parse(SiteHttp.execute(connection)); // a challenge page throws
                     return session;
                 })

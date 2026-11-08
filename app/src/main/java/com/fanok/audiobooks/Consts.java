@@ -47,8 +47,13 @@ public class Consts {
     public static final String PROXY_USER = "user142424";
     public static final String PROXY_PASSWORD = "3yuh5e";
 
+    /**
+     * The desktop Chrome the app claims to be, with the headers it sends (net/BrowserHeaders): a User-Agent is only a
+     * browser's when the whole fingerprint agrees, an anti-bot wall refuses a "Chrome" that omits the rest of it.
+     * Bump the version together with the client hints, which are derived from it.
+     */
     public static final String USER_AGENT
-            = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/110.0.0.0 Safari/537.36";
+            = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/158.0.0.0 Safari/537.36";
 
     public static final int MODEL_BOOKS = 0;
 

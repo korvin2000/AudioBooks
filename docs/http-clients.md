@@ -9,6 +9,7 @@ with `app/`. Symbols are given as `Class.member`; line numbers are deliberately 
 - There is **no single client**. There are four stacks:
   1. **`net/SiteHttp`** — jsoup over Android `HttpURLConnection`. Every **site page**: listings, book pages, chapters
      lists, search, comments, series, JSON pages. This is the main "book" path; all parsers in `source/` use it.
+     Its headers come from **`net/BrowserHeaders`** (the browser fingerprint below).
   2. **Shared OkHttp client** — built once in `App.onCreate`, returned by `App.getOkHttpClient()`. **Audio
      playback, downloads, Picasso images, embedded covers, narrator cards, update checks.**
   3. **Glide** — its own `HttpURLConnection` fetcher (no OkHttp integration). **Cover images in lists** and a few
@@ -20,6 +21,64 @@ with `app/`. Symbols are given as `Class.member`; line numbers are deliberately 
 - **Routing (direct vs proxy) is process-wide**: `net/AppProxy` installs a `java.net.ProxySelector` and an
   `Authenticator`, so stacks 1–3 follow the user's proxy setting per host without per-request code. **WebView ignores
   it.**
+- **Every request says it is a browser, completely** (`net/BrowserHeaders`): a `User-Agent` that names Chrome but
+  arrives without the headers Chrome sends on every request (`Accept`, `Accept-Language`, `Sec-Ch-Ua*` client hints,
+  `Sec-Fetch-*`) is exactly what an anti-bot wall treats as a bot. See "The browser the requests claim to be".
+
+## The browser the requests claim to be (`net/BrowserHeaders`)
+
+**File:** `net/BrowserHeaders.java`. Built, never fetched: the headers are derived from the `User-Agent` in use, so
+user agent and fingerprint always describe the same browser.
+
+| Method | Who uses it | What it adds |
+|---|---|---|
+| `page(userAgent)` | `SiteHttp.asBrowser`, so every site page | `User-Agent`, `Accept` (HTML), `Accept-Language`, `Sec-Ch-Ua`, `Sec-Ch-Ua-Mobile`, `Sec-Ch-Ua-Platform`, `Sec-Fetch-Dest: document`, `Sec-Fetch-Mode: navigate`, `Sec-Fetch-Site: cross-site` (the app's referrer is a search engine), `Sec-Fetch-User: ?1`, `Upgrade-Insecure-Requests: 1` |
+| `resource(userAgent, image)` | The shared OkHttp client's defaults interceptor (`App.defaultHeaders`), `net/Covers.glide` | `Accept` (image or `*/*`), `Accept-Language`, the same client hints. No `User-Agent`: the caller sets it (it may be a site's own) |
+
+`net/ProxyFinder.OkNetwork.site` uses `page(Consts.USER_AGENT)` too: a candidate proxy is judged by the request the
+app will actually make to that site, not by a bare-`User-Agent` probe that a wall may answer differently.
+
+- The client hints are the **low-entropy** ones Chrome sends with every request; they are derived from the agent:
+  desktop Chrome/Windows → `?0` + `"Windows"`, a WebView/Chrome on Android → `?1` + `"Android"` and the
+  `Android WebView` brand, and the `v=` brand versions always equal the agent's major version.
+- **Firefox** (`Firefox/…`): no client hints at all (Firefox has no UA-CH), Firefox's `Accept-Language`
+  (`ru-RU,ru;q=0.8,en-US;q=0.5,en;q=0.3`) and `Accept`.
+- A Chrome older than 100 (`DownloadUtil.DESKTOP_UA`, Chrome 89 for a site's media) gets no hints: that version sent
+  them in a form of its own, so inventing a modern list would be the mismatch this class exists to avoid.
+- `Accept-Encoding` is deliberately **not** set anywhere: jsoup asks for `gzip` itself and decodes it, and on OkHttp a
+  caller-set `Accept-Encoding` would switch off the stack's transparent gzip (downloads would get compressed bytes).
+
+## Why the requests impersonate a browser — a deliberate, owner-accepted risk
+
+The app's HTTP clients present themselves as an ordinary desktop browser (a full Chrome fingerprint, or Firefox/mobile
+when a site's verified session uses one) instead of a neutral client. This is a conscious choice by the project owner,
+not an accident, and it is documented here so the trade-off is on the record.
+
+**Why.** Some free sources (notably `audioboo.org`) sit behind a Cloudflare anti-bot wall whose checks are, for a small
+free hobby reader of free public audiobooks, far stricter than the traffic warrants. The site's owner was contacted,
+agreed the checks are excessive, promised to relax them, and **in the meantime suggested** that the app identify its
+HTTP client as a normal browser so its users keep reaching the free books. `net/BrowserHeaders` implements exactly that:
+a `User-Agent` that names a browser plus every header that browser actually sends, so the claim is internally consistent
+(a half-disguise — a browser `User-Agent` with none of the matching headers — is what a wall flags, and would help no
+one).
+
+**What the owner accepts.**
+- This is browser impersonation to pass an anti-bot challenge. Even with the site owner's blessing for `audioboo.org`,
+  the same browser fingerprint now goes to **every** source the app talks to (it is set in the shared stacks, not per
+  site), so the posture is app-wide, not a one-site exception. The owner accepts this for a non-commercial app that only
+  fetches freely published content.
+- It may run against the letter of Cloudflare's or a site's terms even where the content itself is free. The owner
+  judges the benefit to users of free books to outweigh that for this project and takes responsibility for it.
+- The disguise is intended as **temporary**, pending the `audioboo.org` owner removing the excessive checks. When that
+  happens the fingerprint can be dropped back to a neutral client (or kept, at the owner's discretion).
+- It is a maintenance cost: `Consts.USER_AGENT` and its derived client hints must be bumped together as browser
+  versions move on, or the fingerprint ages into a new tell.
+
+**What it is _not_.** No credentials, tokens, personal data or user identifiers are sent to gain access — only standard
+request headers that a real browser would send anyway. The change is confined to how requests describe themselves; it
+does not bypass authentication, defeat payment, or touch any private or paid resource. The existing privacy invariants
+below (site cookies/UA stay on their own host; proxy logins stay on the proxy; cloud-sync and region checks stay
+direct) are unchanged.
 
 ## Decision table: which stack to use
 
@@ -61,14 +120,16 @@ under the hood, not the app's OkHttp).
 
 ### Defaults set by `connect(url)`
 
-- `User-Agent: Consts.USER_AGENT` (desktop Chrome on Windows), `Referer: https://www.google.com/`,
-  `Accept-Language: ru-RU,…`.
+- `User-Agent: Consts.USER_AGENT` (desktop Chrome on Windows) and every other header of that browser
+  (`SiteHttp.asBrowser` → `BrowserHeaders.page`), `Referer: https://www.google.com/`.
 - Timeout `TIMEOUT_MS` (10 s), or `provider.parser.timeoutMs()` for a known site; body limit `MAX_BODY_BYTES` (4 MB);
   `ignoreHttpErrors(true)` (status is checked by `parse` / `throwForStatus`).
 - **Cookies, in this order:** cookies the host set earlier (`JAR`, per host, process lifetime) → the site's own cookies
   from `provider.parser.cookies()` for names the jar does not hold (sent only to `provider.server`'s host).
-- **User-Agent override:** `provider.parser.userAgent()` when non-null, own host only (audioboo with a verified browser
-  session; null for every other site → the default UA).
+- **User-Agent override:** `provider.parser.userAgent()` when non-empty, own host only (audioboo with a verified
+  browser session; null for every other site → the default UA). The whole fingerprint follows it
+  (`SiteHttp.userAgentOf` → `BrowserHeaders.page`), because Cloudflare binds `cf_clearance` to IP + User-Agent and a
+  desktop Chrome's client hints under the WebView's agent would belie it.
 
 ### Site-specific behaviour hooked into it
 
@@ -96,8 +157,10 @@ to HTTP/1.1 so parallel download segments get separate connections — faster on
 1. **Application interceptor — image guard.** A `GET` for an image path (`App.isImage`: `.jpg .jpeg .png .gif .webp`)
    to a host where `policy/DefaultCover.replaces(url)` is true (audioboo) is answered locally with a synthetic `404`,
    never sent. Reason: GETs for audioboo images make its Cloudflare refuse the app's page requests too.
-2. **Application interceptor — defaults.** Adds `User-Agent: Consts.USER_AGENT` and the owning site's `Referer`
-   (`Provider.refererOf(host)`) only when the caller did not set them.
+2. **Application interceptor — defaults.** Adds `User-Agent: Consts.USER_AGENT`, the rest of that browser
+   (`BrowserHeaders.resource`: `Accept`, `Accept-Language`, client hints — derived from the agent actually in use, so a
+   site's own `DownloadUtil.DESKTOP_UA` or the WebView agent of the forum route gets its own) and the owning site's
+   `Referer` (`Provider.refererOf(host)`), each only when the caller did not set it.
 3. `eventListener` → `AppProxy.reportConnectFailure` for failed proxy connects; `fastFallback(false)`.
 4. `proxyAuthenticator(AppProxy::proxyLogin)` and network interceptor `AppProxy::keepProxyLoginToProxy` (the built-in
    proxy's login is never sent to a site).
@@ -122,7 +185,9 @@ to HTTP/1.1 so parallel download segments get separate connections — faster on
 (`HttpURLConnection`, `Dalvik/…` User-Agent, no cookies). It still follows the process-wide `ProxySelector`.
 
 - `net/Covers.glide(url)` returns the URL, or a `GlideUrl` with the owning site's `Referer` when
-  `SourceParser.referer()`/`hosts()`/`refererHosts()` say the CDN needs it.
+  `SourceParser.referer()`/`hosts()`/`refererHosts()` say the CDN needs it; that `GlideUrl` also replaces Glide's
+  `Dalvik/…` agent with `Consts.USER_AGENT` and its image headers (`BrowserHeaders.resource`). Plain-URL covers keep
+  Glide's own agent and cache key.
 - Users: `adapter/BooksListAddapter` (list covers), `adapter/SeriesListAddapter` (series rows),
   `activity/NarratorActivity`; `SourcesAdapter`, `SourceCardFragment`, `SearchableActivity` load **bundled assets**
   (`SourceInfo.uri`), not network.
@@ -146,7 +211,7 @@ bound to a different IP than the app's requests (the check screen says so).
 |---|---|---|
 | `region/DirectNet` | Region/geolocation probes for `region/RegionCheck` | `Proxy.NO_PROXY`, no cookies, no redirects, 2–3 s timeouts: must measure the device's own network |
 | `sync/CloudSync.http()` | Cloud sync (tokens) | `Proxy.NO_PROXY`, no cookies: tokens never pass through the sites' proxies |
-| `net/ProxyFinder.OkNetwork` (`base()`, `lists()`, `through(candidate)`) | Fetching public proxy lists and testing candidates | Explicit proxy per request, no pool reuse, strict timeouts |
+| `net/ProxyFinder.OkNetwork` (`base()`, `lists()`, `through(candidate)`) | Fetching public proxy lists and testing candidates | Explicit proxy per request, no pool reuse, strict timeouts. Its site check sends the browser headers of a page (`BrowserHeaders.page`), so a proxy that passes it is one the app's own page requests pass through |
 | `net/AppProxy.check(config, url)` | "Test" button of the proxy settings | Only the typed proxy and its login |
 
 ## Routing: `net/AppProxy`
@@ -174,8 +239,9 @@ bound to a different IP than the app's requests (the check screen says so).
 
 ## Invariants (do not break)
 
-1. Without a stored browser session, audioboo page requests are byte-for-byte the old ones: `Consts.USER_AGENT`, no
-   `cf_clearance`, POST (`AudiobooClearanceTest`).
+1. Without a stored browser session, audioboo page requests claim no other browser than the app's default one:
+   `Consts.USER_AGENT` with that agent's headers, no `cf_clearance`, POST (`AudiobooClearanceTest`); with a session they
+   carry the session browser's agent **and** that agent's hints.
 2. No GET for an audioboo image ever leaves the app (OkHttp image guard + `DefaultCover.replaces` branches for Glide).
 3. A site's own cookies and User-Agent go only to its own host (`SiteHttp.connect`, `MemoryCookieJar.with`).
 4. Proxy logins go only to the proxy (`AppProxy.keepProxyLoginToProxy`, `ProxyOnlyAuthenticator`).
@@ -185,7 +251,8 @@ bound to a different IP than the app's requests (the check screen says so).
 
 | Change | Edit |
 |---|---|
-| Default UA / Referer / language for pages | `Consts.USER_AGENT`, `SiteHttp.REFERRER`, `SiteHttp.ACCEPT_LANGUAGE` |
+| Default UA / Referer for pages | `Consts.USER_AGENT`, `SiteHttp.REFERRER` |
+| Language, `Accept`, client hints, `Sec-Fetch-*` (any stack) | `net/BrowserHeaders` (`SiteHttp.ACCEPT_LANGUAGE` is its Chrome language) |
 | Default UA for the shared client | Interceptor in `App.onCreate` (falls back to `Consts.USER_AGENT`) |
 | A new site needing cookies/UA/POST/Referer | Override the matching `SourceParser` default in `source/<Site>.java`; no client code changes |
 | A new site whose images must not be requested | `DefaultCover.replaces` (and keep its URLs away from Glide) |
@@ -194,6 +261,7 @@ bound to a different IP than the app's requests (the check screen says so).
 
 ## Tests touching the clients
 
-`app/src/test/java/com/fanok/audiobooks/`: `net/SiteHttpTest`, `AppDownloadNetworkTest`, `source/AudiobooClearanceTest`,
+`app/src/test/java/com/fanok/audiobooks/`: `net/SiteHttpTest`, `net/BrowserHeadersTest`, `AppDownloadNetworkTest`,
+`source/AudiobooClearanceTest`,
 `policy/EmbeddedCoverTest`, `policy/DefaultCoverTest`, `activity/ActivityCookiesTest`, `source/SourceContractTest`,
 `source/LiveDumpTest` (live, opt-in).

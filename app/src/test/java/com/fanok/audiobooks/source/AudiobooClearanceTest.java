@@ -36,9 +36,14 @@ public class AudiobooClearanceTest {
         Connection.Request own = SiteHttp.connect(Audioboo.SERVER + "/page/2/").request();
         assertEquals(AGENT, own.header("User-Agent"));
         assertEquals("abc", own.cookie(Audioboo.CLEARANCE_COOKIE));
+        // the rest of that browser: a desktop Chrome's hints under a mobile Agent would not be its own
+        assertEquals("?1", own.header("Sec-Ch-Ua-Mobile"));
+        assertEquals("\"Android\"", own.header("Sec-Ch-Ua-Platform"));
+        assertEquals("navigate", own.header("Sec-Fetch-Mode"));
 
         Connection.Request other = SiteHttp.connect("https://archive.org/download/x/1.mp3").request();
         assertEquals(Consts.USER_AGENT, other.header("User-Agent"));
         assertNull(other.cookie(Audioboo.CLEARANCE_COOKIE));
+        assertEquals("?0", other.header("Sec-Ch-Ua-Mobile"));
     }
 }
