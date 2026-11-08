@@ -72,7 +72,9 @@ public final class DownloadStatusText {
             return s.isCompleteBook() ? res.getString(R.string.download_status_complete_all)
                     : res.getQuantityString(R.plurals.download_chapters_of, s.chaptersTotal, s.chaptersDone, s.chaptersTotal);
         }
-        return stateLabel(res, s) + " " + s.chaptersDone + "/" + s.chaptersSelected;
+        // an HLS book is one transfer for many chapters (the notification's status): its share, not "0/0"
+        return stateLabel(res, s) + " " + (s.chaptersSelected > 0 ? s.chaptersDone + "/" + s.chaptersSelected
+                : s.percent() + "%");
     }
 
     @Nullable

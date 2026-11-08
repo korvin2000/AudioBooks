@@ -55,6 +55,7 @@ import com.fanok.audiobooks.R;
 import com.fanok.audiobooks.activity.BookActivity;
 import com.fanok.audiobooks.activity.MainActivity;
 import com.fanok.audiobooks.activity.SearchableActivity;
+import com.fanok.audiobooks.adapter.BookSheetDownload;
 import com.fanok.audiobooks.adapter.BookSheetPeople;
 import com.fanok.audiobooks.adapter.BooksListAddapter;
 import com.fanok.audiobooks.adapter.ListFocus;
@@ -697,6 +698,7 @@ public class FavoriteFragment extends MvpAppCompatFragment implements FavoriteVi
             mPresenter.onMenuSeries(book.getUrlSeries(), book.getSeries());
         });
         BookSheetPeople.bind(layout, book); // the stars of the author and reader rows, once their visibility is set
+        BookSheetDownload.bind(layout, book, dialog);
         dialog.show();
     }
 

@@ -138,7 +138,7 @@ public class BookDescriptionPresenter extends MvpPresenter<Description> implemen
      * is not what the site served before ({@link IllegalStateException}). jsoup's {@link UncheckedIOException} is
      * told by its cause.
      */
-    static int errorMessage(Throwable error) {
+    public static int errorMessage(Throwable error) {
         Throwable e = error instanceof UncheckedIOException && error.getCause() != null ? error.getCause() : error;
         if (e == null) {
             return R.string.error_no_network;

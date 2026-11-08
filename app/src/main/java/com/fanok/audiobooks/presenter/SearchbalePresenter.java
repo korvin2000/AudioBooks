@@ -16,6 +16,7 @@ import com.arellomobile.mvp.MvpPresenter;
 import com.fanok.audiobooks.Consts;
 import com.fanok.audiobooks.R;
 import com.fanok.audiobooks.Url;
+import com.fanok.audiobooks.adapter.BookSheetDownload;
 import com.fanok.audiobooks.adapter.BookSheetPeople;
 import com.fanok.audiobooks.interface_pacatge.searchable.SearchableModel;
 import com.fanok.audiobooks.interface_pacatge.searchable.SearchablePresenter;
@@ -1242,6 +1243,7 @@ public class SearchbalePresenter extends MvpPresenter<SearchableView> implements
                     bookPOJO.getSeries(), Consts.MODEL_BOOKS, "searchebleBooks");
         });
         BookSheetPeople.bind(layout, bookPOJO); // stars for the author and the reader, once their rows are set
+        BookSheetDownload.bind(layout, bookPOJO, dialog); // the real offer, not a group's display copy
         dialog.show();
     }
 }
