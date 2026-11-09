@@ -13,12 +13,12 @@ import android.content.res.Configuration;
 import android.graphics.Bitmap;
 import android.graphics.drawable.Drawable;
 import android.os.Looper;
-import android.view.Gravity;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
+import android.widget.RelativeLayout;
 import android.widget.TextView;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -561,26 +561,30 @@ public class BooksListAddapter extends RecyclerView.Adapter<BooksListAddapter.My
     }
 
     /**
-     * The medium list: the big list's row without the free space above the series, as tall as its text, and the
-     * cover in the big one's proportions as tall as six lines of it: a one-line title, the genre, series, author and
-     * reader in the genre's size, and the duration.
+     * The medium list: the big list's row as tall as its text or its cover, whichever is taller. The cover, in the big
+     * one's proportions, is as tall as six lines of the text (a one-line title, the genre, series, author and reader
+     * in the genre's size, and the duration) and in the row's middle. The free space is above the last line
+     * (duration and source), which so keeps to the bottom as on the other cards, not above the series.
      */
     private static void medium(View row) {
         row.getLayoutParams().height = ViewGroup.LayoutParams.WRAP_CONTENT;
-        // a match_parent child adds nothing to a wrap_content LinearLayout: the row would be the cover's height
-        row.findViewById(R.id.texts).getLayoutParams().height = ViewGroup.LayoutParams.WRAP_CONTENT;
-        row.findViewById(R.id.gap).setVisibility(View.GONE);
         int height = 5 * lineHeight(row.findViewById(R.id.genre)) + lineHeight(row.findViewById(R.id.time));
         int width = height * row.getResources().getDimensionPixelSize(R.dimen.recycler_item_image_width_big)
                 / row.getResources().getDimensionPixelSize(R.dimen.recycler_item_height_big);
         View cover = row.findViewById(R.id.imageView);
         cover.getLayoutParams().width = width;
         cover.getLayoutParams().height = height;
+        ((RelativeLayout.LayoutParams) cover.getLayoutParams()).addRule(RelativeLayout.CENTER_VERTICAL);
+        // a wrap_content LinearLayout counts its match_parent children only when all are: so is the cover's column
+        // as the text's, and the row takes the text's height when that is the taller
+        ((View) cover.getParent()).getLayoutParams().height = ViewGroup.LayoutParams.MATCH_PARENT;
         ViewGroup.LayoutParams ring = row.findViewById(R.id.donutProgress).getLayoutParams();
         ring.width = width;
         ring.height = width;
-        // a row taller than its cover (a two-line title) has the cover in its middle; the text stays at the top
-        ((LinearLayout.LayoutParams) ((View) cover.getParent()).getLayoutParams()).gravity = Gravity.CENTER_VERTICAL;
+        View gap = row.findViewById(R.id.gap);
+        ViewGroup column = (ViewGroup) gap.getParent();
+        column.removeView(gap);
+        column.addView(gap, column.getChildCount() - 1);
     }
 
     /** A one-line text's height, with its font padding and icon. */
