@@ -154,6 +154,9 @@ public class MediaPlayerService extends MediaBrowserServiceCompat {
 
     public static final String ACTION_PLAY = "audioBook.ACTION_PLAY";
 
+    /** Of {@link #ACTION_PLAY}: the URL of a book the database knows, played from its checkpoint as a browser asks. */
+    public static final String EXTRA_BOOK_URL = "audioBook.bookUrl";
+
     public static final String ACTION_PAUSE = "audioBook.ACTION_PAUSE";
 
     public static final String ACTION_PREVIOUS = "audioBook.ACTION_PREVIOUS";
@@ -219,6 +222,8 @@ public class MediaPlayerService extends MediaBrowserServiceCompat {
     private static volatile boolean running;
     private static volatile boolean isPlay;
     private static volatile String currentBookUrl;
+    @Nullable
+    private static volatile String restoringBookUrl;
     @Nullable
     private static volatile BookPOJO currentBook;
 
@@ -424,6 +429,15 @@ public class MediaPlayerService extends MediaBrowserServiceCompat {
         return currentBookUrl;
     }
 
+    /**
+     * The book a cold start (media button, «Слушать последнюю книгу», a browser client) is reading from the database
+     * to play, or null: the player holds it next, unless a newer command comes first.
+     */
+    @Nullable
+    public static String restoringBookUrl() {
+        return restoringBookUrl;
+    }
+
     /** The book the service holds, as the screen that opened it knows it; null without a book. */
     @Nullable
     public static BookPOJO currentBook() {
@@ -489,6 +503,7 @@ public class MediaPlayerService extends MediaBrowserServiceCompat {
         @Override
         public void onIsPlayingChanged(boolean isPlaying) {
             if (isPlaying) {
+                checkpointNow(false); //the book now really plays: it is the last played, however short the session
                 startProgress();
                 onSleepTimerPlaying(true);
             } else {
@@ -636,6 +651,7 @@ public class MediaPlayerService extends MediaBrowserServiceCompat {
         removeNotification();
         isPlay = false;
         currentBookUrl = null;
+        restoringBookUrl = null;
         currentBook = null;
 
         //5. the executor goes last; every submit checks isShutdown()
@@ -718,6 +734,8 @@ public class MediaPlayerService extends MediaBrowserServiceCompat {
             }
         } else if (ACTION_EXIT.equals(action) && !EXIT_TOKEN.equals(intent.getStringExtra(EXTRA_EXIT_TOKEN))) {
             Log.w(TAG, "exit without the notification's token ignored");
+        } else if (ACTION_PLAY.equals(action) && intent.getStringExtra(EXTRA_BOOK_URL) != null) {
+            playFromMediaId(intent.getStringExtra(EXTRA_BOOK_URL)); //that book, whatever was loaded last
         } else if (action != null) {
             handleIncomingAction(action);
         }
@@ -946,7 +964,7 @@ public class MediaPlayerService extends MediaBrowserServiceCompat {
         closeFlipWindow();
         listenForFlip(false);
         resolving = false;
-        restoring = false;
+        setRestoring(null);
         failedKind = null;
         book = null;
         bookUrl = null;
@@ -1059,7 +1077,7 @@ public class MediaPlayerService extends MediaBrowserServiceCompat {
         final int generation = ++gen;
         cancelRetry();
         //the newest command wins over a book still being read from the database
-        restoring = false;
+        setRestoring(null);
         if (freshChapter) {
             errorPolicy.reset();
             recoveredAtMs = C.TIME_UNSET;
@@ -1171,7 +1189,7 @@ public class MediaPlayerService extends MediaBrowserServiceCompat {
         //taken at request time, so the newest request wins and an older one still on its way is dropped
         final int generation = ++gen;
         final Context app = getApplicationContext();
-        restoring = true;
+        setRestoring(url);
         boolean queued = execDb(() -> {
             final ArrayList<AudioPOJO> list = new ArrayList<>();
             BookPOJO found = null;
@@ -1198,11 +1216,15 @@ public class MediaPlayerService extends MediaBrowserServiceCompat {
                 if (generation != gen || player == null) {
                     return;
                 }
-                restoring = false;
+                setRestoring(null);
                 if (restored != null && !ParentalControl.isAllowed(app, restored)) {
                     //a blocked book is never started by a command: the book screen asks for the PIN first
                     wantPlaying = false;
-                    if (resolving && hasBook()) {
+                    if (!hasBook()) {
+                        stop();
+                        return;
+                    }
+                    if (resolving) {
                         //this request dropped the loaded chapter's resolution: resolve it again, paused
                         loadChapter(chapterIndex, startPositionMs, false);
                         return;
@@ -1233,9 +1255,15 @@ public class MediaPlayerService extends MediaBrowserServiceCompat {
             });
         });
         if (!queued) {
-            restoring = false;
+            setRestoring(null);
         }
         publishState();
+    }
+
+    /** A cold start reads the book {@code url} from the database; null: none does. */
+    private void setRestoring(@Nullable String url) {
+        restoring = url != null;
+        restoringBookUrl = url;
     }
 
     /**
@@ -1676,7 +1704,8 @@ public class MediaPlayerService extends MediaBrowserServiceCompat {
         if (checkpoint == null || movedByOther(checkpoint) != null) {
             return;
         }
-        storage.storeCheckpoint(checkpoint, synchronous);
+        //only audio actually heard makes the book the last played: not one loaded paused, nor a failed attempt
+        storage.storeCheckpoint(checkpoint, player.isPlaying(), synchronous);
         written = checkpoint;
         adopted = null;
         lastCheckpointAt = SystemClock.elapsedRealtime();
@@ -2156,8 +2185,8 @@ public class MediaPlayerService extends MediaBrowserServiceCompat {
         final String url = imageUrl;
         if (DefaultCover.replaces(url)) {
             // its site's covers are never requested (its bot protection would then refuse the app's pages): the cover
-            // in its audio, at once when it was read before, else when EmbeddedCover has read it (embeddedCover)
-            artworkFailedUrl = url;
+            // in its audio, at once when it was read before, else when EmbeddedCover has read it (embeddedCover); asked
+            // again on the next update, so a failed read is retried (EmbeddedCover drops repeats and paces retries)
             image = EmbeddedCover.cached(this, bookUrl);
             if (image != null) {
                 publishMetadata();

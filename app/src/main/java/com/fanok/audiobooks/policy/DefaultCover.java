@@ -59,9 +59,13 @@ public final class DefaultCover {
     @NonNull
     public static Drawable drawable(@NonNull Context context, @Nullable String key) {
         android.graphics.Bitmap embedded = EmbeddedCover.cached(context, key);
-        if (embedded != null) {
-            return new android.graphics.drawable.BitmapDrawable(context.getResources(), embedded);
-        }
+        return embedded != null ? new android.graphics.drawable.BitmapDrawable(context.getResources(), embedded)
+                : gradient(context, key);
+    }
+
+    /** The default cover of the book {@code key} alone, never its read one (so never read from disk): for a list. */
+    @NonNull
+    public static Drawable gradient(@NonNull Context context, @Nullable String key) {
         GradientDrawable background = new GradientDrawable(GradientDrawable.Orientation.TL_BR,
                 PALETTES[paletteOf(key)]);
         Drawable overlay = ContextCompat.getDrawable(context, R.drawable.default_cover_overlay);

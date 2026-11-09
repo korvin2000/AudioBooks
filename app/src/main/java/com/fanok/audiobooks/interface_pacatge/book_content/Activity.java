@@ -74,7 +74,10 @@ public interface Activity extends MvpView {
     @StateStrategyType(AddToEndSingleStrategy.class)
     void stateElse();
 
-    /** The speed was changed (the speed dialog's OK or Стандарт): the toolbar item and player button show it. */
+    /**
+     * The speed was changed (the speed dialog's OK or Стандарт, a TV's minus / plus): the toolbar item and player
+     * button show it.
+     */
     @StateStrategyType(SkipStrategy.class)
     void showSpeed(float speed);
 
@@ -93,6 +96,10 @@ public interface Activity extends MvpView {
      */
     @StateStrategyType(OneExecutionStateStrategy.class)
     void showLoadError(String message, String report);
+
+    /** The book's site refused the app with its browser check: «Пройти» (passed, the book loads again), offered once. */
+    @StateStrategyType(OneExecutionStateStrategy.class)
+    void showSiteCheckOffer(@NonNull com.fanok.audiobooks.search.Provider site);
 
     /** A notice that must be read: shown long, and on the next attach when the screen was stopped. */
     @StateStrategyType(OneExecutionStateStrategy.class)

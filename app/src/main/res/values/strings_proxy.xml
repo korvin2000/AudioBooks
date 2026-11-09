@@ -25,6 +25,9 @@
     <string name="proxy_rescan">Найти заново</string>
     <string name="proxy_note">Публичные прокси бывают медленными и нестабильными; при сбое приложение подберёт другой.</string>
     <string name="proxy_close">Закрыть</string>
+    <!-- the main screen's offer when the automatic proxies all stopped answering (MainActivity) -->
+    <string name="proxy_exhausted_title">Прокси не отвечают</string>
+    <string name="proxy_exhausted_message">Все найденные прокси перестали отвечать. Пока рабочий не найден, сайты «через прокси» открываются напрямую.</string>
 
     <string name="proxy_summary_off">Выключен · настройки устройства</string>
     <string name="proxy_summary_builtin">Встроенный прокси · %1$s</string>

@@ -64,10 +64,11 @@ import okhttp3.Response;
  * ({@link #CONTROLS}), whose answer a proxy cannot fake. An audiobook site, often down, never judges a proxy: the
  * selected one ({@link #targetOf}) only ranks the verified proxies, those it serves first. {@link AppProxy} routes
  * traffic through the proxy in use and its spares ({@link #proxiesForRequest()}) and reports a suspect proxy: a
- * transport failure leaves the proxy when control checks fail through it and pass through a spare; a site's refusal
- * swaps it with a spare that the site serves. An exhausted list starts a new search; a search that finds nothing keeps
- * the list in use. Automatic searches run at most once per {@link #AUTO_SCAN_INTERVAL_MS} and never without a network;
- * the user's "Найти заново" ({@link #rescan()}) always may. Listeners hear every state change on the main thread.
+ * transport failure leaves the proxy when control checks fail through it and pass through a later one, or when none
+ * passes but the control server answers directly (the list runs out); a site's refusal swaps it with a spare that the
+ * site serves. An exhausted list starts a new search; a search that finds nothing keeps the list in use. Automatic
+ * searches run at most once per {@link #AUTO_SCAN_INTERVAL_MS} and never without a network; the user's "Найти заново"
+ * ({@link #rescan()}) always may. Listeners hear every state change on the main thread.
  */
 public final class ProxyFinder {
 
@@ -104,9 +105,15 @@ public final class ProxyFinder {
         public final String site;
         /** Verified proxies that passed {@link #site}. */
         public final int sitePassed;
+        /**
+         * When the proxies found all stopped answering (wall clock), while no proxy has been in use since; 0 otherwise.
+         * One value per run-out, so the UI can offer a new search once for it.
+         */
+        public final long exhaustedAt;
 
         State(@NonNull Phase phase, int tested, int total, int found, @Nullable ProxyCandidate current, int spares,
-                long lastScanAt, int refused, int unreachable, @Nullable String site, int sitePassed) {
+                long lastScanAt, int refused, int unreachable, @Nullable String site, int sitePassed,
+                long exhaustedAt) {
             this.phase = phase;
             this.tested = tested;
             this.total = total;
@@ -118,6 +125,7 @@ public final class ProxyFinder {
             this.unreachable = unreachable;
             this.site = site;
             this.sitePassed = sitePassed;
+            this.exhaustedAt = exhaustedAt;
         }
     }
 
@@ -136,6 +144,9 @@ public final class ProxyFinder {
          * geo-block or challenge, a 429, a 5xx).
          */
         long site(@NonNull ProxyCandidate candidate, @NonNull String page, int timeoutMs) throws IOException;
+
+        /** Asks {@code control} directly, through no proxy; returns when it passes, throws otherwise. */
+        void reachable(@NonNull Control control, int timeoutMs) throws IOException;
     }
 
     /**
@@ -202,7 +213,7 @@ public final class ProxyFinder {
     static final long SITE_COOLDOWN_MS = 60_000;
     static final int MAX_CANDIDATES = 400;
     static final int PROBE_THREADS = 24;
-    /** Per connect, read and write of a check in a search; its call gets twice this. */
+    /** Per connect, read and write of a check in a search or of a spare in a confirmation; its call gets twice this. */
     static final int PROBE_TIMEOUT_MS = 5_000;
     /** The same for a confirmation of the proxy in use: a call of at most 15 s. */
     static final int RECHECK_TIMEOUT_MS = 7_500;
@@ -258,6 +269,8 @@ public final class ProxyFinder {
     @Nullable
     private String site;
     private int sitePassed;
+    /** {@link State#exhaustedAt}, saved with the list; cleared by {@link #updateCurrent} once a proxy is in use. */
+    private long exhaustedAt;
     /** The proxy whose last control confirmation passed, and when: see {@link #CONFIRM_QUIET_MS}. */
     private ProxyCandidate confirmed;
     private long confirmedAt;
@@ -304,7 +317,10 @@ public final class ProxyFinder {
             lastScanAt = saved.scannedAt;
             nextAutoScanAt = saved.scannedAt > 0 ? saved.scannedAt + AUTO_SCAN_INTERVAL_MS : 0;
             updateCurrent();
-            phase = current != null ? Phase.READY : Phase.IDLE;
+            // a run-out as saved; a list saved before that was kept, which ran out: now
+            exhaustedAt = current != null ? 0 : saved.exhaustedAt > 0 ? saved.exhaustedAt
+                    : verified.isEmpty() ? 0 : clock.getAsLong();
+            phase = current != null ? Phase.READY : exhaustedAt > 0 ? Phase.FAILED : Phase.IDLE;
         }
     }
 
@@ -349,7 +365,7 @@ public final class ProxyFinder {
     public synchronized State state() {
         int spares = current != null ? verified.size() - index - 1 : 0;
         return new State(phase, tested, total, found, current, spares, lastScanAt, refused, unreachable, site,
-                sitePassed);
+                sitePassed, exhaustedAt);
     }
 
     /** The proxy in use, or null when none is verified. */
@@ -520,9 +536,11 @@ public final class ProxyFinder {
 
     /**
      * The proxy in use by control checks: one, and after {@link #RETRY_DELAY_MS} one of another operator. When both
-     * fail, the first spare is checked by the second server: it passes, so the proxy in use is left
-     * ({@link #advancePast}); it fails too, or there is none to compare with, so the network may be at fault (online
-     * means only that Android has an active network): the list stays and a search starts when due.
+     * fail, the spares are checked in order by the second server, each within {@link #PROBE_TIMEOUT_MS}: the first that
+     * passes takes over, the proxy in use and the dead spares before it are left ({@link #advancePast}). When none
+     * passes, the same server asked directly decides: it answers, so the proxies are dead, not the network, and the
+     * list runs out; it fails too, so the network may be at fault (online means only that Android has an active
+     * network): the list stays. Either way a search starts when due.
      */
     private void confirmTransport() {
         ProxyCandidate candidate = current;
@@ -540,24 +558,39 @@ public final class ProxyFinder {
                 refresh(candidate, network.control(candidate, controls.get(attempt), RECHECK_TIMEOUT_MS));
                 return;
             } catch (IOException | RuntimeException e) {
-                // once more through another operator, then the spare decides
+                // once more through another operator, then the spares decide
             }
         }
-        ProxyCandidate spare = spare();
+        for (ProxyCandidate spare : spares()) {
+            if (!online.getAsBoolean() || current != candidate) {
+                return;
+            }
+            try {
+                refresh(spare, network.control(spare, controls.get(1), PROBE_TIMEOUT_MS));
+                advancePast(candidate, spare);
+                return;
+            } catch (IOException | RuntimeException e) {
+                // dead as well, or the network: the next one, then the direct check, decides
+            }
+        }
         if (!online.getAsBoolean() || current != candidate) {
             return;
         }
-        if (spare == null) {
-            scanIfDue(); // nothing shows that another route works now: the list stays
-            return;
+        if (directWorks(controls.get(1))) {
+            advancePast(candidate, null);
+        } else {
+            scanIfDue(); // a common outage, not the proxies': the list stays
         }
+    }
+
+    /** True when {@code control} answers the device directly: the network works. */
+    private boolean directWorks(@NonNull Control control) {
         try {
-            refresh(spare, network.control(spare, controls.get(1), RECHECK_TIMEOUT_MS));
+            network.reachable(control, RECHECK_TIMEOUT_MS);
+            return true;
         } catch (IOException | RuntimeException e) {
-            scanIfDue(); // a common outage, not the proxy's: the list stays
-            return;
+            return false;
         }
-        advancePast(candidate);
     }
 
     /**
@@ -615,6 +648,13 @@ public final class ProxyFinder {
         return current != null && index + 1 < verified.size() ? verified.get(index + 1) : null;
     }
 
+    /** The spares after the proxy in use, in order; none without one. */
+    @NonNull
+    private synchronized List<ProxyCandidate> spares() {
+        return current != null ? new ArrayList<>(verified.subList(index + 1, verified.size()))
+                : Collections.<ProxyCandidate>emptyList();
+    }
+
     private static boolean pause(long ms) {
         if (ms <= 0) {
             return true;
@@ -628,16 +668,24 @@ public final class ProxyFinder {
         }
     }
 
-    private void advancePast(@NonNull ProxyCandidate failed) {
+    /**
+     * The proxy in use failed: {@code next}, a spare that passed, takes over and the proxies before it are left; null
+     * leaves them all: the list runs out ({@link Phase#FAILED}, {@link State#exhaustedAt}), a search starts when due.
+     */
+    private void advancePast(@NonNull ProxyCandidate failed, @Nullable ProxyCandidate next) {
         boolean exhausted;
         synchronized (this) {
-            if (current != failed) {
+            int to = next == null ? verified.size() : verified.indexOf(next);
+            if (current != failed || to <= index) {
                 return;
             }
-            index++;
+            index = to;
             updateCurrent();
-            save();
             exhausted = current == null;
+            if (exhausted) {
+                exhaustedAt = clock.getAsLong();
+            }
+            save();
             if (phase != Phase.SCANNING) {
                 phase = exhausted ? Phase.FAILED : phase == Phase.KEPT ? Phase.KEPT : Phase.READY;
             }
@@ -1089,6 +1137,9 @@ public final class ProxyFinder {
         current = candidate;
         currentProxy = candidate != null ? proxies.get(0) : null;
         route = Collections.unmodifiableList(proxies);
+        if (candidate != null) {
+            exhaustedAt = 0; // a proxy is in use again: the run-out is over
+        }
         if (before == null ? candidate != null : !before.equals(candidate)) {
             try {
                 switched.run();
@@ -1100,7 +1151,7 @@ public final class ProxyFinder {
 
     // guarded by this
     private void save() {
-        prefs.edit().putString(PREF_LIST, Saved.toJson(verified, index, lastScanAt)).apply();
+        prefs.edit().putString(PREF_LIST, Saved.toJson(verified, index, lastScanAt, exhaustedAt)).apply();
     }
 
     private void publish() {
@@ -1174,26 +1225,30 @@ public final class ProxyFinder {
     }
 
     /**
-     * The persisted list: the verified proxies, the one in use and when they were found (v1). A v2 list, which also
-     * kept the sites its search tried, loads the same; those fields are ignored.
+     * The persisted list: the verified proxies, the one in use, when they were found and when the list ran out
+     * ({@link State#exhaustedAt}, 0 in a list saved before it was kept) (v1). A v2 list, which also kept the sites its
+     * search tried, loads the same; those fields are ignored.
      */
     static final class Saved {
         final List<ProxyCandidate> proxies;
         final int index;
         final long scannedAt;
+        final long exhaustedAt;
 
-        Saved(@NonNull List<ProxyCandidate> proxies, int index, long scannedAt) {
+        Saved(@NonNull List<ProxyCandidate> proxies, int index, long scannedAt, long exhaustedAt) {
             this.proxies = proxies;
             this.index = index;
             this.scannedAt = scannedAt;
+            this.exhaustedAt = exhaustedAt;
         }
 
         @NonNull
-        static String toJson(@NonNull List<ProxyCandidate> proxies, int index, long scannedAt) {
+        static String toJson(@NonNull List<ProxyCandidate> proxies, int index, long scannedAt, long exhaustedAt) {
             JsonObject root = new JsonObject();
             root.addProperty("v", 1);
             root.addProperty("current", index);
             root.addProperty("scannedAt", scannedAt);
+            root.addProperty("exhaustedAt", exhaustedAt);
             JsonArray array = new JsonArray();
             for (ProxyCandidate proxy : proxies) {
                 JsonObject item = new JsonObject();
@@ -1213,7 +1268,7 @@ public final class ProxyFinder {
         static Saved fromJson(@Nullable String json) {
             List<ProxyCandidate> proxies = new ArrayList<>();
             if (json == null || json.isEmpty()) {
-                return new Saved(Collections.unmodifiableList(proxies), 0, 0);
+                return new Saved(Collections.unmodifiableList(proxies), 0, 0, 0);
             }
             try {
                 JsonObject root = JsonParser.parseString(json).getAsJsonObject();
@@ -1232,9 +1287,10 @@ public final class ProxyFinder {
                 }
                 int index = root.has("current") ? root.get("current").getAsInt() : 0;
                 long scannedAt = root.has("scannedAt") ? root.get("scannedAt").getAsLong() : 0;
-                return new Saved(Collections.unmodifiableList(proxies), Math.max(0, index), scannedAt);
+                long exhaustedAt = root.has("exhaustedAt") ? root.get("exhaustedAt").getAsLong() : 0;
+                return new Saved(Collections.unmodifiableList(proxies), Math.max(0, index), scannedAt, exhaustedAt);
             } catch (RuntimeException e) {
-                return new Saved(Collections.<ProxyCandidate>emptyList(), 0, 0);
+                return new Saved(Collections.<ProxyCandidate>emptyList(), 0, 0, 0);
             }
         }
     }
@@ -1242,10 +1298,10 @@ public final class ProxyFinder {
     /**
      * The real network. Lists come directly ({@link Proxy#NO_PROXY}), never through the proxy in use. A check is one
      * request through the candidate without following redirects. A control check is a GET of the control server and
-     * passes on that server's own answer only ({@link Control#passes}); a site check is a GET with a one-byte Range (a
-     * POST for a site whose pages are posted, as {@link SiteHttp} sends) and passes on a {@link ProxyFinder#usable}
-     * answer. Over HTTPS the TLS handshake with the real server proves the tunnel reached it. No connection outlives
-     * its check.
+     * passes on that server's own answer only ({@link Control#passes}); asked directly ({@link #reachable}), it tells
+     * dead proxies from a dead network. A site check is a GET with a one-byte Range (a POST for a site whose pages are
+     * posted, as {@link SiteHttp} sends) and passes on a {@link ProxyFinder#usable} answer. Over HTTPS the TLS
+     * handshake with the real server proves the tunnel reached it. No connection outlives its check.
      */
     static final class OkNetwork implements Network {
         /** Built on first use, on the finder's threads: the finder itself is created during app start. */
@@ -1279,11 +1335,14 @@ public final class ProxyFinder {
             return lists;
         }
 
-        /** A client through {@code candidate} alone: {@code timeoutMs} per connect, read and write, twice that per call. */
+        /**
+         * A client through {@code proxy} alone ({@link Proxy#NO_PROXY}: directly): {@code timeoutMs} per connect, read
+         * and write, twice that per call.
+         */
         @NonNull
-        private OkHttpClient through(@NonNull ProxyCandidate candidate, int timeoutMs) {
+        private OkHttpClient through(@NonNull Proxy proxy, int timeoutMs) {
             return base().newBuilder()
-                    .proxy(candidate.toProxy())
+                    .proxy(proxy)
                     .connectTimeout(timeoutMs, TimeUnit.MILLISECONDS)
                     .readTimeout(timeoutMs, TimeUnit.MILLISECONDS)
                     .writeTimeout(timeoutMs, TimeUnit.MILLISECONDS)
@@ -1306,12 +1365,23 @@ public final class ProxyFinder {
         @Override
         public long control(@NonNull ProxyCandidate candidate, @NonNull Control control, int timeoutMs)
                 throws IOException {
+            return ask(through(candidate.toProxy(), timeoutMs), control, " through " + candidate);
+        }
+
+        @Override
+        public void reachable(@NonNull Control control, int timeoutMs) throws IOException {
+            ask(through(Proxy.NO_PROXY, timeoutMs), control, " directly");
+        }
+
+        /** One GET of {@code control} by {@code client}: the milliseconds it took; throws unless it passes. */
+        private static long ask(@NonNull OkHttpClient client, @NonNull Control control, @NonNull String route)
+                throws IOException {
             Request request = new Request.Builder().url(control.url).header("User-Agent", Consts.USER_AGENT).build();
             long start = System.nanoTime();
-            try (Response response = through(candidate, timeoutMs).newCall(request).execute()) {
+            try (Response response = client.newCall(request).execute()) {
                 String body = control.marker == null ? "" : readCapped(response.body().byteStream(), MARKER_BYTES);
                 if (!control.passes(response.code(), body)) {
-                    throw new IOException("HTTP " + response.code() + " from " + control + " through " + candidate);
+                    throw new IOException("HTTP " + response.code() + " from " + control + route);
                 }
                 return Math.max(1, TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - start));
             }
@@ -1333,7 +1403,7 @@ public final class ProxyFinder {
                 builder.header("Range", "bytes=0-0");
             }
             long start = System.nanoTime();
-            try (Response response = through(candidate, timeoutMs).newCall(builder.build()).execute()) {
+            try (Response response = through(candidate.toProxy(), timeoutMs).newCall(builder.build()).execute()) {
                 if (!usable(response.code())) {
                     throw new SiteRefused(response.code(), candidate);
                 }

@@ -38,6 +38,7 @@ import androidx.recyclerview.widget.RecyclerView;
 import com.fanok.audiobooks.R;
 import com.fanok.audiobooks.activity.SourceActivity;
 import com.fanok.audiobooks.net.AppProxy;
+import com.fanok.audiobooks.net.ProxyFinder;
 import com.fanok.audiobooks.search.Provider;
 import com.fanok.audiobooks.search.SourceHealth;
 import com.fanok.audiobooks.search.SourceInfo;
@@ -104,7 +105,7 @@ public class SourcesDialogFragment extends DialogFragment {
     private ItemTouchHelper touchHelper;
     private TextView checkedAt;
     private TextView hint;
-    private View refresh;
+    private ImageButton refresh;
     private View refreshProgress;
     /** Checks under way; the refresh button is a spinner while there is one. */
     private int running;
@@ -121,6 +122,14 @@ public class SourcesDialogFragment extends DialogFragment {
             // once for a burst of changes, and after every listener of this one ran (AppProxy reads its routes there)
             hint.removeCallbacks(sync);
             hint.post(sync);
+        }
+    };
+    /** The proxy's state the hint shows; the search's progress alone does not redraw it. */
+    @Nullable
+    private SourceTexts.ProxyState proxyState;
+    private final ProxyFinder.Listener finderListener = state -> {
+        if (hint != null && SourceTexts.proxyState(state) != proxyState) {
+            renderHint();
         }
     };
 
@@ -162,7 +171,11 @@ public class SourcesDialogFragment extends DialogFragment {
         refreshProgress = view.findViewById(R.id.sourcesRefreshProgress);
         view.findViewById(R.id.sourcesAllDirect).setOnClickListener(v -> setAllDirect(true));
         view.findViewById(R.id.sourcesAllProxy).setOnClickListener(v -> setAllDirect(false));
-        refresh.setOnClickListener(v -> check(Sources.active(), PARALLEL));
+        refresh.setOnClickListener(v -> {
+            if (running == 0) { // a focused button stays under the spinner: a press then starts nothing
+                check(Sources.active(), PARALLEL);
+            }
+        });
 
         RecyclerView list = view.findViewById(R.id.sourcesList);
         // a fixed height that fits most phones: twelve rows, less on a short (landscape) screen
@@ -173,7 +186,6 @@ public class SourcesDialogFragment extends DialogFragment {
         touchHelper = new ItemTouchHelper(new DragCallback());
         touchHelper.attachToRecyclerView(list);
 
-        hint.setText(hintText(context));
         hint.setMovementMethod(LinkMovementMethod.getInstance());
         getChildFragmentManager().setFragmentResultListener(ProxyDialogFragment.RESULT_CLOSED, this,
                 (key, result) -> renderHint());
@@ -191,6 +203,7 @@ public class SourcesDialogFragment extends DialogFragment {
     public void onStart() {
         super.onStart();
         prefs.registerOnSharedPreferenceChangeListener(listener);
+        ProxyFinder.get(requireContext()).addListener(finderListener); // onResume draws the state of now
         AlertDialog dialog = (AlertDialog) getDialog();
         if (dialog != null) {
             // set here, not in the builder: the dialog stays open, the ranking shows on its rows
@@ -213,6 +226,7 @@ public class SourcesDialogFragment extends DialogFragment {
     @Override
     public void onStop() {
         prefs.unregisterOnSharedPreferenceChangeListener(listener);
+        ProxyFinder.get(requireContext()).removeListener(finderListener);
         if (hint != null) {
             hint.removeCallbacks(sync);
         }
@@ -256,11 +270,11 @@ public class SourcesDialogFragment extends DialogFragment {
         }
     }
 
-    /** "Прокси выключен … Настроить": the last word opens the proxy dialog over this one. */
+    /** "Рабочий прокси не найден … Настроить" for {@code reason}: the last word opens the proxy dialog over this. */
     @NonNull
-    private CharSequence hintText(@NonNull Context context) {
-        SpannableStringBuilder text = new SpannableStringBuilder(context.getString(R.string.sources_proxy_off))
-                .append(' ');
+    private CharSequence hintText(@NonNull Context context, @NonNull String reason) {
+        SpannableStringBuilder text = new SpannableStringBuilder(context.getString(R.string.sources_proxy_not_working,
+                SourceTexts.sentence(reason))).append(' ');
         int start = text.length();
         text.append(context.getString(R.string.sources_proxy_setup));
         text.setSpan(new ClickableSpan() {
@@ -274,8 +288,15 @@ public class SourcesDialogFragment extends DialogFragment {
         return text;
     }
 
+    /** Why "через прокси" does nothing now, while it does nothing ({@link SourceTexts#proxyState}). */
     private void renderHint() {
-        hint.setVisibility(AppProxy.MODE_OFF.equals(AppProxy.mode()) ? View.VISIBLE : View.GONE);
+        Context context = hint.getContext();
+        proxyState = SourceTexts.proxyState(context);
+        String reason = SourceTexts.proxyReason(context, proxyState);
+        if (reason != null) {
+            hint.setText(hintText(context, reason));
+        }
+        hint.setVisibility(reason != null ? View.VISIBLE : View.GONE);
     }
 
     private void renderCheckedAt() {
@@ -290,7 +311,8 @@ public class SourcesDialogFragment extends DialogFragment {
 
     private void renderRank() {
         if (rankButton != null) {
-            rankButton.setEnabled(!ranking);
+            // enabled while focused, as in enable(): autoRank ignores a press while ranking
+            rankButton.setEnabled(!ranking || rankButton.isFocused());
         }
     }
 
@@ -348,8 +370,11 @@ public class SourcesDialogFragment extends DialogFragment {
     }
 
     private void renderRefresh() {
-        refresh.setVisibility(running > 0 ? View.INVISIBLE : View.VISIBLE);
-        refreshProgress.setVisibility(running > 0 ? View.VISIBLE : View.GONE);
+        boolean busy = running > 0;
+        // a focused button stays, its icon under the spinner: hidden, it would send a TV remote's focus to the top
+        refresh.setVisibility(busy && !refresh.isFocused() ? View.INVISIBLE : View.VISIBLE);
+        refresh.setImageAlpha(busy ? 0 : 255);
+        refreshProgress.setVisibility(busy ? View.VISIBLE : View.GONE);
     }
 
     /** Every site direct, or every site through the proxy; the active sites whose route changed are checked again. */
@@ -536,8 +561,12 @@ public class SourcesDialogFragment extends DialogFragment {
         save(before);
     }
 
+    /**
+     * A focused view stays enabled, only dimmed: disabled, it would send a TV remote's focus to the dialog's top (the
+     * stepper ignores a press past its end).
+     */
     private static void enable(@NonNull View view, boolean enabled) {
-        view.setEnabled(enabled);
+        view.setEnabled(enabled || view.isFocused());
         view.setAlpha(enabled ? 1 : 0.38f);
     }
 
@@ -611,6 +640,18 @@ public class SourcesDialogFragment extends DialogFragment {
     }
 
     private final class Adapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> {
+
+        Adapter() {
+            // the rows replaced at once (sync: a ranking, a change made elsewhere) keep their views, and a TV
+            // remote's focus on one; without ids the focused row is dropped and the focus jumps to the dialog's top
+            setHasStableIds(true);
+        }
+
+        @Override
+        public long getItemId(int position) {
+            Object row = rows.get(position);
+            return row == Rows.DIVIDER ? -2 : ((Provider) row).ordinal();
+        }
 
         @Override
         public int getItemCount() {

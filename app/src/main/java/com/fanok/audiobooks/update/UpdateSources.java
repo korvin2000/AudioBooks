@@ -3,7 +3,12 @@ package com.fanok.audiobooks.update;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
+import com.google.gson.JsonElement;
+import com.google.gson.JsonParseException;
+import com.google.gson.JsonParser;
+
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
 import java.util.regex.Matcher;
@@ -11,8 +16,8 @@ import java.util.regex.Pattern;
 
 /**
  * Where a new version of the app is published and how each place says so; pure Java, so the parsing is tested on the JVM.
- * GitHub releases first, then the owner's mirror, then the app's topic on 4pda (readable by guests only in its "lofi"
- * form; its files need a forum login).
+ * GitHub releases first, then the owner's mirror and its copy on Yandex Disk, then the app's topic on 4pda (readable by
+ * guests only in its "lofi" form; its files need a forum login).
  */
 public final class UpdateSources {
 
@@ -21,6 +26,14 @@ public final class UpdateSources {
     static final String GITHUB_DOWNLOAD = "https://github.com/korvin2000/AudioBooks/releases/download/";
     static final String MIRROR = "https://www.abc-guitars.com/data/audiobook/";
     static final String MIRROR_INFO = MIRROR + "update.txt";
+    /**
+     * The listing of the owner's public Yandex Disk folder {@code https://disk.yandex.ru/d/UsQE3CEkNPSOUw} (the mirror's
+     * files again): each file with a fresh direct link, which lives a few hours, and its SHA-256. Not the API's
+     * {@code …/download}, which answers 429 to anonymous callers.
+     */
+    static final String DISK_LIST = "https://cloud-api.yandex.net/v1/disk/public/resources?public_key="
+            + "https%3A%2F%2Fdisk.yandex.ru%2Fd%2FUsQE3CEkNPSOUw&limit=100"
+            + "&fields=_embedded.items.name,_embedded.items.file,_embedded.items.sha256";
     public static final String FORUM_TOPIC = "https://4pda.to/forum/lofiversion/index.php?t1128418.html";
 
     private static final Pattern TAG = Pattern.compile("/releases/tag/([^/?#]+)$");
@@ -110,6 +123,63 @@ public final class UpdateSources {
     /** The mirror's {@code update.txt}: {@code version=}, {@code file=} and an optional {@code sha256=}; null when unusable. */
     @Nullable
     static Release mirrorRelease(@NonNull String text) {
+        String[] info = info(text);
+        return info == null ? null : new Release(info[0], MIRROR + info[1], info[2], null);
+    }
+
+    /** The release on Yandex Disk: the {@code update.txt} {@code text} names a file, whose link {@code listing} gives. */
+    @Nullable
+    static Release diskRelease(@NonNull String text, @NonNull String listing) {
+        String[] info = info(text);
+        String[] link = info == null ? null : diskFile(listing, info[1]);
+        return link == null ? null : new Release(info[0], link[0], info[2] != null ? info[2] : link[1], null);
+    }
+
+    /**
+     * {@code name}'s direct link in {@link #DISK_LIST}'s answer and its SHA-256 (null when the listing has none); null
+     * when the answer is not a listing (an error, a page) or the file is not in it. {@code [0]} the link, {@code [1]} the hash.
+     */
+    @Nullable
+    static String[] diskFile(@NonNull String listing, @NonNull String name) {
+        try {
+            JsonElement items = child(child(JsonParser.parseString(listing), "_embedded"), "items");
+            if (items != null && items.isJsonArray()) {
+                for (JsonElement item : items.getAsJsonArray()) {
+                    String link = string(item, "file");
+                    if (link != null && link.startsWith("https://") && name.equals(string(item, "name"))) {
+                        return new String[]{link, sum(string(item, "sha256"))};
+                    }
+                }
+            }
+        } catch (JsonParseException e) {
+            // not JSON: no listing
+        }
+        return null;
+    }
+
+    @Nullable
+    private static JsonElement child(@Nullable JsonElement parent, @NonNull String name) {
+        return parent != null && parent.isJsonObject() ? parent.getAsJsonObject().get(name) : null;
+    }
+
+    @Nullable
+    private static String string(@Nullable JsonElement parent, @NonNull String name) {
+        JsonElement value = child(parent, name);
+        return value != null && value.isJsonPrimitive() ? value.getAsString() : null;
+    }
+
+    /** {@code sha} when it is a SHA-256 in hex, else null. */
+    @Nullable
+    private static String sum(@Nullable String sha) {
+        return sha != null && sha.matches("[0-9a-fA-F]{64}") ? sha : null;
+    }
+
+    /**
+     * An {@code update.txt}: {@code [0]} the version, {@code [1]} the file (no path, an APK), {@code [2]} the SHA-256 or
+     * null; null when the text is not one.
+     */
+    @Nullable
+    private static String[] info(@NonNull String text) {
         String version = null;
         String file = null;
         String sha = null;
@@ -131,7 +201,16 @@ public final class UpdateSources {
         if (version == null || !VERSION.matcher(version).matches() || file == null || !FILE.matcher(file).matches()) {
             return null;
         }
-        return new Release(version, MIRROR + file, sha != null && sha.matches("[0-9a-fA-F]{64}") ? sha : null, null);
+        return new String[]{version, file, sum(sha)};
+    }
+
+    /**
+     * The places asked on one route, in order: GitHub, the mirror, Yandex Disk; in Russia Yandex Disk first, as it is
+     * what answers there while GitHub and the mirror stall.
+     */
+    @NonNull
+    static <T> List<T> routeOrder(boolean russia, @NonNull T github, @NonNull T mirror, @NonNull T disk) {
+        return russia ? Arrays.asList(disk, github, mirror) : Arrays.asList(github, mirror, disk);
     }
 
     /**

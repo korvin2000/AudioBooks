@@ -4,6 +4,7 @@
     <string name="favorites_books">Книги</string>
     <string name="favorites_authors">Авторы</string>
     <string name="favorites_readers">Чтецы</string>
+    <string name="favorites_genres">Жанры</string>
     <string name="favorites_list_count">%1$s · %2$d</string>
     <string name="favorites_switcher_desc">Избранное: %1$s. Выбрать список</string>
 
@@ -32,4 +33,21 @@
     <string name="favorite_people_open_readers">Открыть «Исполнители»</string>
     <string name="favorite_people_clear_authors">Убрать всех авторов из избранного?</string>
     <string name="favorite_people_clear_readers">Убрать всех чтецов из избранного?</string>
+
+    <!-- Избранное → Жанры (FavoriteGenresFragment) and the stars of a site's Жанры (GenreListAddapter) -->
+    <string name="favorite_genres_add">Добавить жанр</string>
+    <string name="favorite_genres_pick">Любимые жанры</string>
+    <string name="favorite_genres_sort_added">По порядку добавления</string>
+    <string name="favorite_genres_sort_name">По названию</string>
+    <string name="favorite_genres_sort_picks">По частоте открытия</string>
+    <string name="favorite_genres_clear">Убрать все жанры из избранного?</string>
+    <string name="favorite_genres_empty">Здесь пока нет жанров.\nОтметьте жанр звёздочкой в разделе «Жанры» или добавьте из списка.</string>
+    <string name="favorite_genres_never">Ещё не открывали</string>
+    <plurals name="favorite_genres_picks">
+        <item quantity="one">Открывали %d раз</item>
+        <item quantity="few">Открывали %d раза</item>
+        <item quantity="many">Открывали %d раз</item>
+        <item quantity="other">Открывали %d раз</item>
+    </plurals>
+    <string name="genre_star_hint">Любимые жанры теперь в «Избранное» → «Жанры»</string>
 </resources>

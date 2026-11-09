@@ -77,13 +77,27 @@ final class SourceActions {
         show(anchor, prefs, before, after, describe(head, before, after, provider, Words.of(context)));
     }
 
-    /** Sends {@code provider} direct or through the proxy. */
+    /**
+     * Sends {@code provider} direct or through the proxy. Through a proxy that cannot carry it now, the snackbar says
+     * why; with the proxy off in the settings, its action is "Включить" ({@code enableProxy}) in place of the undo.
+     */
     static void setDirect(@NonNull View anchor, @NonNull SharedPreferences prefs, @NonNull Provider provider,
-            boolean direct) {
+            boolean direct, @NonNull Runnable enableProxy) {
+        Context context = anchor.getContext();
         SourceSnapshot before = SourceSnapshot.take(prefs);
         AppProxy.setDirect(prefs, provider, direct);
-        show(anchor, prefs, before, SourceSnapshot.take(prefs), anchor.getContext().getString(direct ? R.string.sources_done_direct
-                : R.string.sources_done_proxy, provider.title));
+        String text = context.getString(direct ? R.string.sources_done_direct : R.string.sources_done_proxy,
+                provider.title);
+        SourceTexts.ProxyState state = direct ? SourceTexts.ProxyState.WORKS : SourceTexts.proxyState(context);
+        String reason = SourceTexts.proxyReason(context, state);
+        if (state == SourceTexts.ProxyState.OFF) {
+            Snackbar.make(anchor, text + SourceTexts.SEP + reason, SNACKBAR_MS)
+                    .setAction(R.string.sources_proxy_needed_action, v -> enableProxy.run())
+                    .show();
+            return;
+        }
+        show(anchor, prefs, before, SourceSnapshot.take(prefs),
+                reason == null ? text : text + SourceTexts.SEP + reason);
     }
 
     /**

@@ -14,6 +14,19 @@ import org.junit.Test;
 
 public class UpdateSourcesTest {
 
+    private static final String APK_SHA = "a8d9f079" + "0123456789abcdef0123456789abcdef0123456789abcdef" + "0000b282";
+    private static final String TXT_SHA = "13d67bfe" + "0123456789abcdef0123456789abcdef0123456789abcdef" + "0000f88d";
+    private static final String APK_LINK = "https://downloader.disk.yandex.ru/disk/aa11/6af2083a/apk"
+            + "?filename=AudioBooks-8.3.apk&disposition=attachment";
+    private static final String TXT_LINK = "https://downloader.disk.yandex.ru/disk/bb22/6af2083a/txt"
+            + "?filename=update.txt&disposition=attachment";
+    /** What the API's rate limit answers. */
+    private static final String RATE_LIMITED = "{\"error\":\"TooManyRequestsError\",\"message\":\"Too many requests\"}";
+    /** The folder's listing as the public API answers (2026-11-09), the links shortened. */
+    private static final String DISK = "{\"_embedded\":{\"items\":["
+            + "{\"name\":\"AudioBooks-8.3.apk\",\"file\":\"" + APK_LINK + "\",\"sha256\":\"" + APK_SHA + "\"},"
+            + "{\"name\":\"update.txt\",\"file\":\"" + TXT_LINK + "\",\"sha256\":\"" + TXT_SHA + "\"}]}}";
+
     /** The lofi topic page as 4pda serves it (2026-10-31), cut to the header's download list and two posts' files. */
     private static final String TOPIC = "<div class=\"postcontent\">Версия: 7.8<br>…"
             + "<span style=\"color:blue\"><strong>Скачать:</strong></span><br>"
@@ -73,6 +86,49 @@ public class UpdateSourcesTest {
         assertNull(UpdateSources.mirrorRelease("version=8.0\nfile=../x.apk"));
         assertNull(UpdateSources.mirrorRelease("version=8.0"));
         assertNull(UpdateSources.mirrorRelease("<html>Not found</html>"));
+    }
+
+    @Test
+    public void diskListingGivesEachFilesLink() {
+        assertArrayEquals(new String[]{TXT_LINK, TXT_SHA}, UpdateSources.diskFile(DISK, "update.txt"));
+        assertArrayEquals(new String[]{APK_LINK, APK_SHA}, UpdateSources.diskFile(DISK, "AudioBooks-8.3.apk"));
+        assertNull(UpdateSources.diskFile(DISK, "missing.apk"));
+        assertNull(UpdateSources.diskFile(RATE_LIMITED, "update.txt"));
+        assertNull(UpdateSources.diskFile("<html>Bad gateway</html>", "update.txt"));
+        assertNull(UpdateSources.diskFile("", "update.txt"));
+    }
+
+    @Test
+    public void diskReleaseTakesTheApkFromTheListing() {
+        Release release = UpdateSources.diskRelease("version=8.3\r\nfile=AudioBooks-8.3.apk\r\n", DISK);
+        assertEquals("8.3", release.version);
+        assertEquals(APK_LINK, release.apkUrl);
+        assertEquals(APK_SHA, release.sha256);
+
+        String sha = "bfa478d6d9e12d776bfe4d7e5346de708fbacce2c4aa009dc3b401bbdae596c0";
+        assertEquals(sha, UpdateSources.diskRelease("version=8.3\nfile=AudioBooks-8.3.apk\nsha256=" + sha, DISK).sha256);
+        // no hash in the listing, none in update.txt: the file is not checked against one
+        assertNull(UpdateSources.diskRelease("version=8.3\nfile=AudioBooks-8.3.apk",
+                DISK.replace(",\"sha256\":\"" + APK_SHA + "\"", "")).sha256);
+    }
+
+    @Test
+    public void diskReleaseRejectsBadInput() {
+        String text = "version=8.3\nfile=AudioBooks-8.3.apk";
+        assertNull(UpdateSources.diskRelease("version=8.4\nfile=AudioBooks-8.4.apk", DISK)); // not in the folder
+        assertNull(UpdateSources.diskRelease("version=8.3\nfile=../x.apk", DISK));
+        assertNull(UpdateSources.diskRelease("<html>Not found</html>", DISK));
+        assertNull(UpdateSources.diskRelease(text, RATE_LIMITED));
+        assertNull(UpdateSources.diskRelease(text, "<html>Bad gateway</html>"));
+        assertNull(UpdateSources.diskRelease(text, ""));
+        assertNull(UpdateSources.diskRelease(text, DISK.replace("https://downloader.disk.yandex.ru/disk/aa11",
+                "http://downloader.disk.yandex.ru/disk/aa11")));
+    }
+
+    @Test
+    public void yandexDiskIsAskedFirstOnlyInRussia() {
+        assertEquals(Arrays.asList("github", "mirror", "disk"), UpdateSources.routeOrder(false, "github", "mirror", "disk"));
+        assertEquals(Arrays.asList("disk", "github", "mirror"), UpdateSources.routeOrder(true, "github", "mirror", "disk"));
     }
 
     @Test

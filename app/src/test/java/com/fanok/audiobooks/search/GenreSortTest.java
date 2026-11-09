@@ -96,6 +96,30 @@ public class GenreSortTest {
     }
 
     @Test
+    public void favoritePutsTheStarredGenresFirstAndTheMoreOpenedOfThemFirst() {
+        Map<String, Object> counts = new HashMap<>();
+        counts.put(Genre.KIDS.name(), 5);
+        counts.put(Genre.DETECTIVE.name(), 2);
+        Map<String, ?> picks = GenrePicks.merge(counts, Arrays.asList(Genre.HORROR, Genre.DETECTIVE));
+        List<GenrePOJO> genres = Arrays.asList(genre("Для детей", 0), genre("Фэнтези", 0), genre("Ужасы, мистика", 0),
+                genre("Детективы, триллеры, боевики", 0));
+        assertEquals(Arrays.asList("Детективы, триллеры, боевики", "Ужасы, мистика", "Для детей", "Фэнтези"),
+                names(GenreSort.FAVORITE.sorted(genres, picks)));
+    }
+
+    @Test
+    public void favoriteRanksACombinedGenreAsTheBestOfTheGenresItNames() {
+        Map<String, ?> picks = GenrePicks.merge(Collections.singletonMap(Genre.KIDS.name(), 5),
+                Collections.singletonList(Genre.ACTION));
+        assertEquals(GenrePicks.FAVORITE_BOOST, GenrePicks.count(picks, "Детективы, триллеры, боевики"));
+        assertEquals(0, GenrePicks.count(picks, "Детектив"));
+        List<GenrePOJO> genres = Arrays.asList(genre("Для детей", 0), genre("Детектив", 0),
+                genre("Детективы, триллеры, боевики", 0));
+        assertEquals(Arrays.asList("Детективы, триллеры, боевики", "Для детей", "Детектив"),
+                names(GenreSort.FAVORITE.sorted(genres, picks)));
+    }
+
+    @Test
     public void aPickCountsForTheGenreOnEverySiteAndAnUnknownNameForItself() {
         assertEquals(Genre.HORROR.name(), GenrePicks.key("Ужасы, мистика"));
         assertEquals(Genre.HORROR.name(), GenrePicks.key("Мистика и ужасы"));

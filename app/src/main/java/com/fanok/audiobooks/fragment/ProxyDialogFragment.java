@@ -142,7 +142,9 @@ public class ProxyDialogFragment extends DialogFragment implements ProxyFinder.L
                 progress.setProgress(state.tested);
             }
         }
-        rescan.setEnabled(!scanning);
+        // a focused button that turns disabled sends a TV remote's focus to the dialog's top; pressed again, a search
+        // under way ignores it
+        rescan.setEnabled(!scanning || rescan.isFocused());
         CharSequence text = statusText(status.getContext(), state);
         status.setText(text);
         status.setVisibility(text.length() > 0 ? View.VISIBLE : View.GONE);

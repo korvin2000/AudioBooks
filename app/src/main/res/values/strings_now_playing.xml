@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="menu_now_playing">Сейчас играет</string>
-    <!-- Настройки → Общие: the book played last opens paused at start (MainActivity.openLastBook) -->
-    <string name="autoload_last_book">Загрузка последней книги</string>
-    <string name="autoload_last_book_desc">При запуске открывать последнюю книгу без воспроизведения</string>
+    <!-- Настройки → Общие: the book listened to last plays on in the background at app start (MainActivity.playLastBook) -->
+    <string name="play_last_book">Слушать последнюю книгу</string>
+    <string name="play_last_book_desc">При запуске продолжать её в фоне</string>
 </resources>

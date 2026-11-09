@@ -3,4 +3,7 @@
 <resources>
     <string name="folder_layout">Папки при сохранении</string>
     <string name="folder_layout_summary">Стратегия создания папок при сохранении: %s</string>
+
+    <!-- Загруженные: the toolbar's switcher (FavoriteFragment.installSavedSwitcher) -->
+    <string name="saved_switcher_desc">Загруженные. Выбрать список</string>
 </resources>

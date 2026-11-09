@@ -32,15 +32,18 @@ import androidx.preference.PreferenceManager;
 import com.arellomobile.mvp.InjectViewState;
 import com.arellomobile.mvp.MvpPresenter;
 import com.fanok.audiobooks.BookRemovedException;
+import com.fanok.audiobooks.CookesExeption;
 import com.fanok.audiobooks.Consts;
 import com.fanok.audiobooks.policy.DefaultCover;
 import com.fanok.audiobooks.policy.EmbeddedCover;
 import com.fanok.audiobooks.EncodingExeption;
 import com.fanok.audiobooks.R;
 import com.fanok.audiobooks.Url;
+import com.fanok.audiobooks.activity.ActivityCookies;
 import com.fanok.audiobooks.activity.CarModeActivity;
 import com.fanok.audiobooks.activity.SleepTimerActivity;
 import com.fanok.audiobooks.adapter.ListFocus;
+import com.fanok.audiobooks.search.Provider;
 import com.fanok.audiobooks.interface_pacatge.book_content.Activity;
 import com.fanok.audiobooks.interface_pacatge.book_content.ActivityPresenter;
 import com.fanok.audiobooks.interface_pacatge.book_content.AudioModelInterfece;
@@ -126,7 +129,10 @@ public class BookPresenter extends MvpPresenter<Activity> implements ActivityPre
 
     private static float speed = 1;
 
-    /** The speed dialog's slider (touch screens) moves by 0.05x, from PlaybackSettings.MIN_SPEED to MAX_SPEED. */
+    /**
+     * The speed dialog's step, 0.05x, one grid for both its controls: the slider (touch screens) and minus / plus (TV),
+     * from PlaybackSettings.MIN_SPEED to MAX_SPEED.
+     */
     private static final int SPEED_STEPS_PER_UNIT = 20;
     /** A D-pad press on the slider: 0.25x. */
     private static final int SPEED_KEY_STEPS = 5;
@@ -150,8 +156,6 @@ public class BookPresenter extends MvpPresenter<Activity> implements ActivityPre
     private Context mContext;
 
     private boolean error = false;
-    /** Load the book paused even with «Автовоспроизведение» on (set before the view attaches). */
-    private boolean paused;
 
     private SharedPreferences pref;
 
@@ -267,24 +271,21 @@ public class BookPresenter extends MvpPresenter<Activity> implements ActivityPre
     }
 
     /**
-     * The speed one press of the dialog's minus ({@code direction} -1) or plus (+1) away: the next tenth below or above
-     * (1,25× goes to 1,2× or 1,3×), within the player's range.
+     * The speed one press of the dialog's minus ({@code direction} -1) or plus (+1) away: the next 0.05x step strictly
+     * below or above (1,25× goes to 1,2× or 1,3×; 1,23× from a media controller to 1,2× or 1,25×), within the player's
+     * range. A speed off a step only by float rounding counts as on it; the result is always a whole step, no drift.
      */
     static float speedStepped(float value, int direction) {
-        int hundredths = Math.round(PlaybackSettings.clampSpeed(value) * 100);
-        int tenths = direction > 0 ? hundredths / 10 + 1 : (hundredths + 9) / 10 - 1;
-        return PlaybackSettings.clampSpeed(tenths / 10f);
+        double steps = PlaybackSettings.clampSpeed(value) * (double) SPEED_STEPS_PER_UNIT;
+        int next = direction > 0 ? (int) Math.floor(steps + 1e-3) + 1 : (int) Math.ceil(steps - 1e-3) - 1;
+        return PlaybackSettings.clampSpeed(next / (float) SPEED_STEPS_PER_UNIT);
     }
 
-    /** Plays at this speed without keeping it: the speed dialog lets it be heard before OK. */
+    /** Plays at this speed without keeping it: the speed dialog's slider lets it be heard before OK. */
     private void playAtSpeed(float value) {
         Intent intent = new Intent(Broadcast_SET_SPEED);
         intent.putExtra("speed", PlaybackSettings.clampSpeed(value));
         getViewState().broadcastSend(intent);
-    }
-
-    public void setPaused(boolean paused) {
-        this.paused = paused;
     }
 
     @Override
@@ -400,8 +401,11 @@ public class BookPresenter extends MvpPresenter<Activity> implements ActivityPre
                 mAudioListDBModel.syncChapters(mBookPOJO, mAudioPOJO);
             }
 
-            if (mBookPOJO.getUrl().equals(MediaPlayerService.currentBookUrl())) {
-                //the player already holds this book (e.g. opened from the notification): show it, never restart it
+            String restoring = MediaPlayerService.restoringBookUrl();
+            if (mBookPOJO.getUrl().equals(MediaPlayerService.currentBookUrl())
+                    || mBookPOJO.getUrl().equals(restoring)) {
+                //the player already holds this book (e.g. opened from the notification), or reads it from the
+                //database to play («Слушать последнюю книгу» at start): show it, never restart it
                 getViewState().broadcastSend(new Intent(Broadcast_SHOW_TITLE));
                 getViewState().showProgres(false);
                 return;
@@ -410,14 +414,16 @@ public class BookPresenter extends MvpPresenter<Activity> implements ActivityPre
             Checkpoint checkpoint = resumePoint();
             int curentTrack = checkpoint.chapterIndex;
             AudioPOJO pojo = mAudioPOJO.get(curentTrack);
-            if (!MediaPlayerService.isPlay()) {
+            //another book plays, or is read from the database to play
+            boolean otherPlays = MediaPlayerService.isPlay() || restoring != null;
+            if (!otherPlays) {
                 getViewState().showTitle(pojo.getName());
             }
 
-            boolean keepOtherBook = pref.getBoolean("reproductionPref", true) && MediaPlayerService.isPlay();
+            boolean keepOtherBook = pref.getBoolean("reproductionPref", true) && otherPlays;
             if (!keepOtherBook) {
                 //one command; autoplay decides the intent, nothing toggles afterwards
-                playAudio(curentTrack, checkpoint.positionMs, !paused && pref.getBoolean("autoPlayPref", false));
+                playAudio(curentTrack, checkpoint.positionMs, pref.getBoolean("autoPlayPref", false));
             } else {
                 //play now toggles the other book: say once how to switch to this one
                 getViewState().showSwitchBookHint();
@@ -448,33 +454,37 @@ public class BookPresenter extends MvpPresenter<Activity> implements ActivityPre
     }
 
     /**
-     * The speed is heard while it changes; only OK keeps it. Cancel, back or a tap outside return to the speed the
-     * dialog opened with. A TV gets minus and plus buttons (a remote moves a slider in big jumps), a touch screen the
-     * slider.
+     * A TV gets minus and plus buttons (a remote moves a slider in big jumps), and each press keeps the speed at once:
+     * «Закрыть», back or a tap outside only close. A touch screen gets the slider: the speed is heard while it changes,
+     * only OK keeps it, and Cancel, back or a tap outside return to the speed the dialog opened with.
      */
     @Override
     public void buttonSpeedClick(View view) {
 
+        final boolean tv = ListFocus.isTv(view.getContext());
         final float initial = speed;
         final float[] chosen = {speed};
-        final boolean[] confirmed = {false};
+        final boolean[] confirmed = {tv}; // a TV kept every press already: closing has nothing to undo
         dismissSpeedDialog();
 
         final AlertDialog.Builder popDialog = new AlertDialog.Builder(view.getContext());
         popDialog.setIcon(R.drawable.ic_speedometer);
         popDialog.setTitle(view.getContext().getString(R.string.title_set_speed_popup));
-        popDialog.setView(ListFocus.isTv(view.getContext()) ? speedButtons(view.getContext(), chosen)
-                : speedSlider(view.getContext(), chosen));
+        popDialog.setView(tv ? speedButtons(view.getContext()) : speedSlider(view.getContext(), chosen));
 
-        popDialog.setPositiveButton(R.string.ok,
-                (dialog, which) -> {
-                    confirmed[0] = true;
-                    if (chosen[0] != speed) {
-                        setSpeed(chosen[0]);
-                    }
-                    dialog.dismiss();
-                });
-        popDialog.setNegativeButton(R.string.cancel, null);
+        if (tv) {
+            popDialog.setPositiveButton(R.string.close, null);
+        } else {
+            popDialog.setPositiveButton(R.string.ok,
+                    (dialog, which) -> {
+                        confirmed[0] = true;
+                        if (chosen[0] != speed) {
+                            setSpeed(chosen[0]);
+                        }
+                        dialog.dismiss();
+                    });
+            popDialog.setNegativeButton(R.string.cancel, null);
+        }
         // bottom left: back to 1x and close; always set, a previewed speed must not keep playing
         popDialog.setNeutralButton(R.string.speed_standard, (dialog, which) -> {
             confirmed[0] = true;
@@ -528,15 +538,17 @@ public class BookPresenter extends MvpPresenter<Activity> implements ActivityPre
         return linearLayout;
     }
 
-    /** The speed dialog's minus, speed and plus (TV): a press moves {@code chosen[0]} by 0.1x. */
-    private View speedButtons(Context context, final float[] chosen) {
+    /**
+     * The speed dialog's minus, speed and plus (TV): a press moves the speed by 0.05x and keeps it, from the speed kept
+     * now (a media controller may have changed it while the dialog is open).
+     */
+    private View speedButtons(Context context) {
         final View content = LayoutInflater.from(context).inflate(R.layout.dialog_speed, null);
         final TextView value = content.findViewById(R.id.speedValue);
-        value.setText(speedText(chosen[0]));
+        value.setText(speedText(speed));
         View.OnClickListener step = button -> {
-            chosen[0] = speedStepped(chosen[0], button.getId() == R.id.speedUp ? 1 : -1);
-            value.setText(speedText(chosen[0]));
-            playAtSpeed(chosen[0]);
+            setSpeed(speedStepped(speed, button.getId() == R.id.speedUp ? 1 : -1));
+            value.setText(speedText(speed));
         };
         // never disabled at an end: a focused button that turns disabled sends a TV remote's focus elsewhere
         content.findViewById(R.id.speedDown).setOnClickListener(step);
@@ -752,6 +764,9 @@ public class BookPresenter extends MvpPresenter<Activity> implements ActivityPre
             }
             return;
         }
+        // its site's covers are never requested: the one in its audio, at once from the chapters kept for it (online,
+        // offline or after a failed page alike); its page's first chapter follows in onNext
+        EmbeddedCover.fetch(mContext, mBookPOJO.getUrl(), null);
         if (!Consts.isNetworkAvailable(mContext)) {
             new Thread(new Runnable() {
                 @Override
@@ -926,6 +941,11 @@ public class BookPresenter extends MvpPresenter<Activity> implements ActivityPre
                     onCompleteAudio();
                 } else if (mLastError instanceof BookRemovedException) {
                     getViewState().showLongToast(R.string.book_taken_down);
+                    error = true;
+                } else if (mLastError instanceof CookesExeption
+                        && ActivityCookies.passes(Provider.ofUrl(mBookPOJO.getUrl()))) {
+                    // the site's browser check, not a broken book: «Пройти», as the description offers
+                    getViewState().showSiteCheckOffer(Provider.ofUrl(mBookPOJO.getUrl()));
                     error = true;
                 } else {
                     String errDetail = mLastError != null ? (" (" + mLastError.getClass().getSimpleName() + (mLastError.getMessage() != null ? ": " + mLastError.getMessage() : "") + ")") : "";

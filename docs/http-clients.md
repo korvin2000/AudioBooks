@@ -147,9 +147,11 @@ under the hood, not the app's OkHttp).
   Cloudflare challenged GETs. Redirects are followed by hand on the same site only, up to `MAX_REDIRECTS`.
 - Rate limits: a 429 with `Retry-After` marks the host in `LIMITED_UNTIL`; requests are refused locally until then
   (`net/RateLimitedException`, surfaced as `ProviderPage.Status.RATE_LIMITED`).
-- Challenges: `CookesExeption` → `ProviderPage.Status.BLOCKED` → UI message `R.string.site_challenge`, or for sites
-  whose check can be passed in a browser (`ActivityCookies.passes(provider)`: audioboo, baza-knig) an offer
-  «Пройти» (`BooksView.showSiteCheckOffer`, `Description.showSiteCheckOffer`).
+- Challenges: `CookesExeption` → `ProviderPage.Status.BLOCKED` with `ProviderPage.challenge` → UI message
+  `R.string.site_challenge`, or for sites whose check can be passed in a browser (`ActivityCookies.passes(provider)`:
+  audioboo, baza-knig) an offer «Пройти» (`BooksView.showSiteCheckOffer`, `Description.showSiteCheckOffer`). A plain
+  403/503 is `BLOCKED` without `challenge`: an outage or a refusal no browser can pass, so a list offers the other route
+  or shows the message, never the check.
 - In auto-proxy mode a challenged/blocked page reports the route as suspect (`AppProxy.reportSuspect`), which may
   re-verify the proxy.
 - `model/BookPages.get(url, fetch)` coalesces identical book-page requests for 60 s (description, chapters and
@@ -171,7 +173,9 @@ to HTTP/1.1 so parallel download segments get separate connections — faster on
    (`BrowserHeaders.resource`: `Accept`, `Accept-Language`, client hints — derived from the agent actually in use, so a
    site's own `DownloadUtil.DESKTOP_UA` or the WebView agent of the forum route gets its own) and the owning site's
    `Referer` (`Provider.refererOf(host)`), each only when the caller did not set it.
-3. `eventListener` → `AppProxy.reportConnectFailure` for failed proxy connects; `fastFallback(false)`.
+3. `eventListenerFactory` (one listener per call) → `AppProxy.reportConnectFailure` for failed proxy connects and
+   `AppProxy.reportTransportFailure` for a call that failed after it connected through a proxy (not cancelled, not
+   interrupted; a hint the finder confirms); `fastFallback(false)`.
 4. `proxyAuthenticator(AppProxy::proxyLogin)` and network interceptor `AppProxy::keepProxyLoginToProxy` (the built-in
    proxy's login is never sent to a site).
 5. Cookie jar `net/MemoryCookieJar` (`App.getCookieJar()`): process-lifetime, per host/path/scheme;
@@ -184,7 +188,7 @@ to HTTP/1.1 so parallel download segments get separate connections — faster on
 | `util/DownloadUtil.upstreamFor` | media3 `OkHttpDataSource` for playback and downloads | `AppProxy.mediaClient(provider, client)` picks the book's site route for its audio CDNs; `SourceParser.mediaCookies/mediaHeaders`; `FullBodyDataSource` guards cut bodies |
 | `util/DownloadUtil.downloaderFactory` | media3 downloads | `App.getDownloadHttpClient()` (HTTP/1.1) |
 | Picasso (singleton set in `App.onCreate` with `OkHttp3Downloader`) | Covers on the book page, full-screen cover, other-books strip, favorites/history sheets, downloads list, comments avatars, notification/media-session artwork (`service/MediaPlayerService.loadArtwork`), car mode | Image guard applies |
-| `policy/EmbeddedCover` | Range read of the ID3 tag of a book's first MP3 (archive.org for audioboo) | Through `AppProxy.mediaClient` + 30 s call timeout; one book at a time |
+| `policy/EmbeddedCover` | Range read of the ID3 tag of a book's first MP3 (archive.org for audioboo books only; never audio on audioboo itself) | Through `AppProxy.mediaClient` + 30 s call timeout. Two lanes, at most two reads at once: the opened or playing book at once (`fetch`; from its kept chapters as soon as it opens), the lists' rows one at a time, the topmost row in the list first, while in the list (`request` on attach / `forget` on detach). A book's MP3 is its kept first chapter (Room `books_audio`: its downloaded copy, else its URL), else, for a never-opened book's row, its audioboo book page loaded once through `AudioModel.loadOnce` (the book screen's path, without its repeats): one page at a time, ≥ 3 s apart, none for 30 min after a challenge, a refused stored clearance or 403/429/503, silently. 404/410: that URL is not asked again in the process (a page's URL: the page is asked again after the book's backoff); other failures retry later per book and source (backoff; a row's failure never holds back the opened book, a new URL goes at once), rows pause 2 min after 3 failures in a row |
 | `util/DownloadStorageHelper.exportCover` | `cover.jpg` next to exported chapters | Image guard applies |
 | `search/Narrators` | Narrator cards (fantlab) | |
 | `update/Updater` | Update check and APK download | Tries `AppProxy.updateRoutes(base)`; the 4pda forum route uses `forumClient` = this client + WebView cookies + the WebView's UA |
@@ -203,13 +207,16 @@ to HTTP/1.1 so parallel download segments get separate connections — faster on
   (`SourceInfo.uri`), not network.
 - The OkHttp image guard does **not** see Glide. Audioboo URLs are therefore never handed to Glide: the call sites
   branch on `DefaultCover.replaces(photo)` and show `DefaultCover.drawable(...)` (gradient, or the embedded cover once
-  `policy/EmbeddedCover` has read one).
+  `policy/EmbeddedCover` has read one). `BooksListAddapter` (catalog, favourites, history, search) shows the embedded
+  cover from memory or lets Glide decode its cached file (never on the main thread), else the gradient while the row
+  asks `EmbeddedCover.request`; it listens while its list is in a window and swaps only the cover of the rows of a book
+  whose cover arrives (a `COVER` payload), so a cover read on the book screen or in the player is there on return.
 
 ## 4. WebView — browser checks and logins
 
 | Screen | Purpose | Cookies / UA |
 |---|---|---|
-| `activity/ActivityCookies` | The user passes a site's browser check; the app verifies the session with one `SiteHttp` request and stores it | baza-knig: `PHPSESSID`, WebView UA forced to `Consts.USER_AGENT`, stored in prefs `cookes_baza_knig` → `BazaKnig.cookies()`. audioboo (`EXTRA_PROVIDER=AUDIOBOO`): `cf_clearance` + the WebView's **own** UA (Cloudflare binds clearance to IP + UA), prefs `cookies_audioboo` / `user_agent_audioboo` → `Audioboo.cookies()` / `Audioboo.userAgent()`; closes with `RESULT_OK` when opened from an error offer |
+| `activity/ActivityCookies` | The user passes a site's browser check; the app verifies the session with one `SiteHttp` request and stores it | baza-knig: `PHPSESSID`, WebView UA forced to `Consts.USER_AGENT`, stored in prefs `cookes_baza_knig` → `BazaKnig.cookies()`. audioboo (`EXTRA_PROVIDER=AUDIOBOO`): `cf_clearance` + the WebView's **own** UA (Cloudflare binds clearance to IP + UA), kept by `Audioboo.saveClearance` (memory + prefs `cookies_audioboo` / `user_agent_audioboo`) → `Audioboo.cookies()` / `Audioboo.userAgent()`, forgotten once the site refuses it (`Audioboo.withClearance`); closes with `RESULT_OK` when opened from an error offer. audioboo's check loads and verifies the very page refused (`ActivityCookies.intent(context, provider, url, book)`), never the start page, which the site may let through without any clearance; a book's page the app is still refused after the browser passed is handed over from the WebView (`BookPages.offer`, for `BookPages.TTL_MS`) |
 | `activity/ForumLoginActivity` | 4pda login for updates | WebView cookies, read by `Updater.forumClient` |
 
 WebView does **not** use `AppProxy`'s selector: if a site is routed through the proxy, a browser-check session is
@@ -222,6 +229,7 @@ bound to a different IP than the app's requests (the check screen says so).
 | `region/DirectNet` | Region/geolocation probes for `region/RegionCheck` | `Proxy.NO_PROXY`, no cookies, no redirects, 2–3 s timeouts: must measure the device's own network |
 | `sync/CloudSync.http()` | Cloud sync (tokens) | `Proxy.NO_PROXY`, no cookies: tokens never pass through the sites' proxies |
 | `net/ProxyFinder.OkNetwork` (`base()`, `lists()`, `through(candidate)`) | Fetching public proxy lists and testing candidates | Explicit proxy per request, no pool reuse, strict timeouts. Its site check sends the browser headers of a page (`BrowserHeaders.page`), so a proxy that passes it is one the app's own page requests pass through |
+| `net/ProxyFinder.OkNetwork.reachable(control)` | The direct control probe: when the automatic proxy in use and every spare fail a control check, one GET of the same connectivity server (Google/Mozilla/Apple/Ubuntu, `ProxyFinder.CONTROLS`) tells dead proxies (the list runs out, a search follows) from a dead network (the list stays) | `Proxy.NO_PROXY` (`base()`), no cookies, no redirects, 7.5 s timeouts; passes on the server's own answer only. A request from the device's own network, like `region/DirectNet` |
 | `net/AppProxy.check(config, url)` | "Test" button of the proxy settings | Only the typed proxy and its login |
 
 ## Routing: `net/AppProxy`
@@ -245,13 +253,22 @@ bound to a different IP than the app's requests (the check screen says so).
 | Site cookies/headers for media | `SourceParser.mediaCookies(bookUrl)`, `mediaHeaders(bookUrl)` → `DownloadUtil` |
 | Referer for images/media | `SourceParser.referer()`, `hosts()`, `refererHosts()` → `Provider.refererOf` (OkHttp interceptor) and `Covers.glide` |
 | Covers never requested from a site | `policy/DefaultCover.replaces(url)` (audioboo): call sites + OkHttp image guard; covers come from `policy/EmbeddedCover` (ID3 art of the first MP3) or the gradient default |
-| Browser-check session | `ActivityCookies` → `Audioboo.setClearance` / `Consts.setBazaKnigCookies`, loaded at start in `App.onCreate` |
+| Browser-check session | `ActivityCookies` → `Audioboo.saveClearance` / `Consts.setBazaKnigCookies`, loaded at start in `App.onCreate`; a challenged audioboo request that carried the stored clearance forgets it (memory, prefs, jar; not a newer one saved meanwhile) and goes once more without a session (`Audioboo.withClearance`); a list offers the check for a detected challenge only (`ProviderPage.challenge`) |
+
+Root cause of the audioboo browser check coming back (2026-11-09): the stored `cf_clearance` (with the WebView
+User-Agent) was restored at every start and resent after Cloudflare had stopped accepting it. Its lifetime is the
+site's «Challenge Passage», decided server-side and possibly only minutes, so every request was challenged and «Пройти»
+came back after 5–10 minutes or a restart. Now a challenged clearance is forgotten and the request goes once more as the
+app's default request, and the list offers the check only for a detected challenge. The only lever on the lifetime
+itself is the site's Challenge Passage setting; the owner may ask audioboo's admin to raise it.
 
 ## Invariants (do not break)
 
 1. Without a stored browser session, audioboo page requests claim no other browser than the app's default one:
    `Consts.USER_AGENT` with that agent's headers, no `cf_clearance`, POST (`AudiobooClearanceTest`); with a session they
-   carry the session browser's agent **and** that agent's hints.
+   carry the session browser's agent **and** that agent's hints, both of one session per request. A request with the
+   stored clearance that gets a challenge forgets it and goes once more as without a session; a second challenge, and
+   only a detected challenge (not a plain 403/503), makes the list offer the check.
 2. No GET for an audioboo image ever leaves the app (OkHttp image guard + `DefaultCover.replaces` branches for Glide).
 3. A site's own cookies and User-Agent go only to its own host (`SiteHttp.connect`, `MemoryCookieJar.with`).
 4. Proxy logins go only to the proxy (`AppProxy.keepProxyLoginToProxy`, `ProxyOnlyAuthenticator`).

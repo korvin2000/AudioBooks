@@ -27,6 +27,9 @@ import com.fanok.audiobooks.App;
 import com.fanok.audiobooks.BuildConfig;
 import com.fanok.audiobooks.R;
 import com.fanok.audiobooks.net.AppProxy;
+import com.fanok.audiobooks.region.AppRegion;
+import com.fanok.audiobooks.region.Region;
+import com.fanok.audiobooks.region.RegionCheck;
 import com.fanok.audiobooks.update.UpdateSources.Release;
 
 import java.io.File;
@@ -60,8 +63,9 @@ import okhttp3.ResponseBody;
 /**
  * "Автообновление": finds a newer version of the app, downloads it and offers to install it. A check runs
  * {@link #START_DELAY_S} after the app starts and then every {@link #PERIOD_MS} while the process lives (time asleep
- * counts); "О программе" runs one by hand. The places are asked in order: GitHub and the mirror through the settings'
- * route, both again through the other routes ({@link AppProxy#updateRoutes}), then 4pda. The first that answers decides
+ * counts); "О программе" runs one by hand. The places are asked in order: GitHub, the mirror and its copy on Yandex
+ * Disk through the settings' route (Yandex Disk first when the region is Russia, {@link UpdateSources#routeOrder}), all
+ * again through the other routes ({@link AppProxy#updateRoutes}), then 4pda. The first that answers decides
  * whether there is a newer version; its APK, or failing that the next place's, is downloaded, checked (hash, package,
  * version code, signature) and offered. 4pda's files need a forum login: without one the offer is to log in.
  * All work runs on one background thread, one check at a time.
@@ -98,7 +102,7 @@ public final class Updater {
         }
     }
 
-    private enum Site { GITHUB, MIRROR, FORUM }
+    private enum Site { GITHUB, MIRROR, DISK, FORUM }
 
     /** A 4pda answer that is not the file: a login (or the site's browser check) is needed first. */
     private static final class LoginRequired extends IOException {
@@ -237,11 +241,13 @@ public final class Updater {
             cleanUp(new File(app.getCacheDir(), DIR));
             List<Site> sites = new ArrayList<>();
             List<OkHttpClient> clients = new ArrayList<>();
+            RegionCheck.Result region = AppRegion.last(app);
+            boolean russia = region != null && region.region == Region.RUSSIA;
             for (OkHttpClient route : AppProxy.updateRoutes(base)) {
-                sites.add(Site.GITHUB);
-                clients.add(route);
-                sites.add(Site.MIRROR);
-                clients.add(route);
+                for (Site place : UpdateSources.routeOrder(russia, Site.GITHUB, Site.MIRROR, Site.DISK)) {
+                    sites.add(place);
+                    clients.add(route);
+                }
             }
             sites.add(Site.FORUM);
             clients.add(forumClient(app, base));
@@ -330,6 +336,18 @@ public final class Updater {
                 Release release = UpdateSources.mirrorRelease(text(client, UpdateSources.MIRROR_INFO, site));
                 if (release == null) {
                     throw new IOException("unreadable update.txt");
+                }
+                return release;
+            }
+            case DISK: {
+                String listing = text(client, UpdateSources.DISK_LIST, site);
+                String[] info = UpdateSources.diskFile(listing, "update.txt");
+                if (info == null) {
+                    throw new IOException("no update.txt on Yandex Disk");
+                }
+                Release release = UpdateSources.diskRelease(text(client, info[0], site), listing);
+                if (release == null) {
+                    throw new IOException("unreadable update.txt on Yandex Disk");
                 }
                 return release;
             }

@@ -32,7 +32,7 @@
             android:src="@drawable/ic_favorite_remove"
             app:tint="?attr/colorItemMenu" />
 
-        <!-- the weight lets a long title ("Прослушанные") shrink on a crowded toolbar, never the arrow -->
+        <!-- the weight lets a long title shrink on a crowded toolbar, never the arrow -->
         <TextView
             android:id="@+id/favoritesSwitcherTitle"
             android:textAppearance="@style/TextAppearance.Widget.AppCompat.Toolbar.Title"

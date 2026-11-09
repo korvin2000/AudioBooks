@@ -53,6 +53,7 @@ import com.fanok.audiobooks.Consts;
 import com.fanok.audiobooks.GridSpacingItemDecoration;
 import com.fanok.audiobooks.R;
 import com.fanok.audiobooks.activity.BookActivity;
+import com.fanok.audiobooks.activity.ClearSavedActivity;
 import com.fanok.audiobooks.activity.MainActivity;
 import com.fanok.audiobooks.activity.SearchableActivity;
 import com.fanok.audiobooks.adapter.BookSheetDownload;
@@ -108,8 +109,8 @@ public class FavoriteFragment extends MvpAppCompatFragment implements FavoriteVi
     private BottomSheetDialog bookMenu;
 
     /**
-     * The toolbar's title is a switcher: the lists of the whole favorites (not a site's part of them), or the
-     * listening status of the history.
+     * The toolbar's title is a switcher: the lists of the whole favorites (not a site's part of them), the
+     * listening status of the history, or the downloads manager of Загруженные.
      */
     private boolean switcher;
 
@@ -283,9 +284,12 @@ public class FavoriteFragment extends MvpAppCompatFragment implements FavoriteVi
         if (titleId != 0) {
             requireActivity().setTitle(titleId);
         }
-        switcher = (table == TABLE_FAVORITE && !requireArguments().containsKey(ARG_SOURCE)) || table == TABLE_HISTORY;
+        switcher = (table == TABLE_FAVORITE && !requireArguments().containsKey(ARG_SOURCE)) || table == TABLE_HISTORY
+                || table == TABLE_SAVED;
         if (table == TABLE_HISTORY) {
             installHistorySwitcher();
+        } else if (table == TABLE_SAVED) {
+            installSavedSwitcher();
         } else if (switcher) {
             FavoritesSwitcher.install(this, FavoritesSwitcher.BOOKS);
         }
@@ -519,6 +523,19 @@ public class FavoriteFragment extends MvpAppCompatFragment implements FavoriteVi
                             setSubTitle(lastSubtitle);
                             mPresenter.reloadHistory();
                         }));
+    }
+
+    /** The title of Загруженные: "⬇ Загруженные ⌄", a menu of this list and «Скачанные книги» (ClearSavedActivity). */
+    private void installSavedSwitcher() {
+        Context context = requireContext();
+        String[] names = {context.getString(R.string.menu_saved), context.getString(R.string.downloads_manager)};
+        FavoritesSwitcher.install(this, R.drawable.ic_menu_saved, names[0],
+                context.getString(R.string.saved_switcher_desc),
+                (activity, anchor, arrow) -> FavoritesSwitcher.choose(activity, anchor, arrow, names, 0, chosen -> {
+                    if (chosen == 1 && binding != null) {
+                        ClearSavedActivity.startActivity(activity); // as Settings → Загрузки → Скачанные книги does
+                    }
+                }));
     }
 
 

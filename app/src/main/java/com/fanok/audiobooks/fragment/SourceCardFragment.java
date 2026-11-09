@@ -48,6 +48,7 @@ import com.fanok.audiobooks.activity.MainActivity;
 import com.fanok.audiobooks.activity.SourceActivity;
 import com.fanok.audiobooks.model.BooksDBModel;
 import com.fanok.audiobooks.net.AppProxy;
+import com.fanok.audiobooks.net.ProxyFinder;
 import com.fanok.audiobooks.region.Region;
 import com.fanok.audiobooks.search.Provider;
 import com.fanok.audiobooks.search.SourceHealth;
@@ -166,6 +167,14 @@ public class SourceCardFragment extends Fragment {
             // once for a burst of changes, and after every listener of this one ran (AppProxy reads its routes there)
             root.removeCallbacks(refresh);
             root.post(refresh);
+        }
+    };
+    /** The proxy's state the card shows; the search's progress alone does not redraw it. */
+    @Nullable
+    private SourceTexts.ProxyState proxyState;
+    private final ProxyFinder.Listener finderListener = state -> {
+        if (root != null && SourceTexts.proxyState(state) != proxyState) {
+            render();
         }
     };
     /** The switches act on the user's changes only: never on a restored or a drawn state (onStart draws them). */
@@ -360,6 +369,7 @@ public class SourceCardFragment extends Fragment {
     public void onStart() {
         super.onStart();
         prefs.registerOnSharedPreferenceChangeListener(listener);
+        ProxyFinder.get(requireContext()).addListener(finderListener);
         render(); // a change made while the card was away (the settings, another card)
         loadLibrary(); // and in the lists (a book added, a download removed)
     }
@@ -367,6 +377,7 @@ public class SourceCardFragment extends Fragment {
     @Override
     public void onStop() {
         prefs.unregisterOnSharedPreferenceChangeListener(listener);
+        ProxyFinder.get(requireContext()).removeListener(finderListener);
         if (root != null) {
             root.removeCallbacks(refresh);
         }
@@ -722,18 +733,26 @@ public class SourceCardFragment extends Fragment {
     }
 
     /**
-     * The route switch; under it, the proxy switched off in the settings (the route does nothing now, with the way to
-     * switch it on), or the site going direct where the user's region needs the proxy.
+     * The route switch; under it, why "через прокси" goes direct now ({@link SourceTexts#proxyState}) with the way out:
+     * the proxy switched off or not set up in the settings, or no working proxy found ("Найти заново"); or the site
+     * going direct where the user's region needs the proxy.
      */
     private void renderProxy(@NonNull Context context, @Nullable SourceInfo info, @Nullable Region region) {
         boolean direct = AppProxy.isDirect(provider);
-        boolean proxyOff = AppProxy.MODE_OFF.equals(AppProxy.mode());
+        proxyState = SourceTexts.proxyState(context);
+        String reason = SourceTexts.proxyReason(context, proxyState);
         setChecked(proxySwitch, !direct, proxyListener);
-        proxySummary.setText(direct ? R.string.sources_proxy_direct
-                : proxyOff ? R.string.sources_proxy_idle : R.string.sources_proxy_on);
-        if (proxyOff) {
-            hint(getString(R.string.sources_proxy_off_hint), R.string.sources_proxy_enable, R.drawable.bg_source_hint,
-                    R.drawable.ic_source_info, secondary, this::showProxyDialog);
+        proxySummary.setText(direct ? getString(R.string.sources_proxy_direct) : reason != null
+                ? getString(R.string.sources_proxy_idle, reason) : getString(R.string.sources_proxy_on));
+        boolean none = proxyState == SourceTexts.ProxyState.NONE;
+        int action = proxyState == SourceTexts.ProxyState.OFF ? R.string.sources_proxy_enable
+                : proxyState == SourceTexts.ProxyState.UNSET ? R.string.sources_proxy_setup
+                : none ? R.string.proxy_rescan : 0; // a search, or no network: nothing to do
+        if (!direct && action != 0) {
+            hint(getString(R.string.sources_proxy_idle_hint, SourceTexts.sentence(reason)), action,
+                    none ? R.drawable.bg_source_hint_warn : R.drawable.bg_source_hint,
+                    none ? R.drawable.ic_source_alert : R.drawable.ic_source_info, none ? warn : secondary,
+                    none ? this::rescanProxies : this::showProxyDialog);
         } else if (direct && info != null && Boolean.TRUE.equals(info.blockedIn(region))) {
             hint(getString(R.string.sources_proxy_needed_hint, SourceTexts.regionName(context, region)),
                     R.string.sources_proxy_needed_action, R.drawable.bg_source_hint_warn, R.drawable.ic_source_alert,
@@ -852,7 +871,7 @@ public class SourceCardFragment extends Fragment {
     /** The other route; an active site, or one under a check, is checked again on it, as the sources dialog does. */
     private void setDirect(boolean direct) {
         if (root != null && direct != AppProxy.isDirect(provider)) {
-            SourceActions.setDirect(root, prefs, provider, direct);
+            SourceActions.setDirect(root, prefs, provider, direct, this::showProxyDialog);
             if (checking || Sources.isActive(provider)) {
                 startCheck();
             }
@@ -923,10 +942,17 @@ public class SourceCardFragment extends Fragment {
         }
     }
 
+    /** Also from a snackbar, which may outlive the card. */
     private void showProxyDialog() {
-        if (getChildFragmentManager().findFragmentByTag(ProxyDialogFragment.TAG) == null) {
+        if (isAdded() && getChildFragmentManager().findFragmentByTag(ProxyDialogFragment.TAG) == null) {
             new ProxyDialogFragment().show(getChildFragmentManager(), ProxyDialogFragment.TAG);
         }
+    }
+
+    /** "Найти заново": a new search of the automatic mode, in the proxy dialog that shows it run. */
+    private void rescanProxies() {
+        ProxyFinder.get(requireContext()).rescan();
+        showProxyDialog();
     }
 
     /** Another site's card: in place of this one where the host can, else on a screen of its own. */

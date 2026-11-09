@@ -53,6 +53,17 @@ public class AudioModel implements AudioModelInterfece {
         return audio(url, parser != null ? page -> BookPages.get(page, parser::fetch) : SiteHttp::get);
     }
 
+    /**
+     * The chapters at {@code url} from one try, on the caller's thread: never repeated ({@link #loadRetrying}), and a
+     * shared fetch that failed is not followed by one of its own ({@link BookPages#get(String, BookPages.Fetch,
+     * boolean)}), so one call is one request (audioboo's resend after it refused the stored clearance aside). For a
+     * caller that paces the site's pages itself.
+     */
+    public static ArrayList<AudioPOJO> loadOnce(@NonNull String url) throws IOException {
+        SourceParser parser = Provider.parserOf(url);
+        return load(url, parser != null ? page -> BookPages.get(page, parser::fetch, false) : SiteHttp::get);
+    }
+
     static Observable<ArrayList<AudioPOJO>> audio(String url, PageSource pages) {
         return Observable.create(emitter -> {
             ArrayList<AudioPOJO> chapters;

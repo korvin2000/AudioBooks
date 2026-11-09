@@ -36,6 +36,7 @@ import com.fanok.audiobooks.activity.MainActivity;
 import com.fanok.audiobooks.activity.SourceActivity;
 import com.fanok.audiobooks.adapter.SourcesAdapter;
 import com.fanok.audiobooks.net.AppProxy;
+import com.fanok.audiobooks.net.ProxyFinder;
 import com.fanok.audiobooks.region.Region;
 import com.fanok.audiobooks.search.Provider;
 import com.fanok.audiobooks.search.SourceHealth;
@@ -97,6 +98,14 @@ public class SourcesFragment extends Fragment implements SourcesAdapter.Listener
     @Nullable
     private CharSequence subtitle;
     private final Runnable refresh = this::render;
+    /** The proxy's state the chip and the rows show; the search's progress alone does not redraw them. */
+    @Nullable
+    private SourceTexts.ProxyState proxyState;
+    private final ProxyFinder.Listener finderListener = state -> {
+        if (root != null && SourceTexts.proxyState(state) != proxyState) {
+            render();
+        }
+    };
     /** A field: SharedPreferences holds its listeners weakly. */
     private final SharedPreferences.OnSharedPreferenceChangeListener listener = (p, key) -> {
         if (root != null && SourceTexts.watched(key)) {
@@ -214,6 +223,7 @@ public class SourcesFragment extends Fragment implements SourcesAdapter.Listener
     public void onStart() {
         super.onStart();
         prefs.registerOnSharedPreferenceChangeListener(listener);
+        ProxyFinder.get(requireContext()).addListener(finderListener);
         render(); // a change made while this screen was away (the card's screen, the settings)
     }
 
@@ -245,6 +255,7 @@ public class SourcesFragment extends Fragment implements SourcesAdapter.Listener
     @Override
     public void onStop() {
         prefs.unregisterOnSharedPreferenceChangeListener(listener);
+        ProxyFinder.get(requireContext()).removeListener(finderListener);
         if (root != null) {
             root.removeCallbacks(refresh);
         }
@@ -290,19 +301,21 @@ public class SourcesFragment extends Fragment implements SourcesAdapter.Listener
                 books.put(entry.getKey(), entry.getValue().books);
             }
         }
+        proxyState = SourceTexts.proxyState(context);
+        boolean proxyOn = proxyState == SourceTexts.ProxyState.WORKS;
         adapter.show(SourcesAdapter.rows(Sources.all(), Sources.activeCount(), order, books, results), infos, results,
-                checking, region, twoPane ? selected : null);
+                checking, region, twoPane ? selected : null, proxyOn);
 
         regionChip.setText(SourceTexts.regionName(context, region));
-        boolean proxyOn = !AppProxy.MODE_OFF.equals(AppProxy.mode());
         int proxied = 0;
         for (Provider provider : Sources.active()) {
             if (!AppProxy.isDirect(provider)) {
                 proxied++;
             }
         }
-        proxyChip.setText(proxyOn ? getString(R.string.sources_chip_proxy_on, proxied)
-                : getString(R.string.sources_chip_proxy_off));
+        String reason = SourceTexts.proxyReason(context, proxyState);
+        proxyChip.setText(reason == null ? getString(R.string.sources_chip_proxy_on, proxied)
+                : SourceTexts.sentence(reason));
         proxyChip.setChipIconResource(proxyOn ? R.drawable.ic_shield_check : R.drawable.ic_source_shield_outline);
         String ago = SourceTexts.ago(context, SourceHealth.lastCheckedAt(prefs), System.currentTimeMillis());
         checkedChip.setText(ago == null ? getString(R.string.sources_chip_never)
@@ -369,8 +382,9 @@ public class SourcesFragment extends Fragment implements SourcesAdapter.Listener
         render();
     }
 
+    /** Also from a snackbar, which may outlive the screen. */
     private void showProxyDialog() {
-        if (getChildFragmentManager().findFragmentByTag(ProxyDialogFragment.TAG) == null) {
+        if (isAdded() && getChildFragmentManager().findFragmentByTag(ProxyDialogFragment.TAG) == null) {
             new ProxyDialogFragment().show(getChildFragmentManager(), ProxyDialogFragment.TAG);
         }
     }
@@ -447,7 +461,7 @@ public class SourcesFragment extends Fragment implements SourcesAdapter.Listener
                 SourceActions.setActive(root, prefs, provider, !Sources.isActive(provider));
                 break;
             default:
-                SourceActions.setDirect(root, prefs, provider, !AppProxy.isDirect(provider));
+                SourceActions.setDirect(root, prefs, provider, !AppProxy.isDirect(provider), this::showProxyDialog);
                 break;
         }
         render();

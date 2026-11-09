@@ -45,26 +45,50 @@ public class BookPresenterSpeedTest {
     }
 
     @Test
-    public void minusAndPlusMoveByATenth() {
-        assertEquals(1.1f, BookPresenter.speedStepped(1f, 1), 1e-6f);
-        assertEquals(0.9f, BookPresenter.speedStepped(1f, -1), 1e-6f);
-        assertEquals(1.6f, BookPresenter.speedStepped(1.5f, 1), 1e-6f);
+    public void minusAndPlusMoveByTheSlidersStep() {
+        assertEquals(1.05f, BookPresenter.speedStepped(1f, 1), 0f);
+        assertEquals(0.95f, BookPresenter.speedStepped(1f, -1), 0f);
+        assertEquals(1.55f, BookPresenter.speedStepped(1.5f, 1), 0f);
+        assertEquals(1.3f, BookPresenter.speedStepped(1.25f, 1), 0f);
+        assertEquals(1.2f, BookPresenter.speedStepped(1.25f, -1), 0f);
+        // a speed kept by the old dialog (tenths) is on the grid too
+        assertEquals(1.15f, BookPresenter.speedStepped(1.1f, 1), 0f);
+        assertEquals("1,05×", BookPresenter.speedText(BookPresenter.speedStepped(1f, 1)));
     }
 
     @Test
-    public void aSpeedBetweenTenthsGoesToTheNextTenth() {
-        // kept by the old slider (0.05x steps)
-        assertEquals(1.3f, BookPresenter.speedStepped(1.25f, 1), 1e-6f);
-        assertEquals(1.2f, BookPresenter.speedStepped(1.25f, -1), 1e-6f);
+    public void aSpeedOffTheGridGoesToTheNextStep() {
+        // as a media controller may set it
+        assertEquals(1.25f, BookPresenter.speedStepped(1.23f, 1), 0f);
+        assertEquals(1.2f, BookPresenter.speedStepped(1.23f, -1), 0f);
+        assertEquals(1.25f, BookPresenter.speedStepped(1.249f, 1), 0f);
+        assertEquals(1.2f, BookPresenter.speedStepped(1.249f, -1), 0f);
+        assertEquals(1.3f, BookPresenter.speedStepped(1.251f, 1), 0f);
+        assertEquals(1.25f, BookPresenter.speedStepped(1.251f, -1), 0f);
     }
 
     @Test
     public void bothEndsOfThePlayersRangeAreReachedAndKept() {
         assertEquals(PlaybackSettings.MIN_SPEED, BookPresenter.speedStepped(0.3f, -1), 0f);
         assertEquals(PlaybackSettings.MIN_SPEED, BookPresenter.speedStepped(PlaybackSettings.MIN_SPEED, -1), 0f);
-        assertEquals(0.3f, BookPresenter.speedStepped(PlaybackSettings.MIN_SPEED, 1), 1e-6f);
-        assertEquals(PlaybackSettings.MAX_SPEED, BookPresenter.speedStepped(2.4f, 1), 1e-6f);
+        assertEquals(0.3f, BookPresenter.speedStepped(PlaybackSettings.MIN_SPEED, 1), 0f);
+        assertEquals(PlaybackSettings.MAX_SPEED, BookPresenter.speedStepped(2.45f, 1), 0f);
+        assertEquals(2.45f, BookPresenter.speedStepped(PlaybackSettings.MAX_SPEED, -1), 0f);
         assertEquals(PlaybackSettings.MAX_SPEED, BookPresenter.speedStepped(PlaybackSettings.MAX_SPEED, 1), 0f);
+    }
+
+    @Test
+    public void pressesDoNotDrift() {
+        float value = 1f;
+        for (int i = 0; i < 20; i++) {
+            value = BookPresenter.speedStepped(value, 1);
+        }
+        assertEquals(2f, value, 0f);
+        value = PlaybackSettings.MAX_SPEED;
+        for (int i = 0; i < 45; i++) {
+            value = BookPresenter.speedStepped(value, -1);
+        }
+        assertEquals(PlaybackSettings.MIN_SPEED, value, 0f);
     }
 
     @Test

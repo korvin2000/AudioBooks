@@ -4,7 +4,7 @@
     <string name="history_all">Вся история</string>
     <string name="history_not_started">Не слушал</string>
     <string name="history_listening">Слушаю</string>
-    <string name="history_finished">Прослушанные</string>
+    <string name="history_finished">Прослушал</string>
     <string name="history_switcher_desc">История: %1$s. Выбрать список</string>
 
     <!-- История: the period of the last opening of the book's page, the calendar icon -->

@@ -12,6 +12,7 @@ import android.app.UiModeManager;
 import android.app.Activity;
 import android.content.ActivityNotFoundException;
 import android.content.Context;
+import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.res.Configuration;
@@ -39,6 +40,7 @@ import androidx.drawerlayout.widget.DrawerLayout;
 import androidx.fragment.app.Fragment;
 import androidx.fragment.app.FragmentManager;
 import androidx.fragment.app.FragmentTransaction;
+import androidx.preference.PreferenceFragmentCompat;
 import androidx.preference.PreferenceManager;
 import androidx.recyclerview.widget.RecyclerView;
 import com.arellomobile.mvp.MvpAppCompatActivity;
@@ -51,20 +53,22 @@ import com.fanok.audiobooks.R;
 import com.fanok.audiobooks.adapter.ListFocus;
 import com.fanok.audiobooks.fragment.BooksFragment;
 import com.fanok.audiobooks.fragment.FavoriteFragment;
+import com.fanok.audiobooks.fragment.ProxyDialogFragment;
 import com.fanok.audiobooks.fragment.SettingsFragment;
 import com.fanok.audiobooks.fragment.SourcesDialogFragment;
 import com.fanok.audiobooks.interface_pacatge.main.MainView;
-import com.fanok.audiobooks.model.BooksDBModel;
+import com.fanok.audiobooks.net.AppProxy;
+import com.fanok.audiobooks.net.ProxyFinder;
 import com.fanok.audiobooks.pojo.BookPOJO;
 import com.fanok.audiobooks.pojo.StorageUtil;
 import com.fanok.audiobooks.presenter.MainPresenter;
-import com.fanok.audiobooks.service.Checkpoint;
 import com.fanok.audiobooks.service.MediaPlayerService;
 import com.fanok.audiobooks.region.AppRegion;
 import com.fanok.audiobooks.search.Provider;
 import com.fanok.audiobooks.search.SourceSnapshot;
 import com.fanok.audiobooks.search.Sources;
 import com.fanok.audiobooks.update.Updater;
+import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 import com.google.android.material.navigation.NavigationView;
 import com.google.android.material.snackbar.Snackbar;
 
@@ -121,6 +125,11 @@ public class MainActivity extends MvpAppCompatActivity
     private Intent pendingSources;
     private final DialogQueue dialogs = new DialogQueue();
     private boolean updateQueued;
+    /** The run-out of automatic proxies ({@link ProxyFinder.State#exhaustedAt}) whose new-search offer was answered. */
+    private static long proxyOfferedFor;
+    /** That offer waits in {@link #dialogs}. */
+    private boolean proxyOfferQueued;
+    private final ProxyFinder.Listener proxyListener = this::offerProxyRescan;
     private Runnable permissionDone;
 
     private SharedPreferences preferences;
@@ -163,7 +172,7 @@ public class MainActivity extends MvpAppCompatActivity
 
     /**
      * The app anew on the catalog source's "Аудиокниги", in place of {@code activity}'s task: after the source was
-     * switched or switched off. Not a launch, so «Загрузка последней книги» does not open the book over it.
+     * switched or switched off. Not a launch, so «Слушать последнюю книгу» does not start the book again.
      */
     public static void restartOnCatalog(@NonNull Activity activity) {
         activity.startActivity(new Intent(activity, MainActivity.class)
@@ -321,6 +330,7 @@ public class MainActivity extends MvpAppCompatActivity
     @Override
     protected void onStart() {
         super.onStart();
+        ProxyFinder.get(this).addListener(proxyListener); // onResume looks at the state of now
         if (!freshStart) {
             return;
         }
@@ -340,9 +350,8 @@ public class MainActivity extends MvpAppCompatActivity
             fragment = Integer.parseInt(pref.getString("pref_start_screen", "0"));
             boolean notificationClick = intent.getBooleanExtra("notificationClick", false);
             mPresenter.startFragment(fragment, notificationClick);
-            if (fragment != Consts.LAST_BOOK && !notificationClick
-                    && pref.getBoolean("pref_autoload_last_book", false)) {
-                openLastBook();
+            if (!notificationClick && pref.getBoolean("pref_play_last_book", false)) {
+                playLastBook();
             }
         }
         if (intent.hasExtra(EXTRA_SOURCES)) {
@@ -378,12 +387,85 @@ public class MainActivity extends MvpAppCompatActivity
         }
         Updater.setListener(this::offerUpdate);
         offerUpdate();
+        offerProxyRescan(ProxyFinder.get(this).state());
     }
 
     @Override
     protected void onPause() {
         Updater.setListener(null);
         super.onPause();
+    }
+
+    @Override
+    protected void onStop() {
+        ProxyFinder.get(this).removeListener(proxyListener);
+        super.onStop();
+    }
+
+    /**
+     * The automatic proxies all stopped answering ({@link ProxyFinder.State#exhaustedAt}), no search found another
+     * ({@link ProxyFinder.Phase#FAILED}: one under way is waited for) and a source takes the proxy: a new search is
+     * offered, once for that run-out, after the dialogs queued before it. Meanwhile such sources go direct.
+     */
+    private void offerProxyRescan(@NonNull ProxyFinder.State state) {
+        if (!proxyOfferQueued && rescanDue(state)) {
+            proxyOfferQueued = true;
+            dialogs.add(this::showProxyRescanDialog);
+        }
+    }
+
+    /** {@code state} is a run-out not offered yet, in the automatic mode, with an active source through the proxy. */
+    private static boolean rescanDue(@NonNull ProxyFinder.State state) {
+        if (state.phase != ProxyFinder.Phase.FAILED || state.current != null || state.exhaustedAt == 0
+                || state.exhaustedAt == proxyOfferedFor || !AppProxy.MODE_AUTO.equals(AppProxy.mode())) {
+            return false;
+        }
+        for (Provider provider : Sources.active()) {
+            if (!AppProxy.isDirect(provider)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * "Прокси не отвечают": "Найти заново" starts a search and opens the proxy dialog, which shows it run; the next
+     * dialog waits for that one to close. Only an answer (a cancel too) settles the offer: a dialog closed by
+     * recreation is offered again.
+     */
+    private void showProxyRescanDialog(@NonNull Runnable done) {
+        proxyOfferQueued = false;
+        ProxyFinder.State state = ProxyFinder.get(this).state();
+        if (isFinishing() || isDestroyed() || !rescanDue(state)) {
+            done.run(); // the state moved on while it waited
+            return;
+        }
+        long offered = state.exhaustedAt;
+        boolean[] accepted = new boolean[1];
+        AlertDialog dialog = new MaterialAlertDialogBuilder(this)
+                .setTitle(R.string.proxy_exhausted_title)
+                .setMessage(R.string.proxy_exhausted_message)
+                .setPositiveButton(R.string.proxy_rescan, (d, which) -> {
+                    proxyOfferedFor = offered;
+                    ProxyFinder.get(this).rescan();
+                    FragmentManager fragments = getSupportFragmentManager();
+                    if (!fragments.isStateSaved()) { // else it cannot be shown: the queue goes on at once
+                        accepted[0] = true;
+                        afterDialog(ProxyDialogFragment.class, done);
+                        if (fragments.findFragmentByTag(ProxyDialogFragment.TAG) == null) {
+                            new ProxyDialogFragment().show(fragments, ProxyDialogFragment.TAG);
+                        }
+                    }
+                })
+                .setNegativeButton(R.string.later, (d, which) -> proxyOfferedFor = offered)
+                .setOnCancelListener(d -> proxyOfferedFor = offered)
+                .setOnDismissListener(d -> {
+                    if (!accepted[0]) {
+                        done.run();
+                    }
+                })
+                .show();
+        dialog.getButton(DialogInterface.BUTTON_POSITIVE).requestFocus(); // a remote's first press answers
     }
 
     /** A downloaded update (or one on 4pda that needs a login) is put to the user once, after other dialogs. */
@@ -519,7 +601,7 @@ public class MainActivity extends MvpAppCompatActivity
                 .setMessage(R.string.sources_autorank_offer_message)
                 .setPositiveButton(R.string.sources_autorank_offer_yes, (dialog, which) -> {
                     accepted[0] = true;
-                    afterSourcesDialog(done);
+                    afterDialog(SourcesDialogFragment.class, done);
                     showSourcesSettings(true);
                 })
                 .setNegativeButton(R.string.sources_autorank_offer_no, null)
@@ -534,13 +616,13 @@ public class MainActivity extends MvpAppCompatActivity
                 .show();
     }
 
-    /** Runs {@code done} once, when the sources dialog that is about to open is gone. */
-    private void afterSourcesDialog(@NonNull Runnable done) {
+    /** Runs {@code done} once, when the dialog of {@code type} that is about to open (or is open) is gone. */
+    private void afterDialog(@NonNull Class<? extends Fragment> type, @NonNull Runnable done) {
         FragmentManager fragments = getSupportFragmentManager();
         fragments.registerFragmentLifecycleCallbacks(new FragmentManager.FragmentLifecycleCallbacks() {
             @Override
             public void onFragmentDestroyed(@NonNull FragmentManager fm, @NonNull Fragment fragment) {
-                if (fragment instanceof SourcesDialogFragment) {
+                if (type.isInstance(fragment)) {
                     fragments.unregisterFragmentLifecycleCallbacks(this);
                     if (!isChangingConfigurations() && !isFinishing()) {
                         done.run(); // a rotation ends this activity's queue: the rest waits for the next start
@@ -563,14 +645,17 @@ public class MainActivity extends MvpAppCompatActivity
                 }
             }
             if(keyCode == KeyEvent.KEYCODE_DPAD_LEFT) {
+                // handled as on the right: unhandled, the key would move the focus on, one step past the target
                 if (currentFocus.getId()==R.id.app_bar_search){
                     Toolbar toolbar = findViewById(R.id.toolbar);
-                    toolbar.requestFocus();
+                    if (toolbar != null && toolbar.requestFocus()) {
+                        return true;
+                    }
                 }
                 if (currentFocus.getId()==R.id.toolbar){
                     View view = findViewById(R.id.layout_nav_audiobooks);
-                    if(view!=null){
-                        view.requestFocus();
+                    if (view != null && view.requestFocus()) {
+                        return true;
                     }
                 }
             }
@@ -657,6 +742,9 @@ public class MainActivity extends MvpAppCompatActivity
 
 
         freshStart = savedInstanceState == null;
+        if (getSupportFragmentManager().findFragmentByTag(ProxyDialogFragment.TAG) != null) {
+            dialogs.add(done -> afterDialog(ProxyDialogFragment.class, done)); // restored open: offers wait for it
+        }
 
 
         getOnBackPressedDispatcher().addCallback(this, new OnBackPressedCallback(true) {
@@ -731,8 +819,9 @@ public class MainActivity extends MvpAppCompatActivity
         if (current != null && tag.equals(current.getTag()) && !tag.equals("searchebleBooks")
                 && Objects.equals(urlArg(current), urlArg(fragment))) {
             // the side-menu entry of the section on screen, chosen again with a TV remote: into its list, at the top
-            View list = mSectionFrom != null && mSectionFrom.isFocused() && current.getView() != null
-                    ? current.getView().findViewById(R.id.list) : null;
+            View list = mSectionFrom == null || !mSectionFrom.isFocused() || current.getView() == null ? null
+                    : current instanceof PreferenceFragmentCompat ? ((PreferenceFragmentCompat) current).getListView()
+                    : current.getView().findViewById(R.id.list);
             if (list instanceof RecyclerView && ((RecyclerView) list).getAdapter() != null
                     && ((RecyclerView) list).getAdapter().getItemCount() > 0) {
                 ListFocus.focusFirst((RecyclerView) list);
@@ -819,30 +908,21 @@ public class MainActivity extends MvpAppCompatActivity
     }
 
     /**
-     * «Загрузка последней книги»: the book played last (the player's, else the last checkpoint's) opens paused over
-     * the start screen, so Back leads to it; nothing when there is none.
+     * «Слушать последнюю книгу»: the player resumes the book listened to last (its checkpoint, chapters from the
+     * database) in the background; never over a player already up, nothing when no book was listened to yet. A book
+     * only opened since (loaded paused) is not the one listened to.
      */
-    private void openLastBook() {
-        Context app = getApplicationContext();
-        new Thread(() -> {
-            String url = MediaPlayerService.currentBookUrl();
-            if (url == null) {
-                Checkpoint last = new StorageUtil(app).loadLastCheckpoint();
-                url = last == null ? null : last.bookUrl;
-            }
-            BookPOJO book = null;
-            try {
-                book = url == null ? null : new BooksDBModel(app).getSomewhere(url);
-            } catch (RuntimeException e) {
-                Log.w(TAG, "openLastBook: cannot read the book", e);
-            }
-            BookPOJO found = book;
-            runOnUiThread(() -> {
-                if (found != null && !isFinishing() && !isDestroyed()) {
-                    BookActivity.startNewActivity(this, found, false, true);
-                }
-            });
-        }).start();
+    private void playLastBook() {
+        String url = new StorageUtil(this).loadLastPlayedUrl();
+        if (MediaPlayerService.isRunning() || url == null) {
+            return;
+        }
+        try {
+            ContextCompat.startForegroundService(this, new Intent(this, MediaPlayerService.class)
+                    .setAction(MediaPlayerService.ACTION_PLAY).putExtra(MediaPlayerService.EXTRA_BOOK_URL, url));
+        } catch (RuntimeException e) { // ForegroundServiceStartNotAllowedException is an IllegalStateException
+            Log.w(TAG, "playLastBook: the player cannot start", e);
+        }
     }
 
     @Override

@@ -16,6 +16,8 @@ public class StorageUtil {
 
     /** Keys through which the player once received the chapter list and play state; dropped on the next checkpoint. */
     private static final String[] LEGACY_PLAYBACK_KEYS = {"audioArrayList", "audioIndex", "urlBook", "imageUrl", "timeStart"};
+    /** The URL of the book whose checkpoint was last written while it played. */
+    private static final String KEY_LAST_PLAYED = "checkpoint_last_played";
 
     private SharedPreferences preferences;
 
@@ -26,14 +28,20 @@ public class StorageUtil {
         this.preferences = context.getSharedPreferences(STORAGE, Context.MODE_PRIVATE);
     }
 
-    /** Writes the checkpoint as one record, under its book and as the latest one. */
-    public void storeCheckpoint(@NonNull Checkpoint checkpoint, boolean synchronous) {
+    /**
+     * Writes the checkpoint as one record, under its book and as the latest one; {@code playing}: its book is also the
+     * one played last ({@link #loadLastPlayedUrl}).
+     */
+    public void storeCheckpoint(@NonNull Checkpoint checkpoint, boolean playing, boolean synchronous) {
         Checkpoint stored = loadCheckpoint(checkpoint.bookUrl);
         // a pause or stop at the same place keeps when it was reached: it must not outrank a later place elsewhere
         String value = (checkpoint.equals(stored) ? stored : checkpoint).serialize();
         SharedPreferences.Editor editor = preferences.edit()
                 .putString(Checkpoint.key(checkpoint.bookUrl), value)
                 .putString(Checkpoint.KEY_LAST, value);
+        if (playing) {
+            editor.putString(KEY_LAST_PLAYED, checkpoint.bookUrl);
+        }
         for (String legacy : LEGACY_PLAYBACK_KEYS) {
             editor.remove(legacy);
         }
@@ -55,6 +63,20 @@ public class StorageUtil {
     @Nullable
     public Checkpoint loadLastCheckpoint() {
         return Checkpoint.parse(preferences.getString(Checkpoint.KEY_LAST, null));
+    }
+
+    /**
+     * @return the book last checkpointed while it played, or null: «Слушать последнюю книгу» resumes it, not one only
+     * opened (loaded paused) since. Until the key was ever written (right after an update that brought it) the book of
+     * {@link #loadLastCheckpoint} stands in; once it exists there is no fallback.
+     */
+    @Nullable
+    public String loadLastPlayedUrl() {
+        if (!preferences.contains(KEY_LAST_PLAYED)) {
+            Checkpoint last = loadLastCheckpoint();
+            return last == null ? null : last.bookUrl;
+        }
+        return preferences.getString(KEY_LAST_PLAYED, null);
     }
 
     public void storeCountAudioListnered(int count) {

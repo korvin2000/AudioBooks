@@ -83,8 +83,8 @@
     <string name="open_site">Открыть на сайте</string>
     <string name="worning_loading_not_finish">Данные загружены не до конца. Подождите.</string>
     <string name="title_set_speed_popup">Выберите скорость</string>
-    <string name="speed_down">Медленнее на 0,1</string>
-    <string name="speed_up">Быстрее на 0,1</string>
+    <string name="speed_down">Медленнее на 0,05</string>
+    <string name="speed_up">Быстрее на 0,05</string>
 
     <!--Settings -->
     <string name="setting_theme">Тема</string>
@@ -659,7 +659,8 @@
     <string name="sources_drag">Перетащите, чтобы изменить порядок</string>
     <string name="sources_mode_direct">%1$s: напрямую. Нажмите, чтобы через прокси</string>
     <string name="sources_mode_proxy">%1$s: через прокси. Нажмите, чтобы напрямую</string>
-    <string name="sources_proxy_off">Прокси выключен: «через прокси» не действует.</string>
+    <!-- %1$s: a sources_proxy_reason_* as a sentence -->
+    <string name="sources_proxy_not_working">%1$s: «через прокси» не действует.</string>
     <string name="sources_proxy_setup">Настроить</string>
     <string name="sources_checked_at">Проверено %1$s</string>
     <string name="sources_never_checked">Доступность не проверялась</string>
@@ -787,7 +788,7 @@
     <string name="flip_pause_desc">Экраном вниз — пауза через 4 с, перевернули в течение 2 мин — воспроизведение продолжится</string>
     <string name="update_title">Доступно обновление</string>
     <string name="update_ready">Доступна новая версия %1$s (установлена %2$s). Установить её сейчас?</string>
-    <string name="update_forum">Доступна новая версия %1$s (установлена %2$s). Сейчас её можно скачать только с 4pda: GitHub и зеркало не отвечают. Для скачивания файла нужно войти на форум.</string>
+    <string name="update_forum">Доступна новая версия %1$s (установлена %2$s). Сейчас её можно скачать только с 4pda: GitHub и зеркала не отвечают. Для скачивания файла нужно войти на форум.</string>
     <string name="update_install">Установить</string>
     <string name="update_later">Позже</string>
     <string name="update_forum_login">Войти на 4pda</string>

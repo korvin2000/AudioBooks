@@ -87,6 +87,7 @@ public class SourcesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder
     private Region region;
     @Nullable
     private Provider selected;
+    private boolean proxyOn = true;
 
     public SourcesAdapter(@NonNull Listener listener) {
         this.listener = listener;
@@ -95,11 +96,12 @@ public class SourcesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder
 
     /**
      * Shows {@code rows} (from {@link #rows}) with the facts, the last checks, the sites being checked, the user's
-     * region and the site whose card is open beside the list (null on a phone).
+     * region, the site whose card is open beside the list (null on a phone) and whether "через прокси" goes through a
+     * proxy now ({@code proxyOn}, {@link com.fanok.audiobooks.fragment.SourceTexts#proxyState}).
      */
     public void show(@NonNull List<Object> rows, @NonNull Map<Provider, SourceInfo> infos,
             @NonNull Map<Provider, SourceProbe.Result> results, @NonNull Set<Provider> checking,
-            @Nullable Region region, @Nullable Provider selected) {
+            @Nullable Region region, @Nullable Provider selected, boolean proxyOn) {
         this.rows.clear();
         this.rows.addAll(rows);
         this.infos = infos;
@@ -107,6 +109,7 @@ public class SourcesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder
         this.checking = checking;
         this.region = region;
         this.selected = selected;
+        this.proxyOn = proxyOn;
         notifyDataSetChanged();
     }
 
@@ -260,8 +263,8 @@ public class SourcesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder
     }
 
     /**
-     * The route icon: a shield in the accent through the proxy (faded while the proxy is off), an arrow direct, an amber
-     * shield direct where the user's region needs the proxy. Returns its words.
+     * The route icon: a shield in the accent through the proxy (faded while no proxy carries it), an arrow direct, an
+     * amber shield direct where the user's region needs the proxy. Returns its words.
      */
     @NonNull
     private String bindRoute(@NonNull RowHolder holder, @NonNull Provider provider, @Nullable SourceInfo info,
@@ -285,7 +288,7 @@ public class SourcesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder
         }
         holder.route.setImageResource(icon);
         ImageViewCompat.setImageTintList(holder.route, ColorStateList.valueOf(tint));
-        holder.route.setAlpha(!direct && AppProxy.MODE_OFF.equals(AppProxy.mode()) ? 0.4f : 1);
+        holder.route.setAlpha(!direct && !proxyOn ? 0.4f : 1);
         return context.getString(words);
     }
 
