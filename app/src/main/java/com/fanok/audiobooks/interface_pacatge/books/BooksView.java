@@ -84,8 +84,8 @@ public interface BooksView extends MvpView {
     void showRouteOffer(@StringRes int message, @NonNull String site, @StringRes int action,
             boolean openProxySettings);
 
-    /** Offers to pass the browser check of the site that refused the listing; the list loads again once passed. */
+    /** Offers to pass the browser check of the site on {@code url}, the page it refused (null: unknown); then the list loads again. */
     @StateStrategyType(OneExecutionStateStrategy.class)
-    void showSiteCheckOffer(@NonNull com.fanok.audiobooks.search.Provider site);
+    void showSiteCheckOffer(@NonNull com.fanok.audiobooks.search.Provider site, @androidx.annotation.Nullable String url);
 
 }

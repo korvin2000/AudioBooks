@@ -51,11 +51,22 @@ public final class BookPages {
     /** A copy of the page at {@code url}: joined, reused or fetched with {@code fetch}. */
     @NonNull
     public static Document get(@NonNull String url, @NonNull Fetch fetch) throws IOException {
-        return get(url, fetch, System.currentTimeMillis());
+        return get(url, fetch, true);
+    }
+
+    /** As {@link #get(String, Fetch)}; {@code again} false: a joined fetch that failed fails this call too. */
+    @NonNull
+    public static Document get(@NonNull String url, @NonNull Fetch fetch, boolean again) throws IOException {
+        return get(url, fetch, System.currentTimeMillis(), again);
     }
 
     @NonNull
     static Document get(@NonNull String url, @NonNull Fetch fetch, long now) throws IOException {
+        return get(url, fetch, now, true);
+    }
+
+    @NonNull
+    private static Document get(String url, Fetch fetch, long now, boolean again) throws IOException {
         FutureTask<Document> task;
         boolean mine = false;
         synchronized (PAGES) {
@@ -75,7 +86,7 @@ public final class BookPages {
             return task.get().clone();
         } catch (ExecutionException e) {
             drop(url, task);
-            if (!mine) {
+            if (!mine && again) {
                 return fetch.get(url); // another caller's fetch failed (or was cancelled): this one tries itself
             }
             Throwable cause = e.getCause();
@@ -89,6 +100,18 @@ public final class BookPages {
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             throw new InterruptedIOException("interrupted waiting for " + url);
+        }
+    }
+
+    /**
+     * {@code page} as the page at {@code url} for the next {@link #TTL_MS}: the copy the browser check got when the site
+     * still refused the app's own request (ActivityCookies), so the book screen it reopens reads that.
+     */
+    public static void offer(@NonNull String url, @NonNull Document page) {
+        FutureTask<Document> task = new FutureTask<>(() -> page);
+        task.run();
+        synchronized (PAGES) {
+            PAGES.put(url, new Page(task, System.currentTimeMillis()));
         }
     }
 

@@ -76,6 +76,10 @@ public class ProxyFinderTest {
         final Set<String> refused = ConcurrentHashMap.newKeySet();
         /** Control servers and sites that answer no proxy. */
         final Set<String> down = ConcurrentHashMap.newKeySet();
+        /** The control servers answer the device directly; false: its network is down. */
+        volatile boolean direct = true;
+        /** Direct checks so far (not in {@link #calls}). */
+        final AtomicInteger directs = new AtomicInteger();
         volatile Script script = (label, url, attempt) -> null;
         volatile Runnable onFetch = () -> { };
         volatile long delayMs;
@@ -103,6 +107,14 @@ public class ProxyFinderTest {
         public long site(@NonNull ProxyCandidate candidate, @NonNull String page, int timeoutMs) throws IOException {
             sites.incrementAndGet();
             return answer(candidate, page, true);
+        }
+
+        @Override
+        public void reachable(@NonNull ProxyFinder.Control control, int timeoutMs) throws IOException {
+            directs.incrementAndGet();
+            if (!direct) {
+                throw new IOException("no network");
+            }
         }
 
         private long answer(ProxyCandidate candidate, String url, boolean site) throws IOException {
@@ -545,11 +557,13 @@ public class ProxyFinderTest {
         finder.reportFailure(finder.currentProxy().address());
         assertEquals("2.2.2.2:80", finder.state().current.label());
 
-        // without a spare to compare with, the last one stays (the network may be at fault); the last search is less
-        // than ten minutes old: no automatic search yet
+        // without a spare, and the control server does not answer directly either: the last one stays (the network
+        // may be at fault); the last search is less than ten minutes old: no automatic search yet
+        network.direct = false;
         now.addAndGet(ProxyFinder.CONFIRM_QUIET_MS);
         finder.reportFailure(finder.currentProxy().address());
         assertEquals("2.2.2.2:80", finder.state().current.label());
+        assertEquals(1, network.directs.get());
         assertEquals(scans, network.fetches.get());
 
         // once a search is due, the next failure starts one; it finds nothing, so the list stays
@@ -558,6 +572,100 @@ public class ProxyFinderTest {
         assertTrue(network.fetches.get() > scans);
         assertEquals("2.2.2.2:80", finder.state().current.label());
         assertEquals(ProxyFinder.Phase.KEPT, finder.state().phase);
+    }
+
+    @Test
+    public void deadLeadersDoNotHideALiveLaterProxy() {
+        List<String> labels = working(4);
+        target.set(null); // no site ranks them: the list goes by their latency
+        ProxyFinder finder = finder();
+        finder.rescan();
+        assertEquals(labels.subList(0, 3), routeLabels(finder));
+
+        // the proxy in use and the next two died; the fourth, beyond the route of a request, still works
+        for (String dead : labels.subList(0, 3)) {
+            network.latency.remove(dead);
+        }
+        network.calls.clear();
+        finder.reportFailure(finder.currentProxy().address(), true);
+
+        List<String> checked = new ArrayList<>();
+        for (String call : network.calls) {
+            checked.add(call.split(" ", 2)[0]);
+        }
+        assertEquals("twice the proxy in use, then each spare in turn",
+                Arrays.asList(labels.get(0), labels.get(0), labels.get(1), labels.get(2), labels.get(3)), checked);
+        assertEquals(labels.get(3), finder.state().current.label());
+        assertEquals(ProxyFinder.Phase.READY, finder.state().phase);
+        assertEquals(3, saved().index);
+        assertEquals("a proxy answered: the network works, nothing is asked directly", 0, network.directs.get());
+    }
+
+    @Test
+    public void theListRunsOutWhenNoProxyAnswersButTheControlServerDoes() {
+        lists("1.1.1.1:80\n2.2.2.2:80\n", "");
+        network.latency.put("1.1.1.1:80", 100L);
+        network.latency.put("2.2.2.2:80", 200L);
+        ProxyFinder finder = finder();
+        finder.rescan();
+        int fetches = network.fetches.get();
+        int switched = switches.get();
+        assertEquals(0, finder.state().exhaustedAt);
+
+        // both died; the control server answers the device itself: the proxies, not the network
+        network.latency.clear();
+        finder.reportFailure(finder.currentProxy().address(), true);
+
+        ProxyFinder.State state = finder.state();
+        assertEquals(ProxyFinder.Phase.FAILED, state.phase);
+        assertNull(state.current);
+        assertNull(finder.currentProxy());
+        assertEquals(now.get(), state.exhaustedAt);
+        assertEquals(1, network.directs.get());
+        assertEquals("the index past the end", 2, saved().index);
+        assertEquals("the connections through the last one are dropped", switched + 1, switches.get());
+        assertEquals(ProxyFinder.Phase.FAILED, heard.get(heard.size() - 1).phase);
+        assertEquals("the last search is less than ten minutes old", fetches, network.fetches.get());
+        assertTrue("a restart keeps the run-out", finder().state().exhaustedAt > 0);
+
+        // the automatic search, once due, finds nothing: the same run-out
+        now.addAndGet(ProxyFinder.AUTO_SCAN_INTERVAL_MS);
+        assertTrue(finder.proxiesForRequest().isEmpty());
+        assertTrue(network.fetches.get() > fetches);
+        assertEquals(ProxyFinder.Phase.FAILED, finder.state().phase);
+        assertEquals(state.exhaustedAt, finder.state().exhaustedAt);
+
+        // one that finds a proxy ends it
+        network.latency.put("2.2.2.2:80", 200L);
+        finder.rescan();
+        assertEquals("2.2.2.2:80", finder.state().current.label());
+        assertEquals(0, finder.state().exhaustedAt);
+    }
+
+    @Test
+    public void aRestartKeepsTheRunOutAfterAFailedSearch() {
+        lists("1.1.1.1:80\n", "");
+        network.latency.put("1.1.1.1:80", 100L);
+        ProxyFinder finder = finder();
+        finder.rescan();
+        network.latency.clear();
+        finder.reportFailure(finder.currentProxy().address(), true);
+        long exhaustedAt = finder.state().exhaustedAt;
+        assertTrue(exhaustedAt > 0);
+
+        // within the search's cooldown: the run-out, not an idle finder, so «Найти заново» is offered
+        now.addAndGet(1);
+        ProxyFinder.State restarted = finder().state();
+        assertEquals(ProxyFinder.Phase.FAILED, restarted.phase);
+        assertEquals(exhaustedAt, restarted.exhaustedAt);
+
+        // the next search finds nothing and saves an empty list: the run-out stays
+        now.addAndGet(ProxyFinder.AUTO_SCAN_INTERVAL_MS);
+        assertTrue(finder.proxiesForRequest().isEmpty());
+        assertTrue(saved().proxies.isEmpty());
+        restarted = finder().state();
+        assertEquals(ProxyFinder.Phase.FAILED, restarted.phase);
+        assertEquals(exhaustedAt, restarted.exhaustedAt);
     }
 
     @Test
@@ -631,13 +739,16 @@ public class ProxyFinderTest {
         assertEquals(switched + 1, switches.get());
         assertEquals(1, saved().index);
 
-        // the proxy in use and the spare both fail: the network, not the proxy; the list stays
+        // the proxy in use and the spare both fail, and nothing answers directly: the network, not the proxy; the list
+        // stays
         network.calls.clear();
         network.latency.remove("2.2.2.2:80");
         network.latency.remove("3.3.3.3:80");
+        network.direct = false;
         int fetches = network.fetches.get();
         finder.reportFailure(finder.currentProxy().address(), true);
         assertEquals(3, network.calls.size());
+        assertEquals(1, network.directs.get());
         assertEquals("2.2.2.2:80", finder.state().current.label());
         assertEquals(1, finder.state().spares);
         assertEquals(1, saved().index);
@@ -1162,9 +1273,13 @@ public class ProxyFinderTest {
         finder.reportFailure(finder.currentProxy().address(), true);
         assertEquals(2, switches.get());
         network.latency.remove("2.2.2.2:80");
+        network.direct = false;
         finder.reportFailure(finder.currentProxy().address(), true);
-        assertEquals("the last one stays without a spare to compare with: no change, nothing dropped", 2,
+        assertEquals("the last one stays while nothing answers directly: no change, nothing dropped", 2,
                 switches.get());
+        network.direct = true;
+        finder.reportFailure(finder.currentProxy().address(), true);
+        assertEquals("the list ran out: the connections through the last one are dropped", 3, switches.get());
     }
 
     @Test
@@ -1315,12 +1430,13 @@ public class ProxyFinderTest {
         List<ProxyCandidate> proxies = Arrays.asList(
                 new ProxyCandidate("1.2.3.4", 8080, Proxy.Type.HTTP).checked(420, 1_700_000_000_000L),
                 new ProxyCandidate("5.6.7.8", 1080, Proxy.Type.SOCKS).checked(950, 1_700_000_000_001L));
-        String json = ProxyFinder.Saved.toJson(proxies, 1, 1_700_000_000_002L);
+        String json = ProxyFinder.Saved.toJson(proxies, 1, 1_700_000_000_002L, 1_700_000_000_003L);
         assertFalse("no sites are kept any more", json.contains("target") || json.contains("refused"));
         ProxyFinder.Saved saved = ProxyFinder.Saved.fromJson(json);
         assertEquals(proxies, saved.proxies);
         assertEquals(1, saved.index);
         assertEquals(1_700_000_000_002L, saved.scannedAt);
+        assertEquals(1_700_000_000_003L, saved.exhaustedAt);
         assertEquals(420, saved.proxies.get(0).latencyMs());
         assertEquals(1_700_000_000_001L, saved.proxies.get(1).checkedAt());
         assertSame(Proxy.Type.SOCKS, saved.proxies.get(1).type());
@@ -1335,6 +1451,7 @@ public class ProxyFinderTest {
             assertEquals(old, proxies, loaded.proxies);
             assertEquals(1, loaded.index);
             assertEquals(5, loaded.scannedAt);
+            assertEquals("no run-out kept yet", 0, loaded.exhaustedAt);
         }
     }
 

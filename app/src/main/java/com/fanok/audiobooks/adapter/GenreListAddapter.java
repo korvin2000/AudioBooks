@@ -16,8 +16,11 @@ import androidx.annotation.Nullable;
 import androidx.recyclerview.widget.RecyclerView;
 import com.fanok.audiobooks.R;
 import com.fanok.audiobooks.activity.NarratorActivity;
+import com.fanok.audiobooks.fragment.FavoritesSwitcher;
 import com.fanok.audiobooks.model.FavoritePeople;
 import com.fanok.audiobooks.pojo.GenrePOJO;
+import com.fanok.audiobooks.search.Genre;
+import com.fanok.audiobooks.search.GenrePicks;
 import com.google.android.material.snackbar.Snackbar;
 import java.util.ArrayList;
 import java.util.List;
@@ -30,20 +33,39 @@ public class GenreListAddapter extends RecyclerView.Adapter<GenreListAddapter.My
 
     /** Set once the hint after the very first favourite person ever was shown. */
     private static final String HINT_PREF = "people_star_hint_shown";
+    /** The same for the very first favourite genre. */
+    private static final String GENRE_HINT_PREF = "genre_star_hint_shown";
+    /** {@link #mStarKind} of rows without a star. */
+    private static final int NO_STARS = -1;
 
     private RecyclerTushListner listner;
     private ArrayList<GenrePOJO> mModel;
-    /** FavoritePeople.AUTHOR / READER when rows show a favourite star; -1 (genres) shows none. */
-    private int mStarKind = -1;
+    /**
+     * FavoritePeople.AUTHOR / READER or {@link FavoritesSwitcher#GENRES} when rows show a favourite star;
+     * {@link #NO_STARS} shows none.
+     */
+    private int mStarKind = NO_STARS;
+    /** The genre a genre list is narrowed to: a star of a row naming more genres stars this one. */
+    @Nullable
+    private Genre mNarrowedTo;
 
     /** Rows get a star at the end that toggles that person in FavoritePeople of {@code kind}. */
     public void showStars(int kind) {
         mStarKind = kind;
     }
 
+    /**
+     * Rows of a site's genres get a star for the app's genres they name ({@link GenrePicks#toggleStar}), in a list
+     * narrowed to the genre {@code narrowedTo} (null: not narrowed).
+     */
+    public void showGenreStars(@Nullable Genre narrowedTo) {
+        mStarKind = FavoritesSwitcher.GENRES;
+        mNarrowedTo = narrowedTo;
+    }
+
     /** Re-reads the stars (another screen may have changed the favourites); rebinds only the stars. */
     public void refreshStars() {
-        if (mStarKind >= 0 && getItemCount() > 0) {
+        if (mStarKind != NO_STARS && getItemCount() > 0) {
             notifyItemRangeChanged(0, getItemCount(), STAR);
         }
     }
@@ -178,7 +200,14 @@ public class GenreListAddapter extends RecyclerView.Adapter<GenreListAddapter.My
             mStar.setOnClickListener(view -> {
                 int position = getBindingAdapterPosition();
                 GenrePOJO person = getItem(position);
-                if (person == null || mStarKind < 0) {
+                if (person == null || mStarKind == NO_STARS) {
+                    return;
+                }
+                if (mStarKind == FavoritesSwitcher.GENRES) {
+                    if (GenrePicks.toggleStar(view.getContext(), person.getName(), mNarrowedTo)) {
+                        firstAddHint(view);
+                    }
+                    refreshStars(); // other rows may name the same genre
                     return;
                 }
                 if (FavoritePeople.get(view.getContext()).toggle(mStarKind, person.getName(), person.getUrl())) {
@@ -228,25 +257,29 @@ public class GenreListAddapter extends RecyclerView.Adapter<GenreListAddapter.My
         void bindStar(GenrePOJO person) {
             // the number stands right next to the star; without the star it keeps its margin from the edge
             ViewGroup.MarginLayoutParams lp = (ViewGroup.MarginLayoutParams) mReting.getLayoutParams();
-            lp.setMarginEnd(mStarKind < 0
-                    ? mReting.getResources().getDimensionPixelSize(R.dimen.text_margin) : 0);
-            if (mStarKind < 0) {
+            boolean genres = mStarKind == FavoritesSwitcher.GENRES;
+            boolean starred = mStarKind != NO_STARS && (!genres || Genre.of(person.getName()) != null);
+            lp.setMarginEnd(starred ? 0 : mReting.getResources().getDimensionPixelSize(R.dimen.text_margin));
+            if (!starred) { // a site genre none of the app's genres matches cannot be a favourite
                 mStar.setVisibility(View.GONE);
                 return;
             }
-            boolean on = FavoritePeople.get(mStar.getContext()).has(mStarKind, person.getName());
+            boolean on = genres ? GenrePicks.starred(GenrePicks.favorites(mStar.getContext()), person.getName())
+                    : FavoritePeople.get(mStar.getContext()).has(mStarKind, person.getName());
             mStar.setActivated(on);
             mStar.setContentDescription(mStar.getContext().getString(
                     on ? R.string.people_star_remove : R.string.people_star_add));
             mStar.setVisibility(View.VISIBLE);
         }
 
-        /** The very first person ever added says once where the favourites are kept. */
+        /** The very first person or genre ever added says once where the favourites are kept. */
         private void firstAddHint(View view) {
+            boolean genres = mStarKind == FavoritesSwitcher.GENRES;
+            String key = genres ? GENRE_HINT_PREF : HINT_PREF;
             SharedPreferences pref = getDefaultSharedPreferences(view.getContext());
-            if (!pref.getBoolean(HINT_PREF, false)) {
-                pref.edit().putBoolean(HINT_PREF, true).apply();
-                Snackbar.make(view, mStarKind == FavoritePeople.AUTHOR
+            if (!pref.getBoolean(key, false)) {
+                pref.edit().putBoolean(key, true).apply();
+                Snackbar.make(view, genres ? R.string.genre_star_hint : mStarKind == FavoritePeople.AUTHOR
                         ? R.string.people_star_hint_author : R.string.people_star_hint_reader,
                         Snackbar.LENGTH_LONG).show();
             }

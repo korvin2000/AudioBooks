@@ -174,7 +174,7 @@ public final class AppProxy {
     private static void installSelector() {
         ProxySelector.setDefault(new Selector(system,
                 () -> route(mode, configured(), customRoute, AppProxy::autoProxies), AppProxy::proxied,
-                AppProxy::onConnectFailed));
+                AppProxy::reportTransportFailure));
     }
 
     /** Stores and applies a mode; the automatic mode starts a search when no proxy is verified yet. */
@@ -484,11 +484,32 @@ public final class AppProxy {
         return f != null ? f.proxiesForRequest() : Collections.emptyList();
     }
 
-    private static void onConnectFailed(@Nullable SocketAddress address, @Nullable IOException failure) {
-        ProxyFinder f = finder;
-        if (MODE_AUTO.equals(mode) && f != null) {
-            f.reportFailure(address);
+    /**
+     * A connection through {@code address} failed (the selector's report), or a call through it failed after it
+     * connected (from the shared client's event listener or {@link SiteHttp}: a read timeout, a reset, a cut body;
+     * never a site's HTTP answer). A hint the finder confirms by control checks before it moves on; only the proxy in
+     * use counts. Never throws.
+     */
+    public static void reportTransportFailure(@Nullable SocketAddress address, @Nullable IOException failure) {
+        try {
+            ProxyFinder f = finder;
+            if (MODE_AUTO.equals(mode) && f != null) {
+                f.reportFailure(address);
+            }
+        } catch (RuntimeException ignored) {
+            // a hint must never break the request that gave it
         }
+    }
+
+    /**
+     * The address of the automatic proxy in use when a request to {@code host} goes through it, taken before the
+     * request for {@link #reportTransportFailure}; null in another mode, for a direct host, or without a verified proxy.
+     */
+    @Nullable
+    static SocketAddress autoProxyFor(@Nullable String host) {
+        ProxyFinder f = finder;
+        Proxy proxy = MODE_AUTO.equals(mode) && f != null && proxied(host) ? f.currentProxy() : null;
+        return proxy != null ? proxy.address() : null;
     }
 
     /**

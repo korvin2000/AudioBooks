@@ -192,7 +192,7 @@
             android:textColorLink="@color/sources_link"
             android:textSize="13sp"
             android:visibility="gone"
-            tools:text="@string/sources_proxy_off_hint" />
+            tools:text="Прокси выключен в настройках, поэтому маршрут этого сайта сейчас не действует. Включить прокси" />
 
         <View style="@style/Widget.App.Sources.Divider" />
 

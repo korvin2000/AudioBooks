@@ -383,9 +383,9 @@
         <CheckBoxPreference
             android:defaultValue="false"
             android:icon="@drawable/ic_autoload_book"
-            android:key="pref_autoload_last_book"
-            android:summary="@string/autoload_last_book_desc"
-            android:title="@string/autoload_last_book" />
+            android:key="pref_play_last_book"
+            android:summary="@string/play_last_book_desc"
+            android:title="@string/play_last_book" />
 
         <!-- update.Updater: a check at the start and every 1.5 h; "О программе" checks by hand either way -->
         <CheckBoxPreference

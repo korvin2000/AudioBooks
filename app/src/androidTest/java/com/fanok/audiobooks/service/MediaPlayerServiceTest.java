@@ -695,7 +695,7 @@ public class MediaPlayerServiceTest {
             row.setAudioUrl(audio.getUrl());
             rows.add(row);
         }
-        new StorageUtil(context).storeCheckpoint(new Checkpoint(request.bookUrl, 0, 0), true);
+        new StorageUtil(context).storeCheckpoint(new Checkpoint(request.bookUrl, 0, 0), false, true);
         return request;
     }
 

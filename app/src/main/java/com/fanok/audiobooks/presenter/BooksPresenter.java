@@ -14,6 +14,7 @@ import android.view.View;
 import android.widget.ImageView;
 import android.widget.TextView;
 import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
 import com.arellomobile.mvp.InjectViewState;
 import com.arellomobile.mvp.MvpPresenter;
@@ -35,6 +36,7 @@ import com.fanok.audiobooks.pojo.BookPOJO;
 import com.fanok.audiobooks.pojo.GenrePOJO;
 import com.fanok.audiobooks.policy.DefaultCover;
 import com.fanok.audiobooks.policy.ParentalControl;
+import com.fanok.audiobooks.search.Genre;
 import com.fanok.audiobooks.search.GenrePicks;
 import com.fanok.audiobooks.search.GenreSort;
 import com.fanok.audiobooks.search.ListingCursor;
@@ -93,6 +95,9 @@ public class BooksPresenter extends MvpPresenter<BooksView> implements
     private Map<String, ?> mPicks = Collections.emptyMap();
     /** The genre list's toolbar search: only the genres whose names contain it are shown. */
     private String mGenreQuery = "";
+    /** A genre list opened from Избранное → Жанры shows only the site genres that name this one; null shows all. */
+    @Nullable
+    private final Genre mGenreFilter;
     /** Cards shown and pages fetched since the user's last action, bounding the automatic hunt for matches. */
     private int mHuntBaseShown;
     private int mHuntPages;
@@ -106,11 +111,15 @@ public class BooksPresenter extends MvpPresenter<BooksView> implements
     /** The listing URL; a period or a server-side duration chosen in the filter bar rewrites it in place. */
     private String mUrl;
 
-    /** @param period the period kept with a rewritten URL ({@link BooksView#rememberUrl}), or null */
+    /**
+     * @param period the period kept with a rewritten URL ({@link BooksView#rememberUrl}), or null
+     * @param genre  the genre a genre list is narrowed to, or null
+     */
     public BooksPresenter(@NonNull String url, int modelId, @NonNull String subTitle,
-            ListingFilters.Period period, @NonNull Context context) {
+            ListingFilters.Period period, @Nullable Genre genreFilter, @NonNull Context context) {
         mUrl = Url.canonical(url); // a link on a former or mobile host lists from the current one
         mModelId = modelId;
+        mGenreFilter = genreFilter;
         mSubTitle = subTitle;
         mBooksDBModel = new BooksDBModel(context);
         mProvider = Provider.ofUrl(url);
@@ -242,10 +251,10 @@ public class BooksPresenter extends MvpPresenter<BooksView> implements
         getViewState().setPosition(0);
     }
 
-    /** The loaded genres in the chosen order, narrowed to the search. */
+    /** The loaded genres in the chosen order, narrowed to the favourite genre and the search. */
     private void showGenres() {
         mPicks = GenrePicks.all(mContext);
-        List<GenrePOJO> shown = mGenreCursor.items();
+        List<GenrePOJO> shown = GenrePicks.narrowed(mGenreCursor.items(), mGenreFilter);
         if (!mGenreQuery.isEmpty()) { // narrowed before it is sorted: a built-in list holds tens of thousands
             ArrayList<GenrePOJO> matching = new ArrayList<>();
             for (GenrePOJO item : shown) {
@@ -697,10 +706,10 @@ public class BooksPresenter extends MvpPresenter<BooksView> implements
                     routeFailed(tried, result);
                 } else if (mRoute != null && mRoute.deferred) {
                     return; // the accepted offer retries below, on the other route
-                } else if (result.status == ProviderPage.Status.BLOCKED
-                        && com.fanok.audiobooks.activity.ActivityCookies.passes(mProvider)) {
-                    // the site lets a browser in: the user passes its check there, the app then uses that session
-                    getViewState().showSiteCheckOffer(mProvider);
+                } else if (result.challenge && com.fanok.audiobooks.activity.ActivityCookies.passes(mProvider)) {
+                    // the site lets a browser in: the user passes its check there, the app then uses that session; a
+                    // plain 403/503 (an outage, a refusal) is no check a browser could pass
+                    getViewState().showSiteCheckOffer(mProvider, result.challengedUrl);
                 } else if (!offerRoute(result)) {
                     showFailure(result);
                 }
@@ -876,9 +885,8 @@ public class BooksPresenter extends MvpPresenter<BooksView> implements
         }
         if (result.status == ProviderPage.Status.RATE_LIMITED) {
             getViewState().showToast(rateLimited(result));
-        } else if (result.status == ProviderPage.Status.BLOCKED
-                && com.fanok.audiobooks.activity.ActivityCookies.passes(mProvider)) {
-            getViewState().showSiteCheckOffer(mProvider);
+        } else if (result.challenge && com.fanok.audiobooks.activity.ActivityCookies.passes(mProvider)) {
+            getViewState().showSiteCheckOffer(mProvider, result.challengedUrl);
         } else if (result.status == ProviderPage.Status.BLOCKED) {
             getViewState().showToast(CookesExeption.messageFor(mUrl)); // the cookie hint is what can help
         } else {

@@ -7,8 +7,11 @@ import static com.fanok.audiobooks.activity.ParentalControlActivity.PARENTAL_CON
 import android.annotation.SuppressLint;
 import android.app.UiModeManager;
 import android.content.Context;
+import android.content.ContextWrapper;
 import android.content.SharedPreferences;
 import android.content.res.Configuration;
+import android.graphics.Bitmap;
+import android.graphics.drawable.Drawable;
 import android.os.Looper;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -20,12 +23,16 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.annotation.OptIn;
 import androidx.core.content.ContextCompat;
+import androidx.lifecycle.Lifecycle;
+import androidx.lifecycle.LifecycleEventObserver;
+import androidx.lifecycle.LifecycleOwner;
 import androidx.media3.common.util.UnstableApi;
 import androidx.media3.exoplayer.offline.Download;
 import androidx.media3.exoplayer.offline.DownloadIndex;
 import androidx.preference.PreferenceManager;
 import androidx.recyclerview.widget.RecyclerView;
 import com.bumptech.glide.Glide;
+import com.bumptech.glide.RequestManager;
 import com.fanok.audiobooks.App;
 import com.fanok.audiobooks.Consts;
 import com.fanok.audiobooks.R;
@@ -36,10 +43,15 @@ import com.fanok.audiobooks.model.BooksDBModel;
 import com.fanok.audiobooks.model.ListeningProgress;
 import com.fanok.audiobooks.pojo.AudioListPOJO;
 import com.fanok.audiobooks.pojo.BookPOJO;
+import com.fanok.audiobooks.policy.DefaultCover;
+import com.fanok.audiobooks.policy.EmbeddedCover;
 import com.fanok.audiobooks.search.Provider;
 import com.fanok.audiobooks.util.DownloadUtil;
 import com.github.lzyzsd.circleprogress.DonutProgress;
+import java.io.File;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -67,6 +79,60 @@ public class BooksListAddapter extends RecyclerView.Adapter<BooksListAddapter.My
     /** A row that stands for several books (a group in the search): their URLs, whose best marks it shows. */
     private java.util.Map<String, java.util.List<String>> mAliases = java.util.Collections.emptyMap();
     private static final Object STATUS_CHANGED = new Object();
+    /** A row's cover was read from its audio: only the picture is set again. */
+    private static final Object COVER = new Object();
+    /** The list while in a window, and its screen's lifecycle (null: not found). */
+    @Nullable
+    private RecyclerView mList;
+    @Nullable
+    private Lifecycle mHost;
+    /** The rows ask only while the screen is started: one on top (the book's) leaves the list in its window. */
+    private final LifecycleEventObserver mHostState = (owner, event) -> {
+        if (event == Lifecycle.Event.ON_STOP && mList != null) {
+            rows(mList, false);
+        } else if (event == Lifecycle.Event.ON_START) {
+            notifyItemRangeChanged(0, getItemCount(), COVER); // what was read meanwhile; they ask again
+        }
+    };
+
+    {
+        // a row moved (DiffUtil) waits at its new place; told after the list (observers are told last first)
+        registerAdapterDataObserver(new RecyclerView.AdapterDataObserver() {
+            @Override
+            public void onItemRangeMoved(int fromPosition, int toPosition, int itemCount) {
+                if (mList != null) {
+                    rows(mList, true);
+                }
+            }
+        });
+    }
+
+    /** A cover read anywhere (the book screen, the player, a row) shows at once in this list's rows of the book. */
+    private final EmbeddedCover.Listener mCovers = (key, cover) -> {
+        for (int i = 0; mModel != null && i < mModel.size(); i++) {
+            if (EmbeddedCover.isOf(key, mModel.get(i).getUrl())) {
+                notifyItemChanged(i, COVER);
+            }
+        }
+    };
+
+    /** Listens while the list is in a window, so the static listener set never holds a list that is gone. */
+    private final View.OnAttachStateChangeListener mWindow = new View.OnAttachStateChangeListener() {
+        @Override
+        public void onViewAttachedToWindow(@NonNull View view) {
+            EmbeddedCover.listen(mCovers);
+            watch((RecyclerView) view);
+            notifyItemRangeChanged(0, getItemCount(), COVER); // what was read while it was away; asks again
+        }
+
+        @Override
+        public void onViewDetachedFromWindow(@NonNull View view) {
+            EmbeddedCover.unlisten(mCovers);
+            watch(null);
+            rows((RecyclerView) view, false);
+        }
+    };
+
     @UnstableApi
     class MyHolder extends RecyclerView.ViewHolder {
 
@@ -103,6 +169,11 @@ public class BooksListAddapter extends RecyclerView.Adapter<BooksListAddapter.My
         private final TextView mTime;
 
         private final TextView mTitle;
+
+        /** The book whose cover this row waits for, showing the default one meanwhile; null when it shows its own. */
+        private String mCoverOf;
+        /** The book this row asked for while in the list, until it has its cover, shows another or leaves. */
+        private String mAsked;
 
 
         @UnstableApi
@@ -154,29 +225,7 @@ public class BooksListAddapter extends RecyclerView.Adapter<BooksListAddapter.My
                 throw new NullPointerException();
             }
 
-            android.graphics.drawable.Drawable mask =
-                    com.fanok.audiobooks.policy.ParentalControl.coverMask(mImageView.getContext(), book);
-            if (mask != null) {
-                Glide.with(mImageView).load(mask).into(mImageView);
-
-            } else {
-                if (book.getPhoto() != null && !book.getPhoto().isEmpty()) {
-                    String photoPath = book.getPhoto();
-                    if (com.fanok.audiobooks.policy.DefaultCover.replaces(photoPath)) {
-                        Glide.with(mImageView).load(com.fanok.audiobooks.policy.DefaultCover.drawable(
-                                mImageView.getContext(), book.getUrl())).into(mImageView);
-                    } else if (photoPath.startsWith("content://")) {
-                        Glide.with(mImageView).load(android.net.Uri.parse(photoPath)).into(mImageView);
-                    } else if (photoPath.startsWith("/") || photoPath.contains(":\\")) {
-                        Glide.with(mImageView).load(new java.io.File(photoPath)).into(mImageView);
-                    } else {
-                        Glide.with(mImageView).load(com.fanok.audiobooks.net.Covers.glide(photoPath)).into(mImageView);
-                    }
-                } else {
-                    mImageView.setImageDrawable(
-                            ContextCompat.getDrawable(mImageView.getContext(), android.R.drawable.ic_menu_gallery));
-                }
-            }
+            bindCover(book);
 
             String label = mSourceLabels.get(book.getUrl());
             Provider provider = Provider.ofUrl(book.getUrl());
@@ -280,6 +329,73 @@ public class BooksListAddapter extends RecyclerView.Adapter<BooksListAddapter.My
 
         }
 
+        /**
+         * The row's cover. A book of a site whose covers are never requested (audioboo) shows the one read from its
+         * audio: from memory, else its file, which Glide decodes off the main thread; while there is none, the default
+         * cover shows and the row, while in the list, asks for it ({@link #ask}).
+         */
+        void bindCover(BookPOJO book) {
+            String wanted = null;
+            String photo = book.getPhoto();
+            Drawable mask = com.fanok.audiobooks.policy.ParentalControl.coverMask(mImageView.getContext(), book);
+            if (mask != null) {
+                Glide.with(mImageView).load(mask).into(mImageView);
+            } else if (DefaultCover.replaces(photo)
+                    || (photo == null || photo.isEmpty()) && DefaultCover.replaces(book.getUrl())) {
+                Drawable gradient = DefaultCover.gradient(mImageView.getContext(), book.getUrl());
+                Bitmap read = EmbeddedCover.memory(book.getUrl());
+                File saved = read == null ? EmbeddedCover.saved(mImageView.getContext(), book.getUrl()) : null;
+                RequestManager glide = Glide.with(mImageView);
+                (read != null ? glide.load(read) : saved != null ? glide.load(saved) : glide.load(gradient))
+                        .placeholder(gradient).into(mImageView);
+                if (read == null && saved == null) {
+                    wanted = book.getUrl();
+                }
+            } else if (photo != null && !photo.isEmpty()) {
+                if (photo.startsWith("content://")) {
+                    Glide.with(mImageView).load(android.net.Uri.parse(photo)).into(mImageView);
+                } else if (photo.startsWith("/") || photo.contains(":\\")) {
+                    Glide.with(mImageView).load(new java.io.File(photo)).into(mImageView);
+                } else {
+                    Glide.with(mImageView).load(com.fanok.audiobooks.net.Covers.glide(photo)).into(mImageView);
+                }
+            } else {
+                mImageView.setImageDrawable(
+                        ContextCompat.getDrawable(mImageView.getContext(), android.R.drawable.ic_menu_gallery));
+            }
+            mCoverOf = wanted;
+            ask(); // rebound in the list (a payload, a status): asks again, or no more
+        }
+
+        /**
+         * In the list (attached) while its screen is started, the row asks for its book's cover while it waits for it,
+         * at its position: the topmost goes first ({@link EmbeddedCover#request}); prefetched or cached off screen, it
+         * does not.
+         */
+        void ask() {
+            if (mAsked != null && !mAsked.equals(mCoverOf)) {
+                leaveCover();
+            }
+            if (mCoverOf != null && itemView.isAttachedToWindow()
+                    && (mHost == null || mHost.getCurrentState().isAtLeast(Lifecycle.State.STARTED))) {
+                int at = getBindingAdapterPosition(); // with the changes not laid out yet
+                at = at == RecyclerView.NO_POSITION ? getLayoutPosition() : at;
+                if (mAsked == null) {
+                    EmbeddedCover.request(mAsked = mCoverOf, at);
+                } else {
+                    EmbeddedCover.move(mAsked, at);
+                }
+            }
+        }
+
+        /** The row asks no more: it has its cover, shows another book, left the list or its screen stopped. */
+        void leaveCover() {
+            if (mAsked != null) {
+                EmbeddedCover.forget(mAsked);
+                mAsked = null;
+            }
+        }
+
         private void setVisible(boolean b) {
             if (mListened != null) mListened.setVisibility(b ? View.VISIBLE : View.GONE);
             if (b) {
@@ -367,6 +483,63 @@ public class BooksListAddapter extends RecyclerView.Adapter<BooksListAddapter.My
     @Override
     public void onBindViewHolder(@NonNull MyHolder myHolder, int i) {
         myHolder.bind(mModel.get(i));
+    }
+
+    @UnstableApi
+    @Override
+    public void onBindViewHolder(@NonNull MyHolder myHolder, int i, @NonNull List<Object> payloads) {
+        if (!payloads.isEmpty() && Collections.frequency(payloads, COVER) == payloads.size()) {
+            myHolder.bindCover(mModel.get(i)); // the rest of the row, and the remote's focus on it, stay
+        } else {
+            super.onBindViewHolder(myHolder, i, payloads);
+        }
+    }
+
+    /** A row came into the list (shown): it asks for its cover, if it waits for one. */
+    @OptIn(markerClass = UnstableApi.class)
+    @Override
+    public void onViewAttachedToWindow(@NonNull MyHolder holder) {
+        super.onViewAttachedToWindow(holder);
+        holder.ask();
+    }
+
+    /** A row left the list (scrolled off, cached or recycled): it asks no more. */
+    @OptIn(markerClass = UnstableApi.class)
+    @Override
+    public void onViewDetachedFromWindow(@NonNull MyHolder holder) {
+        super.onViewDetachedFromWindow(holder);
+        holder.leaveCover();
+    }
+
+    /** The list's rows ask again ({@code ask}), or none does (it left its window, this adapter or its screen stopped). */
+    @OptIn(markerClass = UnstableApi.class)
+    private void rows(RecyclerView list, boolean ask) {
+        for (int i = 0; i < list.getChildCount(); i++) {
+            RecyclerView.ViewHolder holder = list.getChildViewHolder(list.getChildAt(i));
+            if (holder instanceof MyHolder) {
+                if (ask) {
+                    ((MyHolder) holder).ask();
+                } else {
+                    ((MyHolder) holder).leaveCover();
+                }
+            }
+        }
+    }
+
+    /** Follows the screen of {@code list} (its context, unwrapped to the activity), or none (null). */
+    private void watch(@Nullable RecyclerView list) {
+        if (mHost != null) {
+            mHost.removeObserver(mHostState);
+        }
+        Context context = list == null ? null : list.getContext();
+        while (context instanceof ContextWrapper && !(context instanceof LifecycleOwner)) {
+            context = ((ContextWrapper) context).getBaseContext();
+        }
+        mList = list;
+        mHost = context instanceof LifecycleOwner ? ((LifecycleOwner) context).getLifecycle() : null;
+        if (mHost != null) {
+            mHost.addObserver(mHostState); // started, it is told ON_START at once
+        }
     }
 
     @UnstableApi
@@ -655,8 +828,22 @@ public class BooksListAddapter extends RecyclerView.Adapter<BooksListAddapter.My
     }
 
     @Override
+    public void onAttachedToRecyclerView(@NonNull RecyclerView recyclerView) {
+        super.onAttachedToRecyclerView(recyclerView);
+        recyclerView.addOnAttachStateChangeListener(mWindow);
+        if (recyclerView.isAttachedToWindow()) {
+            EmbeddedCover.listen(mCovers);
+            watch(recyclerView);
+        }
+    }
+
+    @Override
     public void onDetachedFromRecyclerView(@NonNull RecyclerView recyclerView) {
         super.onDetachedFromRecyclerView(recyclerView);
+        recyclerView.removeOnAttachStateChangeListener(mWindow);
+        EmbeddedCover.unlisten(mCovers);
+        watch(null);
+        rows(recyclerView, false);
         if (executor != null && !executor.isShutdown()) {
             executor.shutdown();
         }

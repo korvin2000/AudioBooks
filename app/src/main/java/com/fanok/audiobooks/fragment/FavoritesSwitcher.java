@@ -20,26 +20,29 @@ import com.fanok.audiobooks.R;
 import com.fanok.audiobooks.activity.MainActivity;
 import com.fanok.audiobooks.model.BooksDBModel;
 import com.fanok.audiobooks.model.FavoritePeople;
+import com.fanok.audiobooks.search.GenrePicks;
 import io.reactivex.Single;
 import io.reactivex.android.schedulers.AndroidSchedulers;
 import io.reactivex.schedulers.Schedulers;
 import java.util.function.IntConsumer;
 
 /**
- * The title of Избранное: "★ Книги ⌄" on the activity's shared toolbar, a menu of the three lists (books, authors,
- * readers) with their sizes. The list on screen puts it up and takes it down with its view; the choice is remembered,
- * so the drawer, the start screen and the links open the list chosen last. The history puts up the same switcher for
- * its listening status (FavoriteFragment).
+ * The title of Избранное: "★ Книги ⌄" on the activity's shared toolbar, a menu of the four lists (books, authors,
+ * readers, genres) with their sizes. The list on screen puts it up and takes it down with its view; the choice is
+ * remembered, so the drawer, the start screen and the links open the list chosen last. The history puts up the same
+ * switcher for its listening status, and Загруженные for the downloads manager (FavoriteFragment).
  */
 public final class FavoritesSwitcher {
     /** The books; the people lists are {@link FavoritePeople#AUTHOR} and {@link FavoritePeople#READER}. */
     public static final int BOOKS = -1;
+    /** The favourite genres ({@link GenrePicks#favorites}). */
+    public static final int GENRES = -2;
     /** The tag every list of Избранное is shown under: switching keeps the back stack as it is. */
     public static final String TAG = "favorite";
     private static final String PREF_KIND = "favorites_kind";
-    private static final int[] KINDS = {BOOKS, FavoritePeople.AUTHOR, FavoritePeople.READER};
+    private static final int[] KINDS = {BOOKS, FavoritePeople.AUTHOR, FavoritePeople.READER, GENRES};
     private static final int[] TITLES = {R.string.favorites_books, R.string.favorites_authors,
-            R.string.favorites_readers};
+            R.string.favorites_readers, R.string.favorites_genres};
 
     private FavoritesSwitcher() {
     }
@@ -52,6 +55,9 @@ public final class FavoritesSwitcher {
 
     @NonNull
     static Fragment create(int kind) {
+        if (kind == GENRES) {
+            return new FavoriteGenresFragment();
+        }
         return kind == FavoritePeople.AUTHOR || kind == FavoritePeople.READER
                 ? FavoritePeopleFragment.newInstance(kind)
                 : FavoriteFragment.newInstance(R.string.menu_favorite, Consts.TABLE_FAVORITE);
@@ -62,7 +68,7 @@ public final class FavoritesSwitcher {
     }
 
     private static int index(int kind) {
-        return kind == FavoritePeople.AUTHOR ? 1 : kind == FavoritePeople.READER ? 2 : 0;
+        return kind == FavoritePeople.AUTHOR ? 1 : kind == FavoritePeople.READER ? 2 : kind == GENRES ? 3 : 0;
     }
 
     /** Opens the menu of a switcher: {@code anchor} is the switcher, {@code arrow} its arrow. */
@@ -180,7 +186,8 @@ public final class FavoritesSwitcher {
         Single.fromCallable(() -> {
                     FavoritePeople people = FavoritePeople.get(app);
                     return new int[]{new BooksDBModel(app).getUrls(Consts.TABLE_FAVORITE).size(),
-                            people.count(FavoritePeople.AUTHOR), people.count(FavoritePeople.READER)};
+                            people.count(FavoritePeople.AUTHOR), people.count(FavoritePeople.READER),
+                            GenrePicks.favorites(app).size()};
                 })
                 .subscribeOn(Schedulers.io())
                 .observeOn(AndroidSchedulers.mainThread())

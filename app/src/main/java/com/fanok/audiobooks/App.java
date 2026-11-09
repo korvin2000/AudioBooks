@@ -319,8 +319,13 @@ public class App extends Application {
             builder.addInterceptor(defaultHeaders());
 
             // OkHttp 5 tells the ProxySelector only of failed TCP connects; a refused tunnel or handshake through an
-            // automatic proxy is reported here. The download client (newBuilder) inherits this listener.
-            builder.eventListener(new okhttp3.EventListener() {
+            // automatic proxy is reported here, and so is a call that failed after it connected through one (a read
+            // timeout, a reset) as a hint; a cancelled or interrupted call is not the proxy's. One listener per call,
+            // to know the proxy it used. The download client (newBuilder) inherits this factory.
+            builder.eventListenerFactory(newCall -> new okhttp3.EventListener() {
+                /** The proxy of the call's last connection; null before one, or when it was direct. */
+                private volatile java.net.Proxy through;
+
                 @Override
                 public void connectFailed(@androidx.annotation.NonNull okhttp3.Call call,
                         @androidx.annotation.NonNull java.net.InetSocketAddress inetSocketAddress,
@@ -329,6 +334,23 @@ public class App extends Application {
                         @androidx.annotation.NonNull IOException ioe) {
                     if (proxy.type() != java.net.Proxy.Type.DIRECT && !call.isCanceled()) {
                         AppProxy.reportConnectFailure(proxy.address(), ioe);
+                    }
+                }
+
+                @Override
+                public void connectionAcquired(@androidx.annotation.NonNull okhttp3.Call call,
+                        @androidx.annotation.NonNull okhttp3.Connection connection) {
+                    java.net.Proxy proxy = connection.route().proxy();
+                    through = proxy.type() != java.net.Proxy.Type.DIRECT ? proxy : null;
+                }
+
+                @Override
+                public void callFailed(@androidx.annotation.NonNull okhttp3.Call call,
+                        @androidx.annotation.NonNull IOException ioe) {
+                    java.net.Proxy proxy = through;
+                    if (proxy != null && !call.isCanceled() && (ioe instanceof java.net.SocketTimeoutException
+                            || !(ioe instanceof java.io.InterruptedIOException))) {
+                        AppProxy.reportTransportFailure(proxy.address(), ioe);
                     }
                 }
             });

@@ -17,7 +17,10 @@ import android.text.SpannableString;
 import android.text.Spanned;
 import android.text.TextUtils;
 import android.text.style.ForegroundColorSpan;
+import android.view.View;
 import android.widget.Toast;
+import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 import androidx.appcompat.app.AlertDialog;
 import androidx.core.content.ContextCompat;
 import androidx.preference.Preference;
@@ -28,6 +31,7 @@ import com.fanok.audiobooks.BuildConfig;
 import com.fanok.audiobooks.R;
 import com.fanok.audiobooks.activity.ActivitySendEmail;
 import com.fanok.audiobooks.activity.MainActivity;
+import com.fanok.audiobooks.adapter.ListFocus;
 import com.fanok.audiobooks.region.AppRegion;
 import com.fanok.audiobooks.region.Region;
 import com.fanok.audiobooks.region.RegionCheck;
@@ -37,6 +41,9 @@ import java.util.Locale;
 import org.jetbrains.annotations.NotNull;
 
 public class AboutFragment extends PreferenceFragmentCompat {
+
+    /** TV: the remote's row, kept across this screen's views (a «Поддержать» group opened over it) and re-creations. */
+    private final ListFocus mListFocus = new ListFocus();
 
     @Override
     public void onNavigateToScreen(PreferenceScreen preferenceScreen) {
@@ -233,6 +240,30 @@ public class AboutFragment extends PreferenceFragmentCompat {
                 activity.highlightNav(R.id.layout_nav_about);
             }
         }
+    }
+
+    @Override
+    public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
+        super.onViewCreated(view, savedInstanceState);
+        mListFocus.restore(this, savedInstanceState);
+    }
+
+    @Override
+    public void onPause() {
+        super.onPause();
+        mListFocus.onPause(this);
+    }
+
+    @Override
+    public void onSaveInstanceState(@NonNull Bundle outState) {
+        super.onSaveInstanceState(outState);
+        mListFocus.onSaveInstanceState(outState);
+    }
+
+    @Override
+    public void onDestroyView() {
+        mListFocus.onDestroyView();
+        super.onDestroyView();
     }
 
     /** Opens {@code url} in a browser; devices without one get a message instead of a crash. */

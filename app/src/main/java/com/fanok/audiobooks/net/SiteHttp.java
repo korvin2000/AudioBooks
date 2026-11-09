@@ -11,12 +11,15 @@ import com.google.gson.JsonParser;
 import org.jsoup.Connection;
 import org.jsoup.HttpStatusException;
 import org.jsoup.Jsoup;
+import org.jsoup.UnsupportedMimeTypeException;
 import org.jsoup.nodes.Document;
 
 import okhttp3.HttpUrl;
 
 import java.io.IOException;
 import java.io.InterruptedIOException;
+import java.net.SocketAddress;
+import java.net.SocketTimeoutException;
 import java.net.URL;
 import java.util.Collections;
 import java.util.Locale;
@@ -245,11 +248,21 @@ public final class SiteHttp {
             throw new RateLimitedException(url, wait); // the site asked not to be asked before then
         }
         asXhrIfAjax(connection.request());
-        Connection.Response response = connection.execute();
-        if (response.statusCode() == RateLimitedException.STATUS) {
-            long answered = System.currentTimeMillis(); // the wait counts from the answer, not from the ask
-            limit(requestedHost, Url.hostOf(response.url().toString()),
-                    RateLimitedException.retryAfterSeconds(response.header("Retry-After"), answered), answered);
+        SocketAddress proxy = AppProxy.autoProxyFor(requestedHost); // the automatic proxy in use, if it carries this
+        Connection.Response response;
+        try {
+            response = connection.execute();
+            if (response.statusCode() == RateLimitedException.STATUS) { // kept even if the body is then cut
+                long answered = System.currentTimeMillis(); // the wait counts from the answer, not from the ask
+                limit(requestedHost, Url.hostOf(response.url().toString()),
+                        RateLimitedException.retryAfterSeconds(response.header("Retry-After"), answered), answered);
+            }
+            response.readFully(); // the body too: one cut in transit fails here, where its proxy is known
+        } catch (IOException e) {
+            if (proxy != null && inTransit(e, Thread.currentThread().isInterrupted())) {
+                AppProxy.reportTransportFailure(proxy, e); // a hint the finder confirms by control checks
+            }
+            throw e;
         }
         if (response.statusCode() == 403 || response.statusCode() == 429) {
             // the automatic proxy may be the one refused, by the host that answered (after redirects)
@@ -260,6 +273,16 @@ public final class SiteHttp {
             JAR.computeIfAbsent(requestedHost, k -> new ConcurrentHashMap<>()).putAll(cookies);
         }
         return response;
+    }
+
+    /**
+     * Pure: {@code e} of a request is a failure in transit (no answer, a reset, a body cut by a timeout), which may be
+     * the proxy's; not a site's answer ({@link HttpStatusException}, {@link UnsupportedMimeTypeException}) nor a
+     * cancelled load ({@code interrupted}, an {@link InterruptedIOException} other than a timeout).
+     */
+    static boolean inTransit(IOException e, boolean interrupted) {
+        return !interrupted && !(e instanceof HttpStatusException) && !(e instanceof UnsupportedMimeTypeException)
+                && (!(e instanceof InterruptedIOException) || e instanceof SocketTimeoutException);
     }
 
     /**
@@ -399,7 +422,7 @@ public final class SiteHttp {
      * Pure: Cloudflare marks every challenge with {@code cf-mitigated}; older walls are known by title (DDoS-Guard's
      * captcha says "Проверка безопасности" in Russia).
      */
-    static boolean isChallenge(String cfMitigated, String title) {
+    public static boolean isChallenge(String cfMitigated, String title) {
         if (cfMitigated != null) {
             return true;
         }

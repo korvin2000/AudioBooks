@@ -28,6 +28,7 @@ import android.widget.Toast;
 import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 import androidx.appcompat.app.ActionBar;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
@@ -62,6 +63,8 @@ import com.fanok.audiobooks.pojo.BookPOJO;
 import com.fanok.audiobooks.pojo.GenrePOJO;
 import com.fanok.audiobooks.policy.ParentalControl;
 import com.fanok.audiobooks.presenter.BooksPresenter;
+import com.fanok.audiobooks.search.Genre;
+import com.fanok.audiobooks.search.GenrePicks;
 import com.fanok.audiobooks.search.GenreSort;
 import com.fanok.audiobooks.search.ListingFilters;
 import com.fanok.audiobooks.search.ListingFilters.Duration;
@@ -86,6 +89,8 @@ public class BooksFragment extends MvpAppCompatFragment implements BooksView {
     private static final String ARG_SUB_TITLE = "sub_title";
     private static final String ARG_SUB_TITLE_STRING = "sub_title_string";
     private static final String ARG_MODEL = "model_id";
+    /** A genre list narrowed to the site genres that name this {@link Genre#name()} (Избранное → Жанры). */
+    private static final String ARG_GENRE = "genre";
     /** The filter-bar period, kept next to the URL it rewrote ({@link #rememberUrl}). */
     private static final String ARG_PERIOD = "period";
     /** The URL the listing was opened on, never rewritten: MainActivity tells a re-tapped root by it. */
@@ -169,6 +174,13 @@ public class BooksFragment extends MvpAppCompatFragment implements BooksView {
         args.putString(ARG_SUB_TITLE_STRING, subTitle);
         args.putInt(ARG_MODEL, modelID);
         fragment.setArguments(args);
+        return fragment;
+    }
+
+    /** The site's genre list at {@code url} narrowed to those that name {@code genre}, titled {@code title}. */
+    public static BooksFragment newInstance(@NonNull String url, @NonNull Genre genre, @NonNull String title) {
+        BooksFragment fragment = newInstance(url, R.string.menu_genre, title, Consts.MODEL_GENRE);
+        fragment.requireArguments().putString(ARG_GENRE, genre.name());
         return fragment;
     }
 
@@ -342,7 +354,10 @@ public class BooksFragment extends MvpAppCompatFragment implements BooksView {
             case Consts.MODEL_AUTOR:
             case Consts.MODEL_ARTIST:
                 mAddapterGenre = new GenreListAddapter();
-                if (modelID != Consts.MODEL_GENRE) {
+                if (modelID == Consts.MODEL_GENRE) {
+                    Bundle arg = getArguments();
+                    mAddapterGenre.showGenreStars(GenrePicks.genre(arg != null ? arg.getString(ARG_GENRE) : null));
+                } else {
                     mAddapterGenre.showStars(modelID == Consts.MODEL_AUTOR
                             ? FavoritePeople.AUTHOR : FavoritePeople.READER);
                 }
@@ -488,6 +503,7 @@ public class BooksFragment extends MvpAppCompatFragment implements BooksView {
         }
         return new BooksPresenter(url, modelID, subTitle,
                 ListingFilters.Period.of(arg != null ? arg.getString(ARG_PERIOD) : null),
+                GenrePicks.genre(arg != null ? arg.getString(ARG_GENRE) : null),
                 requireContext().getApplicationContext());
     }
 
@@ -584,7 +600,7 @@ public class BooksFragment extends MvpAppCompatFragment implements BooksView {
     }
 
     @Override
-    public void showSiteCheckOffer(@NonNull Provider site) {
+    public void showSiteCheckOffer(@NonNull Provider site, @Nullable String url) {
         if (binding == null) {
             return;
         }
@@ -595,7 +611,7 @@ public class BooksFragment extends MvpAppCompatFragment implements BooksView {
                         Snackbar.LENGTH_INDEFINITE)
                 .setAction(R.string.site_check_action, v -> {
                     if (isAdded()) {
-                        siteCheckLauncher.launch(ActivityCookies.intent(requireContext(), site));
+                        siteCheckLauncher.launch(ActivityCookies.intent(requireContext(), site, url != null ? url : mUrl, false));
                     }
                 });
         mRouteOffer.show();
@@ -1007,7 +1023,7 @@ public class BooksFragment extends MvpAppCompatFragment implements BooksView {
         }
         mParentalVersion = parentalVersion;
         if (mAddapterGenre != null) {
-            mAddapterGenre.refreshStars(); // a person may have left the favourites on another screen
+            mAddapterGenre.refreshStars(); // a person or genre may have left the favourites on another screen
         }
         MainActivity activity = (MainActivity) getActivity();
         if (activity != null) {

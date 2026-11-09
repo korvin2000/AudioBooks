@@ -142,8 +142,6 @@ public class BookActivity extends MvpAppCompatActivity implements Activity {
     }
 
     private static final String ARG_BOOK = "arg_book";
-    /** The book opens paused whatever «Автовоспроизведение» says (MainActivity: «Загрузка последней книги»). */
-    private static final String ARG_PAUSED = "arg_paused";
     /** Far beyond the system long press (~500 ms), so a slow tap never switches books by accident. */
     private static final long SWITCH_BOOK_HOLD_MS = 2500;
     private static final String PREF_SEEK_BUTTONS = "seekButtonsPref";
@@ -228,6 +226,8 @@ public class BookActivity extends MvpAppCompatActivity implements Activity {
     /** The options menu while it exists: its favourite and speed items follow their state in place. */
     @Nullable
     private Menu mMenu;
+    /** A remote's focus was on the toolbar's speed text as {@link #rebuildMenu} ran: its new view takes it back. */
+    private boolean mSpeedFocused;
     /** The book's and its people's favourite state, shared by the toolbar, the ★ tab and the description. */
     private BookFavorites mFavorites;
     private final BookFavorites.Listener mFavoritesListener = this::onBookFavoritesChanged;
@@ -330,14 +330,8 @@ public class BookActivity extends MvpAppCompatActivity implements Activity {
 
     public static void startNewActivity(@NonNull Context context, @NonNull BookPOJO bookPOJO,
             boolean notificationClick) {
-        startNewActivity(context, bookPOJO, notificationClick, false);
-    }
-
-    public static void startNewActivity(@NonNull Context context, @NonNull BookPOJO bookPOJO,
-            boolean notificationClick, boolean paused) {
         Intent intent = new Intent(context, BookActivity.class);
         intent.putExtra("notificationClick", notificationClick);
-        intent.putExtra(ARG_PAUSED, paused);
         String json = new GsonBuilder().serializeNulls().create().toJson(bookPOJO);
         intent.putExtra(ARG_BOOK, json);
         //one policy for every way in; a "notificationClick" extra is never a reason to skip it
@@ -439,12 +433,9 @@ public class BookActivity extends MvpAppCompatActivity implements Activity {
 
     @ProvidePresenter
     BookPresenter provideBookPresenter() {
-        Intent intent = getIntent();
-        String json = intent.getStringExtra(ARG_BOOK);
+        String json = getIntent().getStringExtra(ARG_BOOK);
         if (json == null) throw new NullPointerException();
-        BookPresenter presenter = new BookPresenter(BookPOJO.parceJsonToBookPojo(json), getApplicationContext());
-        presenter.setPaused(intent.getBooleanExtra(ARG_PAUSED, false));
-        return presenter;
+        return new BookPresenter(BookPOJO.parceJsonToBookPojo(json), getApplicationContext());
     }
 
     @UnstableApi
@@ -861,8 +852,16 @@ public class BookActivity extends MvpAppCompatActivity implements Activity {
             tab.setIcon(favoritesTabIcon());
         }
         if (mMenu != null && bindFavoriteItems(mMenu)) {
-            invalidateOptionsMenu(); //an author or reader item came or went: the toolbar is laid out anew
+            rebuildMenu(); //an author or reader item came or went: the toolbar is laid out anew
         }
+    }
+
+    /** invalidateOptionsMenu; a remote's focus on the toolbar's speed text goes to the rebuilt menu's new one. */
+    private void rebuildMenu() {
+        // left on the old view, the focus would drop to the toolbar's Up arrow
+        MenuItem speed = mMenu == null ? null : mMenu.findItem(R.id.playbackSpeed);
+        mSpeedFocused = speed != null && speed.getActionView() != null && speed.getActionView().isFocused();
+        invalidateOptionsMenu();
     }
 
     private int favoritesTabIcon() {
@@ -1075,6 +1074,11 @@ public class BookActivity extends MvpAppCompatActivity implements Activity {
         }
         bindFavoriteItems(menu);
         bindSpeedItem(menu);
+        View speed = menu.findItem(R.id.playbackSpeed).getActionView();
+        if (mSpeedFocused && speed != null) {
+            speed.post(speed::requestFocus); // once the rebuilt toolbar holds it, after the old one went
+        }
+        mSpeedFocused = false;
 
         mPresenter.onCreateOptionsMenu(menu);
         layoutToolbar(menu);
@@ -1213,6 +1217,32 @@ public class BookActivity extends MvpAppCompatActivity implements Activity {
     @Override
     public void refreshActivity() {
         BookActivity.refreshActivity(this, mBookPOJO, mNotificationClick);
+    }
+
+    /** The browser check of the book's site, which refused the app: passed, the book screen loads again. */
+    private final androidx.activity.result.ActivityResultLauncher<Intent> mSiteCheck = registerForActivityResult(
+            new androidx.activity.result.contract.ActivityResultContracts.StartActivityForResult(), result -> {
+                if (result.getResultCode() == RESULT_OK) {
+                    refreshActivity();
+                }
+            });
+    /** The «Пройти» offer on screen: the description and the chapters fail on the same page, one offer does. */
+    @Nullable
+    private Snackbar mSiteCheckOffer;
+
+    @Override
+    public void showSiteCheckOffer(@NonNull com.fanok.audiobooks.search.Provider site) {
+        if (mSiteCheckOffer != null && mSiteCheckOffer.isShownOrQueued()) {
+            return;
+        }
+        mSiteCheckOffer = Snackbar.make(findViewById(R.id.view_pager), getString(R.string.site_check_offer, site.title),
+                        Snackbar.LENGTH_INDEFINITE)
+                .setAction(R.string.site_check_action, v -> mSiteCheck.launch(ActivityCookies.intent(this, site, mBookPOJO.getUrl(), true)));
+        //above the collapsed player, which is drawn over the screen's bottom
+        if (bottomSheetBehavior != null && bottomSheetBehavior.getState() == BottomSheetBehavior.STATE_COLLAPSED) {
+            mSiteCheckOffer.setAnchorView(mPlayer);
+        }
+        mSiteCheckOffer.show();
     }
 
     @Override
@@ -1853,7 +1883,7 @@ public class BookActivity extends MvpAppCompatActivity implements Activity {
         showingView = mBookPOJO.getUrl();
         mFavorites.refresh(); //the book may have been (un)marked on another screen meanwhile
         bindTopSideButtons();
-        invalidateOptionsMenu(); //the toolbar settings may have changed meanwhile
+        rebuildMenu(); //the toolbar settings may have changed meanwhile
         bindSpeedButton(); //the speed may have changed on another book's screen
         View decorView = getWindow().getDecorView();
         int uiOptions = View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN;

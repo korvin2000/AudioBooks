@@ -10,16 +10,19 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
 import androidx.fragment.app.FragmentActivity;
+import androidx.preference.PreferenceFragmentCompat;
+import androidx.preference.PreferenceGroup;
 import androidx.recyclerview.widget.RecyclerView;
 import com.fanok.audiobooks.App;
 import com.fanok.audiobooks.R;
 import com.fanok.audiobooks.activity.MainActivity;
 
 /**
- * A TV remote's place in a list whose rows have keys (URLs). On a TV the side menu comes first in the window, so when
- * the focused row leaves (a reload rebuilds the rows, Back re-creates the screen) Android hands the focus to the menu.
- * The row is remembered by its key and focused again once the new rows are laid out; a section just opened from the
- * menu focuses its first row. Off a TV it does nothing. One per screen, kept across its views.
+ * A TV remote's place in a list whose rows have keys (URLs, preference keys). On a TV the side menu comes first in the
+ * window, so when the focused row leaves (a reload rebuilds the rows, Back re-creates the screen, a settings group
+ * opens over it) Android hands the focus to the menu. The row is remembered by its key and focused again once the new
+ * rows are laid out; a section just opened from the menu focuses its first row. Off a TV it does nothing. One per
+ * screen, kept across its views.
  */
 public final class ListFocus {
 
@@ -44,6 +47,9 @@ public final class ListFocus {
 
     /** The row to focus once the list has rows again, while the focus is lost (nowhere, or dropped on the menu). */
     private String mPending;
+
+    /** A preference screen's {@link #restore} waiting for its list's layout; null when none or its view went. */
+    private View.OnLayoutChangeListener mRestore;
 
     public static boolean isTv(@NonNull Context context) {
         UiModeManager modes = (UiModeManager) context.getSystemService(Context.UI_MODE_SERVICE);
@@ -70,6 +76,11 @@ public final class ListFocus {
         mLeft = focusedKey(list);
     }
 
+    /** {@link #onPause(RecyclerView)} of a preference screen: the key of its focused row's preference. */
+    public void onPause(@NonNull PreferenceFragmentCompat screen) {
+        mLeft = preferenceKey(screen);
+    }
+
     /**
      * Back to the same view: the window gives its focus back by itself; a screen that {@code reloads} its rows on
      * resume focuses the row again after that reload, which may come before the focus is back.
@@ -83,6 +94,7 @@ public final class ListFocus {
 
     /** The view goes (another screen replaces it): its focused row is focused again in the next one. */
     public void onDestroyView() {
+        mRestore = null;
         if (mLeft != null) {
             mPending = mLeft;
         }
@@ -156,6 +168,56 @@ public final class ListFocus {
         list.post(() -> focus(list, 0, true));
     }
 
+    /**
+     * From a preference screen's onViewCreated, after super (its rows are bound then): once its list is laid out, the
+     * row of the preference remembered as the screen went (a group opened over it, the activity re-created), else the
+     * first row, takes the focus, if the side-menu entry that opened the screen still holds it, or the focus is lost:
+     * nowhere, dropped on the menu, or on this new list (its default row: no remote has been on it yet). Anything else
+     * (the toolbar, a remote that moved meanwhile) is left alone; the layouts after these first ones do nothing.
+     */
+    public void restore(@NonNull PreferenceFragmentCompat screen, @Nullable Bundle saved) {
+        attach(isTv(), saved);
+        RecyclerView list = screen.getListView();
+        if (!mTv || list == null) {
+            return;
+        }
+        mRestore = new View.OnLayoutChangeListener() {
+            private boolean mScrolled;
+
+            @Override
+            public void onLayoutChange(View view, int left, int top, int right, int bottom, int oldLeft, int oldTop,
+                    int oldRight, int oldBottom) {
+                if (mRestore != this || !takeSectionFocus(screen) && !focusLost(screen.getActivity(), list)) {
+                    done();
+                    return;
+                }
+                RecyclerView.Adapter<?> adapter = list.getAdapter();
+                int position = mPending == null || !(adapter instanceof PreferenceGroup.PreferencePositionCallback) ? 0
+                        : Math.max(((PreferenceGroup.PreferencePositionCallback) adapter)
+                                .getPreferenceAdapterPosition(mPending), 0); // a key gone or hidden: the first row
+                RecyclerView.ViewHolder row = list.findViewHolderForAdapterPosition(position);
+                if (row == null && !mScrolled) {
+                    mScrolled = true; // here again after that layout
+                    list.scrollToPosition(position);
+                    return;
+                }
+                if (row == null || !row.itemView.requestFocus()) {
+                    list.requestFocus(); // the first row that can take it (that one is disabled)
+                }
+                done();
+            }
+
+            private void done() {
+                list.removeOnLayoutChangeListener(this);
+                if (mRestore == this) {
+                    mRestore = null;
+                    mPending = null;
+                }
+            }
+        };
+        list.addOnLayoutChangeListener(mRestore);
+    }
+
     private static boolean takeSectionFocus(@NonNull Fragment owner) {
         FragmentActivity activity = owner.getActivity();
         return activity instanceof MainActivity && ((MainActivity) activity).takeSectionFocus(owner);
@@ -184,6 +246,25 @@ public final class ListFocus {
         View row = list.getFocusedChild();
         int position = row == null ? RecyclerView.NO_POSITION : list.getChildAdapterPosition(row);
         return position == RecyclerView.NO_POSITION ? null : ((Keyed) list.getAdapter()).keyAt(position);
+    }
+
+    /** The key of the preference whose row of {@code screen} has the focus (the settings have no categories). */
+    @Nullable
+    private String preferenceKey(@NonNull PreferenceFragmentCompat screen) {
+        RecyclerView list = screen.getListView();
+        PreferenceGroup group = screen.getPreferenceScreen();
+        View row = !mTv || list == null || group == null ? null : list.getFocusedChild();
+        if (row == null || !(list.getAdapter() instanceof PreferenceGroup.PreferencePositionCallback)) {
+            return null;
+        }
+        PreferenceGroup.PreferencePositionCallback rows = (PreferenceGroup.PreferencePositionCallback) list.getAdapter();
+        int position = list.getChildAdapterPosition(row);
+        for (int i = 0; position != RecyclerView.NO_POSITION && i < group.getPreferenceCount(); i++) {
+            if (rows.getPreferenceAdapterPosition(group.getPreference(i)) == position) {
+                return group.getPreference(i).getKey();
+            }
+        }
+        return null;
     }
 
     private static void focus(@NonNull RecyclerView list, int position, boolean scroll) {

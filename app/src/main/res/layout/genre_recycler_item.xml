@@ -70,7 +70,7 @@
             android:drawableStart="@drawable/ic_reting"
             tools:text="1840" />
 
-        <!-- a favourite person toggle (GenreListAddapter.showStars); genres keep it GONE; 40dp keeps the number close -->
+        <!-- a favourite person or genre toggle (GenreListAddapter.showStars / showGenreStars); 40dp keeps the number close -->
         <ImageButton
             android:id="@+id/star"
             android:layout_width="40dp"

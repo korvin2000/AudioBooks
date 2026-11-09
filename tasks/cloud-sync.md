@@ -53,7 +53,7 @@ ActivityResultContract), Google — AuthorizationClient; оба возвраща
 
 Белый список (тип задан таблицей, не угадывается из JSON):
 - String: `pref_theme`, `books_adapter_layout_pref`, `seek_step`, `pref_sort_favorite`, `pref_start_screen`;
-- boolean: `history_procent`, `toolbar_*` (12), `autoPlayPref`, `reproductionPref`, `seekButtonsPref`, `seekToPausePref`, `rewind_back`, `safeNavigationPref`, `scrollToSelectedPref`, `search_pref`, `pref_autoload_last_book`;
+- boolean: `history_procent`, `toolbar_*` (12), `autoPlayPref`, `reproductionPref`, `seekButtonsPref`, `seekToPausePref`, `rewind_back`, `safeNavigationPref`, `scrollToSelectedPref`, `search_pref`, `pref_play_last_book`;
 - float (`STORAGE`): `speed`.
 По решению владельца добавлены источники (`pref_sources`, `pref_sources_max`, `sorce_books`, поисковые галочки
 `search_<источник>`) и эквалайзер (`STORAGE.equalizer`, JSON). Прокси и маршруты источников — нет.

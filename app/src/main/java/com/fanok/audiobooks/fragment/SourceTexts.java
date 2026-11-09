@@ -17,6 +17,8 @@ import com.fanok.audiobooks.BuildConfig;
 import com.fanok.audiobooks.R;
 import com.fanok.audiobooks.Url;
 import com.fanok.audiobooks.net.AppProxy;
+import com.fanok.audiobooks.net.ProxyConfig;
+import com.fanok.audiobooks.net.ProxyFinder;
 import com.fanok.audiobooks.region.AppRegion;
 import com.fanok.audiobooks.region.Region;
 import com.fanok.audiobooks.search.Provider;
@@ -42,8 +44,9 @@ import java.util.concurrent.TimeUnit;
 /**
  * What the source screens say about a site, shared by the sources dialog, the source list, the card and the position
  * sheet: the status of the last check and its colour, the book count, the server, the age, how long ago a check was,
- * the region. The rules (rounding, units, joining) are pure functions that take their words as arguments, so JVM tests
- * check them without resources; the {@code Context} forms only fetch the words.
+ * the region, whether "через прокси" goes through a proxy now. The rules (rounding, units, joining) are pure functions
+ * that take their words as arguments, so JVM tests check them without resources; the {@code Context} forms only fetch
+ * the words.
  */
 public final class SourceTexts {
 
@@ -323,15 +326,83 @@ public final class SourceTexts {
         return text.toString();
     }
 
+    // ---------------------------------------------------------------- the proxy of "через прокси"
+
+    /** What a source set to go "через прокси" gets now: the mode's proxy, or why it goes direct instead. */
+    public enum ProxyState { WORKS, OFF, UNSET, SCANNING, OFFLINE, NONE }
+
+    /**
+     * Pure: the state in the proxy {@code mode} ({@link AppProxy#mode()}), with the built-in proxy {@code configured}
+     * or not, and the automatic search having a proxy in use ({@code found}) or not, in its {@code phase}. Unlike
+     * {@link AppProxy#proxyUsable()} it never starts a search, so a screen may ask at every redraw.
+     */
+    @NonNull
+    static ProxyState proxyState(@NonNull String mode, boolean configured, boolean found,
+            @NonNull ProxyFinder.Phase phase) {
+        switch (mode) {
+            case AppProxy.MODE_BUILTIN:
+                return configured ? ProxyState.WORKS : ProxyState.UNSET;
+            case AppProxy.MODE_AUTO:
+                if (found) {
+                    return ProxyState.WORKS;
+                }
+                return phase == ProxyFinder.Phase.SCANNING ? ProxyState.SCANNING
+                        : phase == ProxyFinder.Phase.NO_NETWORK ? ProxyState.OFFLINE : ProxyState.NONE;
+            default:
+                return ProxyState.OFF;
+        }
+    }
+
+    /** The state in the mode of now with {@code finder}'s state (a listener's). */
+    @NonNull
+    public static ProxyState proxyState(@NonNull ProxyFinder.State finder) {
+        return proxyState(AppProxy.mode(), AppProxy.configured(), finder.current != null, finder.phase);
+    }
+
+    /** The state now. */
+    @NonNull
+    public static ProxyState proxyState(@NonNull Context context) {
+        return proxyState(ProxyFinder.get(context).state());
+    }
+
+    /** Why "через прокси" goes direct in {@code state}: "рабочий прокси не найден"; null when the proxy carries it. */
+    @Nullable
+    public static String proxyReason(@NonNull Context context, @NonNull ProxyState state) {
+        switch (state) {
+            case OFF:
+                return context.getString(R.string.sources_proxy_reason_off);
+            case UNSET:
+                return context.getString(R.string.sources_proxy_reason_unset);
+            case SCANNING:
+                return context.getString(R.string.sources_proxy_reason_scanning);
+            case OFFLINE:
+                return context.getString(R.string.sources_proxy_reason_offline);
+            case NONE:
+                return context.getString(R.string.sources_proxy_reason_none);
+            default:
+                return null;
+        }
+    }
+
+    /** Pure: {@code text} as a sentence, its first letter capital: "рабочий прокси…" → "Рабочий прокси…". */
+    @NonNull
+    static String sentence(@NonNull String text) {
+        return text.isEmpty() ? text : text.substring(0, 1).toUpperCase(RUSSIAN) + text.substring(1);
+    }
+
     // ---------------------------------------------------------------- shared by the screens
 
     /**
-     * True for a preference that changes what the source screens show: the order, the routes, the proxy, the checks,
-     * the catalog source, the region; null (the preferences were cleared) too.
+     * True for a preference that changes what the source screens show: the order, the routes, the proxy (its mode and
+     * the built-in server and login), the checks, the catalog source, the region; null (the preferences were cleared)
+     * too.
      */
     public static boolean watched(@Nullable String key) {
         return key == null || Sources.PREF.equals(key) || Sources.SELECTED.equals(key)
                 || AppProxy.PREF_DIRECT.equals(key) || AppProxy.PREF_MODE.equals(key)
+                || ProxyConfig.PREF_TYPE.equals(key) || ProxyConfig.PREF_HOST.equals(key)
+                || ProxyConfig.PREF_PORT.equals(key) || ProxyConfig.PREF_USER.equals(key)
+                || ProxyConfig.PREF_PASSWORD.equals(key)
                 || SourceHealth.PREF_RESULTS.equals(key) || SourceHealth.PREF_CHECKED_AT.equals(key)
                 || AppRegion.PREF_REGION.equals(key);
     }

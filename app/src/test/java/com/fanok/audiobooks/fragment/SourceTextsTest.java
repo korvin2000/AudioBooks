@@ -5,6 +5,8 @@ import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
+import com.fanok.audiobooks.net.AppProxy;
+import com.fanok.audiobooks.net.ProxyFinder;
 import com.fanok.audiobooks.region.Region;
 import com.fanok.audiobooks.region.RegionCheck;
 import com.fanok.audiobooks.search.Provider;
@@ -131,6 +133,32 @@ public class SourceTextsTest {
         assertTrue(SourceTexts.watched("region"));
         assertTrue("cleared", SourceTexts.watched(null));
         assertFalse(SourceTexts.watched("pref_theme"));
+    }
+
+    @Test
+    public void throughTheProxyGoesThroughOneOnlyWhenTheModeHasOne() {
+        ProxyFinder.Phase ready = ProxyFinder.Phase.READY;
+        assertEquals(SourceTexts.ProxyState.OFF, SourceTexts.proxyState(AppProxy.MODE_OFF, true, true, ready));
+        assertEquals(SourceTexts.ProxyState.WORKS,
+                SourceTexts.proxyState(AppProxy.MODE_BUILTIN, true, false, ProxyFinder.Phase.FAILED));
+        assertEquals(SourceTexts.ProxyState.UNSET, SourceTexts.proxyState(AppProxy.MODE_BUILTIN, false, true, ready));
+        assertEquals("a search under way keeps the proxy in use", SourceTexts.ProxyState.WORKS,
+                SourceTexts.proxyState(AppProxy.MODE_AUTO, false, true, ProxyFinder.Phase.SCANNING));
+        assertEquals(SourceTexts.ProxyState.SCANNING,
+                SourceTexts.proxyState(AppProxy.MODE_AUTO, true, false, ProxyFinder.Phase.SCANNING));
+        assertEquals("offline is not \"none found\"", SourceTexts.ProxyState.OFFLINE,
+                SourceTexts.proxyState(AppProxy.MODE_AUTO, true, false, ProxyFinder.Phase.NO_NETWORK));
+        assertEquals(SourceTexts.ProxyState.NONE,
+                SourceTexts.proxyState(AppProxy.MODE_AUTO, true, false, ProxyFinder.Phase.FAILED));
+        assertEquals("before the first search", SourceTexts.ProxyState.NONE,
+                SourceTexts.proxyState(AppProxy.MODE_AUTO, true, false, ProxyFinder.Phase.IDLE));
+    }
+
+    @Test
+    public void aReasonBecomesASentence() {
+        assertEquals("Рабочий прокси не найден", SourceTexts.sentence("рабочий прокси не найден"));
+        assertEquals("Нет сети", SourceTexts.sentence("Нет сети"));
+        assertEquals("", SourceTexts.sentence(""));
     }
 
     @Test

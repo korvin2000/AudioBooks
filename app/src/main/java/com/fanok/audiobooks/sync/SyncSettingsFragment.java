@@ -3,6 +3,7 @@ package com.fanok.audiobooks.sync;
 import android.content.Context;
 import android.content.SharedPreferences;
 import android.os.Bundle;
+import android.view.View;
 import android.widget.Toast;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -12,6 +13,7 @@ import androidx.preference.Preference;
 import androidx.preference.PreferenceFragmentCompat;
 import androidx.preference.PreferenceManager;
 import com.fanok.audiobooks.R;
+import com.fanok.audiobooks.adapter.ListFocus;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -28,6 +30,9 @@ public class SyncSettingsFragment extends PreferenceFragmentCompat
 
     /** Each cloud's sign-in action, by its id. */
     private final Map<String, Runnable> signIns = new HashMap<>();
+
+    /** TV: the remote's row, kept across this screen's re-creations. */
+    private final ListFocus listFocus = new ListFocus();
 
     @Override
     public void onCreate(@Nullable Bundle savedInstanceState) {
@@ -57,6 +62,12 @@ public class SyncSettingsFragment extends PreferenceFragmentCompat
     }
 
     @Override
+    public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
+        super.onViewCreated(view, savedInstanceState);
+        listFocus.restore(this, savedInstanceState);
+    }
+
+    @Override
     public void onResume() {
         super.onResume();
         requireActivity().setTitle(R.string.sync_service);
@@ -66,8 +77,21 @@ public class SyncSettingsFragment extends PreferenceFragmentCompat
 
     @Override
     public void onPause() {
+        listFocus.onPause(this);
         PreferenceManager.getDefaultSharedPreferences(requireContext()).unregisterOnSharedPreferenceChangeListener(this);
         super.onPause();
+    }
+
+    @Override
+    public void onSaveInstanceState(@NonNull Bundle outState) {
+        super.onSaveInstanceState(outState);
+        listFocus.onSaveInstanceState(outState);
+    }
+
+    @Override
+    public void onDestroyView() {
+        listFocus.onDestroyView();
+        super.onDestroyView();
     }
 
     @Override

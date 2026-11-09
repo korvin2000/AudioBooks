@@ -50,6 +50,12 @@
     <string name="sources_inactive">неактивен</string>
     <string name="sources_badge_catalog">каталог</string>
     <string name="sources_badge_new">новый</string>
+    <!-- why "через прокси" goes direct now (SourceTexts.proxyReason): after "Включено, но", alone as a sentence -->
+    <string name="sources_proxy_reason_off">прокси выключен в настройках</string>
+    <string name="sources_proxy_reason_unset">встроенный прокси не настроен</string>
+    <string name="sources_proxy_reason_scanning">идёт поиск прокси</string>
+    <string name="sources_proxy_reason_offline">нет сети</string>
+    <string name="sources_proxy_reason_none">рабочий прокси не найден</string>
 
     <!-- the snackbar after a change, with its undo (fragment.SourceActions) -->
     <string name="sources_undo">Отменить</string>
@@ -68,7 +74,6 @@
     <!-- the list -->
     <string name="sources_list_subtitle">Каталог: %1$s</string>
     <string name="sources_chip_proxy_on">Прокси вкл · %1$d через прокси</string>
-    <string name="sources_chip_proxy_off">Прокси выключен</string>
     <string name="sources_chip_checked">Проверено %1$s</string>
     <string name="sources_chip_never">Не проверялись</string>
     <string name="sources_order_user">Порядок</string>
@@ -121,8 +126,9 @@
     <string name="sources_proxy_title">Через прокси</string>
     <string name="sources_proxy_on">Страницы, аудио и обложки идут через прокси приложения</string>
     <string name="sources_proxy_direct">Напрямую, без прокси</string>
-    <string name="sources_proxy_idle">Включено, но прокси выключен в настройках</string>
-    <string name="sources_proxy_off_hint">Прокси выключен в настройках, поэтому маршрут этого сайта сейчас не действует.</string>
+    <!-- %1$s: a sources_proxy_reason_* -->
+    <string name="sources_proxy_idle">Включено, но %1$s</string>
+    <string name="sources_proxy_idle_hint">%1$s, поэтому маршрут этого сайта сейчас не действует.</string>
     <string name="sources_proxy_enable">Включить прокси</string>
     <string name="sources_proxy_needed_hint">Из региона «%1$s» сайт отдаёт блок или фрагменты — нужен прокси.</string>
     <string name="sources_proxy_needed_action">Включить</string>

@@ -8,10 +8,13 @@ import static org.junit.Assert.assertTrue;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.InterruptedIOException;
 import java.io.OutputStream;
 import java.net.InetAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.net.SocketException;
+import java.net.SocketTimeoutException;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
@@ -20,6 +23,7 @@ import java.util.Locale;
 import java.util.concurrent.CopyOnWriteArrayList;
 import org.jsoup.Connection;
 import org.jsoup.HttpStatusException;
+import org.jsoup.UnsupportedMimeTypeException;
 import org.junit.Test;
 
 public class SiteHttpTest {
@@ -66,6 +70,18 @@ public class SiteHttpTest {
         assertFalse(SiteHttp.isChallenge(null, "Аудиокниги слушать онлайн"));
         assertFalse(SiteHttp.isChallenge(null, null));
         assertFalse(SiteHttp.isChallenge(null, ""));
+    }
+
+    @Test
+    public void onlyAFailureInTransitMayBeTheProxys() {
+        assertTrue(SiteHttp.inTransit(new SocketTimeoutException("Read timed out"), false));
+        assertTrue(SiteHttp.inTransit(new SocketException("Connection reset"), false));
+        assertTrue("a body cut short", SiteHttp.inTransit(new IOException("unexpected end of stream"), false));
+        assertFalse("the site answered", SiteHttp.inTransit(new HttpStatusException("HTTP error", 502, "u"), false));
+        assertFalse(SiteHttp.inTransit(new RateLimitedException("u", 5), false));
+        assertFalse(SiteHttp.inTransit(new UnsupportedMimeTypeException("Unhandled", "image/png", "u"), false));
+        assertFalse("a cancelled load", SiteHttp.inTransit(new InterruptedIOException("interrupted"), false));
+        assertFalse("a cancelled load", SiteHttp.inTransit(new SocketTimeoutException("Read timed out"), true));
     }
 
     @Test

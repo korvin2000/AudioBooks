@@ -568,29 +568,12 @@ public class DescriptionBookFragment extends MvpAppCompatFragment
         bindFavorites();
     }
 
-    /** The browser check of the book's site, which refused the app: passed, the book screen loads again. */
-    private final androidx.activity.result.ActivityResultLauncher<android.content.Intent> mSiteCheck =
-            registerForActivityResult(new androidx.activity.result.contract.ActivityResultContracts
-                    .StartActivityForResult(), result -> {
-                if (result.getResultCode() == android.app.Activity.RESULT_OK && getActivity() instanceof BookActivity) {
-                    ((BookActivity) getActivity()).refreshActivity();
-                }
-            });
-
+    /** The book screen's one «Пройти» offer: the chapters fail on the same page and offer it too. */
     @Override
     public void showSiteCheckOffer(com.fanok.audiobooks.search.Provider site) {
-        View root = getView();
-        if (root == null) {
-            return;
+        if (getActivity() instanceof BookActivity) {
+            ((BookActivity) getActivity()).showSiteCheckOffer(site);
         }
-        com.google.android.material.snackbar.Snackbar.make(root, getString(R.string.site_check_offer, site.title),
-                        com.google.android.material.snackbar.Snackbar.LENGTH_INDEFINITE)
-                .setAction(R.string.site_check_action, v -> {
-                    if (isAdded()) {
-                        mSiteCheck.launch(com.fanok.audiobooks.activity.ActivityCookies.intent(requireContext(), site));
-                    }
-                })
-                .show();
     }
 
     @Override

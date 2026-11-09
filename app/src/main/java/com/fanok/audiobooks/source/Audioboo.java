@@ -7,11 +7,15 @@ import static com.fanok.audiobooks.source.Html.rows;
 import static com.fanok.audiobooks.source.Html.seriesItem;
 import static com.fanok.audiobooks.source.Html.text;
 
+import android.content.SharedPreferences;
 import android.util.Log;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.preference.PreferenceManager;
 
+import com.fanok.audiobooks.App;
+import com.fanok.audiobooks.CookesExeption;
 import com.fanok.audiobooks.Url;
 import com.fanok.audiobooks.model.BookPages;
 import com.fanok.audiobooks.model.ComentsModel;
@@ -86,16 +90,57 @@ public final class Audioboo implements SourceParser {
     public static final String PREF_CLEARANCE = "cookies_audioboo";
     public static final String PREF_AGENT = "user_agent_audioboo";
 
+    private static final String[] NONE = {"", ""};
+
     /**
      * The accepted clearance and its User-Agent, published together; empty until the user passes the check, so the
-     * requests stay as they were.
+     * requests stay as they were. Changed under the class's lock only.
      */
-    private static volatile String[] session = {"", ""};
+    private static volatile String[] session = NONE;
 
-    /** The clearance the user's browser got and the app's request with it was let through with, and its User-Agent. */
-    public static void setClearance(@Nullable String value, @Nullable String userAgent) {
+    /** The session the request on this thread goes out with ({@link #withClearance}): its agent and cookie are of one. */
+    private static final ThreadLocal<String[]> SENT = new ThreadLocal<>();
+
+    /** The clearance and its User-Agent in memory only: the stored ones, restored at start (App). */
+    public static synchronized void setClearance(@Nullable String value, @Nullable String userAgent) {
         boolean both = value != null && !value.isEmpty() && userAgent != null && !userAgent.isEmpty();
-        session = both ? new String[]{value, userAgent} : new String[]{"", ""};
+        session = both ? new String[]{value, userAgent} : NONE;
+    }
+
+    /**
+     * The clearance the user's browser got and the app's request with it was let through with, and that browser's
+     * User-Agent: kept in memory and in the preferences under the lock {@link #forgetClearance} takes, so a late
+     * refusal of a former clearance cannot remove it; a clearance the site issued earlier (the jar) no longer shadows it.
+     */
+    public static synchronized void saveClearance(String value, String userAgent) {
+        SharedPreferences pref = prefs();
+        if (pref != null) {
+            pref.edit().putString(PREF_CLEARANCE, value).putString(PREF_AGENT, userAgent).apply();
+        }
+        SiteHttp.forget(SERVER, CLEARANCE_COOKIE);
+        setClearance(value, userAgent);
+    }
+
+    /**
+     * Forgets the clearance {@code dead} the site refused, in memory and in the preferences, unless another one was saved
+     * meanwhile; and any clearance the site issued (the jar), which would go out in their place.
+     */
+    static synchronized void forgetClearance(@NonNull String dead) {
+        if (dead.equals(session[0])) {
+            session = NONE;
+        }
+        SharedPreferences pref = prefs();
+        if (pref != null && dead.equals(pref.getString(PREF_CLEARANCE, ""))) {
+            pref.edit().remove(PREF_CLEARANCE).remove(PREF_AGENT).apply();
+        }
+        SiteHttp.forget(SERVER, CLEARANCE_COOKIE);
+    }
+
+    /** The app's preferences; null without the app (JVM tests). */
+    @Nullable
+    private static SharedPreferences prefs() {
+        App app = App.getInstance();
+        return app == null ? null : PreferenceManager.getDefaultSharedPreferences(app);
     }
 
     /** The clearance in use, or "". */
@@ -104,12 +149,47 @@ public final class Audioboo implements SourceParser {
         return session[0];
     }
 
+    /**
+     * {@code fetch} of {@code url} with one session for the whole request. A challenge to a request that carried the
+     * stored clearance means the site no longer takes it: it is forgotten ({@link #forgetClearance}) and the request goes
+     * once more with the session then in force, none unless the user passed the check meanwhile: the app's own request,
+     * as before the check existed. A second challenge reaches the caller, which offers the check; any other failure
+     * (an HTTP error, a rate limit, a timeout) keeps the clearance. No lock is held while the request is out.
+     */
+    static Document withClearance(String url, BookPages.Fetch fetch) throws IOException {
+        String[] used = session;
+        try {
+            return sendWith(used, url, fetch);
+        } catch (CookesExeption challenge) {
+            if (used[0].isEmpty()) {
+                throw challenge;
+            }
+            forgetClearance(used[0]);
+            return sendWith(session, url, fetch);
+        }
+    }
+
+    private static Document sendWith(String[] with, String url, BookPages.Fetch fetch) throws IOException {
+        SENT.set(with);
+        try {
+            return fetch.get(url);
+        } finally {
+            SENT.remove();
+        }
+    }
+
+    /** The session of the request going out on this thread ({@link #withClearance}), else the stored one. */
+    private static String[] inUse() {
+        String[] sent = SENT.get();
+        return sent != null ? sent : session;
+    }
+
     // ---------------------------------------------------------------- SourceParser
 
     /** The book search goes out as the DLE search form (its query POSTed); every other page as {@link SiteHttp#get}. */
     @Override
     public Document fetch(String url) throws IOException {
-        return isSearchForm(url) ? SiteHttp.postForm(url) : SiteHttp.get(url);
+        return withClearance(url, u -> isSearchForm(u) ? SiteHttp.postForm(u) : SiteHttp.get(u));
     }
 
     @Override
@@ -126,7 +206,7 @@ public final class Audioboo implements SourceParser {
     /** The clearance the user's browser got, once the site took it from the app too; none before. */
     @Override
     public Map<String, String> cookies() {
-        String value = session[0];
+        String value = inUse()[0];
         return value.isEmpty() ? Collections.<String, String>emptyMap()
                 : Collections.singletonMap(CLEARANCE_COOKIE, value);
     }
@@ -134,7 +214,7 @@ public final class Audioboo implements SourceParser {
     /** The browser's User-Agent while its clearance is used: Cloudflare binds the clearance to it. */
     @Override
     public String userAgent() {
-        String[] current = session;
+        String[] current = inUse();
         return current[0].isEmpty() ? null : current[1];
     }
 
@@ -146,7 +226,8 @@ public final class Audioboo implements SourceParser {
     /** Every listing page is POSTed with the site's sort form: the URL's {@link #SORT_PARAM}, else the date sort. */
     @Override
     public ProviderPage<BookPOJO> loadListing(String url, int pageNo) throws IOException {
-        return listing(fetchListing(withoutSort(url), sortOf(url)), url, pageNo);
+        String sort = sortOf(url);
+        return listing(withClearance(withoutSort(url), u -> fetchListing(u, sort)), url, pageNo);
     }
 
     /** The index, genres and the author, reader and series links of cards share one scheme. */
@@ -196,8 +277,8 @@ public final class Audioboo implements SourceParser {
         if (performers) {
             // 17k tags: ~4 MB unpacked (0.3 MB sent), the bound SiteHttp sets for a page
             int limit = 4 * SiteHttp.MAX_BODY_BYTES;
-            return parseReaders(SiteHttp.parse(SiteHttp.execute(SiteHttp.connect(
-                    SERVER + "/tags/").maxBodySize(limit)), limit));
+            return parseReaders(withClearance(SERVER + "/tags/",
+                    u -> SiteHttp.parse(SiteHttp.execute(SiteHttp.connect(u).maxBodySize(limit)), limit)));
         }
         Elements letters = fetch(url).select("a.alfavit[href]");
         if (pageNo <= 1) {

@@ -11,6 +11,7 @@ import com.fanok.audiobooks.R;
 import com.fanok.audiobooks.pojo.EqualizerSettings;
 import com.fanok.audiobooks.pojo.StorageUtil;
 import com.fanok.audiobooks.presenter.BookPresenter;
+import com.fanok.audiobooks.search.GenrePicks;
 import com.fanok.audiobooks.search.Provider;
 import com.fanok.audiobooks.search.Sources;
 import com.google.gson.Gson;
@@ -33,7 +34,8 @@ final class SyncedSettings {
 
     /** Default preferences holding text. */
     private static final List<String> TEXTS = Arrays.asList("pref_theme", "books_adapter_layout_pref", "seek_step",
-            "pref_sort_favorite", "pref_start_screen", Sources.PREF, Sources.PREF_MAX, Sources.SELECTED);
+            "pref_sort_favorite", "pref_start_screen", Sources.PREF, Sources.PREF_MAX, Sources.SELECTED,
+            GenrePicks.PREF_FAVORITES);
     /** The list settings among them, with the array of their values. */
     private static final Map<String, Integer> LISTS = new HashMap<>();
     /** Default preferences holding a flag; also the search checkbox of every source. */
@@ -42,7 +44,7 @@ final class SyncedSettings {
             "toolbar_speed", "toolbar_download", "toolbar_sleep_timer", "toolbar_car_mode", "toolbar_equalizer", "toolbar_settings",
             "toolbar_open_site", "toolbar_main_screen", "toolbar_refresh", "autoPlayPref", "reproductionPref",
             "seekButtonsPref", "seekToPausePref", "rewind_back", "safeNavigationPref", "scrollToSelectedPref",
-            "search_pref", "pref_autoload_last_book", "flip_pause"));
+            "search_pref", "pref_play_last_book", "flip_pause"));
     /** Settings of the {@link StorageUtil#STORAGE} file: a float and a JSON text. */
     private static final String SPEED = "speed", EQUALIZER = "equalizer";
 
@@ -170,6 +172,8 @@ final class SyncedSettings {
                     }
                 }
                 return false;
+            case GenrePicks.PREF_FAVORITES: // every name one of this version's genres
+                return value.isEmpty() || GenrePicks.parse(value).size() == value.split(",", -1).length;
             default:
                 return false; // not synced by this version
         }

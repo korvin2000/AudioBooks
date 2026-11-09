@@ -22,11 +22,13 @@ import android.os.PowerManager;
 import android.provider.SearchRecentSuggestions;
 import android.util.Log;
 import android.text.format.Formatter;
+import android.view.View;
 import android.widget.Toast;
 
 import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 import androidx.appcompat.app.AlertDialog;
 import androidx.core.content.ContextCompat;
 import androidx.media3.common.util.UnstableApi;
@@ -49,6 +51,7 @@ import com.fanok.audiobooks.activity.ActivityImport;
 import com.fanok.audiobooks.activity.ClearSavedActivity;
 import com.fanok.audiobooks.activity.MainActivity;
 import com.fanok.audiobooks.activity.ParentalControlActivity;
+import com.fanok.audiobooks.adapter.ListFocus;
 import com.fanok.audiobooks.download.StoreLocation;
 import com.fanok.audiobooks.model.AudioDBModel;
 import com.fanok.audiobooks.model.AudioListDBModel;
@@ -126,6 +129,9 @@ public class SettingsFragment extends PreferenceFragmentCompat implements
     }
 
     private static final int EXTERNAL_STORAGE_PERMISSION_REQUEST_CODE = 342;
+
+    /** TV: the remote's row, kept across this screen's views (a group opened over it) and re-creations (a theme). */
+    private final ListFocus mListFocus = new ListFocus();
 
     private final ActivityResultLauncher<Intent> createBackupLauncher = registerForActivityResult(
             new ActivityResultContracts.StartActivityForResult(),
@@ -333,12 +339,31 @@ public class SettingsFragment extends PreferenceFragmentCompat implements
     }
 
     @Override
+    public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
+        super.onViewCreated(view, savedInstanceState);
+        mListFocus.restore(this, savedInstanceState);
+    }
+
+    @Override
     public void onPause() {
         super.onPause();
+        mListFocus.onPause(this);
         // Unregister the listener whenever a key changes
         getPreferenceScreen().getSharedPreferences()
                 .unregisterOnSharedPreferenceChangeListener(this);
         ProxyFinder.get(requireContext()).removeListener(proxyListener);
+    }
+
+    @Override
+    public void onSaveInstanceState(@NonNull Bundle outState) {
+        super.onSaveInstanceState(outState);
+        mListFocus.onSaveInstanceState(outState);
+    }
+
+    @Override
+    public void onDestroyView() {
+        mListFocus.onDestroyView();
+        super.onDestroyView();
     }
 
     /** The proxy entry's summary follows the mode and the automatic search while the settings are visible. */

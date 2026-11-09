@@ -19,9 +19,11 @@ import androidx.appcompat.app.AppCompatActivity;
 import androidx.preference.PreferenceManager;
 import com.fanok.audiobooks.AppThemes;
 import com.fanok.audiobooks.Consts;
+import com.fanok.audiobooks.CookesExeption;
 import com.fanok.audiobooks.R;
 import com.fanok.audiobooks.Url;
 import com.fanok.audiobooks.databinding.ActivityCookiesBinding;
+import com.fanok.audiobooks.model.BookPages;
 import com.fanok.audiobooks.net.AppProxy;
 import com.fanok.audiobooks.net.SiteHttp;
 import com.fanok.audiobooks.search.Provider;
@@ -31,20 +33,33 @@ import io.reactivex.Single;
 import io.reactivex.android.schedulers.AndroidSchedulers;
 import io.reactivex.disposables.Disposable;
 import io.reactivex.schedulers.Schedulers;
+import com.google.gson.JsonArray;
+import com.google.gson.JsonParser;
 import org.jsoup.Connection;
+import org.jsoup.HttpStatusException;
+import org.jsoup.Jsoup;
+import org.jsoup.nodes.Document;
 
 
 /**
  * Lets the user pass the site's browser check in a real browser; the session is kept only once a real request of the
  * app with it returns a normal page (UI-17). Leaving early never touches the stored session. baza-knig (the settings'
  * default): its session cookie. audioboo: Cloudflare's clearance, bound to the browser's own User-Agent, which the
- * app then sends to that site ({@link Audioboo#setClearance}). Opened by a list the site refused
- * ({@link #EXTRA_PROVIDER}), it closes itself once the session is accepted, so the list loads again.
+ * app then sends to that site ({@link Audioboo#saveClearance}). Opened by a list the site refused
+ * ({@link #EXTRA_PROVIDER}), it closes itself once the session is accepted, so the list loads again. audioboo's check
+ * runs on the very page refused ({@link #EXTRA_URL}); a book's page the app is still refused is read from this browser.
  */
 public class ActivityCookies extends AppCompatActivity {
 
     /** The {@link Provider} name of the site; without it baza-knig, as the settings open it. */
     public static final String EXTRA_PROVIDER = "provider";
+    /**
+     * audioboo: the page the site refused. The check is passed and verified on it, never on the start page: the site
+     * may let that through without any clearance, which would "verify" one its other pages refuse.
+     */
+    private static final String EXTRA_URL = "url";
+    /** With {@link #EXTRA_URL}, a book's page: the copy this browser shows serves if the app is still refused. */
+    private static final String EXTRA_BOOK = "book";
 
     private static final String TAG = "ActivityCookies";
     private static final String SESSION_COOKIE = "PHPSESSID";
@@ -56,6 +71,10 @@ public class ActivityCookies extends AppCompatActivity {
     /** audioboo: the clearance and the browser's User-Agent, not baza-knig's session. */
     private boolean clearance;
     private String server;
+    /** What is checked: {@link #EXTRA_URL} on audioboo, else {@link #server}. */
+    private String page;
+    private boolean book;
+    private boolean taken;
     private boolean proxyHinted;
 
     /** Whether the browser check of {@code provider} can be passed here, so a list it refused offers it. */
@@ -66,6 +85,13 @@ public class ActivityCookies extends AppCompatActivity {
     @NonNull
     public static Intent intent(@NonNull Context context, @NonNull Provider provider) {
         return new Intent(context, ActivityCookies.class).putExtra(EXTRA_PROVIDER, provider.name());
+    }
+
+    /** The check of the page at {@code url} that {@code provider} refused; {@code book}: a book's page. */
+    @NonNull
+    public static Intent intent(@NonNull Context context, @NonNull Provider provider, @NonNull String url,
+            boolean book) {
+        return intent(context, provider).putExtra(EXTRA_URL, url).putExtra(EXTRA_BOOK, book);
     }
 
     @SuppressLint("SetJavaScriptEnabled")
@@ -81,6 +107,9 @@ public class ActivityCookies extends AppCompatActivity {
 
         clearance = Provider.AUDIOBOO.name().equals(getIntent().getStringExtra(EXTRA_PROVIDER));
         server = clearance ? Audioboo.SERVER + "/" : Url.SERVER_BAZA_KNIG;
+        String asked = getIntent().getStringExtra(EXTRA_URL);
+        page = clearance && asked != null && Url.isHost(Url.canonical(asked), server) ? Url.canonical(asked) : server;
+        book = !page.equals(server) && getIntent().getBooleanExtra(EXTRA_BOOK, false);
         setSupportActionBar(binding.toolbar);
         setTitle(Url.hostOf(server));
         ActionBar actionBar = getSupportActionBar();
@@ -93,7 +122,9 @@ public class ActivityCookies extends AppCompatActivity {
         binding.webView.setWebViewClient(new WebViewClient() {
             @Override
             public void onPageFinished(WebView view, String url) {
-                verifyCurrentSession();
+                if (!verifyCurrentSession() && (verification == null || verification.isDisposed())) {
+                    takePageIfShown(); // no clearance to try or being tried, yet the browser has the book's page
+                }
             }
         });
         binding.webView.getSettings().setLoadsImagesAutomatically(true);
@@ -102,17 +133,57 @@ public class ActivityCookies extends AppCompatActivity {
             binding.webView.getSettings().setUserAgentString(Consts.USER_AGENT);
         } // audioboo: the browser as it is; the app takes its User-Agent, to which the clearance is bound
         binding.webView.setScrollBarStyle(View.SCROLLBARS_INSIDE_OVERLAY);
-        binding.webView.loadUrl(server);
+        binding.webView.loadUrl(page);
     }
 
-    /** Checks the WebView's current session once per distinct value: one request of the app's own to the site. */
-    private void verifyCurrentSession() {
+    /**
+     * A book's page the app is still refused although this browser shows it (the clearance bound to the browser
+     * itself, the app reaching the site through a proxy): the book screen reads this copy ({@link BookPages#offer}).
+     * Only that very page with its chapters is taken, never another one the user went to or a challenge or error page.
+     */
+    private void takePageIfShown() {
+        String shown = binding == null ? null : binding.webView.getUrl();
+        if (!book || taken || shown == null || isDestroyed() || !Url.samePage(shown, page)
+                || SiteHttp.isChallenge(null, binding.webView.getTitle())) {
+            return;
+        }
+        taken = true;
+        binding.webView.evaluateJavascript("[location.href, document.documentElement.outerHTML]", json -> {
+            Document doc = null;
+            try {
+                JsonArray got = JsonParser.parseString(json).getAsJsonArray();
+                String href = got.get(0).getAsString();
+                Document parsed = Jsoup.parse(got.get(1).getAsString(), href);
+                if (Url.samePage(href, page) && !SiteHttp.isChallenge(null, parsed.title())
+                        && !Audioboo.parseTracks(parsed, page).isEmpty()) {
+                    doc = parsed;
+                }
+            } catch (RuntimeException e) { // no chapter list: not the book's page as the screen needs it
+                Log.i(TAG, "Page not taken: " + e);
+            }
+            if (doc == null || isFinishing() || isDestroyed()) {
+                taken = false;
+                return;
+            }
+            BookPages.offer(page, doc);
+            verified = true;
+            setResult(RESULT_OK);
+            finish();
+        });
+    }
+
+    /**
+     * Checks the WebView's current session once per distinct value: one request of the app's own to the site.
+     *
+     * @return whether a check went out
+     */
+    private boolean verifyCurrentSession() {
         final String name = clearance ? Audioboo.CLEARANCE_COOKIE : SESSION_COOKIE;
         final String session = cookie(CookieManager.getInstance().getCookie(server), name);
         // a clearance equal to the stored one is checked too: the site may refuse it to the app now (a new address)
         if (session.isEmpty() || session.equals(lastTried)
                 || !clearance && session.equals(Consts.getBazaKnigCookies())) {
-            return;
+            return false;
         }
         final String agent = binding.webView.getSettings().getUserAgentString();
         lastTried = session;
@@ -121,20 +192,17 @@ public class ActivityCookies extends AppCompatActivity {
         }
         verification = Single.fromCallable(() -> {
                     // Cloudflare binds the clearance to the browser's UA: the request must look like that browser
-                    Connection connection = SiteHttp.asBrowser(SiteHttp.connect(server), agent).cookie(name, session);
+                    Connection connection = SiteHttp.asBrowser(SiteHttp.connect(page), agent).cookie(name, session);
                     SiteHttp.parse(SiteHttp.execute(connection)); // a challenge page throws
                     return session;
                 })
                 .subscribeOn(Schedulers.io())
                 .observeOn(AndroidSchedulers.mainThread())
                 .subscribe(ok -> {
-                    SharedPreferences pref = PreferenceManager.getDefaultSharedPreferences(this);
                     if (clearance) {
-                        pref.edit().putString(Audioboo.PREF_CLEARANCE, ok).putString(Audioboo.PREF_AGENT, agent)
-                                .apply();
-                        SiteHttp.forget(server, name); // a former clearance the site issued must not shadow it
-                        Audioboo.setClearance(ok, agent);
+                        Audioboo.saveClearance(ok, agent);
                     } else {
+                        SharedPreferences pref = PreferenceManager.getDefaultSharedPreferences(this);
                         pref.edit().putString("cookes_baza_knig", ok).apply();
                         Consts.setBazaKnigCookies(ok);
                     }
@@ -154,7 +222,12 @@ public class ActivityCookies extends AppCompatActivity {
                         proxyHinted = true;
                         Toast.makeText(this, R.string.site_check_proxy, Toast.LENGTH_LONG).show();
                     }
+                    if (e instanceof CookesExeption
+                            || e instanceof HttpStatusException && ((HttpStatusException) e).getStatusCode() == 403) {
+                        takePageIfShown(); // refused, not a network failure: the next page load verifies again
+                    }
                 });
+        return true;
     }
 
     /** The value of {@code PHPSESSID} in a {@code Cookie} header string, or "" when absent or malformed. */
@@ -192,6 +265,7 @@ public class ActivityCookies extends AppCompatActivity {
         if (binding != null) {
             binding.webView.stopLoading();
             binding.webView.destroy();
+            binding = null; // a late script result finds no page to take
         }
         super.onDestroy();
     }

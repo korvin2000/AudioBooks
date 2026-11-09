@@ -22,7 +22,10 @@ public enum GenreSort {
     NAME_DESC(R.string.genre_sort_name_desc),
     /** Most books first ({@link #count}); a genre without a count (0) goes last. */
     COUNT(R.string.genre_sort_count),
-    /** The genres the user opens most on any site first ({@link GenrePicks}); genre lists only. */
+    /**
+     * The user's genres first ({@link GenrePicks}): the starred ones (Избранное → Жанры), then the ones opened most
+     * on any site; genre lists only.
+     */
     FAVORITE(R.string.genre_sort_favorite);
 
     public final int title;
@@ -50,7 +53,7 @@ public enum GenreSort {
 
     /**
      * A sorted copy: {@code genres} itself is left as it is, and equal ones keep the site's order. {@code picks} are
-     * the {@link GenrePicks#all} counts {@link #FAVORITE} sorts by.
+     * the {@link GenrePicks#all} counts (the favourites raised above the rest) {@link #FAVORITE} sorts by.
      */
     @NonNull
     public ArrayList<GenrePOJO> sorted(@NonNull List<GenrePOJO> genres, @NonNull Map<String, ?> picks) {

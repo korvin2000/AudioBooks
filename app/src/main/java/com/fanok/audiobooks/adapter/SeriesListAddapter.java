@@ -98,12 +98,20 @@ public class SeriesListAddapter extends RecyclerView.Adapter<SeriesListAddapter.
             mText.setText(book.getName());
             if (mImage != null) {
                 if (com.fanok.audiobooks.policy.DefaultCover.replaces(book.getPhoto())) {
-                    // its site's covers are never requested: the one read from its audio, else none, as before
-                    Bitmap embedded = com.fanok.audiobooks.policy.EmbeddedCover.cached(itemView.getContext(),
-                            book.getUrl());
-                    Glide.with(itemView.getContext()).clear(mImage);
-                    mImage.setImageBitmap(embedded);
-                    mImage.setVisibility(embedded != null ? View.VISIBLE : View.GONE);
+                    // its site's covers are never requested: the one read from its audio (from memory, else its file,
+                    // decoded off the main thread), else none, as before
+                    Bitmap read = com.fanok.audiobooks.policy.EmbeddedCover.memory(book.getUrl());
+                    java.io.File embedded = read == null
+                            ? com.fanok.audiobooks.policy.EmbeddedCover.saved(itemView.getContext(), book.getUrl())
+                            : null;
+                    if (read != null) {
+                        Glide.with(itemView.getContext()).load(read).into(mImage);
+                    } else if (embedded != null) {
+                        Glide.with(itemView.getContext()).load(embedded).into(mImage);
+                    } else {
+                        Glide.with(itemView.getContext()).clear(mImage);
+                    }
+                    mImage.setVisibility(read != null || embedded != null ? View.VISIBLE : View.GONE);
                 } else if (book.getPhoto() != null && !book.getPhoto().isEmpty()) {
                     Glide.with(itemView.getContext())
                             .asBitmap()
