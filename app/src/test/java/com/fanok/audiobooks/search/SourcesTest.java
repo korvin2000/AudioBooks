@@ -297,6 +297,17 @@ public class SourcesTest {
     }
 
     @Test
+    public void fourReadMustBeThreeTimesAsFast() {
+        up(A, 290, false, 0);
+        up(Provider.FOUR_READ, 100, false, 0); // counts as 300 ms
+        assertEquals(Arrays.asList(A, Provider.FOUR_READ), ranked(Provider.FOUR_READ, A));
+        results.clear();
+        up(A, 310, false, 0);
+        up(Provider.FOUR_READ, 100, false, 0);
+        assertEquals(Arrays.asList(Provider.FOUR_READ, A), ranked(A, Provider.FOUR_READ));
+    }
+
+    @Test
     public void aZeroTimeCountsAsOneMillisecond() {
         up(A, 0, false, 0);
         up(B, 1, false, 100);

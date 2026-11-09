@@ -2,6 +2,7 @@ package com.fanok.audiobooks.adapter;
 
 import android.annotation.SuppressLint;
 import android.content.Context;
+import android.view.KeyEvent;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -10,6 +11,7 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.recyclerview.widget.RecyclerView;
 import com.fanok.audiobooks.R;
+import com.fanok.audiobooks.activity.NarratorActivity;
 import com.fanok.audiobooks.presenter.FavoritePeoplePresenter.Row;
 import com.fanok.audiobooks.search.Provider;
 import java.util.ArrayList;
@@ -67,6 +69,7 @@ public class FavoritePeopleAdapter extends RecyclerView.Adapter<FavoritePeopleAd
         Row row = mRows.get(position);
         holder.name.setText(row.person.name);
         holder.desc.setText(describe(holder.itemView.getContext(), row));
+        holder.card.setVisibility(row.card == null ? View.GONE : View.VISIBLE);
     }
 
     @Override
@@ -77,14 +80,29 @@ public class FavoritePeopleAdapter extends RecyclerView.Adapter<FavoritePeopleAd
     class Holder extends RecyclerView.ViewHolder {
         final TextView name;
         final TextView desc;
+        /** A reader's narrator card on fantlab.ru, as in the readers list (GenreListAddapter). */
+        final View card;
 
         Holder(@NonNull View itemView) {
             super(itemView);
             name = itemView.findViewById(R.id.name);
             desc = itemView.findViewById(R.id.desc);
+            card = itemView.findViewById(R.id.card);
             itemView.findViewById(R.id.reting).setVisibility(View.GONE);
             itemView.setOnClickListener(v -> click(false));
             itemView.setOnLongClickListener(v -> click(true));
+            card.setOnClickListener(v -> {
+                Row row = getItem(getBindingAdapterPosition());
+                if (row != null && row.card != null) {
+                    NarratorActivity.start(v.getContext(), row.person.name, row.card);
+                }
+            });
+            // TV: the row keeps focus, so D-pad right moves it to the card and left back
+            itemView.setOnKeyListener((v, keyCode, event) -> keyCode == KeyEvent.KEYCODE_DPAD_RIGHT
+                    && event.getAction() == KeyEvent.ACTION_DOWN && card.getVisibility() == View.VISIBLE
+                    && card.requestFocus());
+            card.setOnKeyListener((v, keyCode, event) -> keyCode == KeyEvent.KEYCODE_DPAD_LEFT
+                    && event.getAction() == KeyEvent.ACTION_DOWN && itemView.requestFocus());
         }
 
         private boolean click(boolean longClick) {

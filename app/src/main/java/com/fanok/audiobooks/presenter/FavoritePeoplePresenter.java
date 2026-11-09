@@ -47,6 +47,9 @@ public final class FavoritePeoplePresenter {
         public final Set<String> genres;
         /** The place in the newest-first list (the date order). */
         final int order;
+        /** A reader's narrator card on fantlab.ru (search.Narrators), set by the screen as it loads; null for none. */
+        @Nullable
+        public String card;
 
         Row(FavoritePeople.Person person, int books, List<Provider> sites, Set<String> genres, int order) {
             this.person = person;

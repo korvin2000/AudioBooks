@@ -495,8 +495,10 @@
     <string name="dir_title_download">Загрузки (для сторонних плееров)</string>
     <string name="last_book">Последняя открытая книга</string>
     <string name="books_adapter_layout_list_title">Список</string>
+    <string name="books_adapter_layout_medium_list_title">Средний список</string>
     <string name="books_adapter_layout_big_list_title">Большой список</string>
     <string name="books_adapter_layout_list_value" translatable="false">list</string>
+    <string name="books_adapter_layout_medium_list_value" translatable="false">medium_list</string>
     <string name="books_adapter_layout_big_list_value" translatable="false">big_list</string>
     <string name="abook_value" translatable="false">abook</string>
     <string name="abook" translatable="false">Akniga</string>

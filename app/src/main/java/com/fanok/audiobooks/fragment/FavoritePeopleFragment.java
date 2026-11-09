@@ -49,6 +49,7 @@ import com.fanok.audiobooks.model.BooksDBModel;
 import com.fanok.audiobooks.model.FavoritePeople;
 import com.fanok.audiobooks.presenter.FavoritePeoplePresenter;
 import com.fanok.audiobooks.presenter.FavoritePeoplePresenter.Row;
+import com.fanok.audiobooks.search.Narrators;
 import com.fanok.audiobooks.search.Provider;
 import com.google.android.material.bottomsheet.BottomSheetDialog;
 import com.google.android.material.navigation.NavigationView;
@@ -304,8 +305,14 @@ public class FavoritePeopleFragment extends Fragment implements FavoritePeople.L
         final int k = kind;
         mLoad = Single.fromCallable(() -> {
                     BooksDBModel db = new BooksDBModel(app);
-                    return FavoritePeoplePresenter.rows(k, FavoritePeople.get(app).all(k), db.getAllFavorite(),
-                            db.getAllHistory());
+                    ArrayList<Row> rows = FavoritePeoplePresenter.rows(k, FavoritePeople.get(app).all(k),
+                            db.getAllFavorite(), db.getAllHistory());
+                    if (k == FavoritePeople.READER) { // a reader's card opens from the row, as in Исполнители
+                        for (Row row : rows) {
+                            row.card = Narrators.card(row.person.name);
+                        }
+                    }
+                    return rows;
                 })
                 .subscribeOn(Schedulers.io())
                 .observeOn(AndroidSchedulers.mainThread())

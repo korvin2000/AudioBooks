@@ -41,7 +41,7 @@
             android:summary="@string/book_toolbar_desc"
             android:title="@string/book_toolbar">
             <CheckBoxPreference
-                android:defaultValue="true"
+                android:defaultValue="false"
                 android:key="toolbar_title"
                 android:title="@string/toolbar_title" />
             <CheckBoxPreference
@@ -57,27 +57,27 @@
                 android:key="toolbar_favorite_reader"
                 android:title="@string/book_fav_reader_item" />
             <CheckBoxPreference
-                android:defaultValue="true"
+                android:defaultValue="false"
                 android:key="toolbar_share"
                 android:title="@string/share" />
             <CheckBoxPreference
-                android:defaultValue="false"
+                android:defaultValue="true"
                 android:key="toolbar_speed"
                 android:title="@string/book_toolbar_speed_pref" />
             <CheckBoxPreference
-                android:defaultValue="false"
+                android:defaultValue="true"
                 android:key="toolbar_download"
                 android:title="@string/dowland" />
             <CheckBoxPreference
-                android:defaultValue="false"
+                android:defaultValue="true"
                 android:key="toolbar_sleep_timer"
                 android:title="@string/sleep_timer" />
             <CheckBoxPreference
-                android:defaultValue="false"
+                android:defaultValue="true"
                 android:key="toolbar_car_mode"
                 android:title="@string/car_mode" />
             <CheckBoxPreference
-                android:defaultValue="false"
+                android:defaultValue="true"
                 android:key="toolbar_equalizer"
                 android:title="@string/equalizer" />
             <CheckBoxPreference
@@ -89,7 +89,7 @@
                 android:key="toolbar_open_site"
                 android:title="@string/open_site" />
             <CheckBoxPreference
-                android:defaultValue="false"
+                android:defaultValue="true"
                 android:key="toolbar_main_screen"
                 android:title="@string/add_to_main_screen" />
             <CheckBoxPreference

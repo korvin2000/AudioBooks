@@ -13,6 +13,7 @@ import android.content.res.Configuration;
 import android.graphics.Bitmap;
 import android.graphics.drawable.Drawable;
 import android.os.Looper;
+import android.view.Gravity;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -546,23 +547,46 @@ public class BooksListAddapter extends RecyclerView.Adapter<BooksListAddapter.My
     @NonNull
     @Override
     public MyHolder onCreateViewHolder(@NonNull ViewGroup viewGroup, int i) {
-        View view = LayoutInflater.from(viewGroup.getContext()).inflate(
-                R.layout.books_recycler_item, viewGroup, false);
-        SharedPreferences preferences = PreferenceManager
-                .getDefaultSharedPreferences(viewGroup.getContext());
-        String listType = preferences.getString("books_adapter_layout_pref",
-                viewGroup.getContext().getString(R.string.books_adapter_layout_list_value));
-
-        if (listType.equals(viewGroup.getContext().getString(R.string.books_adapter_layout_list_value))) {
-            view = LayoutInflater.from(viewGroup.getContext()).inflate(
-                    R.layout.books_recycler_item, viewGroup, false);
-        } else if (listType.equals(viewGroup.getContext().getString(
-                R.string.books_adapter_layout_big_list_value))) {
-            view = LayoutInflater.from(viewGroup.getContext()).inflate(
-                    R.layout.books_recycler_item_big, viewGroup, false);
+        Context context = viewGroup.getContext();
+        String listType = PreferenceManager.getDefaultSharedPreferences(context).getString(
+                "books_adapter_layout_pref", context.getString(R.string.books_adapter_layout_list_value));
+        boolean medium = listType.equals(context.getString(R.string.books_adapter_layout_medium_list_value));
+        boolean big = medium || listType.equals(context.getString(R.string.books_adapter_layout_big_list_value));
+        View view = LayoutInflater.from(context).inflate(
+                big ? R.layout.books_recycler_item_big : R.layout.books_recycler_item, viewGroup, false);
+        if (medium) {
+            medium(view);
         }
-
         return new MyHolder(view);
+    }
+
+    /**
+     * The medium list: the big list's row without the free space above the series, as tall as its text, and the
+     * cover in the big one's proportions as tall as six lines of it: a one-line title, the genre, series, author and
+     * reader in the genre's size, and the duration.
+     */
+    private static void medium(View row) {
+        row.getLayoutParams().height = ViewGroup.LayoutParams.WRAP_CONTENT;
+        // a match_parent child adds nothing to a wrap_content LinearLayout: the row would be the cover's height
+        row.findViewById(R.id.texts).getLayoutParams().height = ViewGroup.LayoutParams.WRAP_CONTENT;
+        row.findViewById(R.id.gap).setVisibility(View.GONE);
+        int height = 5 * lineHeight(row.findViewById(R.id.genre)) + lineHeight(row.findViewById(R.id.time));
+        int width = height * row.getResources().getDimensionPixelSize(R.dimen.recycler_item_image_width_big)
+                / row.getResources().getDimensionPixelSize(R.dimen.recycler_item_height_big);
+        View cover = row.findViewById(R.id.imageView);
+        cover.getLayoutParams().width = width;
+        cover.getLayoutParams().height = height;
+        ViewGroup.LayoutParams ring = row.findViewById(R.id.donutProgress).getLayoutParams();
+        ring.width = width;
+        ring.height = width;
+        // a row taller than its cover (a two-line title) has the cover in its middle; the text stays at the top
+        ((LinearLayout.LayoutParams) ((View) cover.getParent()).getLayoutParams()).gravity = Gravity.CENTER_VERTICAL;
+    }
+
+    /** A one-line text's height, with its font padding and icon. */
+    private static int lineHeight(View text) {
+        text.measure(View.MeasureSpec.UNSPECIFIED, View.MeasureSpec.UNSPECIFIED);
+        return text.getMeasuredHeight();
     }
 
     /**

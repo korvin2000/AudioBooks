@@ -72,6 +72,7 @@
         </RelativeLayout>
 
         <LinearLayout
+            android:id="@+id/texts"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
             android:layout_marginStart="@dimen/recycler_item_textmargin"
@@ -157,7 +158,9 @@
                         tools:text="5" />
                 </LinearLayout>
 
+                <!-- the free space above the series; the medium list has none (BooksListAddapter.medium) -->
                 <View
+                    android:id="@+id/gap"
                     android:layout_width="match_parent"
                     android:layout_height="0dp"
                     android:layout_weight="1" />
