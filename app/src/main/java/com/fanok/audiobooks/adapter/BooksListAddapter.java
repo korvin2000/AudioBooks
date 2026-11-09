@@ -74,6 +74,9 @@ public class BooksListAddapter extends RecyclerView.Adapter<BooksListAddapter.My
 
         private final TextView mAutor;
 
+        /** The list's author | reader line, which fits the names itself; null in the big list's layout. */
+        private final FairRow mNames;
+
         private final TextView mComents;
 
         private final DonutProgress mDonutProgress;
@@ -116,6 +119,7 @@ public class BooksListAddapter extends RecyclerView.Adapter<BooksListAddapter.My
             mTime = itemView.findViewById(R.id.time);
             mAutor = itemView.findViewById(R.id.autor);
             mArtist = itemView.findViewById(R.id.artist);
+            mNames = itemView.findViewById(R.id.names);
             LinearLayout linearLayout = itemView.findViewById(R.id.contentConteiner);
             mSource = itemView.findViewById(R.id.source);
             mDonutProgress = itemView.findViewById(R.id.donutProgress);
@@ -217,14 +221,19 @@ public class BooksListAddapter extends RecyclerView.Adapter<BooksListAddapter.My
                 mComents.setVisibility(View.GONE);
             }
 
-            if (book.getAutor() != null && !book.getAutor().isEmpty()) {
-                mAutor.setText(book.getAutor());
-                mAutor.setVisibility(View.VISIBLE);
+            if (mNames != null) {
+                mNames.setNames(book.getAutor(), book.getArtist());
             } else {
-                mAutor.setVisibility(View.GONE);
+                if (book.getAutor() != null && !book.getAutor().isEmpty()) {
+                    mAutor.setText(book.getAutor());
+                    mAutor.setVisibility(View.VISIBLE);
+                } else {
+                    mAutor.setVisibility(View.GONE);
+                }
+                // readers come with trailing spaces (an em space too), which would keep the reader off the row's end
+                mArtist.setText(book.getArtist() == null ? null
+                        : EDGE_SPACES.matcher(book.getArtist()).replaceAll(""));
             }
-            // readers come with trailing spaces (an em space too), which would keep the reader off the row's end
-            mArtist.setText(book.getArtist() == null ? null : EDGE_SPACES.matcher(book.getArtist()).replaceAll(""));
             if (book.getTime() != null && !book.getTime().isEmpty()) {
                 mTime.setText(Consts.formatTimeDisplay(book.getTime()));
                 mTime.setVisibility(View.VISIBLE);
