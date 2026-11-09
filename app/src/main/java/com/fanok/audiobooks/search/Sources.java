@@ -43,6 +43,11 @@ public final class Sources {
     public static final String PREF_RANKED_AT = "pref_sources_ranked_at";
     /** A site through the proxy is less stable: it must be this many times faster to rank above a direct one. */
     static final int PROXY_PENALTY = 2;
+    /**
+     * 4Read, a small catalog in Ukrainian (4 850 books), answers fastest (light pages behind Cloudflare) and so
+     * topped the ranking alone: it must be this many times faster to rank above another site.
+     */
+    static final int SMALL_CATALOG_PENALTY = 3;
     /** Times within this percentage of a group's fastest count as equal: the site with more books ranks higher. */
     static final int SAME_SPEED_PERCENT = 135;
 
@@ -284,7 +289,8 @@ public final class Sources {
      * <ol>
      * <li>a site works when its result is {@link ProviderPage.Status#OK}; empty, failed, timed out, blocked, rate
      * limited and unchecked sites do not;</li>
-     * <li>its time is {@code max(millis, 1)}, times {@link #PROXY_PENALTY} through the proxy;</li>
+     * <li>its time is {@code max(millis, 1)}, times {@link #PROXY_PENALTY} through the proxy, times
+     * {@link #SMALL_CATALOG_PENALTY} for 4Read;</li>
      * <li>the working sites by time, ties in the user's order, in groups: a group starts at its fastest site and takes
      * every next one whose time is at most {@link #SAME_SPEED_PERCENT}% of that; within a group more books first, ties
      * by time;</li>
@@ -303,7 +309,8 @@ public final class Sources {
             SourceProbe.Result result = results.get(provider);
             if (works(result)) {
                 time.put(provider, Math.max(result.millis, 1)
-                        * (Boolean.TRUE.equals(result.proxied) ? PROXY_PENALTY : 1));
+                        * (Boolean.TRUE.equals(result.proxied) ? PROXY_PENALTY : 1)
+                        * (provider == Provider.FOUR_READ ? SMALL_CATALOG_PENALTY : 1));
                 working.add(provider);
             } else {
                 failed.add(provider);

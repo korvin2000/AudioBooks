@@ -118,7 +118,7 @@ public enum Provider {
     BAZA_KNIG_INFO(BazaKnigInfo.SERVER, "База Книг (info)", "baza_knig_info", "search_baza_knig_info", 26,
             "BazaKnigInfo", BazaKnigInfo.INDEX, BazaKnigInfo.GENRES, BazaKnigInfo.AUTHORS, BazaKnigInfo.READERS,
             new BazaKnigInfo(), BAZA_KNIG),
-    FOUR_READ(FourRead.SERVER, "4Read", "four_read", "search_four_read", 27, "FourRead",
+    FOUR_READ(FourRead.SERVER, "4Read (укр)", "four_read", "search_four_read", 27, "FourRead",
             FourRead.INDEX, FourRead.GENRES, FourRead.AUTHORS, FourRead.READERS, new FourRead()),
     AKNIGA_ME(AknigaMe.SERVER, "Akniga.me", "akniga_me", "search_akniga_me", 28, "AknigaMe",
             AknigaMe.INDEX, AknigaMe.GENRES, AknigaMe.AUTHORS, AknigaMe.READERS, new AknigaMe());

@@ -64,8 +64,8 @@ public final class Narrators {
         return page;
     }
 
-    /** The card of the narrator {@code name}, or null. */
-    static synchronized String card(String name) {
+    /** The card of the narrator {@code name}, or null; reads the asset on first use, so off the main thread. */
+    public static synchronized String card(String name) {
         if (cards == null) {
             try (InputStream in = App.getInstance().getAssets().open(PeopleIndex.ASSET)) {
                 cards = cards(PeopleIndex.of(in));

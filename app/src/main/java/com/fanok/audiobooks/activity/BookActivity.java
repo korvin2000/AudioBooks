@@ -103,6 +103,7 @@ import com.google.gson.GsonBuilder;
 import com.squareup.picasso.Picasso;
 import com.squareup.picasso.Target;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
@@ -169,6 +170,11 @@ public class BookActivity extends MvpAppCompatActivity implements Activity {
             "toolbar_favorite_reader", "toolbar_share", "toolbar_speed", "toolbar_download", "toolbar_sleep_timer",
             "toolbar_car_mode", "toolbar_equalizer", "toolbar_settings", "toolbar_open_site", "toolbar_main_screen",
             "toolbar_refresh"};
+    /** The toolbar icons by default, as preferences.xml has them; the other actions stay in the overflow menu. */
+    private static final List<String> TOOLBAR_DEFAULT = Arrays.asList("toolbar_favorite", "toolbar_speed",
+            "toolbar_download", "toolbar_sleep_timer", "toolbar_car_mode", "toolbar_equalizer", "toolbar_main_screen");
+    /** Set once {@link #newToolbarDefaults} ran. */
+    private static final String PREF_TOOLBAR_DEFAULTS = "toolbar_defaults_8_5";
     /**
      * Widths in the book toolbar: the back arrow, an action icon (styles.xml Widget.App.ActionButton), the speed as
      * text (action_book_speed), the overflow.
@@ -1126,7 +1132,7 @@ public class BookActivity extends MvpAppCompatActivity implements Activity {
                 menu.findItem(R.id.removeFavorite).setShowAsAction(action);
             }
         }
-        boolean title = pref.getBoolean("toolbar_title", true) && room >= TOOLBAR_TITLE_MIN_DP;
+        boolean title = pref.getBoolean("toolbar_title", false) && room >= TOOLBAR_TITLE_MIN_DP;
         ActionBar actionBar = getSupportActionBar();
         if (actionBar != null) {
             actionBar.setDisplayShowTitleEnabled(title);
@@ -1147,7 +1153,32 @@ public class BookActivity extends MvpAppCompatActivity implements Activity {
     }
 
     private boolean onToolbar(@NonNull String key) {
-        return pref.getBoolean(key, "toolbar_favorite".equals(key) || "toolbar_share".equals(key));
+        return pref.getBoolean(key, TOOLBAR_DEFAULT.contains(key));
+    }
+
+    /**
+     * Once, at the start of the app: a toolbar left as the default of 8.4 and before had it (title and author,
+     * favourite and share) gets the new default: no title, the icons of {@link #TOOLBAR_DEFAULT}; one the user chose
+     * stays as it showed, its keys never stored kept at their old defaults, not the new ones.
+     */
+    public static void newToolbarDefaults(@NonNull SharedPreferences prefs) {
+        if (prefs.getBoolean(PREF_TOOLBAR_DEFAULTS, false)) {
+            return;
+        }
+        boolean title = prefs.getBoolean("toolbar_title", true);
+        boolean untouched = title;
+        boolean[] shown = new boolean[TOOLBAR_KEYS.length];
+        for (int i = 0; i < TOOLBAR_KEYS.length; i++) {
+            boolean old = "toolbar_favorite".equals(TOOLBAR_KEYS[i]) || "toolbar_share".equals(TOOLBAR_KEYS[i]);
+            shown[i] = prefs.getBoolean(TOOLBAR_KEYS[i], old);
+            untouched &= shown[i] == old;
+        }
+        SharedPreferences.Editor edit = prefs.edit().putBoolean(PREF_TOOLBAR_DEFAULTS, true)
+                .putBoolean("toolbar_title", !untouched && title);
+        for (int i = 0; i < TOOLBAR_KEYS.length; i++) {
+            edit.putBoolean(TOOLBAR_KEYS[i], untouched ? TOOLBAR_DEFAULT.contains(TOOLBAR_KEYS[i]) : shown[i]);
+        }
+        edit.apply();
     }
 
     private static int toolbarWidth(int itemId) {
