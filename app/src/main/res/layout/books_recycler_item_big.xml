@@ -72,7 +72,6 @@
         </RelativeLayout>
 
         <LinearLayout
-            android:id="@+id/texts"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
             android:layout_marginStart="@dimen/recycler_item_textmargin"
@@ -158,7 +157,8 @@
                         tools:text="5" />
                 </LinearLayout>
 
-                <!-- the free space above the series; the medium list has none (BooksListAddapter.medium) -->
+                <!-- the free space above the series; the medium list moves it above the last line, which so keeps to
+                     the card's bottom (BooksListAddapter.medium) -->
                 <View
                     android:id="@+id/gap"
                     android:layout_width="match_parent"
@@ -167,76 +167,70 @@
 
                 <!-- series, author, reader on a line of its own, then duration and source: a long list of readers no
                      longer runs into the source -->
+                <TextView
+                    android:id="@+id/series"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:drawableStart="@drawable/ic_book"
+                    android:gravity="center_vertical"
+                    android:maxLines="1"
+                    android:singleLine="true"
+                    android:textColor="?attr/hrefColor"
+                    android:textSize="@dimen/titleSize"
+                    tools:text="Темная башня" />
+
+                <TextView
+                    android:id="@+id/autor"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:drawableStart="@drawable/ic_autor"
+                    android:gravity="center_vertical"
+                    android:maxLines="1"
+                    android:singleLine="true"
+                    android:textColor="?attr/hrefColor"
+                    android:textSize="@dimen/titleSize"
+                    tools:text="Кинг Стивен" />
+
+                <TextView
+                    android:id="@+id/artist"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:drawableStart="@drawable/ic_artist"
+                    android:ellipsize="end"
+                    android:gravity="center_vertical"
+                    android:maxLines="1"
+                    android:singleLine="true"
+                    android:textColor="?attr/hrefColor"
+                    android:textSize="@dimen/titleSize"
+                    tools:text="Кинг Стивен" />
+
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:orientation="vertical">
+                    android:orientation="horizontal">
 
                     <TextView
-                        android:id="@+id/series"
-                        android:layout_width="match_parent"
+                        android:id="@+id/time"
+                        android:layout_width="0dp"
                         android:layout_height="wrap_content"
-                        android:drawableStart="@drawable/ic_book"
+                        android:layout_marginEnd="@dimen/recycler_item_textmargin"
+                        android:layout_weight="1"
+                        android:drawableStart="@drawable/ic_clock"
                         android:gravity="center_vertical"
                         android:maxLines="1"
                         android:singleLine="true"
-                        android:textColor="?attr/hrefColor"
-                        android:textSize="@dimen/titleSize"
-                        tools:text="Темная башня" />
+                        android:textColor="?attr/subTextColor"
+                        android:textSize="@dimen/books_recyle_item_title_size"
+                        tools:text="13 часов 15 минут" />
 
                     <TextView
-                        android:id="@+id/autor"
-                        android:layout_width="match_parent"
+                        android:id="@+id/source"
+                        android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:drawableStart="@drawable/ic_autor"
-                        android:gravity="center_vertical"
-                        android:maxLines="1"
-                        android:singleLine="true"
-                        android:textColor="?attr/hrefColor"
-                        android:textSize="@dimen/titleSize"
-                        tools:text="Кинг Стивен" />
-
-                    <TextView
-                        android:id="@+id/artist"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:drawableStart="@drawable/ic_artist"
-                        android:ellipsize="end"
-                        android:gravity="center_vertical"
-                        android:maxLines="1"
-                        android:singleLine="true"
-                        android:textColor="?attr/hrefColor"
-                        android:textSize="@dimen/titleSize"
-                        tools:text="Кинг Стивен" />
-
-                    <LinearLayout
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:orientation="horizontal">
-
-                        <TextView
-                            android:id="@+id/time"
-                            android:layout_width="0dp"
-                            android:layout_height="wrap_content"
-                            android:layout_marginEnd="@dimen/recycler_item_textmargin"
-                            android:layout_weight="1"
-                            android:drawableStart="@drawable/ic_clock"
-                            android:gravity="center_vertical"
-                            android:maxLines="1"
-                            android:singleLine="true"
-                            android:textColor="?attr/subTextColor"
-                            android:textSize="@dimen/books_recyle_item_title_size"
-                            tools:text="13 часов 15 минут" />
-
-                        <TextView
-                            android:id="@+id/source"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:layout_marginEnd="@dimen/recycler_item_textmargin"
-                            android:textColor="?attr/subTextColor"
-                            android:textSize="@dimen/books_recyle_item_title_size"
-                            tools:text="Книга в ухе" />
-                    </LinearLayout>
+                        android:layout_marginEnd="@dimen/recycler_item_textmargin"
+                        android:textColor="?attr/subTextColor"
+                        android:textSize="@dimen/books_recyle_item_title_size"
+                        tools:text="Книга в ухе" />
                 </LinearLayout>
             </LinearLayout>
         </LinearLayout>
