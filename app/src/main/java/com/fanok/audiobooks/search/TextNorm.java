@@ -255,7 +255,7 @@ public final class TextNorm {
         return piece.size() == 1 && isPatronymic(piece.get(0));
     }
 
-    static boolean isPatronymic(String w) {
+    public static boolean isPatronymic(String w) {
         if (w.length() < 6) {
             return false;
         }

@@ -213,17 +213,19 @@
                             tools:text="13 часов 15 минут" />
                     </LinearLayout>
 
+                    <!-- FairRow picks and sets the names' texts; both 0dp so a new text needs no extra layout pass;
+                         the reader's paddingStart is the gap between the names -->
                     <com.fanok.audiobooks.adapter.FairRow
+                        android:id="@+id/names"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:gravity="end"
-                        android:orientation="horizontal">
+                        android:paddingEnd="@dimen/recycler_item_textmargin">
 
                         <TextView
                             android:id="@+id/autor"
                             android:layout_width="0dp"
                             android:layout_height="wrap_content"
-                            android:layout_weight="1"
+                            android:visibility="gone"
                             android:drawableStart="@drawable/ic_autor"
                             android:gravity="center_vertical"
                             android:maxLines="1"
@@ -234,10 +236,10 @@
 
                         <TextView
                             android:id="@+id/artist"
-                            android:layout_width="wrap_content"
+                            android:layout_width="0dp"
                             android:layout_height="wrap_content"
-                            android:layout_marginStart="@dimen/recycler_item_textmargin"
-                            android:layout_marginEnd="@dimen/recycler_item_textmargin"
+                            android:visibility="gone"
+                            android:paddingStart="3dp"
                             android:drawableStart="@drawable/ic_artist"
                             android:gravity="center_vertical"
                             android:maxLines="1"
