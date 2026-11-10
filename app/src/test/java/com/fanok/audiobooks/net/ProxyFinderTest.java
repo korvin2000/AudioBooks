@@ -1139,6 +1139,8 @@ public class ProxyFinderTest {
         network.onFetch = () -> { };
         network.latency.put("1.1.1.1:80", 100L);
         online.set(true);
+        assertEquals("back online, the kept proxy is in use again", ProxyFinder.Phase.READY,
+                finder.state().phase);
         int fetches = network.fetches.get();
         now.addAndGet(ProxyFinder.NO_NETWORK_RETRY_MS);
         finder.scanIfDue();

@@ -27,6 +27,9 @@ public class AnswerListAddapter extends RecyclerView.Adapter<AnswerListAddapter.
 
         private final int height;
 
+        /** The avatar's size from the layout, for the replies; the header gets a bigger one. */
+        private final ViewGroup.LayoutParams mAvatarParams;
+
         private final View mBorderBottom;
 
         private final CircleImageView mImageView;
@@ -60,25 +63,27 @@ public class AnswerListAddapter extends RecyclerView.Adapter<AnswerListAddapter.
             mBorderBottom = itemView.findViewById(R.id.border);
             mText.setOnClickListener(v -> ExpandableText.tapToggle(mReadMore));
 
-            ViewGroup.LayoutParams layoutParams = mImageView.getLayoutParams();
-            height = (int) (layoutParams.height * 1.33);
-            width = (int) (layoutParams.width * 1.33);
+            mAvatarParams = mImageView.getLayoutParams();
+            height = (int) (mAvatarParams.height * 1.33);
+            width = (int) (mAvatarParams.width * 1.33);
 
         }
 
         void bind(SubComentsPOJO comentsPOJO) {
 
-            if (getBindingAdapterPosition() == 0) {
+            // set both ways: a recycled holder keeps the header's look (or a reply's) otherwise
+            boolean head = getBindingAdapterPosition() == 0;
+            mImageView.setLayoutParams(head ? new LinearLayout.LayoutParams(width, height) : mAvatarParams);
+            mParentName.setVisibility(head ? View.GONE : View.VISIBLE);
+            mBorderBottom.setVisibility(head ? View.VISIBLE : View.GONE);
+            mReadMore.setText(R.string.show_more);
 
-
-                mImageView.setLayoutParams(new LinearLayout.LayoutParams(width, height));
-                mParentName.setVisibility(View.GONE);
-                mBorderBottom.setVisibility(View.VISIBLE);
-            }
-
+            Picasso.get().cancelRequest(mImageView);
             if (!comentsPOJO.getImage().isEmpty()) {
                 Picasso.get().load(comentsPOJO.getImage()).into(
                         mImageView);
+            } else {
+                mImageView.setImageDrawable(null);
             }
             mName.setText(comentsPOJO.getName());
             mTime.setText(comentsPOJO.getDate());

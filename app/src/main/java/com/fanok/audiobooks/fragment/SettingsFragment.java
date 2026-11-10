@@ -46,7 +46,7 @@ import com.fanok.audiobooks.AppThemes;
 import com.fanok.audiobooks.Consts;
 import com.fanok.audiobooks.MySuggestionProvider;
 import com.fanok.audiobooks.R;
-import com.fanok.audiobooks.activity.ActivityCookies;
+import com.fanok.audiobooks.FontScale;
 import com.fanok.audiobooks.activity.ActivityImport;
 import com.fanok.audiobooks.activity.ClearSavedActivity;
 import com.fanok.audiobooks.activity.MainActivity;
@@ -61,6 +61,7 @@ import com.fanok.audiobooks.net.AppProxy;
 import com.fanok.audiobooks.net.ProxyFinder;
 import com.fanok.audiobooks.pojo.BackupPOJO;
 import com.fanok.audiobooks.service.SeekStep;
+import com.fanok.audiobooks.service.SkipSilenceProcessor;
 import com.fanok.audiobooks.pojo.BookPOJO;
 import com.fanok.audiobooks.pojo.StorageUtil;
 import com.fanok.audiobooks.presenter.FavoritePresenter;
@@ -95,6 +96,8 @@ public class SettingsFragment extends PreferenceFragmentCompat implements
 
     /** The "Управление источниками" entry ({@link SourcesDialogFragment}). */
     private static final String SOURCES_DIALOG = "sources_dialog";
+    /** The "Активные источники" entry ({@link SourceCountDialogFragment}). */
+    private static final String SOURCES_COUNT = "sources_count";
     /** An argument of {@link #withSourcesDialog}: open the sources dialog over the screen, once. */
     private static final String ARG_OPEN_SOURCES = "openSourcesDialog";
     /** An argument of {@link #withSourcesDialog(boolean)}: the sources dialog starts "Автоподбор" as it opens. */
@@ -224,10 +227,13 @@ public class SettingsFragment extends PreferenceFragmentCompat implements
         }
     };
 
+    /** The sources the search checkboxes were built for: they are rebuilt only when the active sources change. */
+    private List<Provider> mSearchSources;
+
     /**
      * The source list and the search-source checkboxes are the active sources ({@link Sources}), in the user's order,
      * not the xml. The nested "source_search" screen is filled both as a child of the main screen (an empty screen is
-     * not clickable) and when it is the screen shown; it is rebuilt, since the active sources may have changed.
+     * not clickable) and when it is the screen shown; it is rebuilt when the active sources changed.
      */
     private void fillSources() {
         List<Provider> providers = Sources.active();
@@ -252,7 +258,8 @@ public class SettingsFragment extends PreferenceFragmentCompat implements
         if (search == null && "source_search".equals(getPreferenceScreen().getKey())) {
             search = getPreferenceScreen();
         }
-        if (search != null) {
+        if (search != null && !providers.equals(mSearchSources)) {
+            mSearchSources = new ArrayList<>(providers);
             search.removeAll();
             for (Provider provider : providers) {
                 CheckBoxPreference box = new CheckBoxPreference(search.getContext());
@@ -264,22 +271,21 @@ public class SettingsFragment extends PreferenceFragmentCompat implements
         }
     }
 
-    /** The choices of the active-source limit, {@link Sources#MIN_LIMIT}..{@link Sources#MAX_LIMIT}. */
-    private void fillSourcesMax() {
-        ListPreference max = findPreference(Sources.PREF_MAX);
-        if (max == null) {
-            return;
-        }
-        CharSequence[] values = new CharSequence[Sources.MAX_LIMIT - Sources.MIN_LIMIT + 1];
-        for (int i = 0; i < values.length; i++) {
-            values[i] = String.valueOf(Sources.MIN_LIMIT + i);
-        }
-        max.setEntries(values);
-        max.setEntryValues(values);
-    }
-
-    /** "Управление источниками": how many are active and how many take the proxy; the dialog does the rest. */
+    /**
+     * "Управление источниками": how many are active and how many take the proxy; the dialog does the rest. With it,
+     * "Активные источники" ({@link SourceCountDialogFragment}).
+     */
     private void initSourcesEntry() {
+        Preference count = findPreference(SOURCES_COUNT);
+        if (count != null) {
+            count.setSummary(SourceCountDialogFragment.summary(count.getContext()));
+            count.setOnPreferenceClickListener(preference -> {
+                if (getChildFragmentManager().findFragmentByTag(SourceCountDialogFragment.TAG) == null) {
+                    new SourceCountDialogFragment().show(getChildFragmentManager(), SourceCountDialogFragment.TAG);
+                }
+                return true;
+            });
+        }
         Preference entry = findPreference(SOURCES_DIALOG);
         if (entry == null) {
             return;
@@ -323,6 +329,9 @@ public class SettingsFragment extends PreferenceFragmentCompat implements
                 .registerOnSharedPreferenceChangeListener(this);
         ProxyFinder.get(requireContext()).addListener(proxyListener);
         updateProxySummary();
+        // back from the drawer's sources or another screen: the active sources and the selection may have changed
+        fillSources();
+        initSourcesEntry();
 
         MainActivity activity = (MainActivity) getActivity();
         if (activity != null) {
@@ -402,7 +411,6 @@ public class SettingsFragment extends PreferenceFragmentCompat implements
                 requireActivity().getApplicationContext(), R.xml.preferences,
                 false);
         fillSources(); // before the summaries: the source list's summary is its chosen entry
-        fillSourcesMax();
         initSummary(getPreferenceScreen());
         initSourcesEntry();
         if (savedInstanceState == null && getArguments() != null && getArguments().getBoolean(ARG_OPEN_SOURCES)
@@ -429,6 +437,22 @@ public class SettingsFragment extends PreferenceFragmentCompat implements
             return true;
         });
 
+        SliderPreference fontScale = findPreference(FontScale.PREF);
+        if (fontScale != null) {
+            fontScale.setFormatter(value -> getString(R.string.font_scale_value, Math.round(value)));
+        }
+        preferenceChangeListner(FontScale.PREF, (preference, newValue) -> {
+            // stored after this returns: then every screen is built anew at the new size
+            requireActivity().getWindow().getDecorView().post(App::recreateActivities);
+            return true;
+        });
+
+        SliderPreference skipSilenceLevel = findPreference(SkipSilenceProcessor.PREF_LEVEL);
+        if (skipSilenceLevel != null) {
+            String[] levels = getResources().getStringArray(R.array.skip_silence_levels);
+            skipSilenceLevel.setFormatter(value -> levels[Math.round(value) - SkipSilenceProcessor.MIN_LEVEL]);
+        }
+
         preferenceChangeListner("bufferSize", (preference, newValue) -> {
             String value = (String) newValue;
             if (value.equals("0")) return false;
@@ -436,6 +460,16 @@ public class SettingsFragment extends PreferenceFragmentCompat implements
         });
 
         preferenceChangeListner("sorce_books", (preference, newValue) -> {
+            Provider chosen = null;
+            for (Provider provider : Provider.values()) {
+                if (provider.prefValue.equals(newValue.toString())) {
+                    chosen = provider;
+                }
+            }
+            if (!Sources.isActive(chosen)) {
+                fillSources(); // the list was filled before the active sources changed: only the active ones now
+                return false;
+            }
             Consts.setSOURCE(newValue.toString());
             return true;
         });
@@ -515,11 +549,6 @@ public class SettingsFragment extends PreferenceFragmentCompat implements
             } catch (Exception e) {
                 Toast.makeText(requireContext(), R.string.backup_not_created, Toast.LENGTH_SHORT).show();
             }
-            return true;
-        });
-
-        preferenceClickListner("cookies", preference -> {
-            startActivity(new Intent(getContext(), ActivityCookies.class));
             return true;
         });
 
@@ -689,8 +718,12 @@ public class SettingsFragment extends PreferenceFragmentCompat implements
                                     .setCancelable(false)
                                     .show();
                             StoreLocation.move(app, target, error -> {
-                                if (progress.isShowing()) {
-                                    progress.dismiss();
+                                try {
+                                    if (progress.isShowing()) {
+                                        progress.dismiss();
+                                    }
+                                } catch (IllegalArgumentException ignored) {
+                                    // the activity was recreated meanwhile: the dialog's window went with it
                                 }
                                 Toast.makeText(app, error, Toast.LENGTH_LONG).show();
                             });
@@ -826,13 +859,14 @@ public class SettingsFragment extends PreferenceFragmentCompat implements
         if (Updater.PREF.equals(key) && sharedPreferences.getBoolean(key, true) && getContext() != null) {
             Updater.check(getContext(), null); // switched on: the first check now, not at the next period
         }
-        if (Sources.PREF_MAX.equals(key)) {
-            int before = Sources.activeCount();
-            Sources.load(sharedPreferences); // a lower limit cuts the active sources; a higher one switches none on
-            if (Sources.activeCount() < before && getContext() != null) {
-                Toast.makeText(getContext(), getString(R.string.sources_max, Sources.maxActive()),
-                        Toast.LENGTH_SHORT).show();
-            }
+        if (Sources.PREF.equals(key) && getView() != null) {
+            // posted: the save that wrote the list moves the catalog source right after it (an undo too)
+            getView().post(() -> {
+                if (isAdded()) {
+                    fillSources();
+                    initSourcesEntry();
+                }
+            });
         }
         updatePrefSummary(findPreference(key));
     }
@@ -1073,11 +1107,9 @@ public class SettingsFragment extends PreferenceFragmentCompat implements
             ListPreference listPref = (ListPreference) p;
             p.setSummary(SeekStep.PREF.equals(p.getKey())
                     ? getString(R.string.seek_step_summary, listPref.getEntry())
-                    : Sources.PREF_MAX.equals(p.getKey())
-                            ? getString(R.string.sources_max_summary, listPref.getEntry())
-                            : DownloadStorageHelper.PREF_FOLDER_LAYOUT.equals(p.getKey())
-                                    ? getString(R.string.folder_layout_summary, listPref.getEntry())
-                                    : listPref.getEntry());
+                    : DownloadStorageHelper.PREF_FOLDER_LAYOUT.equals(p.getKey())
+                            ? getString(R.string.folder_layout_summary, listPref.getEntry())
+                            : listPref.getEntry());
         } else if (p instanceof EditTextPreference) {
             EditTextPreference editTextPref = (EditTextPreference) p;
             if (p.getTitle().toString().toLowerCase().contains("password")) {

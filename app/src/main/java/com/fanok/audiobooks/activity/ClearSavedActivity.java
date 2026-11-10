@@ -2,6 +2,7 @@ package com.fanok.audiobooks.activity;
 
 import static com.fanok.audiobooks.activity.BookActivity.Broadcast_UPDATE_ADAPTER;
 
+import com.fanok.audiobooks.FontScale;
 import android.annotation.SuppressLint;
 import android.app.Activity;
 import android.content.BroadcastReceiver;
@@ -57,6 +58,12 @@ import java.util.List;
 import it.xabaras.android.recyclerview.swipedecorator.RecyclerViewSwipeDecorator;
 
 public class ClearSavedActivity extends MvpAppCompatActivity implements ClearSavedView {
+
+    /** The screen at the chosen font scale (FontScale). */
+    @Override
+    protected void attachBaseContext(Context newBase) {
+        super.attachBaseContext(FontScale.wrap(newBase));
+    }
     private ActivityClearSavedBinding binding;
     @InjectPresenter
     ClearSavedPresenter mPresenter;

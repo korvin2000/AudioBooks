@@ -2,6 +2,7 @@ package com.fanok.audiobooks.search;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
 import org.jsoup.HttpStatusException;
@@ -587,6 +588,40 @@ public class SearchSessionTest {
         scheduler.advanceTimeBy(3, TimeUnit.SECONDS); // empty after 2 s: "кинг" goes out
         assertTrue(s.states().get(0).running);
         assertEquals(5_000, s.states().get(0).startedAt);
+    }
+
+    /** Stopped during its retry in the other letter case, a site has not answered: it is asked again in that case. */
+    @Test
+    public void aSourceStoppedDuringItsCaseRetryCanBeAskedAgain() {
+        final List<String> asked = new ArrayList<>();
+        final boolean[] answers = {false};
+        SearchSession.Source<String> empty = new SearchSession.Source<String>() {
+            @Override
+            public String name() {
+                return "E";
+            }
+
+            @Override
+            public Single<ProviderPage<String>> load(String query, int pageNo) {
+                asked.add(query + pageNo);
+                return query.equals("Кинг") ? Single.just(ProviderPage.<String>empty())
+                        : answers[0] ? Single.just(page(false, "e1")) : Single.<ProviderPage<String>>never();
+            }
+        };
+        SearchSession<String> s = session(Collections.singletonList(empty));
+        s.search("Кинг");
+        scheduler.triggerActions();
+        assertTrue(s.states().get(0).running);
+        s.dispose();
+        assertFalse(s.states().get(0).running);
+        assertNull("stopped, not \"found nothing\"", s.states().get(0).status);
+
+        answers[0] = true;
+        assertTrue(s.loadNext("E"));
+        scheduler.triggerActions();
+        assertEquals(Arrays.asList("Кинг1", "кинг1", "кинг1"), asked);
+        assertEquals(Collections.singletonList("e1"), finished);
+        assertTrue(s.caseRetried("E"));
     }
     /** A source that rate-limited for {@code wait} seconds once, then answers {@code after}. */
     private SearchSession.Source<String> limitedOnce(String name, int wait, ProviderPage<String> after,

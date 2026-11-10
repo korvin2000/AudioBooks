@@ -531,7 +531,8 @@ public class Abmp3Engine implements SourceParser {
 
     @Override
     public ArrayList<ComentsPOJO> comments(String bookUrl, BooleanSupplier cancelled) throws Exception {
-        ComentsModel.Parsed parsed = parseComments(fetch(bookUrl));
+        // the page the description and the chapters were read from, not a second request to the site
+        ComentsModel.Parsed parsed = parseComments(BookPages.get(bookUrl, this::fetch));
         if (parsed.skipped > 0) {
             Log.w(TAG, "skipped " + parsed.skipped + " malformed comments on " + bookUrl);
         }
@@ -664,14 +665,14 @@ public class Abmp3Engine implements SourceParser {
      */
     ProviderPage<GenrePOJO> walkLetters(List<String> letters, int pageNo, PeopleCursor cursor, BookPages.Fetch pages)
             throws IOException {
-        if (pageNo <= 1) {
-            cursor.skipped = 0;
-        }
+        // the cursor changes only with a page returned: a failed refresh keeps the list's place
+        int skipped = pageNo <= 1 ? 0 : cursor.skipped;
         while (true) {
-            int slot = pageNo - 1 + cursor.skipped;
+            int slot = pageNo - 1 + skipped;
             int letter = slot / LETTER_SLOTS;
             int page = slot % LETTER_SLOTS + 1;
             if (letter >= letters.size()) {
+                cursor.skipped = skipped;
                 return ProviderPage.empty();
             }
             Document doc = pages.get(pageUrl(letters.get(letter), page));
@@ -683,9 +684,10 @@ public class Abmp3Engine implements SourceParser {
             boolean empty = found.isEmpty() && !lastLetter;
             if (!more) {
                 // the rest of the letter's slots; this very one too for an empty letter, read again as the next
-                cursor.skipped += LETTER_SLOTS - page + (empty ? 1 : 0);
+                skipped += LETTER_SLOTS - page + (empty ? 1 : 0);
             }
             if (!empty) {
+                cursor.skipped = skipped;
                 return ProviderPage.of(found, more || !lastLetter);
             }
         }

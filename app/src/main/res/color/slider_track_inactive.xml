@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- the rest of a slider's track: the accent, faint -->
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:alpha="0.28" android:color="?attr/colorAccent" />
+</selector>

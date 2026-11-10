@@ -1,5 +1,6 @@
 package com.fanok.audiobooks.activity;
 
+import com.fanok.audiobooks.FontScale;
 import android.annotation.SuppressLint;
 import android.content.Context;
 import android.content.Intent;
@@ -43,18 +44,24 @@ import org.jsoup.nodes.Document;
 
 /**
  * Lets the user pass the site's browser check in a real browser; the session is kept only once a real request of the
- * app with it returns a normal page (UI-17). Leaving early never touches the stored session. baza-knig (the settings'
- * default): its session cookie. audioboo: Cloudflare's clearance, bound to the browser's own User-Agent, which the
+ * app with it returns a normal page (UI-17). Leaving early never touches the stored session. baza-knig: its session
+ * cookie. audioboo: Cloudflare's clearance, bound to the browser's own User-Agent, which the
  * app then sends to that site ({@link Audioboo#saveClearance}). Opened by a list the site refused
- * ({@link #EXTRA_PROVIDER}), it closes itself once the session is accepted, so the list loads again. audioboo's check
- * runs on the very page refused ({@link #EXTRA_URL}); a book's page the app is still refused is read from this browser.
+ * ({@link #EXTRA_PROVIDER}), it closes itself once the session is accepted, so the list loads again. The check runs on
+ * the very page refused ({@link #EXTRA_URL}); audioboo's book page the app is still refused is read from this browser.
  */
 public class ActivityCookies extends AppCompatActivity {
 
-    /** The {@link Provider} name of the site; without it baza-knig, as the settings open it. */
+    /** The screen at the chosen font scale (FontScale). */
+    @Override
+    protected void attachBaseContext(Context newBase) {
+        super.attachBaseContext(FontScale.wrap(newBase));
+    }
+
+    /** The {@link Provider} name of the site; without it baza-knig. */
     public static final String EXTRA_PROVIDER = "provider";
     /**
-     * audioboo: the page the site refused. The check is passed and verified on it, never on the start page: the site
+     * The page the site refused. The check is passed and verified on it, never on the start page: the site
      * may let that through without any clearance, which would "verify" one its other pages refuse.
      */
     private static final String EXTRA_URL = "url";
@@ -71,7 +78,7 @@ public class ActivityCookies extends AppCompatActivity {
     /** audioboo: the clearance and the browser's User-Agent, not baza-knig's session. */
     private boolean clearance;
     private String server;
-    /** What is checked: {@link #EXTRA_URL} on audioboo, else {@link #server}. */
+    /** What is checked: {@link #EXTRA_URL} when it is the site's, else {@link #server}. */
     private String page;
     private boolean book;
     private boolean taken;
@@ -108,8 +115,8 @@ public class ActivityCookies extends AppCompatActivity {
         clearance = Provider.AUDIOBOO.name().equals(getIntent().getStringExtra(EXTRA_PROVIDER));
         server = clearance ? Audioboo.SERVER + "/" : Url.SERVER_BAZA_KNIG;
         String asked = getIntent().getStringExtra(EXTRA_URL);
-        page = clearance && asked != null && Url.isHost(Url.canonical(asked), server) ? Url.canonical(asked) : server;
-        book = !page.equals(server) && getIntent().getBooleanExtra(EXTRA_BOOK, false);
+        page = asked != null && Url.isHost(Url.canonical(asked), server) ? Url.canonical(asked) : server;
+        book = clearance && !page.equals(server) && getIntent().getBooleanExtra(EXTRA_BOOK, false);
         setSupportActionBar(binding.toolbar);
         setTitle(Url.hostOf(server));
         ActionBar actionBar = getSupportActionBar();
@@ -181,8 +188,7 @@ public class ActivityCookies extends AppCompatActivity {
         final String name = clearance ? Audioboo.CLEARANCE_COOKIE : SESSION_COOKIE;
         final String session = cookie(CookieManager.getInstance().getCookie(server), name);
         // a clearance equal to the stored one is checked too: the site may refuse it to the app now (a new address)
-        if (session.isEmpty() || session.equals(lastTried)
-                || !clearance && session.equals(Consts.getBazaKnigCookies())) {
+        if (session.isEmpty() || session.equals(lastTried)) {
             return false;
         }
         final String agent = binding.webView.getSettings().getUserAgentString();
@@ -205,6 +211,8 @@ public class ActivityCookies extends AppCompatActivity {
                         SharedPreferences pref = PreferenceManager.getDefaultSharedPreferences(this);
                         pref.edit().putString("cookes_baza_knig", ok).apply();
                         Consts.setBazaKnigCookies(ok);
+                        // the session the site issued the app's own requests earlier no longer shadows it
+                        SiteHttp.forget(Url.SERVER_BAZA_KNIG, SESSION_COOKIE);
                     }
                     verified = true;
                     Toast.makeText(this, R.string.cookies_loaded, Toast.LENGTH_SHORT).show();

@@ -114,6 +114,10 @@ public class BooksModelParsersTest {
         assertEquals(27, index.items.size());
         assertTrue(index.hasMore);
         assertAllHaveNameAndUrl(index, Url.SERVER_AUDIOBOO);
+        // the card titles "Автор - Название" keep only the title, as the book page does
+        assertEquals("Соло 06", index.items.get(1).getName());
+        assertEquals("Маханенко Василий", index.items.get(1).getAutor());
+        assertEquals("Хроники пищеварения", index.items.get(2).getName());
         ProviderPage<BookPOJO> genre = Audioboo.parseListing(
                 fixture("audioboo/listing-genre-p2.html", Url.SERVER_AUDIOBOO + "/didiktiva/page/2/"), 2);
         assertEquals(27, genre.items.size());
@@ -122,6 +126,14 @@ public class BooksModelParsersTest {
                 fixture("audioboo/search-master-p2.html", Url.SERVER_AUDIOBOO + "/index.php"), 2);
         assertEquals(50, search.items.size());
         assertTrue("its pager only links back to page 1", search.hasMore);
+    }
+
+    @Test
+    public void audiobooListingWithoutPagerIsTheLastPage() throws IOException {
+        ProviderPage<BookPOJO> series = Audioboo.parseListing(
+                fixture("audioboo/series-solo.html", Url.SERVER_AUDIOBOO + "/xfsearch/cikl/Соло/"), 1);
+        assertEquals(6, series.items.size());
+        assertFalse(series.hasMore);
     }
 
     @Test
@@ -142,6 +154,14 @@ public class BooksModelParsersTest {
         assertEquals("Тайна Ночного шоссе", page.items.get(10).getName());
         assertTrue("9532 pages", page.hasMore);
         assertAllHaveNameAndUrl(page, Url.SERVER_BAZA_KNIG);
+    }
+
+    @Test
+    public void bazaKnigLastPageEndsTheListing() throws IOException {
+        Document doc = fixture("bazaknig/listing-index-p2.html", Url.SERVER_BAZA_KNIG + "/page/9532/");
+        // the last page keeps the next arrow, but not as a link (live /page/9617/)
+        doc.select(".page-nav a:has(.pnext)").tagName("span").removeAttr("href");
+        assertFalse(BazaKnig.parseListing(doc, 9532).hasMore);
     }
 
     @Test

@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- the book listings of a site with a SourceParser: the Order submenu is filled from SourceParser.sorts, the source
-     submenu from Provider (BooksFragment) -->
+     item opens BooksFragment's own list of the active sources -->
 <menu xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto">
     <item
@@ -29,16 +29,5 @@
         android:id="@+id/source"
         android:icon="@drawable/ic_web"
         android:title="@string/source"
-        app:showAsAction="always">
-        <menu>
-            <!-- the listing's site's card (SourceActivity), after the sources BooksFragment adds; titled there -->
-            <group
-                android:id="@+id/source_about_group"
-                android:orderInCategory="100">
-                <item
-                    android:id="@+id/source_about"
-                    android:title="@string/sources_about_title" />
-            </group>
-        </menu>
-    </item>
+        app:showAsAction="always" />
 </menu>

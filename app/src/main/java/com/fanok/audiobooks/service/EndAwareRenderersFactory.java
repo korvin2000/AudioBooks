@@ -6,7 +6,7 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.annotation.OptIn;
 import androidx.media3.common.C;
-import androidx.media3.common.audio.AudioProcessor;
+import androidx.media3.common.PlaybackParameters;
 import androidx.media3.common.util.UnstableApi;
 import androidx.media3.exoplayer.DefaultRenderersFactory;
 import androidx.media3.exoplayer.ExoPlaybackException;
@@ -24,7 +24,8 @@ import java.util.ArrayList;
  * when the clock reaches its declared duration: audio that ends sooner (a duration the file overstates, data cut short)
  * leaves the player playing silence with a moving clock, and a seek into that stretch has nothing to play either.
  * The service loads such a chapter again, or finishes it ({@link #endedEarly}, {@link #shouldRecover}).
- * Its audio sink plays the left/right balance ({@link BalanceAudioProcessor}).
+ * Its audio sink plays skip silence ({@link SkipSilenceProcessor}) and the left/right balance
+ * ({@link BalanceAudioProcessor}).
  */
 @OptIn(markerClass = UnstableApi.class)
 final class EndAwareRenderersFactory extends DefaultRenderersFactory {
@@ -87,11 +88,33 @@ final class EndAwareRenderersFactory extends DefaultRenderersFactory {
     @Override
     protected AudioSink buildAudioSink(@NonNull Context context, boolean enableFloatOutput,
             boolean enableAudioOutputPlaybackParameters) {
-        //the default sink, with the balance ahead of Media3's own processors (speed)
+        //the default sink: skip silence, then the balance, ahead of Media3's own processors (speed); the player's
+        //skip silence switch drives ours, Media3's own skipper stays off
+        SkipSilenceProcessor skipper = new SkipSilenceProcessor();
         return new DefaultAudioSink.Builder(context)
                 .setEnableFloatOutput(enableFloatOutput)
                 .setEnableAudioOutputPlaybackParameters(enableAudioOutputPlaybackParameters)
-                .setAudioProcessors(new AudioProcessor[]{new BalanceAudioProcessor()})
+                .setAudioProcessorChain(new DefaultAudioSink.DefaultAudioProcessorChain(
+                        skipper, new BalanceAudioProcessor()) {
+                    @NonNull
+                    @Override
+                    public PlaybackParameters applyPlaybackParameters(@NonNull PlaybackParameters parameters) {
+                        PlaybackParameters applied = super.applyPlaybackParameters(parameters);
+                        skipper.setSpeed(applied.speed);
+                        return applied;
+                    }
+
+                    @Override
+                    public boolean applySkipSilenceEnabled(boolean enabled) {
+                        skipper.setEnabled(enabled);
+                        return enabled;
+                    }
+
+                    @Override
+                    public long getSkippedOutputFrameCount() {
+                        return skipper.skippedFrames();
+                    }
+                })
                 .build();
     }
 

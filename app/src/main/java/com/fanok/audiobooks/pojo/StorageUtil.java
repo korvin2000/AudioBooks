@@ -176,5 +176,6 @@ public class StorageUtil {
         //the sink's own sound plays what was loaded at once, with the equalizer off too: what the dialog shows is heard
         BalanceAudioProcessor.setBalance(settings.balance);
         BalanceAudioProcessor.setNightSound(settings.nightSound);
+        Settings.applyBass(settings.bassStrength);
     }
 }

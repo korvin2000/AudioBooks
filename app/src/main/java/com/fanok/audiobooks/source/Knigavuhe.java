@@ -19,6 +19,7 @@ import androidx.annotation.Nullable;
 import com.fanok.audiobooks.Consts;
 import com.fanok.audiobooks.R;
 import com.fanok.audiobooks.Url;
+import com.fanok.audiobooks.model.BookPages;
 import com.fanok.audiobooks.model.ComentsModel;
 import com.fanok.audiobooks.model.OtherSourceModel;
 import com.fanok.audiobooks.pojo.AudioPOJO;
@@ -213,7 +214,7 @@ public final class Knigavuhe implements SourceParser {
 
     @Override
     public ArrayList<ComentsPOJO> comments(String bookUrl, BooleanSupplier cancelled) throws Exception {
-        ComentsModel.Parsed parsed = parseComments(fetch(bookUrl));
+        ComentsModel.Parsed parsed = parseComments(BookPages.get(bookUrl, this::fetch)); // the page this opening shares
         if (parsed.skipped > 0) {
             Log.w(TAG, "skipped " + parsed.skipped + " malformed comments on " + bookUrl);
         }
@@ -235,7 +236,7 @@ public final class Knigavuhe implements SourceParser {
     @Override
     public ArrayList<OtherArtistPOJO> otherReaders(String bookUrl, String title, String author, String reader)
             throws IOException {
-        return parseOtherReaders(fetch(bookUrl));
+        return parseOtherReaders(BookPages.get(bookUrl, this::fetch));
     }
 
     /** Title and author. */
@@ -272,7 +273,7 @@ public final class Knigavuhe implements SourceParser {
                     pageAutorUrl = Url.SERVER + a.attr("href");
                 }
             } else if (pageTitle.text().contains("Все авторы")) {
-                pageAutorUrl = url;
+                pageAutorUrl = url.replaceFirst("(?<=/)\\d+/$", ""); // without the page number pageUrl added
                 Element h1 = pageTitle.selectFirst("h1");
                 pageAutor = h1 == null ? "" : h1.text();
             }
@@ -603,7 +604,7 @@ public final class Knigavuhe implements SourceParser {
 
         for (int i = 0; i < artistElements.size(); i++) {
             Element element = artistElements.get(i);
-            if (element.text().contains("читает")) {
+            if (element.text().contains("читает") || element.text().contains("читают")) {
                 Elements aTag = element.getElementsByTag("a");
                 if (!aTag.isEmpty()) {
                     bookPOJO.setArtist(aTag.first().text());
@@ -631,7 +632,7 @@ public final class Knigavuhe implements SourceParser {
             if (!aTag.isEmpty()) {
                 Element a = aTag.first();
                 bookPOJO.setGenre(a.text());
-                bookPOJO.setUrlGenre(absUrl(a, "href", ""));
+                bookPOJO.setUrlGenre(absUrl(a, "href", "<page>/"));
             }
         }
 

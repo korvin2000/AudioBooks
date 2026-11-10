@@ -5,28 +5,21 @@ import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
 import com.fanok.audiobooks.fragment.SourcesDialogFragment.Rows;
-import com.fanok.audiobooks.net.FakePrefs;
 import com.fanok.audiobooks.search.Provider;
 import com.fanok.audiobooks.search.Sources;
 
-import org.junit.After;
 import org.junit.Test;
 
 import java.util.Arrays;
 import java.util.List;
 
-/** The rows of the sources dialog: moves on one side of the divider, across it, and at its limits. */
+/** The rows of the sources dialog: moves on one side of the divider, across it, and at its ends. */
 public class SourcesDialogFragmentTest {
 
     private static final Provider A = Provider.values()[0];
     private static final Provider B = Provider.values()[1];
     private static final Provider C = Provider.values()[2];
     private static final Provider D = Provider.values()[3];
-
-    @After
-    public void restoreDefaults() {
-        Sources.load(new FakePrefs()); // the limit is static
-    }
 
     /** {@code [A, B, | C, D]}: two active, two inactive. */
     private static List<Object> rows() {
@@ -42,25 +35,15 @@ public class SourcesDialogFragmentTest {
     }
 
     @Test
-    public void limitIsTheSmallerOfMaxActiveAndTotal() {
-        assertEquals(5, Rows.limit(5));
-        assertEquals(Sources.maxActive(), Rows.limit(Sources.maxActive() + 7));
-    }
-
-    @Test
-    public void aHigherLimitLetsMoreSourcesCrossTheDivider() {
-        FakePrefs prefs = new FakePrefs();
-        prefs.edit().putString(Sources.PREF_MAX, "20").apply();
-        Sources.load(prefs);
+    public void everySourceCanCrossTheDivider() {
         Provider[] all = Provider.values();
-        assertEquals(20, Rows.limit(all.length));
         List<Object> rows = Rows.of(Arrays.asList(all), Sources.DEFAULT_MAX_ACTIVE);
-        for (int active = Sources.DEFAULT_MAX_ACTIVE; active < 20; active++) {
+        for (int active = Sources.DEFAULT_MAX_ACTIVE; active < all.length; active++) {
             assertTrue("source " + (active + 1), Rows.canMove(rows, active + 1, active));
             Rows.move(rows, active + 1, active);
         }
-        assertEquals(20, Rows.divider(rows));
-        assertFalse("not a 21st", Rows.canMove(rows, 21, 20));
+        assertEquals(all.length, Rows.divider(rows));
+        assertEquals(Arrays.asList(all), Rows.active(rows));
     }
 
     @Test
@@ -113,13 +96,12 @@ public class SourcesDialogFragmentTest {
     }
 
     @Test
-    public void noMoreThanTheLimitBecomesActive() {
+    public void theLastInactiveSourceCanBecomeActive() {
         Provider[] all = Provider.values();
         List<Object> rows = Rows.of(Arrays.asList(all), all.length - 1);
         int divider = Rows.divider(rows);
-        boolean room = all.length <= Sources.maxActive();
-        assertEquals(room, Rows.canMove(rows, divider + 1, divider));
-        assertEquals(room, Rows.canMove(rows, divider + 1, 0));
+        assertTrue(Rows.canMove(rows, divider + 1, divider));
+        assertTrue(Rows.canMove(rows, divider + 1, 0));
     }
 
     @Test

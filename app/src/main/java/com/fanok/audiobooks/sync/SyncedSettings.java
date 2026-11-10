@@ -14,6 +14,7 @@ import com.fanok.audiobooks.presenter.BookPresenter;
 import com.fanok.audiobooks.search.GenrePicks;
 import com.fanok.audiobooks.search.Provider;
 import com.fanok.audiobooks.search.Sources;
+import com.fanok.audiobooks.service.SkipSilenceProcessor;
 import com.google.gson.Gson;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -34,7 +35,7 @@ final class SyncedSettings {
 
     /** Default preferences holding text. */
     private static final List<String> TEXTS = Arrays.asList("pref_theme", "books_adapter_layout_pref", "seek_step",
-            "pref_sort_favorite", "pref_start_screen", Sources.PREF, Sources.PREF_MAX, Sources.SELECTED,
+            "pref_sort_favorite", "pref_start_screen", Sources.PREF, Sources.SELECTED,
             GenrePicks.PREF_FAVORITES);
     /** The list settings among them, with the array of their values. */
     private static final Map<String, Integer> LISTS = new HashMap<>();
@@ -44,7 +45,7 @@ final class SyncedSettings {
             "toolbar_speed", "toolbar_download", "toolbar_sleep_timer", "toolbar_car_mode", "toolbar_equalizer", "toolbar_settings",
             "toolbar_open_site", "toolbar_main_screen", "toolbar_refresh", "autoPlayPref", "reproductionPref",
             "seekButtonsPref", "seekToPausePref", "rewind_back", "safeNavigationPref", "scrollToSelectedPref",
-            "search_pref", "pref_play_last_book", "flip_pause"));
+            "search_pref", "pref_play_last_book", "flip_pause", SkipSilenceProcessor.PREF));
     /** Settings of the {@link StorageUtil#STORAGE} file: a float and a JSON text. */
     private static final String SPEED = "speed", EQUALIZER = "equalizer";
 
@@ -75,6 +76,9 @@ final class SyncedSettings {
             if (values.get(key) instanceof Boolean) {
                 out.put(key, values.get(key).toString());
             }
+        }
+        if (values.get(SkipSilenceProcessor.PREF_LEVEL) instanceof Integer) { // the one whole number
+            out.put(SkipSilenceProcessor.PREF_LEVEL, values.get(SkipSilenceProcessor.PREF_LEVEL).toString());
         }
         values = storage(app).getAll();
         if (values.get(SPEED) instanceof Float) {
@@ -110,6 +114,8 @@ final class SyncedSettings {
             }
             if (FLAGS.contains(key)) {
                 mainEdit.putBoolean(key, Boolean.parseBoolean(value));
+            } else if (key.equals(SkipSilenceProcessor.PREF_LEVEL)) {
+                mainEdit.putInt(key, Integer.parseInt(value));
             } else if (key.equals(SPEED)) {
                 storageEdit.putFloat(key, speed(value));
             } else if (key.equals(EQUALIZER)) {
@@ -125,8 +131,7 @@ final class SyncedSettings {
         mainEdit.apply();
         storageEdit.apply();
         new Handler(Looper.getMainLooper()).post(() -> {
-            if (written.contains(Sources.PREF) || written.contains(Sources.PREF_MAX)
-                    || written.contains(Sources.SELECTED)) {
+            if (written.contains(Sources.PREF) || written.contains(Sources.SELECTED)) {
                 Sources.load(main); // may change the selection: it must stay an active source
                 String selected = main.getString(Sources.SELECTED, null);
                 if (selected != null) {
@@ -156,15 +161,15 @@ final class SyncedSettings {
                 return speed(value) > 0;
             case EQUALIZER:
                 return equalizer(value);
-            case Sources.PREF:
-                return true; // Sources.load keeps the known sources of any text
-            case Sources.PREF_MAX:
+            case SkipSilenceProcessor.PREF_LEVEL:
                 try {
-                    int max = Integer.parseInt(value);
-                    return max >= Sources.MIN_LIMIT && max <= Sources.MAX_LIMIT;
+                    int level = Integer.parseInt(value);
+                    return level >= SkipSilenceProcessor.MIN_LEVEL && level <= SkipSilenceProcessor.MAX_LEVEL;
                 } catch (NumberFormatException e) {
                     return false;
                 }
+            case Sources.PREF:
+                return true; // Sources.load keeps the known sources of any text
             case Sources.SELECTED:
                 for (Provider provider : Provider.values()) {
                     if (provider.prefValue.equals(value)) {

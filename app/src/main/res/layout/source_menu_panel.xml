@@ -1,0 +1,86 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The globe panel (fragment.SourceMenu) inside its rounded surface: the active sources in one or two columns
+     (source_menu_row), the scrollbar always in view; under them, fixed, the card of the listing's site. The rows'
+     pills sit 8 dp from the top and the bottom, as the footer's. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:paddingBottom="6dp"
+    tools:viewBindingIgnore="true">
+
+    <GridView
+        android:id="@+id/source_menu_list"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:cacheColorHint="@android:color/transparent"
+        android:choiceMode="singleChoice"
+        android:fadeScrollbars="false"
+        android:listSelector="@android:color/transparent"
+        android:numColumns="1"
+        android:paddingTop="6dp"
+        android:paddingBottom="4dp"
+        android:scrollbarSize="6dp"
+        android:scrollbarStyle="insideOverlay"
+        android:scrollbarThumbVertical="@drawable/scrollbar_thumb_sources"
+        android:scrollbars="vertical"
+        android:stretchMode="columnWidth"
+        tools:listitem="@layout/source_menu_row" />
+
+    <View
+        android:id="@+id/source_menu_divider"
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:layout_marginStart="14dp"
+        android:layout_marginEnd="14dp"
+        android:alpha="0.14"
+        android:background="?attr/colorPrimaryText" />
+
+    <LinearLayout
+        android:id="@+id/source_menu_about"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="4dp"
+        android:background="@drawable/source_menu_row"
+        android:clickable="true"
+        android:focusable="true"
+        android:gravity="center_vertical"
+        android:minHeight="44dp"
+        android:orientation="horizontal"
+        android:paddingStart="17dp"
+        android:paddingTop="6dp"
+        android:paddingEnd="18dp"
+        android:paddingBottom="6dp">
+
+        <ImageView
+            android:layout_width="20dp"
+            android:layout_height="20dp"
+            android:importantForAccessibility="no"
+            app:srcCompat="@drawable/ic_source_info"
+            app:tint="@color/sources_link" />
+
+        <TextView
+            android:id="@+id/source_menu_about_text"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="13dp"
+            android:layout_weight="1"
+            android:ellipsize="end"
+            android:fontFamily="sans-serif-medium"
+            android:maxLines="2"
+            android:textColor="@color/sources_link"
+            android:textSize="14sp"
+            tools:text="Об источнике «Akniga»" />
+
+        <ImageView
+            android:layout_width="16dp"
+            android:layout_height="16dp"
+            android:layout_marginStart="8dp"
+            android:importantForAccessibility="no"
+            app:srcCompat="@drawable/ic_source_chevron"
+            app:tint="@color/sources_link" />
+    </LinearLayout>
+</LinearLayout>

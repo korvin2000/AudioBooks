@@ -1,5 +1,6 @@
 package com.fanok.audiobooks.activity;
 
+import com.fanok.audiobooks.FontScale;
 import android.app.Activity;
 import android.content.Context;
 import android.content.Intent;
@@ -29,6 +30,12 @@ import com.r0adkll.slidr.Slidr;
 import org.jetbrains.annotations.NotNull;
 
 public class ActivityImport extends MvpAppCompatActivity implements ActivityImportInterface {
+
+    /** The screen at the chosen font scale (FontScale). */
+    @Override
+    protected void attachBaseContext(Context newBase) {
+        super.attachBaseContext(FontScale.wrap(newBase));
+    }
 
     private static final String IMPORT = "IMPORT_SITE";
 

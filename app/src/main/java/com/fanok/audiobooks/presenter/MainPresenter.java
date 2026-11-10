@@ -40,12 +40,20 @@ public class MainPresenter extends MvpPresenter<MainView> implements
     }
 
     /** Opens a drawer section of the selected source at {@code url}; a source without the section says so. */
-    private void openSection(String url, int title, int modelId, String tag) {
+    private boolean openSection(String url, int title, int modelId, String tag) {
         if (url == null) {
             getViewState().showToast(R.string.section_not_available);
-            return;
+            return false;
         }
         getViewState().showFragment(BooksFragment.newInstance(url, title, modelId), tag);
+        return true;
+    }
+
+    /** A section the app starts on: a source without it (the start screen, a source switch) starts on its books. */
+    private void startSection(Provider source, String url, int title, int modelId, String tag) {
+        if (source != null && !openSection(url, title, modelId, tag)) {
+            openAudiobooks(source);
+        }
     }
 
     private void openAudiobooks(Provider source) {
@@ -164,17 +172,14 @@ public class MainPresenter extends MvpPresenter<MainView> implements
                 openAudiobooks(source);
             }
         } else if (fragmentID == Consts.FRAGMENT_GENRE) {
-            if (source != null) {
-                openSection(source.sections, R.string.menu_genre, Consts.MODEL_GENRE, "genre");
-            }
+            startSection(source, source == null ? null : source.sections, R.string.menu_genre, Consts.MODEL_GENRE,
+                    "genre");
         } else if (fragmentID == Consts.FRAGMENT_AUTOR) {
-            if (source != null) {
-                openSection(source.authors, R.string.menu_autor, Consts.MODEL_AUTOR, "autor");
-            }
+            startSection(source, source == null ? null : source.authors, R.string.menu_autor, Consts.MODEL_AUTOR,
+                    "autor");
         } else if (fragmentID == Consts.FRAGMENT_ARTIST) {
-            if (source != null) {
-                openSection(source.performers, R.string.menu_artist, Consts.MODEL_ARTIST, "artist");
-            }
+            startSection(source, source == null ? null : source.performers, R.string.menu_artist,
+                    Consts.MODEL_ARTIST, "artist");
         } else if (fragmentID == Consts.FRAGMENT_FAVORITE) {
             getViewState().showFragment(FavoritesSwitcher.remembered(mContext), FavoritesSwitcher.TAG);
 

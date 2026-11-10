@@ -5,6 +5,7 @@ import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
 
 import com.fanok.audiobooks.model.OtherSourceModel;
 import com.fanok.audiobooks.pojo.AudioPOJO;
@@ -271,6 +272,30 @@ public class AudioKnigaBizTest {
         assertEquals("Ю Рё Хан", first.getName());
         assertEquals(S + "/avtor-28906-yu-re-han?page=", first.getUrl());
         assertEquals("1 книг", first.getDescription());
+    }
+
+    @Test
+    public void aFailedRefreshKeepsTheAuthorsWalkInPlace() throws IOException {
+        Document index = page("authors.html", S + "/authors");
+        SourceParser.PeopleCursor cursor = new SourceParser.PeopleCursor();
+        for (int pageNo = 1; pageNo <= 3; pageNo++) {
+            site.people(index, pageNo, cursor, url -> page("authors-let-yu.html", url));
+        }
+        int skipped = cursor.skipped;
+        try {
+            site.people(index, 1, cursor, url -> {
+                throw new IOException("offline");
+            });
+            fail("the refresh fails");
+        } catch (IOException expected) {
+            assertEquals("the list keeps its place", skipped, cursor.skipped);
+        }
+        List<String> fetched = new ArrayList<>();
+        site.people(index, 4, cursor, url -> {
+            fetched.add(url);
+            return page("authors-let-yu.html", url);
+        });
+        assertEquals(Arrays.asList(S + "/authors/let-%D0%93"), fetched);
     }
 
     // ---------------------------------------------------------------- book page

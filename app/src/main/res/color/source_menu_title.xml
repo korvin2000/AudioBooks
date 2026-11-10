@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- A source's name in the globe panel (fragment.SourceMenu): the accent on the catalog's source (activated). -->
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:color="@color/sources_accent" android:state_activated="true" />
+    <item android:color="?attr/colorPrimaryText" />
+</selector>

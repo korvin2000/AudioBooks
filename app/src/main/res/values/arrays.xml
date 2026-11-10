@@ -98,6 +98,15 @@
         <item>@string/excellent</item>
     </string-array>
 
+    <!-- SkipSilenceProcessor levels 1…5 -->
+    <string-array name="skip_silence_levels">
+        <item>Минимальная</item>
+        <item>Низкая</item>
+        <item>Средняя</item>
+        <item>Высокая</item>
+        <item>Максимальная</item>
+    </string-array>
+
     <string-array name="seek_step_titles">
         <item>10 сек</item>
         <item>20 сек</item>

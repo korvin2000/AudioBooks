@@ -166,6 +166,7 @@ public class BookDescriptionModelTest {
         String akniga = BOOK_PAGES[3][1];
         DescriptionPOJO d = BookDescriptionModel.parseDescription(
                 BookPageFixtures.load(BOOK_PAGES[3][0], akniga), akniga);
+        assertEquals("the h1 'Грэхем Йан – Монумент' uses an en dash", "Монумент", d.getTitle());
         assertEquals("https://akniga.org/author/Грэхем Йан/page<page>/", d.getAutorUrl());
         assertEquals("https://akniga.org/performer/Ибраев Шад/page<page>/", d.getArtistUrl());
         // the listing is chosen by host: a URL this app cannot route opens an empty page

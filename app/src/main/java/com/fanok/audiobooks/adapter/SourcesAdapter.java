@@ -198,15 +198,13 @@ public class SourcesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder
         holder.meter.setVisibility(header.active ? View.VISIBLE : View.GONE);
         if (!header.active) {
             holder.count.setText(String.valueOf(header.count));
-            holder.limit.setVisibility(View.GONE);
             return;
         }
-        int limit = Math.min(Sources.maxActive(), Provider.values().length);
-        holder.count.setText(context.getString(R.string.sources_section_count, header.count, limit));
-        holder.limit.setVisibility(header.count >= limit ? View.VISIBLE : View.GONE);
+        int total = Provider.values().length;
+        holder.count.setText(context.getString(R.string.sources_section_count, header.count, total));
         int accent = ContextCompat.getColor(context, R.color.sources_accent);
         int track = ContextCompat.getColor(context, R.color.sources_track);
-        int[] cells = new int[limit];
+        int[] cells = new int[total];
         for (int i = 0; i < cells.length; i++) {
             cells[i] = i < header.count ? accent : track;
         }
@@ -295,7 +293,6 @@ public class SourcesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder
     static final class HeaderHolder extends RecyclerView.ViewHolder {
         final TextView label;
         final TextView count;
-        final TextView limit;
         final TextView note;
         final SourceSegmentsView meter;
 
@@ -303,7 +300,6 @@ public class SourcesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder
             super(itemView);
             label = itemView.findViewById(R.id.sourcesHeaderLabel);
             count = itemView.findViewById(R.id.sourcesHeaderCount);
-            limit = itemView.findViewById(R.id.sourcesHeaderLimit);
             note = itemView.findViewById(R.id.sourcesHeaderNote);
             meter = itemView.findViewById(R.id.sourcesHeaderMeter);
         }

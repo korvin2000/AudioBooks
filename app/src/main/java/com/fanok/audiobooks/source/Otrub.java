@@ -7,6 +7,7 @@ import static com.fanok.audiobooks.source.Html.each;
 import static com.fanok.audiobooks.source.Html.lastPage;
 import static com.fanok.audiobooks.source.Html.text;
 
+import com.fanok.audiobooks.BookRemovedException;
 import com.fanok.audiobooks.R;
 import com.fanok.audiobooks.Url;
 import com.fanok.audiobooks.model.OtherSourceModel;
@@ -393,14 +394,21 @@ public final class Otrub implements SourceParser {
         return bookPOJO;
     }
 
-    /** An XSPlayer playlist, else an inline Playerjs. */
+    /**
+     * An XSPlayer playlist, else an inline Playerjs. A LitRes trial (a {@code litres.ru} chapter) is a
+     * {@link BookRemovedException}.
+     */
     public static ArrayList<AudioPOJO> parseTracks(Document doc, String bookUrl) {
         String bookName = text(doc.selectFirst("h1"));
         String player = Players.findPlayerScript(doc, "XSPlayer(", '{');
         if (player == null) {
             return Players.inlinePlayerjs(doc, bookUrl, bookName);
         }
-        return Players.xsPlaylist(Json.object(player), bookUrl, bookName, "otrub player");
+        ArrayList<AudioPOJO> tracks = Players.xsPlaylist(Json.object(player), bookUrl, bookName, "otrub player");
+        if (tracks.get(0).getUrl().contains("litres.ru/")) {
+            throw new BookRemovedException(bookUrl);
+        }
+        return tracks;
     }
 
     /** The books of a {@code /series/<slug>.html} page, in the site's order. */

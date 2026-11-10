@@ -4,6 +4,7 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
 import android.view.KeyEvent;
@@ -96,6 +97,18 @@ public class ConstsTest {
         assertEquals(BookPresenter.Broadcast_PLAY_NEXT, Consts.mediaKeyBroadcast(KeyEvent.KEYCODE_MEDIA_NEXT));
         assertEquals(BookPresenter.Broadcast_PLAY_PREVIOUS,
                 Consts.mediaKeyBroadcast(KeyEvent.KEYCODE_MEDIA_PREVIOUS));
+        // a TV remote: FAST_FORWARD and REWIND seek, they never change the chapter
+        assertEquals(BookPresenter.Broadcast_SEEK_NEXT_30,
+                Consts.mediaKeyBroadcast(KeyEvent.KEYCODE_MEDIA_FAST_FORWARD));
+        assertEquals(BookPresenter.Broadcast_SEEK_PREVIOUS_10,
+                Consts.mediaKeyBroadcast(KeyEvent.KEYCODE_MEDIA_REWIND));
         assertNull(Consts.mediaKeyBroadcast(KeyEvent.KEYCODE_A));
+    }
+
+    /** An unknown network state (no context) counts as online: the offline branches never block a working network. */
+    @Test
+    public void networkAvailabilityFailsOpen() {
+        assertTrue(Consts.isNetworkAvailable(null));
+        assertFalse(Consts.isOffline(null));
     }
 }

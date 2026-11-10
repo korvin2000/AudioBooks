@@ -68,6 +68,22 @@ public class SnapshotTest {
     }
 
     @Test
+    public void conflicts_aBookOnlyOpenedLosesToThePlaceReachedElsewhere() {
+        Snapshot mine = new Snapshot(), theirs = new Snapshot();
+        mine.pos.put(A, new Snapshot.Pos(0, 0, 99, null)); // a new device opened it a minute ago
+        theirs.pos.put(A, new Snapshot.Pos(4, 50, 30, "Глава 4"));
+        assertEquals(4, Snapshot.merge(new Snapshot(), mine, theirs).pos.get(A).c);
+        assertEquals(4, Snapshot.merge(new Snapshot(), theirs, mine).pos.get(A).c);
+
+        Snapshot base = new Snapshot();
+        base.pos.put(A, new Snapshot.Pos(4, 50, 30, null));
+        Snapshot restarted = new Snapshot();
+        restarted.pos.put(A, new Snapshot.Pos(0, 0, 99, null));
+        assertTrue("a start changed on one side only still spreads",
+                Snapshot.merge(base, restarted, base).pos.get(A).start());
+    }
+
+    @Test
     public void people_areTheSameWhateverTheirPages() {
         Snapshot base = new Snapshot(), mine = new Snapshot(), theirs = new Snapshot();
         String key = Snapshot.person(0, "кинг|с"), gone = Snapshot.person(1, "чтец|ч");

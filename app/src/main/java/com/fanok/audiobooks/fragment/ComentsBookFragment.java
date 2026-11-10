@@ -11,6 +11,7 @@ import androidx.annotation.Nullable;
 import androidx.core.view.ViewCompat;
 import androidx.recyclerview.widget.DividerItemDecoration;
 import androidx.recyclerview.widget.LinearLayoutManager;
+import androidx.recyclerview.widget.RecyclerView;
 import com.arellomobile.mvp.MvpAppCompatFragment;
 import com.arellomobile.mvp.presenter.InjectPresenter;
 import com.arellomobile.mvp.presenter.ProvidePresenter;
@@ -119,12 +120,15 @@ public class ComentsBookFragment extends MvpAppCompatFragment implements Coments
 
     @Override
     public void setPlaceholder(int id) {
-        binding.placeholder.setText(getString(id));
+        setPlaceholder(getString(id));
     }
 
     @Override
     public void setPlaceholder(@NotNull String text) {
         binding.placeholder.setText(text);
+        // shown with an empty list: a failed load sets only this text and never calls showComents()
+        RecyclerView.Adapter<?> adapter = binding.list.getAdapter();
+        binding.placeholder.setVisibility(adapter == null || adapter.getItemCount() == 0 ? View.VISIBLE : View.GONE);
     }
 
     @Override

@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- A source in the globe panel (fragment.SourceMenu): its place in the user's order, its name, the shield when it
+     goes through the proxy. The list sets the states: activated is the catalog's source (the place on an accent badge,
+     the name in the accent), selected the D-pad's row. The place's slot is in sp: the names stay aligned at any text
+     size; a row grows with its text. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:background="@drawable/source_menu_row"
+    android:gravity="center_vertical"
+    android:minHeight="42dp"
+    android:orientation="horizontal"
+    android:paddingStart="14dp"
+    android:paddingTop="4dp"
+    android:paddingEnd="18dp"
+    android:paddingBottom="4dp"
+    tools:viewBindingIgnore="true">
+
+    <TextView
+        android:id="@+id/source_menu_number"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:background="@drawable/source_menu_badge"
+        android:fontFeatureSettings="tnum"
+        android:gravity="center"
+        android:importantForAccessibility="no"
+        android:includeFontPadding="false"
+        android:maxLines="1"
+        android:minWidth="26sp"
+        android:minHeight="20sp"
+        android:paddingStart="4dp"
+        android:paddingEnd="4dp"
+        android:textColor="@color/source_menu_number"
+        android:textSize="12sp"
+        tools:ignore="SpUsage"
+        tools:text="12" />
+
+    <TextView
+        android:id="@+id/source_menu_title"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="10dp"
+        android:layout_weight="1"
+        android:ellipsize="end"
+        android:importantForAccessibility="no"
+        android:maxLines="1"
+        android:textColor="@color/source_menu_title"
+        android:textSize="15sp"
+        tools:text="Книга в ухе" />
+
+    <ImageView
+        android:id="@+id/source_menu_proxy"
+        android:layout_width="16dp"
+        android:layout_height="16dp"
+        android:layout_marginStart="8dp"
+        android:importantForAccessibility="no"
+        android:visibility="gone"
+        app:srcCompat="@drawable/ic_shield_check"
+        app:tint="@color/sources_accent"
+        tools:visibility="visible" />
+</LinearLayout>

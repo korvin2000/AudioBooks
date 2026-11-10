@@ -11,6 +11,7 @@ import androidx.annotation.Nullable;
 
 import com.fanok.audiobooks.BookRemovedException;
 import com.fanok.audiobooks.Url;
+import com.fanok.audiobooks.model.BookPages;
 import com.fanok.audiobooks.model.OtherSourceModel;
 import com.fanok.audiobooks.net.SiteHttp;
 import com.fanok.audiobooks.pojo.AudioPOJO;
@@ -269,7 +270,7 @@ public final class AudioknigaOnline implements SourceParser {
     /** Page 1 is on the book page, the others come from the site's comments XHR; oldest first. */
     @Override
     public ArrayList<ComentsPOJO> comments(String bookUrl, BooleanSupplier cancelled) throws Exception {
-        Document page = fetch(bookUrl);
+        Document page = BookPages.get(bookUrl, this::fetch);
         ArrayList<ComentsPOJO> comments = parseComments(page);
         int pages = commentPages(page);
         for (int no = 2; no <= pages && !cancelled.getAsBoolean(); no++) {

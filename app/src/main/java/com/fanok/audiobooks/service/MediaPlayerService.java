@@ -43,7 +43,6 @@ import android.hardware.SensorEventListener;
 import android.hardware.SensorManager;
 import android.media.AudioManager;
 import android.media.ToneGenerator;
-import android.media.audiofx.BassBoost;
 import android.media.audiofx.Equalizer;
 import android.media.audiofx.PresetReverb;
 import android.net.ConnectivityManager;
@@ -85,6 +84,7 @@ import androidx.media3.common.MediaItem.ClippingConfiguration;
 import androidx.media3.common.PlaybackException;
 import androidx.media3.common.PlaybackParameters;
 import androidx.media3.common.Player;
+import androidx.media3.common.Timeline;
 import androidx.media3.common.util.UnstableApi;
 import androidx.media3.datasource.DataSource;
 import androidx.media3.datasource.HttpDataSource;
@@ -190,6 +190,8 @@ public class MediaPlayerService extends MediaBrowserServiceCompat {
     public static final int countAudioWereShowingRatingPopUp = 15;
     private static final long PROGRESS_INTERVAL_MS = 500;
     private static final long CHECKPOINT_INTERVAL_MS = 10_000;
+    /** How far the session's position may run from the player's before it is sent again. */
+    private static final long SESSION_DRIFT_MS = 1_000;
     /** How long the retry wake lock outlasts the delay of the retry it keeps on time. */
     private static final long RETRY_WAKE_MARGIN_MS = 20_000;
     /** The retry wake lock while a chapter list refresh is fetched (a few page loads, 10 s timeout each). */
@@ -385,6 +387,8 @@ public class MediaPlayerService extends MediaBrowserServiceCompat {
     /** The place of another writer that Play last reloaded the book at. */
     @Nullable
     private Checkpoint adopted;
+    /** The book was loaded paused and no command has moved or played it since. */
+    private boolean untouched;
     private int shownIcon;
     /** What the session was last given, handed to the {@link SessionListener} as one sample. */
     @Nullable
@@ -399,7 +403,6 @@ public class MediaPlayerService extends MediaBrowserServiceCompat {
 
     private boolean mEqualizerEnabled = true;
     private Equalizer mEqualizer;
-    private BassBoost bassBoost;
     private PresetReverb presetReverb;
 
     /** Starts (or reaches the running) service and makes it play {@code request}. */
@@ -557,6 +560,7 @@ public class MediaPlayerService extends MediaBrowserServiceCompat {
                 return;
             }
             sendProgress();
+            syncSessionPosition();
             if (SystemClock.elapsedRealtime() - lastCheckpointAt >= CHECKPOINT_INTERVAL_MS) {
                 checkpointNow(false);
             }
@@ -569,13 +573,15 @@ public class MediaPlayerService extends MediaBrowserServiceCompat {
     private final Runnable focusLossWatchdog = this::onLongFocusLoss;
     /**
      * A new seek step redraws the notification's and the session's seek buttons; the face-down pause switched on or
-     * off takes effect at once (held: prefs keep it weakly).
+     * off takes effect at once (held: prefs keep it weakly), so does skip silence.
      */
     private final SharedPreferences.OnSharedPreferenceChangeListener prefListener = (prefs, key) -> {
         if (SeekStep.PREF.equals(key)) {
             publishState();
         } else if (PREF_FLIP_PAUSE.equals(key)) {
             updateFlip();
+        } else if (SkipSilenceProcessor.PREF.equals(key) || SkipSilenceProcessor.PREF_LEVEL.equals(key)) {
+            applySkipSilence();
         }
     };
 
@@ -753,6 +759,7 @@ public class MediaPlayerService extends MediaBrowserServiceCompat {
     public void play() {
         resumeOnSkip = false;
         wantPlaying = true;
+        untouched = false;
         if (player == null) {
             return;
         }
@@ -855,12 +862,18 @@ public class MediaPlayerService extends MediaBrowserServiceCompat {
         if (player == null || !hasBook()) {
             return;
         }
+        untouched = false;
         long target = Math.max(0, positionMs);
         if (resolving || player.getMediaItemCount() == 0) {
             startPositionMs = target;
         } else {
-            if (!player.getCurrentTimeline().isEmpty() && !player.isCurrentMediaItemSeekable()) {
-                return;
+            Timeline timeline = player.getCurrentTimeline();
+            if (!timeline.isEmpty()) {
+                Timeline.Window window = timeline.getWindow(player.getCurrentMediaItemIndex(), new Timeline.Window());
+                //a chapter still preparing shows a placeholder, never seekable: the player keeps such a seek
+                if (!window.isPlaceholder && !window.isSeekable) {
+                    return;
+                }
             }
             long duration = player.getDuration();
             if (duration != C.TIME_UNSET) {
@@ -904,6 +917,7 @@ public class MediaPlayerService extends MediaBrowserServiceCompat {
     /** The next chapter with the current intent; skips a chapter that failed. */
     public void next() {
         if (player != null && hasBook() && chapterIndex < chapters.size() - 1) {
+            untouched = false;
             resumeAfterGiveUp();
             loadChapter(chapterIndex + 1, 0, true);
         }
@@ -923,6 +937,7 @@ public class MediaPlayerService extends MediaBrowserServiceCompat {
         if (player == null || !hasBook()) {
             return;
         }
+        untouched = false;
         if (chapterIndex > 0) {
             resumeAfterGiveUp();
             loadChapter(chapterIndex - 1, 0, true);
@@ -938,6 +953,7 @@ public class MediaPlayerService extends MediaBrowserServiceCompat {
         }
         resumeOnSkip = false;
         wantPlaying = play;
+        untouched = false;
         pausedAt = play ? -1 : 0;
         loadChapter(index, 0, true);
     }
@@ -1045,6 +1061,7 @@ public class MediaPlayerService extends MediaBrowserServiceCompat {
         }
         resumeOnSkip = false;
         wantPlaying = request.play;
+        untouched = !request.play;
         long position = request.positionMs;
         if (request.play) {
             position = rewoundAfterPause(position, 0);
@@ -1093,7 +1110,8 @@ public class MediaPlayerService extends MediaBrowserServiceCompat {
         player.stop();
         player.clearMediaItems();
         checkpointNow(false);
-        if (freshChapter) {
+        Checkpoint here = snapshot();
+        if (freshChapter && (here == null || !keepsStoredPlace(here))) {
             recordChapter(audio);
         }
         publishMetadata();
@@ -1699,9 +1717,21 @@ public class MediaPlayerService extends MediaBrowserServiceCompat {
         return resolving || player.getMediaItemCount() == 0 ? startPositionMs : player.getCurrentPosition();
     }
 
+    /**
+     * A book only loaded paused, elsewhere than it was left (its chapter has no offline copy): the stored place
+     * stays until a command plays or moves it.
+     */
+    private boolean keepsStoredPlace(@NonNull Checkpoint here) {
+        if (!untouched) {
+            return false;
+        }
+        Checkpoint stored = storage.loadCheckpoint(here.bookUrl);
+        return stored != null && !stored.equals(here);
+    }
+
     private void checkpointNow(boolean synchronous) {
         Checkpoint checkpoint = snapshot();
-        if (checkpoint == null || movedByOther(checkpoint) != null) {
+        if (checkpoint == null || movedByOther(checkpoint) != null || keepsStoredPlace(checkpoint)) {
             return;
         }
         //only audio actually heard makes the book the last played: not one loaded paused, nor a failed attempt
@@ -3111,7 +3141,34 @@ public class MediaPlayerService extends MediaBrowserServiceCompat {
                 .build();
         player.addListener(playerListener);
         player.setPlaybackParameters(new PlaybackParameters(currentSpeed()));
+        applySkipSilence();
         attachEffects();
+    }
+
+    /** Skip silence as set: its level, and on or off (the player's switch drives the sink's skipper). */
+    private void applySkipSilence() {
+        SkipSilenceProcessor.setLevel(mPreferences.getInt(SkipSilenceProcessor.PREF_LEVEL,
+                SkipSilenceProcessor.DEFAULT_LEVEL));
+        if (player != null) {
+            player.setSkipSilenceEnabled(mPreferences.getBoolean(SkipSilenceProcessor.PREF, false));
+        }
+    }
+
+    /**
+     * Skipped silence moves the position faster than the session's speed tells the lock screen, the notification and
+     * the car: their position is sent again once it is a second off, not on every skip.
+     */
+    private void syncSessionPosition() {
+        PlaybackStateCompat shown = shownState;
+        if (mediaSession == null || shown == null || shown.getState() != PlaybackStateCompat.STATE_PLAYING) {
+            return;
+        }
+        long elapsed = SystemClock.elapsedRealtime() - shown.getLastPositionUpdateTime();
+        long expected = shown.getPosition() + (long) (elapsed * shown.getPlaybackSpeed());
+        if (Math.abs(currentPositionMs() - expected) >= SESSION_DRIFT_MS) {
+            mediaSession.setPlaybackState(shownState = buildPlaybackState());
+            tellListener(); //the launcher widget extrapolates the same way
+        }
     }
 
     /** Effects belong to the audio session, which outlives chapter changes: attached once and on a new session. */
@@ -3141,15 +3198,6 @@ public class MediaPlayerService extends MediaBrowserServiceCompat {
             try {
                 mEqualizer = new Equalizer(0, audioSesionId);
 
-                bassBoost = new BassBoost(0, audioSesionId);
-                // at the knob's minimum the effect stays off instead of running at a low strength
-                bassBoost.setEnabled(Settings.isBassOn(Settings.equalizerModel.getBassStrength()));
-                BassBoost.Settings bassBoostSettingTemp = bassBoost.getProperties();
-                BassBoost.Settings bassBoostSetting = new BassBoost.Settings(
-                        bassBoostSettingTemp.toString());
-                bassBoostSetting.strength = Settings.equalizerModel.getBassStrength();
-                bassBoost.setProperties(bassBoostSetting);
-
                 presetReverb = new PresetReverb(0, audioSesionId);
                 presetReverb.setPreset(Settings.equalizerModel.getReverbPreset());
                 presetReverb.setEnabled(Settings.isReverbOn(Settings.equalizerModel.getReverbPreset()));
@@ -3167,11 +3215,6 @@ public class MediaPlayerService extends MediaBrowserServiceCompat {
         if (mEqualizer != null) {
             mEqualizer.release();
             mEqualizer = null;
-        }
-
-        if (bassBoost != null) {
-            bassBoost.release();
-            bassBoost = null;
         }
 
         if (presetReverb != null) {

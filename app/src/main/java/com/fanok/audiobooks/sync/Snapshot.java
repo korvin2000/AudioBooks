@@ -87,6 +87,11 @@ final class Snapshot {
             this.n = n;
         }
 
+        /** The very start of the book: where a book only opened, never played, stands. */
+        boolean start() {
+            return c == 0 && ms == 0;
+        }
+
         /** The same place, whenever and however titled: a place reached anew is no change. */
         @Override
         public boolean equals(Object o) {
@@ -115,9 +120,9 @@ final class Snapshot {
     /**
      * {@code mine} and {@code theirs} merged against {@code base}, the state both last agreed on (empty when unknown:
      * the merge is then a union). A key changed on one side only takes that change, a deletion included; changed on
-     * both, an edit beats a deletion, a later opening or place beats an earlier one, and the cloud's setting wins
-     * (a new device's defaults never override the user's settings). Order and book metadata come from {@code mine}
-     * first; {@link #seq} is left to the caller.
+     * both, an edit beats a deletion, a later opening or place beats an earlier one (a place past the book's start
+     * beats its start), and the cloud's setting wins (a new device's defaults never override the user's settings).
+     * Order and book metadata come from {@code mine} first; {@link #seq} is left to the caller.
      */
     @NonNull
     static Snapshot merge(@NonNull Snapshot base, @NonNull Snapshot mine, @NonNull Snapshot theirs) {
@@ -125,7 +130,9 @@ final class Snapshot {
         out.fav = merge(base.fav, mine.fav, theirs.fav, PRESENT, (a, b) -> b);
         out.hist = merge(base.hist, mine.hist, theirs.hist, Long::equals, Math::max);
         out.people = merge(base.people, mine.people, theirs.people, PRESENT, (a, b) -> b);
-        out.pos = merge(base.pos, mine.pos, theirs.pos, Pos::equals, (a, b) -> a.t > b.t ? a : b);
+        // a book only opened on one side stands at its start, stamped when opened: the place reached on the other wins
+        out.pos = merge(base.pos, mine.pos, theirs.pos, Pos::equals,
+                (a, b) -> a.start() != b.start() ? (a.start() ? b : a) : a.t > b.t ? a : b);
         out.prefs = merge(base.prefs, mine.prefs, theirs.prefs, String::equals, (a, b) -> b);
         Set<String> urls = new HashSet<>(out.fav.keySet());
         urls.addAll(out.hist.keySet());

@@ -1,5 +1,7 @@
 package com.fanok.audiobooks.activity;
 
+import android.content.Context;
+import com.fanok.audiobooks.FontScale;
 import android.content.ActivityNotFoundException;
 import android.content.Intent;
 import android.content.SharedPreferences;
@@ -21,6 +23,12 @@ import java.util.Objects;
 import java.util.regex.Matcher;
 
 public class ActivitySendEmail extends MvpAppCompatActivity {
+
+    /** The screen at the chosen font scale (FontScale). */
+    @Override
+    protected void attachBaseContext(Context newBase) {
+        super.attachBaseContext(FontScale.wrap(newBase));
+    }
 
     private ActivitySendEmailBinding binding;
 
@@ -115,17 +123,23 @@ public class ActivitySendEmail extends MvpAppCompatActivity {
     }
 
     private void click() {
-        if (!validateEmail(Objects.requireNonNull(binding.emailInput.getText()).toString())) {
+        // decided by the fields as they are now: an error shown earlier may be stale (corrected without leaving it)
+        boolean emailOk = validateEmail(Objects.requireNonNull(binding.emailInput.getText()).toString());
+        boolean textOk = validateEmpty(Objects.requireNonNull(binding.messageInput.getText()).toString());
+        if (emailOk) {
+            binding.emailLayout.setErrorEnabled(false);
+        } else {
             binding.emailLayout.setError(getString(R.string.incorect_email));
             binding.emailLayout.setErrorEnabled(true);
         }
-
-        if (!validateEmpty(Objects.requireNonNull(binding.messageInput.getText()).toString())) {
+        if (textOk) {
+            binding.messageLayout.setErrorEnabled(false);
+        } else {
             binding.messageLayout.setError(getString(R.string.empty_text));
             binding.messageLayout.setErrorEnabled(true);
         }
 
-        if (!binding.messageLayout.isErrorEnabled() && !binding.emailLayout.isErrorEnabled()) {
+        if (emailOk && textOk) {
             String email = binding.emailInput.getText().toString().trim();
             String subject = binding.spinner.getSelectedItem().toString();
             String body = binding.messageInput.getText().toString() + "\n\n"

@@ -686,41 +686,28 @@ public class SourceCardFragment extends Fragment {
     }
 
     /**
-     * The switch and its consequences, said before the tap: the place an enabled site takes, the site that leaves at
-     * the limit, why the only active site cannot be switched off. The meter shows the count and this site's cell.
+     * The switch and its consequences, said before the tap: the place an enabled site takes, why the only active site
+     * cannot be switched off. The meter shows the count and this site's cell.
      */
     private void renderActive(@NonNull List<Provider> order, int index, int active) {
         boolean isActive = index < active;
-        int limit = Math.min(Sources.maxActive(), order.size());
         boolean only = isActive && active == 1;
         setChecked(activeSwitch, isActive, activeListener);
         activeSwitch.setEnabled(!only);
-        boolean atLimit = !isActive && active >= limit;
-        String summary;
-        if (only) {
-            summary = getString(R.string.sources_active_only);
-        } else if (isActive) {
-            summary = getString(R.string.sources_active_on, index + 1, active);
-        } else if (!atLimit) {
-            summary = getString(R.string.sources_active_off, active + 1);
-        } else {
-            summary = getString(R.string.sources_active_limit, limit, order.get(active - 1).title);
-        }
-        activeSummary.setText(summary);
-        activeSummary.setTextColor(atLimit ? warn : secondary);
+        activeSummary.setText(only ? getString(R.string.sources_active_only) : isActive
+                ? getString(R.string.sources_active_on, index + 1, active)
+                : getString(R.string.sources_active_off, active + 1));
 
         int accent = ContextCompat.getColor(requireContext(), R.color.sources_accent);
         int track = ContextCompat.getColor(requireContext(), R.color.sources_track);
-        int[] cells = new int[limit];
+        int[] cells = new int[order.size()];
         for (int i = 0; i < cells.length; i++) {
             cells[i] = i >= active ? track : i == index ? accent : ColorUtils.setAlphaComponent(accent, 0x99);
         }
         meter.setCells(cells, -1, isActive ? index : -1);
-        meterCount.setText(getString(R.string.sources_meter_count, active, limit));
+        meterCount.setText(getString(R.string.sources_meter_count, active, order.size()));
         meter.setContentDescription(meterCount.getText());
-        meterFree.setText(active >= limit ? getString(R.string.sources_section_limit)
-                : getString(R.string.sources_meter_free, limit - active));
-        meterFree.setTextColor(active >= limit ? warn : secondary);
+        meterFree.setText(active < order.size() ? getString(R.string.sources_meter_free, order.size() - active) : "");
     }
 
     private void renderPosition(@NonNull List<Provider> order, int index) {

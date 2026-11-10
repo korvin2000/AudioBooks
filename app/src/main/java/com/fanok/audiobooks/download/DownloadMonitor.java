@@ -192,12 +192,16 @@ public final class DownloadMonitor implements DownloadManager.Listener {
         long now = SystemClock.elapsedRealtime();
         if (!meter.sampleDue(now)) return;
         boolean running = false;
+        boolean next = false;
         for (Download d : manager.getCurrentDownloads()) {
+            if (d.state == Download.STATE_QUEUED) next = true;
             if (!isRunning(d.state)) continue;
             running = true;
             meter.account(d.request.id, d.getBytesDownloaded(), now);
         }
-        if (!running) {
+        // between two chapters the next one is queued for a moment: the window goes on; a pause or a wait for the
+        // network starts clean, so a resumed transfer is not read as stalled
+        if (!running && !(next && !manager.getDownloadsPaused() && manager.getNotMetRequirements() == 0)) {
             meter.reset();
         }
     }

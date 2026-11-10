@@ -573,7 +573,7 @@
     <string name="vpn_zaborona_value" translatable="false">zaborona</string>
     <string name="vpn_zaborona_europe_value" translatable="false">zaborona_europe</string>
     <string name="vpn_ukrane_value" translatable="false">vpn_ukrane</string>
-    <string name="cookes_baza_knig_exeption">Сайт требует проверку в браузере. Откройте его в настройках (Cookies сайта) или попробуйте позже</string>
+    <string name="cookes_baza_knig_exeption">Сайт требует проверку в браузере. Откройте каталог или книгу этого сайта — приложение предложит её пройти — или попробуйте позже</string>
     <string name="site_check_offer">%1$s просит пройти проверку в браузере</string>
     <string name="site_check_action">Пройти</string>
     <string name="site_check_proxy">Сайт идёт через прокси, а проверка — напрямую. Переключите сайт на «Напрямую» в его карточке и пройдите проверку снова</string>
@@ -582,7 +582,6 @@
     <string name="site_rate_limited_site">%s просит не так часто: слишком много запросов подряд. Повторите чуть позже</string>
     <string name="site_rate_limited_after">%1$s просит не так часто: слишком много запросов подряд. Повторите через %2$d с</string>
     <string name="getCookies">Получить Cookies</string>
-    <string name="cookies_info_baza_knig">Для доступа к источнику База Книг необходимо обновить Cookies</string>
     <string name="error_cookies_load">Не удалось обновить cookies</string>
     <string name="cookies_loaded">Cookies обновлены</string>
     <string name="wait_loading">Подождите пока страница закончится, а затем закройте окно</string>
@@ -643,8 +642,6 @@
     <string name="equalizer_night">Ночной режим</string>
     <string name="download_state_partial">Скачано частично</string>
     <string name="download_state_full">Скачано полностью</string>
-    <string name="cookies_site">Cookies сайта</string>
-    <string name="cookies_site_summary">Пройти проверку сайта База Книг в браузере</string>
     <string name="downloads_summary">Скачанные книги и ход загрузок</string>
     <string name="cookies_not_verified">Сессия не подтверждена: прежняя сохранена</string>
     <string name="proxy_title">Прокси</string>
@@ -670,7 +667,6 @@
     <string name="sources_move_down">Ниже</string>
     <string name="sources_activate">Включить</string>
     <string name="sources_deactivate">Выключить</string>
-    <string name="sources_max">Активных источников не больше %1$d</string>
     <string name="sources_min">Нужен хотя бы один активный источник</string>
     <string name="sources_seconds">%1$.1f с</string>
     <string name="sources_status_empty">пусто</string>
@@ -769,7 +765,15 @@
 
     <!-- Settings groups (xml/preferences.xml) -->
     <string name="settings_appearance">Оформление</string>
-    <string name="settings_appearance_summary">Тема, вид списка, процент прослушанного, панель книги</string>
+    <string name="settings_appearance_summary">Тема, вид списка, размер шрифта, процент прослушанного, панель книги</string>
+    <!-- Оформление → Размер шрифта (FontScale) -->
+    <string name="font_scale">Размер шрифта</string>
+    <string name="font_scale_summary">Относительно размера шрифта в системе; 100 % — как в системе</string>
+    <string name="font_scale_value">%1$d %%</string>
+    <string name="skip_silence">Пропуск тишины</string>
+    <string name="skip_silence_desc">Сокращает длинные паузы, оставляя между фразами короткую естественную паузу</string>
+    <string name="skip_silence_level">Чувствительность</string>
+    <string name="skip_silence_level_summary">Выше — паузы короче; на максимуме могут пострадать очень тихие звуки</string>
     <string name="settings_playback">Воспроизведение</string>
     <string name="settings_playback_summary">Запуск, кнопки и перемотка, главы</string>
     <string name="settings_sources">Источники и сеть</string>

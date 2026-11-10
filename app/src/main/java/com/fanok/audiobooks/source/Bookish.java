@@ -8,6 +8,7 @@ import static com.fanok.audiobooks.source.Html.text;
 import androidx.annotation.Nullable;
 
 import com.fanok.audiobooks.BookRemovedException;
+import com.fanok.audiobooks.model.BookPages;
 import com.fanok.audiobooks.net.SiteHttp;
 import com.fanok.audiobooks.pojo.AudioPOJO;
 import com.fanok.audiobooks.pojo.BookPOJO;
@@ -104,14 +105,16 @@ public final class Bookish implements SourceParser {
      */
     @Override
     public Document fetch(String url) throws IOException {
+        String genre = listingRoot(url);
         if (url.contains("?")) {
-            return Dle.fetch(url);
+            // a sorted genre tells its id too: a listing restored sorted after the process died is re-sorted in it
+            Document page = Dle.fetch(url);
+            return genre == null ? page : learnCategory(genre, page);
         }
         String key = sortKey(url);
         if (key != null) {
             return Dle.fetch(Dle.sorted(url, Dle.Order.DATE, key));
         }
-        String genre = listingRoot(url);
         return genre == null ? SiteHttp.get(url) : learnCategory(genre, SiteHttp.get(url));
     }
 
@@ -230,7 +233,8 @@ public final class Bookish implements SourceParser {
     /** All comments are on the book page. */
     @Override
     public ArrayList<ComentsPOJO> comments(String bookUrl, BooleanSupplier cancelled) throws Exception {
-        return parseComments(fetch(bookUrl));
+        // the page the description and the chapters were read from, not a second request to the site
+        return parseComments(BookPages.get(bookUrl, this::fetch));
     }
 
     // ---------------------------------------------------------------- URLs

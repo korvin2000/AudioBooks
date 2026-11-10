@@ -12,7 +12,6 @@ import android.graphics.PorterDuff;
 import android.graphics.PorterDuffColorFilter;
 import android.graphics.drawable.Drawable;
 import android.graphics.drawable.LayerDrawable;
-import android.media.audiofx.BassBoost;
 import android.media.audiofx.Equalizer;
 import android.media.audiofx.PresetReverb;
 import android.os.Bundle;
@@ -67,7 +66,6 @@ public class DialogEqualizerFragment extends DialogFragment {
 
     private Equalizer mEqualizer;
 
-    private BassBoost bassBoost;
 
     private PresetReverb presetReverb;
 
@@ -94,6 +92,9 @@ public class DialogEqualizerFragment extends DialogFragment {
     private AnalogController reverbController;
 
     private int[] levels = new int[0];
+
+    /** The chosen preset is moving the bands: their changes are the preset's, not the user's. */
+    private boolean applyingPreset;
 
     public DialogEqualizerFragment() {
         // Required empty public constructor
@@ -157,16 +158,6 @@ public class DialogEqualizerFragment extends DialogFragment {
         } catch (RuntimeException e) {
             Log.w(TAG, "No equalizer for session " + audioSesionId, e);
             return; // onViewCreated closes the dialog with a message
-        }
-        try {
-            bassBoost = new BassBoost(0, audioSesionId);
-            BassBoost.Settings bassBoostSetting = new BassBoost.Settings(bassBoost.getProperties().toString());
-            bassBoostSetting.strength = Settings.equalizerModel.getBassStrength();
-            bassBoost.setProperties(bassBoostSetting);
-            bassBoost.setEnabled(Settings.isBassOn(bassBoostSetting.strength));
-        } catch (RuntimeException e) {
-            Log.w(TAG, "No bass boost", e);
-            bassBoost = null;
         }
         try {
             presetReverb = new PresetReverb(0, audioSesionId);
@@ -236,9 +227,7 @@ public class DialogEqualizerFragment extends DialogFragment {
         equalizerSwitch.setOnCheckedChangeListener((buttonView, isChecked) -> {
             mEqualizer.setEnabled(isChecked);
             Settings.isEqualizerEnabled = isChecked;
-            if (bassBoost != null) {
-                bassBoost.setEnabled(Settings.isBassOn(Settings.equalizerModel.getBassStrength()));
-            }
+            Settings.applyBass(Settings.equalizerModel.getBassStrength());
             if (presetReverb != null) {
                 presetReverb.setEnabled(Settings.isReverbOn(Settings.equalizerModel.getReverbPreset()));
             }
@@ -265,7 +254,6 @@ public class DialogEqualizerFragment extends DialogFragment {
         reverbController.setMax(PresetReverb.PRESET_PLATE); // one step per room, 0 being none
         bassController.setLabel(getString(R.string.equalizer_bass));
         reverbController.setLabel(getString(R.string.equalizer_3d));
-        bassController.setEnabled(bassBoost != null);
         reverbController.setEnabled(presetReverb != null);
 
 
@@ -278,13 +266,7 @@ public class DialogEqualizerFragment extends DialogFragment {
 
         int x = 0;
         if (!Settings.isEqualizerReloaded) {
-            if (bassBoost != null) {
-                try {
-                    x = Settings.bassStep(bassBoost.getRoundedStrength());
-                } catch (Exception e) {
-                    Log.e(TAG, "onViewCreated: " + e.getLocalizedMessage());
-                }
-            }
+            x = Settings.bassStep(Settings.equalizerModel.getBassStrength());
 
             if (presetReverb != null) {
                 try {
@@ -304,10 +286,7 @@ public class DialogEqualizerFragment extends DialogFragment {
                 progress -> {
                     Settings.bassStrength = Settings.bassStrength(progress);
                     try {
-                        if (bassBoost != null) {
-                            bassBoost.setStrength(Settings.bassStrength);
-                            bassBoost.setEnabled(Settings.isBassOn(Settings.bassStrength));
-                        }
+                        Settings.applyBass(Settings.bassStrength);
                         Settings.equalizerModel.setBassStrength(Settings.bassStrength);
                     } catch (Exception e) {
                         Log.e(TAG, "onViewCreated: " + e.getLocalizedMessage());
@@ -355,6 +334,9 @@ public class DialogEqualizerFragment extends DialogFragment {
             seekBar.getThumb().setColorFilter(
                     new PorterDuffColorFilter(themeColor, PorterDuff.Mode.SRC_IN));
             seekBar.setMax(upperEqualizerBandLevel - lowerEqualizerBandLevel);
+            //all bands share one id: a restored view state would give every band the last one's level; the levels
+            //are set from Settings below
+            seekBar.setSaveEnabled(false);
             seekBar.setContentDescription(getString(R.string.equalizer_band_description, label));
 
             textView.setText(label);
@@ -373,6 +355,13 @@ public class DialogEqualizerFragment extends DialogFragment {
             seekBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
                 @Override
                 public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
+                    if (!applyingPreset && Settings.presetPos != 0) {
+                        //moved by a key (D-pad, keyboard) or an accessibility action, which report fromUser=false
+                        //and never start tracking: the preset becomes custom as with a touch
+                        presetSpinner.setSelection(0);
+                        Settings.presetPos = 0;
+                        Settings.equalizerModel.setPresetPos(0);
+                    }
                     mEqualizer.setBandLevel(equalizerBandIndex,
                             (short) (progress + lowerEqualizerBandLevel));
                     points[bandPosition] = mEqualizer.getBandLevel(equalizerBandIndex)
@@ -522,11 +511,16 @@ public class DialogEqualizerFragment extends DialogFragment {
 
                         final short lowerEqualizerBandLevel = mEqualizer.getBandLevelRange()[0];
 
-                        for (short i = 0; i < seekBarFinal.length; i++) {
-                            seekBarFinal[i].setProgress(
-                                    mEqualizer.getBandLevel(i) - lowerEqualizerBandLevel);
-                            points[i] = mEqualizer.getBandLevel(i) - lowerEqualizerBandLevel;
-                            levels[i] = mEqualizer.getBandLevel(i);
+                        applyingPreset = true;
+                        try {
+                            for (short i = 0; i < seekBarFinal.length; i++) {
+                                seekBarFinal[i].setProgress(
+                                        mEqualizer.getBandLevel(i) - lowerEqualizerBandLevel);
+                                points[i] = mEqualizer.getBandLevel(i) - lowerEqualizerBandLevel;
+                                levels[i] = mEqualizer.getBandLevel(i);
+                            }
+                        } finally {
+                            applyingPreset = false;
                         }
                         dataset.updateValues(points);
                         chart.notifyDataUpdate();
@@ -554,10 +548,6 @@ public class DialogEqualizerFragment extends DialogFragment {
 
         if (mEqualizer != null) {
             mEqualizer.release();
-        }
-
-        if (bassBoost != null) {
-            bassBoost.release();
         }
 
         if (presetReverb != null) {

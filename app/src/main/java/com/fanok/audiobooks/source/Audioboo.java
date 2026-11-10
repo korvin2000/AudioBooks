@@ -70,6 +70,9 @@ public final class Audioboo implements SourceParser {
     /** Results per search page. */
     static final int SEARCH_PAGE_SIZE = 50;
 
+    /** Bound of the cycle's listing pages read for a book's series tab. */
+    static final int MAX_SERIES_PAGES = 10;
+
     private static final String TAG = "ComentsModel";
 
     private static final List<Sort.Entry> MENU = Sort.menu(Sort.NEW, Sort.TITLE, Sort.RATING, Sort.POPULAR,
@@ -281,10 +284,9 @@ public final class Audioboo implements SourceParser {
                     u -> SiteHttp.parse(SiteHttp.execute(SiteHttp.connect(u).maxBodySize(limit)), limit)));
         }
         Elements letters = fetch(url).select("a.alfavit[href]");
-        if (pageNo <= 1) {
-            cursor.skipped = 0;
-        }
-        int index = pageNo - 1 + cursor.skipped;
+        // the cursor changes only with a page returned: a failed refresh keeps the list's place
+        int skipped = pageNo <= 1 ? 0 : cursor.skipped;
+        int index = pageNo - 1 + skipped;
         ArrayList<GenrePOJO> authors = new ArrayList<>();
         // an empty letter would end the list: the next one is read in its place
         for (; index < letters.size(); index++) {
@@ -292,8 +294,9 @@ public final class Audioboo implements SourceParser {
             if (!authors.isEmpty() || index == letters.size() - 1) {
                 break;
             }
-            cursor.skipped++;
+            skipped++;
         }
+        cursor.skipped = skipped;
         return ProviderPage.of(authors, index < letters.size() - 1);
     }
 
@@ -327,11 +330,19 @@ public final class Audioboo implements SourceParser {
         return parseTracks(page, base);
     }
 
-    /** The cycle linked from the book page, read from its own listing page. */
+    /** The cycle linked from the book page, read from its own listing pages (27 books each). */
     @Override
     public ArrayList<SeriesPOJO> series(Document page, String bookUrl) throws IOException {
+        ArrayList<SeriesPOJO> result = new ArrayList<>();
         String series = parseSeriesUrl(page);
-        return series.isEmpty() ? new ArrayList<>() : parseSeriesPage(fetch(series));
+        for (int no = 1; !series.isEmpty() && no <= MAX_SERIES_PAGES; no++) {
+            Document doc = fetch(pageUrl(series, no));
+            result.addAll(parseSeriesPage(doc));
+            if (lastPage(doc.select(".navigation a, .pagination a")) <= no) {
+                break;
+            }
+        }
+        return result;
     }
 
     @Override
@@ -482,6 +493,10 @@ public final class Audioboo implements SourceParser {
                     bookPOJO.setTime(text.replace("Время:", "").trim());
                 }
             }
+            // the card title is "Автор - Название", as the book page's heading before parseDescription strips it
+            if (bookPOJO.getName() != null && bookPOJO.getAutor() != null) {
+                bookPOJO.setName(OtherSourceModel.withoutAuthor(bookPOJO.getName().trim(), bookPOJO.getAutor()));
+            }
             if (bookPOJO.getSeries() == null) {
                 Element aTag = book.selectFirst("a[href*=/xfsearch/cikl/]");
                 if (aTag != null) {
@@ -516,8 +531,8 @@ public final class Audioboo implements SourceParser {
             return bookPOJO;
         });
         int last = lastPage(doc.select(".navigation a, .pagination a"));
-        boolean hasMore = last > 0 ? last > page : !result.isEmpty();
-        return ProviderPage.of(result, hasMore);
+        // a page without a pager is the only one (an author, reader or series with few books)
+        return ProviderPage.of(result, last > page);
     }
 
     /** The number in a count text ("[953]", "Найдено публикаций: 12"); 0 when there is none. */

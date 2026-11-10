@@ -11,7 +11,8 @@
     <CheckedTextView
         android:id="@+id/checkedTextView"
         android:layout_width="match_parent"
-        android:layout_height="@dimen/recycler_item_height_genre"
+        android:layout_height="wrap_content"
+        android:minHeight="@dimen/recycler_item_height_genre"
         android:checkMark="?android:attr/listChoiceIndicatorMultiple"
         android:padding="@dimen/text_margin_book_description"
         android:textSize="@dimen/titleSize" />

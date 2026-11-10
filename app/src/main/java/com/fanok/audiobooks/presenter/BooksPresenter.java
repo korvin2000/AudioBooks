@@ -8,6 +8,7 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.graphics.drawable.Drawable;
+import android.os.SystemClock;
 import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -208,6 +209,18 @@ public class BooksPresenter extends MvpPresenter<BooksView> implements
             showFilterBar();
         } else {
             getViewState().showRefreshing(false);
+        }
+    }
+
+    /** Longer than a long toast (3.5 s): the error toasts of a scrolled failing listing never pile up. */
+    private static final long SCROLL_RETRY_MS = 4000;
+    /** {@link SystemClock#elapsedRealtime()} of the last failed page; 0 after a page arrived. */
+    private long mFailedAt;
+
+    /** The scroll asks for the next page; a page that just failed is not asked again on every frame. */
+    public void loadOnScroll() {
+        if (mFailedAt == 0 || SystemClock.elapsedRealtime() - mFailedAt >= SCROLL_RETRY_MS) {
+            loadBoks();
         }
     }
 
@@ -702,6 +715,7 @@ public class BooksPresenter extends MvpPresenter<BooksView> implements
         try {
             RouteAttempt tried = takeRetry(request);
             if (result.isFailure()) {
+                mFailedAt = SystemClock.elapsedRealtime();
                 if (tried != null) {
                     routeFailed(tried, result);
                 } else if (mRoute != null && mRoute.deferred) {
@@ -715,6 +729,7 @@ public class BooksPresenter extends MvpPresenter<BooksView> implements
                 }
                 return;
             }
+            mFailedAt = 0;
             mRoute = null; // the site answers: an unanswered offer is moot
             if (tried != null) {
                 getViewState().showToast(mContext.getString(

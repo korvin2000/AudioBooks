@@ -17,6 +17,7 @@ import androidx.annotation.Nullable;
 
 import com.fanok.audiobooks.R;
 import com.fanok.audiobooks.Url;
+import com.fanok.audiobooks.model.BookPages;
 import com.fanok.audiobooks.model.ComentsModel;
 import com.fanok.audiobooks.model.OtherArtistModel;
 import com.fanok.audiobooks.model.OtherSourceModel;
@@ -328,7 +329,8 @@ public final class Akniga implements SourceParser {
     /** The comments on the page, plus those only its RSS feed holds (best effort). */
     @Override
     public ArrayList<ComentsPOJO> comments(String url, BooleanSupplier cancelled) throws Exception {
-        Document page = fetch(url);
+        // the page the description and the chapters were read from, not a second request (a second session)
+        Document page = BookPages.get(url, this::fetch);
         ComentsModel.Parsed parsed = parseComments(page, url);
         String feedUrl = feedUrl(page);
         if (feedUrl != null) {
@@ -620,7 +622,7 @@ public final class Akniga implements SourceParser {
         }
 
         if (titleElement.size() != 0) {
-            descriptionPOJO.setTitle(titleElement.first().text().trim().replace(autor + " - ", ""));
+            descriptionPOJO.setTitle(OtherSourceModel.withoutAuthor(titleElement.first().text().trim(), autor));
         }
 
         Elements posterElements = document.getElementsByClass("cover__wrapper--image");
@@ -775,7 +777,7 @@ public final class Akniga implements SourceParser {
         }
 
         if (titleElement != null && titleElement.size() != 0) {
-            bookPOJO.setName(titleElement.first().text().trim().replace(autor + " - ", ""));
+            bookPOJO.setName(OtherSourceModel.withoutAuthor(titleElement.first().text().trim(), autor));
         }
 
         Elements posterElements = document.getElementsByClass("cover__wrapper--image");

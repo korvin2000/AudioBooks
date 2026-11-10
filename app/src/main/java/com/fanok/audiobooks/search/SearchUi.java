@@ -142,7 +142,10 @@ public final class SearchUi {
         /** Sites (catalogs) with at least one shown card. */
         public final int sites;
         public final List<Row> rows;
-        /** Cards the scope or the genres hid (the ones whose fields they check and that do not match). */
+        /**
+         * Cards the scope or the genres hid (the ones whose fields they check and that do not match) from the list
+         * shown: on a site's tab, that site's.
+         */
         public final int hiddenByScope;
         /** Rows kept although they lack the scope's fields or a genre. */
         public final int unknown;
@@ -223,6 +226,7 @@ public final class SearchUi {
         List<Offer> main = new ArrayList<>();
         List<Offer> unknown = new ArrayList<>();
         int hidden = 0;
+        int hiddenOnTab = 0;
         for (Offer o : in.offers) {
             o.score(in.request);
             if (in.request.isAnywhere() || o.match().covered) {
@@ -231,6 +235,7 @@ public final class SearchUi {
                 unknown.add(o);
             } else {
                 hidden++;
+                hiddenOnTab += in.tab != null && o.source == in.tab ? 1 : 0;
             }
         }
         int[] hiddenByGenre = new int[1];
@@ -240,8 +245,10 @@ public final class SearchUi {
                 ? SearchGrouper.group(main, in.shownIds, in.fuzzy) : null;
         String author = works != null && namesAuthor(works, in.request) ? authorWord(in.request) : null;
         List<Row> allRows = rows(main, unknown, in, null, hiddenByGenre, author, in.grouped ? works : null);
-        List<Row> rows = in.tab == null ? allRows : rows(main, unknown, in, in.tab, new int[1], author, null);
-        hidden += hiddenByGenre[0];
+        int[] tabHiddenByGenre = new int[1];
+        List<Row> rows = in.tab == null ? allRows : rows(main, unknown, in, in.tab, tabHiddenByGenre, author, null);
+        // the cards hidden from the list shown: on a site's tab, that site's own
+        hidden = in.tab == null ? hidden + hiddenByGenre[0] : hiddenOnTab + tabHiddenByGenre[0];
 
         List<Chip> chips = new ArrayList<>();
         List<Provider> failed = new ArrayList<>();
@@ -482,6 +489,9 @@ public final class SearchUi {
         }
         if (in.sources.isEmpty()) {
             return Empty.NO_SOURCES;
+        }
+        if (tab != null && tab.kind == ChipKind.FOUND && hidden > 0) {
+            return Empty.SCOPE_HID_ALL; // the site found cards, the scope or the genres hide them all
         }
         if (tab != null) {
             switch (tab.kind) {

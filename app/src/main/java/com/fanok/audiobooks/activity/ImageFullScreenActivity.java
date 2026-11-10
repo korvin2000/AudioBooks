@@ -1,5 +1,7 @@
 package com.fanok.audiobooks.activity;
 
+import android.content.Context;
+import com.fanok.audiobooks.FontScale;
 import android.app.Activity;
 import android.app.ActivityOptions;
 import android.content.Intent;
@@ -26,6 +28,12 @@ import com.squareup.picasso.Target;
 import org.jetbrains.annotations.NotNull;
 
 public class ImageFullScreenActivity extends AppCompatActivity {
+
+    /** The screen at the chosen font scale (FontScale). */
+    @Override
+    protected void attachBaseContext(Context newBase) {
+        super.attachBaseContext(FontScale.wrap(newBase));
+    }
 
     private ActivityImageFullScrinBinding binding;
 

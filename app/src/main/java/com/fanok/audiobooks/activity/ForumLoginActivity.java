@@ -1,5 +1,6 @@
 package com.fanok.audiobooks.activity;
 
+import com.fanok.audiobooks.FontScale;
 import android.annotation.SuppressLint;
 import android.content.Context;
 import android.content.Intent;
@@ -27,6 +28,12 @@ import com.r0adkll.slidr.Slidr;
  * itself with them.
  */
 public class ForumLoginActivity extends AppCompatActivity {
+
+    /** The screen at the chosen font scale (FontScale). */
+    @Override
+    protected void attachBaseContext(Context newBase) {
+        super.attachBaseContext(FontScale.wrap(newBase));
+    }
 
     private static final String EXTRA_URL = "url";
 

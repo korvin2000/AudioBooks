@@ -154,6 +154,36 @@ public class SearchUiTest {
         assertEquals(Empty.SCOPE_HID_ALL, SearchUi.reduce(in).empty);
     }
 
+    /** A site's tab whose cards the scope or the genres hide says so, as "All" does, and counts only its own. */
+    @Test
+    public void aTabWhoseCardsTheFilterHidesSaysSo() {
+        in.request = new SearchRequest("князев", EnumSet.of(Field.READER));
+        in.offers = Arrays.asList(
+                offer(Provider.AKNIGA, "Пикник на обочине", "Стругацкие", "Князев Игорь"),
+                offer(Provider.IZIBUK, "Князев и другие", "Иванов", "Петров Пётр"),
+                offer(Provider.IZIBUK, "Князев навсегда", "Сидоров", "Иванов Иван"));
+        state(Provider.AKNIGA, false, Status.OK, 1);
+        state(Provider.IZIBUK, false, Status.OK, 2);
+        state(Provider.KNIGOBLUD, false, Status.EMPTY, 0);
+        state(Provider.BIBLUS, false, Status.EMPTY, 0);
+        assertEquals(2, SearchUi.reduce(in).hiddenByScope);
+        in.tab = Provider.IZIBUK;
+        SearchUi.State tab = SearchUi.reduce(in);
+        assertEquals(Empty.SCOPE_HID_ALL, tab.empty);
+        assertEquals(2, tab.hiddenByScope);
+        in.tab = Provider.AKNIGA;
+        SearchUi.State other = SearchUi.reduce(in);
+        assertEquals(Empty.NONE, other.empty);
+        assertEquals("another site's hidden cards are not this tab's", 0, other.hiddenByScope);
+
+        in.request = SearchRequest.anywhere("чужой");
+        in.genres = EnumSet.of(Genre.ROMANCE);
+        in.offers = Arrays.asList(genre(Provider.IZIBUK, "Чужой", "Алан Дин Фостер", "Фантастика"));
+        in.tab = Provider.IZIBUK;
+        assertEquals("the genres too", Empty.SCOPE_HID_ALL, SearchUi.reduce(in).empty);
+        assertEquals(1, SearchUi.reduce(in).hiddenByScope);
+    }
+
     @Test
     public void ungroupedAllListsCardsAndSortsThem() {
         in.grouped = false;

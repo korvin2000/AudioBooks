@@ -27,13 +27,13 @@ import java.util.Set;
 public final class Sources {
 
     public static final String PREF = "pref_sources";
-    /** The most sources that can be active at once ({@link #maxActive()}), chosen in «Общие», stored as text. */
-    public static final String PREF_MAX = "pref_sources_max";
-    /** The limit with nothing chosen, and how many are active with nothing stored. */
+    /**
+     * The limit of the active sources that older versions stored as text: {@link #load} cuts the stored active count to
+     * it once and removes it, so nobody's active sources grow by themselves.
+     */
+    static final String OLD_LIMIT = "pref_sources_max";
+    /** How many are active with nothing stored. */
     public static final int DEFAULT_MAX_ACTIVE = 13;
-    /** The range of the limit to choose from. */
-    public static final int MIN_LIMIT = 3;
-    public static final int MAX_LIMIT = 20;
     /** The catalog source: the {@link Provider#prefValue} of the source the drawer sections open. */
     public static final String SELECTED = "sorce_books";
     /**
@@ -62,24 +62,9 @@ public final class Sources {
         }
     }
 
-    private static volatile int maxActive = DEFAULT_MAX_ACTIVE;
     private static volatile State state = parse(null);
 
     private Sources() {
-    }
-
-    /** The most sources that can be active at once: {@link #PREF_MAX}, read by {@link #load}. */
-    public static int maxActive() {
-        return maxActive;
-    }
-
-    /** The stored limit clamped to {@link #MIN_LIMIT}..{@link #MAX_LIMIT}; missing or unreadable: the default. */
-    static int readMax(@NonNull SharedPreferences prefs) {
-        try {
-            return Math.max(MIN_LIMIT, Math.min(MAX_LIMIT, Integer.parseInt(prefs.getString(PREF_MAX, null))));
-        } catch (ClassCastException | NumberFormatException e) {
-            return DEFAULT_MAX_ACTIVE;
-        }
     }
 
     /** The active sources, in the user's order. */
@@ -104,8 +89,8 @@ public final class Sources {
     }
 
     /**
-     * Reads the limit and the stored list; call at the start, before anything asks for the sources, and again when the
-     * limit changes. A lower limit cuts the active part without rewriting the stored list.
+     * Reads the stored list; call at the start, before anything asks for the sources, and again when it was written
+     * behind this class's back. An {@link #OLD_LIMIT} still stored cuts the active count once, then goes.
      */
     public static synchronized void load(@NonNull SharedPreferences prefs) {
         String stored;
@@ -114,8 +99,18 @@ public final class Sources {
         } catch (ClassCastException e) {
             stored = null;
         }
-        maxActive = readMax(prefs);
-        state = parse(stored);
+        State s = parse(stored);
+        if (prefs.contains(OLD_LIMIT)) {
+            int limit;
+            try {
+                limit = Integer.parseInt(prefs.getString(OLD_LIMIT, null));
+            } catch (ClassCastException | NumberFormatException e) {
+                limit = DEFAULT_MAX_ACTIVE; // what older versions read from it
+            }
+            s = new State(s.order, Math.max(1, Math.min(s.active, limit)));
+            prefs.edit().putString(PREF, format(s.order, s.active)).remove(OLD_LIMIT).apply();
+        }
+        state = s;
         keepSelectedActive(prefs);
     }
 
@@ -165,9 +160,8 @@ public final class Sources {
     }
 
     /**
-     * Pure (given the limit): {@code provider} switched on, as the last active source (at {@link #maxActive()} in place
-     * of the last one, which becomes the first inactive), or off, as the first inactive one. The only active source
-     * stays on.
+     * Pure: {@code provider} switched on, as the last active source, or off, as the first inactive one. The only active
+     * source stays on.
      */
     @NonNull
     static State switched(@NonNull State s, @NonNull Provider provider, boolean on) {
@@ -175,12 +169,8 @@ public final class Sources {
         if (index < 0 || (index < s.active) == on || (!on && s.active == 1)) {
             return s;
         }
-        if (!on) {
-            return new State(moved(s, provider, s.active - 1).order, s.active - 1);
-        }
-        return s.active < Math.min(maxActive, s.order.size())
-                ? new State(moved(s, provider, s.active).order, s.active + 1)
-                : moved(s, provider, s.active - 1);
+        return on ? new State(moved(s, provider, s.active).order, s.active + 1)
+                : new State(moved(s, provider, s.active - 1).order, s.active - 1);
     }
 
     /** The selected source must be active: otherwise the first active one is selected. True when it moved. */
@@ -191,13 +181,13 @@ public final class Sources {
         } catch (ClassCastException e) {
             selected = null;
         }
+        if (selected == null) {
+            selected = Provider.AKNIGA.prefValue; // nothing chosen yet: the settings' default, which App applies
+        }
         for (Provider provider : active()) {
             if (provider.prefValue.equals(selected)) {
                 return false;
             }
-        }
-        if (selected == null) {
-            return false; // nothing chosen yet: the settings' default applies, and it is checked when chosen
         }
         Provider first = active().get(0);
         prefs.edit().putString(SELECTED, first.prefValue).apply();
@@ -206,10 +196,8 @@ public final class Sources {
     }
 
     /**
-     * Pure (given the limit): the stored text read back. Unknown and repeated ids are dropped; a provider missing from
-     * it is appended inactive; at least one and at most {@link #maxActive()} are active (the overflow becomes the first
-     * inactive). No text: the declaration order, the first {@link #DEFAULT_MAX_ACTIVE} active, so a higher limit
-     * switches nothing on by itself.
+     * Pure: the stored text read back. Unknown and repeated ids are dropped; a provider missing from it is appended
+     * inactive; at least one is active. No text: the declaration order, the first {@link #DEFAULT_MAX_ACTIVE} active.
      */
     @NonNull
     static State parse(@Nullable String text) {
@@ -227,7 +215,7 @@ public final class Sources {
             }
             order.addAll(Arrays.asList(Provider.values()));
         }
-        active = Math.max(1, Math.min(Math.min(maxActive, order.size()), active));
+        active = Math.max(1, Math.min(order.size(), active));
         return new State(new ArrayList<>(order), active);
     }
 
