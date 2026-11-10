@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- A section of the source list in the user's order: «АКТИВНЫЕ 13 из 13 · лимит» with the 13-cell meter, or
+<!-- A section of the source list in the user's order: «АКТИВНЫЕ 13 из 29» with a meter cell per site, or
      «НЕАКТИВНЫЕ 10» with what that means. -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools"
@@ -34,13 +34,7 @@
             android:textColor="?attr/colorPrimaryText"
             android:textSize="13sp"
             android:textStyle="bold"
-            tools:text="13 из 13" />
-
-        <TextView
-            android:id="@+id/sourcesHeaderLimit"
-            style="@style/Widget.App.Sources.Badge"
-            android:text="@string/sources_section_limit"
-            android:textColor="@color/sources_warn" />
+            tools:text="13 из 29" />
     </LinearLayout>
 
     <com.fanok.audiobooks.fragment.SourceSegmentsView

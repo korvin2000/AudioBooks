@@ -1,5 +1,6 @@
 package com.fanok.audiobooks.activity;
 
+import com.fanok.audiobooks.FontScale;
 import android.content.Context;
 import android.content.Intent;
 import android.os.Bundle;
@@ -22,6 +23,12 @@ import com.r0adkll.slidr.Slidr;
  * any other screen that names a site. The toolbar carries the site's title and host; the card adds its actions.
  */
 public class SourceActivity extends AppCompatActivity {
+
+    /** The screen at the chosen font scale (FontScale). */
+    @Override
+    protected void attachBaseContext(Context newBase) {
+        super.attachBaseContext(FontScale.wrap(newBase));
+    }
 
     private static final String EXTRA_PROVIDER = "provider";
 

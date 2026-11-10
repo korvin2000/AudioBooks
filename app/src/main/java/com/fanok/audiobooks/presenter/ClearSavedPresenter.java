@@ -132,17 +132,18 @@ public class ClearSavedPresenter extends MvpPresenter<ClearSavedView> {
         List<String> bookUrls = new ArrayList<>();
         for (DownloadItem item : items) bookUrls.add(item.getBookUrl());
         getViewState().showMessage(mContext.getString(R.string.export_started));
+        // the outcome is told on the application context, as the view's Toast would: the screen may be gone by then
+        final Context app = mContext.getApplicationContext();
         DownloadStorageHelper.exportBooks(mContext, bookUrls, (exported, failed, error) -> {
-            if (mContext == null) return;
             String message;
             if (failed > 0) {
-                message = mContext.getString(R.string.export_failed, exported, failed, error != null ? error : "");
+                message = app.getString(R.string.export_failed, exported, failed, error != null ? error : "");
             } else if (exported > 0) {
-                message = mContext.getString(R.string.export_done, exported);
+                message = app.getString(R.string.export_done, exported);
             } else {
-                message = mContext.getString(R.string.export_nothing);
+                message = app.getString(R.string.export_nothing);
             }
-            getViewState().showMessage(message);
+            android.widget.Toast.makeText(app, message, android.widget.Toast.LENGTH_LONG).show();
         });
     }
 

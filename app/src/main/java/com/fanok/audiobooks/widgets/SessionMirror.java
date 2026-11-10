@@ -20,6 +20,7 @@ import com.fanok.audiobooks.Hourglass;
 import com.fanok.audiobooks.pojo.StorageUtil;
 import com.fanok.audiobooks.service.Checkpoint;
 import com.fanok.audiobooks.service.MediaPlayerService;
+import com.fanok.audiobooks.service.SessionExtras;
 import java.io.ByteArrayOutputStream;
 
 /**
@@ -53,9 +54,11 @@ final class SessionMirror implements MediaPlayerService.SessionListener,
     private final SharedPreferences saved;
     /** Apart from the rest, which is written on every change: the cover only when the book's picture changes. */
     private final SharedPreferences savedCover;
-    /** One picture encoded at a time: the last one, by its address. */
+    /** One picture encoded at a time: the last one, by its address and book (books without an address share null). */
     @Nullable
     private String coverUri;
+    @Nullable
+    private String coverBook;
     @Nullable
     private byte[] cover;
 
@@ -222,8 +225,10 @@ final class SessionMirror implements MediaPlayerService.SessionListener,
     /** The cover as PNG, encoded once per picture; null while the session has none. */
     @Nullable
     private byte[] cover(@Nullable String uri, @NonNull MediaMetadataCompat metadata) {
-        if (!TextUtils.equals(uri, coverUri)) {
+        String book = metadata.getString(SessionExtras.BOOK_KEY);
+        if (!TextUtils.equals(uri, coverUri) || !TextUtils.equals(book, coverBook)) {
             coverUri = uri;
+            coverBook = book;
             cover = null;
         }
         Bitmap bitmap = cover == null ? metadata.getBitmap(MediaMetadataCompat.METADATA_KEY_ALBUM_ART) : null;

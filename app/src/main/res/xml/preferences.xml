@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- Seven groups, each its own screen (SettingsFragment#onNavigateToScreen); keys of the entries are unchanged. -->
-<PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android">
+<PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
 
     <PreferenceScreen
         android:icon="@drawable/ic_theme"
@@ -25,6 +26,17 @@
             android:icon="@drawable/ic_list"
             android:key="books_adapter_layout_pref"
             android:title="@string/books_adapter_layout" />
+
+        <!-- FontScale.PREF: the app's text size, a percentage of the system's; applied by every activity -->
+        <com.fanok.audiobooks.fragment.SliderPreference
+            android:defaultValue="100"
+            android:icon="@drawable/ic_font_size"
+            android:key="pref_font_scale"
+            android:max="200"
+            android:summary="@string/font_scale_summary"
+            android:title="@string/font_scale"
+            app:min="50"
+            app:seekBarIncrement="5" />
 
         <CheckBoxPreference
             android:defaultValue="true"
@@ -163,6 +175,25 @@
             android:summary="@string/scrollToSelectedDesc"
             android:title="@string/scrollToSelected" />
 
+        <!-- SkipSilenceProcessor.PREF / PREF_LEVEL: applied by the player at once -->
+        <CheckBoxPreference
+            android:defaultValue="false"
+            android:icon="@drawable/ic_skip_silence"
+            android:key="skip_silence"
+            android:summary="@string/skip_silence_desc"
+            android:title="@string/skip_silence" />
+
+        <com.fanok.audiobooks.fragment.SliderPreference
+            android:defaultValue="3"
+            android:dependency="skip_silence"
+            android:icon="@drawable/ic_skip_silence_level"
+            android:key="skip_silence_level"
+            android:max="5"
+            android:summary="@string/skip_silence_level_summary"
+            android:title="@string/skip_silence_level"
+            app:min="1"
+            app:seekBarIncrement="1" />
+
     </PreferenceScreen>
 
     <PreferenceScreen
@@ -178,13 +209,12 @@
             android:persistent="false"
             android:title="@string/sources_entry" />
 
-        <!-- search.Sources.PREF_MAX: the most active sources; entries 3..20 are filled in SettingsFragment -->
-        <ListPreference
-            android:defaultValue="13"
-            android:dialogTitle="@string/sources_max_title"
+        <!-- SourceCountDialogFragment: how many of the first sites of the user's order are active (search.Sources) -->
+        <Preference
             android:icon="@drawable/ic_menu_sources"
-            android:key="pref_sources_max"
-            android:title="@string/sources_max_title" />
+            android:key="sources_count"
+            android:persistent="false"
+            android:title="@string/sources_count_title" />
 
         <ListPreference
             android:defaultValue="@string/abook_value"
@@ -217,11 +247,6 @@
             android:summary="@string/proxy_custom_summary"
             android:title="@string/proxy_custom_title" />
 
-        <Preference
-            android:icon="@drawable/ic_cookie"
-            android:key="cookies"
-            android:summary="@string/cookies_site_summary"
-            android:title="@string/cookies_site" />
     </PreferenceScreen>
 
     <PreferenceScreen

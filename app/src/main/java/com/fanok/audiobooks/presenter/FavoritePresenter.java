@@ -75,7 +75,8 @@ public class FavoritePresenter
 
     private Context mContext;
 
-    private boolean firstOpen;
+    /** The order picked in the toolbar (its menu id), kept for every load; 0 = the setting's. */
+    private int sortId;
 
     private boolean scanScheduled = false;
 
@@ -105,7 +106,6 @@ public class FavoritePresenter
     /** The list {@code table}, narrowed to {@code source} from the start (a source card's counter). */
     public FavoritePresenter(int table, @Nullable Provider source) {
         filterSearch = new ArrayList<>();
-        firstOpen = true;
         this.table = table;
         this.source = source;
     }
@@ -115,11 +115,18 @@ public class FavoritePresenter
     public void loadBooks() {
         if (table == Consts.TABLE_SAVED && mContext != null && !scanScheduled) {
             scanScheduled = true;
+            // the list is read now, and once more with what the scan of the download folder imported
             DownloadStorageHelper.scanAndImportDownloadedBooks(mContext, () -> {
                 scanScheduled = false;
+                if (mContext == null || pendingRemoval != null) {
+                    return; // a reload would end the undo offer on screen: the next opening reads what was imported
+                }
+                if (isLoading) { // a read begun before the scan ended may miss its books
+                    disposables.clear();
+                    isLoading = false;
+                }
                 loadBooksInternal();
             });
-            return;
         }
         loadBooksInternal();
     }
@@ -160,6 +167,25 @@ public class FavoritePresenter
         if (source != null) {
             flter = null; // the site's books as they are now, new ones included (bySource)
         }
+        // every load keeps the order: the one picked in the toolbar, else the setting's; the filter follows books
+        if (mContext != null && table != Consts.TABLE_HISTORY) {
+            SharedPreferences pref = PreferenceManager.getDefaultSharedPreferences(mContext);
+            String sort = pref.getString("pref_sort_favorite", mContext.getString(R.string.sort_value_date));
+            boolean bySaved = sortId != 0 ? sortId == R.id.saved
+                    : mContext.getString(R.string.sort_value_saved).equals(sort);
+            if (bySaved && table != Consts.TABLE_SAVED) {
+                // the "saved" order needs the download state of every book: one worker pass, then sort
+                sortBySavedState(books, this::showLoaded);
+                return;
+            }
+            // the date order compares equal: the sort is stable, the rows keep the database's order
+            books.sort(sortId != 0 ? getComparator(sortId) : getComparator(sort));
+        }
+        showLoaded();
+    }
+
+    /** The loaded books on screen, narrowed again by the filter or the source in force. */
+    private void showLoaded() {
         if (flter != null) {
             ArrayList<BookPOJO> newFilter = new ArrayList<>();
             for (BookPOJO bookPOJO : books) {
@@ -173,20 +199,6 @@ public class FavoritePresenter
             finishLoad(flter);
             return;
         }
-        if (firstOpen && mContext != null && table != Consts.TABLE_HISTORY) {
-            firstOpen = false;
-            SharedPreferences pref = PreferenceManager.getDefaultSharedPreferences(mContext);
-            String sort = pref.getString("pref_sort_favorite", mContext.getString(R.string.sort_value_date));
-            if (mContext.getString(R.string.sort_value_saved).equals(sort) && table != Consts.TABLE_SAVED) {
-                // the "saved" order needs the download state of every book: one worker pass, then sort
-                sortBySavedState(books, () -> finishLoad(bySource()));
-                return;
-            }
-            if (!mContext.getString(R.string.sort_value_date).equals(sort)) {
-                books.sort(getComparator(sort));
-            }
-        }
-        firstOpen = false;
         finishLoad(bySource());
     }
 
@@ -309,7 +321,9 @@ public class FavoritePresenter
 
     @Override
     public void onMenuSeries(@NonNull String url, String title) {
-        getViewState().showFragment(BooksFragment.newInstance(url + "?page=", R.string.menu_audiobooks, title,
+        // stored as the catalog opens it (with the site's paging suffix); only a Knigavuhe book page's lacks it
+        String listing = Provider.ofUrl(url) == Provider.KNIGAVUHE && !url.contains("?") ? url + "?page=" : url;
+        getViewState().showFragment(BooksFragment.newInstance(listing, R.string.menu_audiobooks, title,
                 Consts.MODEL_BOOKS), "seriesBooks");
     }
 
@@ -362,6 +376,18 @@ public class FavoritePresenter
         onSearch(mQuery);
     }
 
+    /** Ends the undo offer of {@code book}; a newer swipe's book is not this offer's to delete. */
+    public void commitRemove(@NonNull BookPOJO book) {
+        if (pendingRemoval == book) {
+            commitRemove();
+        }
+    }
+
+    /** The order picked in the toolbar (its menu id), or 0 while the setting's is in force. */
+    public int getSortId() {
+        return sortId;
+    }
+
     @Override
     public void commitRemove() {
         final BookPOJO book = pendingRemoval;
@@ -385,7 +411,8 @@ public class FavoritePresenter
             }
             return;
         }
-        DownloadStorageHelper.submit(() -> {
+        // a row only: not behind an export or a scan on the storage worker, a reload meanwhile would show it again
+        Schedulers.io().scheduleDirect(() -> {
             BooksDBModel booksDBModel = new BooksDBModel(app);
             if (table == Consts.TABLE_FAVORITE) {
                 booksDBModel.removeFavorite(book);
@@ -400,7 +427,7 @@ public class FavoritePresenter
     }
 
     /**
-     * Empties the whole list, rows on the storage worker; the toolbar asked and the user confirmed. The history
+     * Empties the whole list, rows off the main thread; the toolbar asked and the user confirmed. The history
      * narrowed by a status or a period loses only the books shown.
      */
     @Override
@@ -446,7 +473,7 @@ public class FavoritePresenter
         getViewState().showProgres(false);
         onSearch(mQuery);
         final Context app = mContext.getApplicationContext();
-        DownloadStorageHelper.submit(() -> {
+        Schedulers.io().scheduleDirect(() -> {
             BooksDBModel booksDBModel = new BooksDBModel(app);
             AudioDBModel audioDBModel = new AudioDBModel(app);
             for (BookPOJO book : gone) {
@@ -464,11 +491,12 @@ public class FavoritePresenter
     }
 
     /**
-     * Favorites, or history with its listening positions (as the settings' "Очистить" does), on the storage worker;
-     * {@code then} runs on the main thread afterwards.
+     * Favorites, or history with its listening positions (as the settings' "Очистить" does), off the main thread
+     * (rows only: not queued behind the storage worker's exports and scans); {@code then} runs on the main thread
+     * afterwards.
      */
     public static void clearTable(@NonNull Context app, int table, @Nullable Runnable then) {
-        DownloadStorageHelper.submit(() -> {
+        Schedulers.io().scheduleDirect(() -> {
             BooksDBModel booksDBModel = new BooksDBModel(app);
             if (table == Consts.TABLE_FAVORITE) {
                 booksDBModel.clearFavorite();
@@ -511,6 +539,7 @@ public class FavoritePresenter
         } else if (id == R.id.source_filter) {
             offerSources();
         } else if (id == R.id.date) {
+            sortId = id;
             loadBooks();
         } else if (id == R.id.saved_filter) {
             if (!isFilterSaved) {
@@ -537,11 +566,15 @@ public class FavoritePresenter
                 onSearch(mQuery);
             }
         } else if (id == R.id.saved) {
+            sortId = id;
             sortBySavedState(books, () -> {
                 reorderFilter();
                 onSearch(mQuery);
             });
         } else {
+            if (id == R.id.name || id == R.id.genre || id == R.id.autor || id == R.id.artist || id == R.id.series) {
+                sortId = id; // not the search item, which comes here too
+            }
             books.sort(getComparator(id));
             reorderFilter();
             onSearch(mQuery);
@@ -571,6 +604,7 @@ public class FavoritePresenter
                     getViewState().showProgres(false);
                     callback.onStates(states);
                 }, e -> {
+                    isLoading = false; // a load waiting for the "saved" order ends here; the next one tries again
                     getViewState().showProgres(false);
                     getViewState().showToast(R.string.error_load_data);
                 }));
@@ -636,6 +670,7 @@ public class FavoritePresenter
         if (books == null) {
             return;
         }
+        isFilterSaved = false; // every choice below replaces or clears the filter
         if (value == null) {
             getViewState().setSubTitle("");
             flter = null;

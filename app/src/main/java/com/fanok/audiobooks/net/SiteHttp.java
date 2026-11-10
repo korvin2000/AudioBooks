@@ -61,7 +61,7 @@ public final class SiteHttp {
         }
         if (provider != null) {
             connection.timeout(provider.parser.timeoutMs());
-            // the site's own cookies (a session the user pasted in settings), to its own host only, never a former one;
+            // the site's own cookies (a session the user got passing its browser check), to its own host only, never a former one;
             // a newer one the site issued (in the jar) wins
             Map<String, String> own = Url.isHost(url, provider.server)
                     ? provider.parser.cookies() : Collections.<String, String>emptyMap();

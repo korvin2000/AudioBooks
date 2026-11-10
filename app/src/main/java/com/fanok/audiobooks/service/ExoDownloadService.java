@@ -5,6 +5,8 @@ import static com.fanok.audiobooks.activity.BookActivity.Broadcast_UPDATE_ADAPTE
 import android.app.Notification;
 import android.content.Context;
 import android.content.Intent;
+import android.os.Handler;
+import android.os.Looper;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -29,6 +31,7 @@ import com.fanok.audiobooks.util.DownloadUtil;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicBoolean;
 import org.jetbrains.annotations.NotNull;
 
 /**
@@ -43,6 +46,9 @@ public class ExoDownloadService extends DownloadService {
     public static final String CHANNEL_ID = "download_channel";
     private static final int JOB_ID = 1;
     public static final int FOREGROUND_NOTIFICATION_ID = 98;
+    private static final long NOTIFY_DELAY_MS = 300;
+    private static final Handler MAIN = new Handler(Looper.getMainLooper());
+    private static final AtomicBoolean NOTIFY_PENDING = new AtomicBoolean();
 
     private DownloadManagerListener listener;
 
@@ -108,9 +114,20 @@ public class ExoDownloadService extends DownloadService {
         return NotificationDownload.forStatus(this, key, name, monitor.statusOfBook(key), Math.max(0, books.size() - 1));
     }
 
-    /** Tells this app's screens that downloads changed. */
+    /**
+     * Tells this app's screens that downloads changed, at most once per {@link #NOTIFY_DELAY_MS}: each broadcast
+     * refreshes a whole chapter list, and queuing a long book changes every chapter at once. Any thread.
+     */
     public static void notifyChanged(@NonNull Context context) {
-        context.sendBroadcast(new Intent(Broadcast_UPDATE_ADAPTER).setPackage(context.getPackageName()));
+        final Context app = context.getApplicationContext();
+        if (!NOTIFY_PENDING.compareAndSet(false, true)) {
+            return; //the broadcast on its way tells of this change too
+        }
+        MAIN.postDelayed(() -> {
+            //cleared before sending: a change after this point schedules the next broadcast, none is lost
+            NOTIFY_PENDING.set(false);
+            app.sendBroadcast(new Intent(Broadcast_UPDATE_ADAPTER).setPackage(app.getPackageName()));
+        }, NOTIFY_DELAY_MS);
     }
 
     /**
@@ -180,18 +197,17 @@ public class ExoDownloadService extends DownloadService {
 
         /**
          * When the removed download was the last one of its book (same {@code DownloadIds.bookKey}, never a substring
-         * match) and no chapter keeps an exported copy, the book leaves the Saved list with its chapter rows.
+         * match) and no chapter keeps an exported copy, the book leaves the Saved list; its chapter rows stay, as for
+         * any opened online book (a cold-start resume of the book reads them).
          */
         private void forgetBookIfNothingLeft(DownloadIndex index, Download download) {
             String bookUrl = DownloadUtil.bookUrlOf(download.request);
             if (bookUrl == null || bookUrl.isEmpty()) return;
             if (!DownloadUtil.downloadIdsOfBook(index, bookUrl).isEmpty()) return;
-            AudioListDBModel audioListDBModel = new AudioListDBModel(context);
-            for (BooksAudioEntity row : audioListDBModel.getRows(bookUrl)) {
+            for (BooksAudioEntity row : new AudioListDBModel(context).getRows(bookUrl)) {
                 if (row.localUri != null) return;
             }
             new BooksDBModel(context).removeSavedByUrl(bookUrl);
-            audioListDBModel.remove(bookUrl);
         }
     }
 }

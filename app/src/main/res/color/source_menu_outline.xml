@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The globe panel's hairline (fragment.SourceMenu): the theme's text at 14 %, white on the dark and the black theme,
+     black on the light one. -->
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:alpha="0.14" android:color="?attr/colorPrimaryText" />
+</selector>

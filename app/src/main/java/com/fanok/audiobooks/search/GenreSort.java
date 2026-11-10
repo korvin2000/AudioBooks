@@ -67,7 +67,11 @@ public enum GenreSort {
             int sign = this == NAME ? 1 : -1;
             Collections.sort(list, (a, b) -> sign * keys.get(a).compareTo(keys.get(b)));
         } else if (this == COUNT) {
-            Collections.sort(list, (a, b) -> Integer.compare(count(b), count(a)));
+            Map<GenrePOJO, Integer> counts = new IdentityHashMap<>(); // counted once: a list may hold 30 000
+            for (GenrePOJO genre : list) {
+                counts.put(genre, count(genre));
+            }
+            Collections.sort(list, (a, b) -> Integer.compare(counts.get(b), counts.get(a)));
         } else if (this == FAVORITE) {
             Map<GenrePOJO, Integer> counts = new IdentityHashMap<>();
             for (GenrePOJO genre : list) {

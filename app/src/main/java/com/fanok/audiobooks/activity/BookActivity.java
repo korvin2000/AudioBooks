@@ -7,6 +7,7 @@ import static com.fanok.audiobooks.Consts.isServiceRunning;
 import static com.fanok.audiobooks.presenter.BookPresenter.Broadcast_SHOW_TITLE;
 import static com.fanok.audiobooks.service.MediaPlayerService.countAudioWereShowingRatingPopUp;
 
+import com.fanok.audiobooks.FontScale;
 import android.annotation.SuppressLint;
 import android.app.PendingIntent;
 import android.app.UiModeManager;
@@ -58,6 +59,7 @@ import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.widget.AppCompatSeekBar;
 import androidx.appcompat.widget.Toolbar;
+import androidx.coordinatorlayout.widget.CoordinatorLayout;
 import androidx.core.content.ContextCompat;
 import androidx.fragment.app.Fragment;
 import androidx.lifecycle.Lifecycle;
@@ -85,6 +87,7 @@ import com.fanok.audiobooks.pojo.AudioPOJO;
 import com.fanok.audiobooks.pojo.BookPOJO;
 import com.fanok.audiobooks.pojo.OtherArtistPOJO;
 import com.fanok.audiobooks.pojo.StorageUtil;
+import com.fanok.audiobooks.policy.DefaultCover;
 import com.fanok.audiobooks.policy.ParentalControl;
 import com.fanok.audiobooks.presenter.BookPresenter;
 import com.fanok.audiobooks.service.MediaPlayerService;
@@ -113,6 +116,12 @@ import org.xmlpull.v1.XmlPullParser;
 
 public class BookActivity extends MvpAppCompatActivity implements Activity {
 
+    /** The screen at the chosen font scale (FontScale). */
+    @Override
+    protected void attachBaseContext(Context newBase) {
+        super.attachBaseContext(FontScale.wrap(newBase));
+    }
+
     private static final String TAG = "BookActivity";
 
     public static final String Broadcast_SET_IMAGE = "SetImage";
@@ -126,6 +135,9 @@ public class BookActivity extends MvpAppCompatActivity implements Activity {
 
 
     private static String showingView;
+    /** The screen that set {@link #showingView} last: only it clears it, not one destroyed after the next resumed. */
+    private static Object sShowingOwner;
+    private final Object mShowingToken = new Object();
 
 
     private ImageButton mButtonCollapse;
@@ -363,6 +375,10 @@ public class BookActivity extends MvpAppCompatActivity implements Activity {
                     .setPositiveButton(R.string.confirm, null);
 
             AlertDialog dialog = builder.create();
+            if (context instanceof LoadBook) {
+                // its blank loading screen has nothing else to show, whether the book opens or not
+                dialog.setOnDismissListener(d -> ((LoadBook) context).finish());
+            }
             dialog.setOnShowListener(dialogInterface -> {
                 Objects.requireNonNull(editText.getText()).clear();
                 editText.requestFocus();
@@ -460,7 +476,6 @@ public class BookActivity extends MvpAppCompatActivity implements Activity {
         pref = PreferenceManager
                 .getDefaultSharedPreferences(this);
 
-        int isTablet = getResources().getInteger(R.integer.isTablet);
         UiModeManager uiModeManager = (UiModeManager) getApplicationContext().getSystemService(UI_MODE_SERVICE);
         setContentView(R.layout.activity_book);
         mButtonCollapse = findViewById(R.id.buttonCollapse);
@@ -553,7 +568,11 @@ public class BookActivity extends MvpAppCompatActivity implements Activity {
 
 
 
-        if (isTablet == 0 && (uiModeManager == null
+        // decided by the inflated layout, not the screen size: a tablet in portrait has the phones' bottom sheet too
+        ViewGroup.LayoutParams playerParams = mPlayer.getLayoutParams();
+        if (playerParams instanceof CoordinatorLayout.LayoutParams
+                && ((CoordinatorLayout.LayoutParams) playerParams).getBehavior() instanceof BottomSheetBehavior
+                && (uiModeManager == null
                 || uiModeManager.getCurrentModeType() != Configuration.UI_MODE_TYPE_TELEVISION)) {
             bottomSheetBehavior = BottomSheetBehavior.from(mPlayer);
 
@@ -769,7 +788,8 @@ public class BookActivity extends MvpAppCompatActivity implements Activity {
                     return;
                 }
 
-                if (mNotificationClick) {
+                // only a book alone in its task starts the main screen; screens below it are returned to
+                if (mNotificationClick && isTaskRoot()) {
                     Intent intent = new Intent(BookActivity.this, MainActivity.class);
                     intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
                     intent.putExtra("notificationClick", true);
@@ -1002,7 +1022,7 @@ public class BookActivity extends MvpAppCompatActivity implements Activity {
             return true;
         }
         if (id == android.R.id.home) {
-            if (mNotificationClick) {
+            if (mNotificationClick && isTaskRoot()) {
                 Intent intent = new Intent(this, MainActivity.class);
                 intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
                 intent.putExtra("notificationClick", true); // as Back does: not a launch, no last book over it
@@ -1060,10 +1080,16 @@ public class BookActivity extends MvpAppCompatActivity implements Activity {
 
     @Override
     protected void onDestroy() {
-        showingView = "";
+        // a new screen of this same book was resumed first («Обновить», a passed site check): its comments fetch,
+        // which replaced this one's under the same URL, must go on
+        boolean replaced = sShowingOwner != mShowingToken && Objects.equals(mBookPOJO.getUrl(), showingView);
+        if (sShowingOwner == mShowingToken) {
+            showingView = "";
+            sShowingOwner = null;
+        }
         mFavorites.release();
         comentsCount.dispose();
-        if (isFinishing()) {
+        if (isFinishing() && !replaced) {
             com.fanok.audiobooks.model.ComentsModel.cancel(mBookPOJO.getUrl());
         }
         //Moxy destroys the presenter (and its player binding) when this screen is finished for good
@@ -1282,56 +1308,74 @@ public class BookActivity extends MvpAppCompatActivity implements Activity {
     }
 
 
+    /** The shortcut's cover load: Picasso holds its target only weakly, a collected one would never deliver. */
+    @Nullable
+    private Target mShortcutTarget;
+
     @RequiresApi(api = Build.VERSION_CODES.O)
     @Override
     public void addToMainScreen(BookPOJO pojo) {
-        Picasso.get().load(pojo.getPhoto()).into(new Target() {
+        String photo = pojo.getPhoto();
+        if (photo == null || photo.trim().isEmpty() || DefaultCover.replaces(photo)) {
+            pinShortcut(pojo, null); // no cover, or one that is never requested: the app's icon
+            return;
+        }
+        mShortcutTarget = new Target() {
             @Override
             public void onBitmapLoaded(Bitmap bitmap, Picasso.LoadedFrom from) {
-                ShortcutManager shortcutManager = getSystemService(ShortcutManager.class);
-
-                Intent intent = new Intent(getApplicationContext(), LoadBook.class);
-                intent.setAction(Intent.ACTION_VIEW);
-                intent.putExtra("url", pojo.getUrl());
-                intent.putExtra("notificationClick", true);
-
-                ShortcutInfo shortcut = new ShortcutInfo.Builder(getApplicationContext(),
-                        pojo.getUrl())
-                        .setShortLabel(pojo.getName())
-                        .setLongLabel(pojo.getName())
-                        .setIcon(Icon.createWithBitmap(bitmap))
-                        .setIntent(intent)
-                        .build();
-
-                if (shortcutManager != null) {
-                    shortcutManager.setDynamicShortcuts(Collections.singletonList(shortcut));
-                    if (shortcutManager.isRequestPinShortcutSupported()) {
-                        ShortcutInfo pinShortcutInfo = new ShortcutInfo
-                                .Builder(getApplicationContext(), pojo.getUrl())
-                                .build();
-                        Intent pinnedShortcutCallbackIntent =
-                                shortcutManager.createShortcutResultIntent(pinShortcutInfo);
-
-
-                        PendingIntent successCallback = PendingIntent.getBroadcast(
-                                getApplicationContext(), 0,
-                                pinnedShortcutCallbackIntent, PendingIntent.FLAG_IMMUTABLE);
-                        shortcutManager.requestPinShortcut(pinShortcutInfo,
-                                successCallback.getIntentSender());
-                    }
-                }
+                pinShortcut(pojo, bitmap);
             }
 
             @Override
             public void onBitmapFailed(Exception e, Drawable errorDrawable) {
-
+                pinShortcut(pojo, null); // offline or a broken cover: the shortcut still comes, with the app's icon
             }
 
             @Override
             public void onPrepareLoad(Drawable placeHolderDrawable) {
 
             }
-        });
+        };
+        (photo.startsWith("/") ? Picasso.get().load(new java.io.File(photo)) : Picasso.get().load(photo))
+                .into(mShortcutTarget);
+    }
+
+    /** The book's shortcut with its cover, or the app's icon when {@code cover} is null; pinned where supported. */
+    @RequiresApi(api = Build.VERSION_CODES.O)
+    private void pinShortcut(@NonNull BookPOJO pojo, @Nullable Bitmap cover) {
+        ShortcutManager shortcutManager = getSystemService(ShortcutManager.class);
+
+        Intent intent = new Intent(getApplicationContext(), LoadBook.class);
+        intent.setAction(Intent.ACTION_VIEW);
+        intent.putExtra("url", pojo.getUrl());
+        intent.putExtra("notificationClick", true);
+
+        ShortcutInfo shortcut = new ShortcutInfo.Builder(getApplicationContext(),
+                pojo.getUrl())
+                .setShortLabel(pojo.getName())
+                .setLongLabel(pojo.getName())
+                .setIcon(cover != null ? Icon.createWithBitmap(cover)
+                        : Icon.createWithResource(this, R.mipmap.ic_launcher))
+                .setIntent(intent)
+                .build();
+
+        if (shortcutManager != null) {
+            shortcutManager.setDynamicShortcuts(Collections.singletonList(shortcut));
+            if (shortcutManager.isRequestPinShortcutSupported()) {
+                ShortcutInfo pinShortcutInfo = new ShortcutInfo
+                        .Builder(getApplicationContext(), pojo.getUrl())
+                        .build();
+                Intent pinnedShortcutCallbackIntent =
+                        shortcutManager.createShortcutResultIntent(pinShortcutInfo);
+
+
+                PendingIntent successCallback = PendingIntent.getBroadcast(
+                        getApplicationContext(), 0,
+                        pinnedShortcutCallbackIntent, PendingIntent.FLAG_IMMUTABLE);
+                shortcutManager.requestPinShortcut(pinShortcutInfo,
+                        successCallback.getIntentSender());
+            }
+        }
     }
 
 
@@ -1912,6 +1956,7 @@ public class BookActivity extends MvpAppCompatActivity implements Activity {
             showEqualizer(sessionId);
         }
         showingView = mBookPOJO.getUrl();
+        sShowingOwner = mShowingToken;
         mFavorites.refresh(); //the book may have been (un)marked on another screen meanwhile
         bindTopSideButtons();
         rebuildMenu(); //the toolbar settings may have changed meanwhile
@@ -1931,17 +1976,13 @@ public class BookActivity extends MvpAppCompatActivity implements Activity {
 
     @Override
     public boolean dispatchKeyEvent(KeyEvent event) {
-        if (event.getAction() == KeyEvent.ACTION_DOWN) {
-            if ((!isServiceRunning(getApplicationContext(), MediaPlayerService.class))
-                    && (event.getKeyCode() == KEYCODE_MEDIA_PLAY
-                    || event.getKeyCode() == KEYCODE_MEDIA_PLAY_PAUSE)) {
-                mPresenter.buttomPlayClick(mPlayTop);
-                return true;
-            } else if (handleUserInput(getApplicationContext(), event.getKeyCode())) {
-                return true;
-            }
+        if (event.getAction() == KeyEvent.ACTION_DOWN && event.getRepeatCount() == 0
+                && (event.getKeyCode() == KEYCODE_MEDIA_PLAY || event.getKeyCode() == KEYCODE_MEDIA_PLAY_PAUSE)
+                && !isServiceRunning(getApplicationContext(), MediaPlayerService.class)) {
+            mPresenter.buttomPlayClick(mPlayTop);
+            return true;
         }
-        return super.dispatchKeyEvent(event);
+        return handleUserInput(this, event) || super.dispatchKeyEvent(event);
     }
 
 

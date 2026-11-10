@@ -444,7 +444,8 @@ public final class Updater {
             throw new IOException("SHA-256 " + hash + " instead of " + sha);
         }
         PackageManager pm = app.getPackageManager();
-        int flags = Build.VERSION.SDK_INT >= 28 ? PackageManager.GET_SIGNING_CERTIFICATES : PackageManager.GET_SIGNATURES;
+        // Android 9 and 10 read an archive's certificates for GET_SIGNATURES only (signingInfo stays null)
+        int flags = Build.VERSION.SDK_INT >= 30 ? PackageManager.GET_SIGNING_CERTIFICATES : PackageManager.GET_SIGNATURES;
         PackageInfo archive = pm.getPackageArchiveInfo(apk.getPath(), flags);
         PackageInfo installed;
         try {
@@ -467,7 +468,7 @@ public final class Updater {
     @Nullable
     @SuppressWarnings("deprecation")
     private static Signature[] signers(@NonNull PackageInfo info) {
-        if (Build.VERSION.SDK_INT >= 28) {
+        if (Build.VERSION.SDK_INT >= 30) {
             return info.signingInfo == null ? null : info.signingInfo.getApkContentsSigners();
         }
         return info.signatures;

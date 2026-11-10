@@ -7,7 +7,10 @@ import static com.fanok.audiobooks.presenter.BookPresenter.Broadcast_PLAY;
 import static com.fanok.audiobooks.presenter.BookPresenter.Broadcast_PLAY_NEXT;
 import static com.fanok.audiobooks.presenter.BookPresenter.Broadcast_PLAY_PREVIOUS;
 import static com.fanok.audiobooks.presenter.BookPresenter.Broadcast_RESUME;
+import static com.fanok.audiobooks.presenter.BookPresenter.Broadcast_SEEK_NEXT_30;
+import static com.fanok.audiobooks.presenter.BookPresenter.Broadcast_SEEK_PREVIOUS_10;
 
+import android.app.Activity;
 import android.app.ActivityManager;
 import android.content.Context;
 import android.content.Intent;
@@ -17,6 +20,7 @@ import android.util.Log;
 import android.util.TypedValue;
 import android.view.KeyEvent;
 import android.view.MenuItem;
+import android.widget.EditText;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.core.graphics.drawable.DrawableCompat;
@@ -179,7 +183,10 @@ public class Consts {
         return -1;
     }
 
-    /** The player command broadcast of a media key, or null: PLAY plays, PAUSE pauses, PLAY_PAUSE toggles. */
+    /**
+     * The player command broadcast of a media key, or null: PLAY plays, PAUSE pauses, PLAY_PAUSE toggles, FAST_FORWARD
+     * and REWIND seek by the seek step, NEXT (and 3) and PREVIOUS change the chapter.
+     */
     @Nullable
     public static String mediaKeyBroadcast(int keycode) {
         switch (keycode) {
@@ -190,10 +197,12 @@ public class Consts {
             case KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE:
                 return Broadcast_PLAY;
             case KeyEvent.KEYCODE_MEDIA_FAST_FORWARD:
+                return Broadcast_SEEK_NEXT_30;
+            case KeyEvent.KEYCODE_MEDIA_REWIND:
+                return Broadcast_SEEK_PREVIOUS_10;
             case KeyEvent.KEYCODE_3:
             case KeyEvent.KEYCODE_MEDIA_NEXT:
                 return Broadcast_PLAY_NEXT;
-            case KeyEvent.KEYCODE_MEDIA_REWIND:
             case KeyEvent.KEYCODE_MEDIA_PREVIOUS:
                 return Broadcast_PLAY_PREVIOUS;
             default:
@@ -201,7 +210,7 @@ public class Consts {
         }
     }
 
-    /** Sends a media key to the player; @return true when the key is consumed (the play keys). */
+    /** Sends a media key to the player; @return true when it is one ({@link #mediaKeyBroadcast}). */
     public static boolean handleUserInput(@NonNull Context context, int keycode) {
         Log.d(TAG, "Keycode " + keycode);
         String action = mediaKeyBroadcast(keycode);
@@ -209,7 +218,24 @@ public class Consts {
             return false;
         }
         context.sendBroadcast(new Intent(action).setPackage(context.getPackageName()));
-        return !Broadcast_PLAY_NEXT.equals(action) && !Broadcast_PLAY_PREVIOUS.equals(action);
+        return true;
+    }
+
+    /**
+     * A key of {@code activity}: a media key press goes to the player once and is consumed. Left unconsumed, the
+     * system hands the same key to the media session as well and the command runs twice (a TV remote: two chapters
+     * per press). A held key repeats nothing, media keys are not shortcuts while the user types (UI-16), and
+     * without the player's service the key is left to the system.
+     */
+    public static boolean handleUserInput(@NonNull Activity activity, @NonNull KeyEvent event) {
+        if (event.getAction() != KeyEvent.ACTION_DOWN || activity.getCurrentFocus() instanceof EditText) {
+            return false;
+        }
+        if (mediaKeyBroadcast(event.getKeyCode()) == null
+                || !isServiceRunning(activity, com.fanok.audiobooks.service.MediaPlayerService.class)) {
+            return false; // no player of ours to take it: the key goes on to whoever plays
+        }
+        return event.getRepeatCount() > 0 || handleUserInput(activity.getApplicationContext(), event.getKeyCode());
     }
 
     public static boolean isServiceRunning(@NonNull Context context, Class<?> serviceClass) {
@@ -287,32 +313,11 @@ public class Consts {
         }
     }
 
+    /**
+     * False only when the device has no active network at all ({@link #isOffline}); any network (VPN, ethernet, one
+     * without internet) counts, and an unknown state counts as online.
+     */
     public static boolean isNetworkAvailable(android.content.Context context) {
-        if (context == null) return true;
-        try {
-            android.net.ConnectivityManager cm = (android.net.ConnectivityManager) context.getSystemService(android.content.Context.CONNECTIVITY_SERVICE);
-            if (cm != null) {
-                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
-                    android.net.Network activeNetwork = cm.getActiveNetwork();
-                    if (activeNetwork != null) {
-                        android.net.NetworkCapabilities capabilities = cm.getNetworkCapabilities(activeNetwork);
-                        if (capabilities != null && (
-                                capabilities.hasCapability(android.net.NetworkCapabilities.NET_CAPABILITY_INTERNET) ||
-                                capabilities.hasTransport(android.net.NetworkCapabilities.TRANSPORT_WIFI) ||
-                                capabilities.hasTransport(android.net.NetworkCapabilities.TRANSPORT_CELLULAR) ||
-                                capabilities.hasTransport(android.net.NetworkCapabilities.TRANSPORT_ETHERNET) ||
-                                capabilities.hasTransport(android.net.NetworkCapabilities.TRANSPORT_VPN)
-                        )) {
-                            return true;
-                        }
-                    }
-                }
-                android.net.NetworkInfo activeNetworkInfo = cm.getActiveNetworkInfo();
-                if (activeNetworkInfo != null && activeNetworkInfo.isConnected()) {
-                    return true;
-                }
-            }
-        } catch (Exception ignored) {}
-        return true;
+        return !isOffline(context);
     }
 }

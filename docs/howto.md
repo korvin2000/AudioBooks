@@ -355,7 +355,7 @@ adb exec-out run-as com.fanok.books tar -cf - databases shared_prefs files > app
 
 ### How the app talks to sites
 
-- **Pages** go through `net/SiteHttp` (Jsoup over `HttpURLConnection`) with a per-host cookie jar. Cloudflare and DDoS-Guard challenge pages raise `CookesExeption` instead of being parsed. **Settings → site cookies** opens the site in a WebView (`ActivityCookies`) to pass such a challenge.
+- **Pages** go through `net/SiteHttp` (Jsoup over `HttpURLConnection`) with a per-host cookie jar. Cloudflare and DDoS-Guard challenge pages raise `CookesExeption` instead of being parsed. A list or a book the site refused offers to pass such a challenge in a WebView (`ActivityCookies`, for the sites of `ActivityCookies.passes`).
 - **Audio streaming, downloads, and covers** use the shared OkHttp client from `App` (Media3 `OkHttpDataSource`, Picasso). Downloads use an HTTP/1.1 copy of it so that parallel segment requests get separate connections.
 - **TLS** uses normal platform validation; `network_security_config.xml` adds the ISRG Root X1 anchor for sites whose certificates older Android versions do not trust.
 

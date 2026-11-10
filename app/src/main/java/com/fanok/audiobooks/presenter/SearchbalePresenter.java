@@ -4,6 +4,7 @@ package com.fanok.audiobooks.presenter;
 import android.annotation.SuppressLint;
 import android.content.Context;
 import android.content.SharedPreferences;
+import android.graphics.drawable.Drawable;
 import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -32,6 +33,7 @@ import com.fanok.audiobooks.pojo.GenrePOJO;
 import com.fanok.audiobooks.pojo.SearcheblPOJO;
 import com.fanok.audiobooks.pojo.SearchebleArrayPOJO;
 import com.fanok.audiobooks.policy.DefaultCover;
+import com.fanok.audiobooks.policy.ParentalControl;
 import com.fanok.audiobooks.search.Genre;
 import com.fanok.audiobooks.search.GenrePicks;
 import com.fanok.audiobooks.search.PersonSearch;
@@ -372,12 +374,23 @@ public class SearchbalePresenter extends MvpPresenter<SearchableView> implements
         getViewState().setNotFoundVisibile(false);
         getViewState().showSourcesFailed(0);
         if (mModelId == Consts.MODEL_BOOKS) {
+            // the same text search submitted again: the scope and tab chosen on it since the last save stay
+            boolean same = mSearched && mPersonKind < 0 && query.equals(mRequest.text);
+            Set<SearchRequest.Field> scope = mScope;
+            int tab = filter;
             leavePerson();
             long now = System.currentTimeMillis();
             SearchSnapshot last = force ? null : mStore.load(now);
             if (last != null && last.text.equals(query) && now - last.savedAt < FRESH_MS && !last.cards.isEmpty()
                     && complete(last)) {
                 restore(last);
+                if (same) {
+                    Provider shown = Provider.ofSource(tab);
+                    if (tab == -1 || shown != null && mSources.contains(shown)) {
+                        filter = tab;
+                    }
+                    setScope(scope); // publishes
+                }
                 return;
             }
             loadChips(query);
@@ -1153,7 +1166,14 @@ public class SearchbalePresenter extends MvpPresenter<SearchableView> implements
         TextView series = layout.findViewById(R.id.series);
 
         ImageView imageView = layout.findViewById(R.id.imageView);
-        if (DefaultCover.replaces(bookPOJO.getPhoto())) {
+        // masked as the row is: the row's copy carries its group's most restricted genre
+        Drawable mask = ParentalControl.coverMask(imageView.getContext(), shown);
+        if (mask == null) {
+            mask = ParentalControl.coverMask(imageView.getContext(), bookPOJO);
+        }
+        if (mask != null) {
+            imageView.setImageDrawable(mask);
+        } else if (DefaultCover.replaces(bookPOJO.getPhoto())) {
             imageView.setImageDrawable(DefaultCover.drawable(imageView.getContext(), bookPOJO.getUrl()));
         } else {
             Picasso.get()

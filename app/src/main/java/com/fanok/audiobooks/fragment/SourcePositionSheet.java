@@ -233,8 +233,7 @@ public class SourcePositionSheet extends BottomSheetDialogFragment {
         to = Math.max(0, Math.min(order.size() - 1, to));
         Preview preview = Preview.of(order, active, provider, to);
 
-        subtitle.setText(getString(R.string.sources_sheet_subtitle, provider.title, from + 1, active,
-                Sources.maxActive()));
+        subtitle.setText(getString(R.string.sources_sheet_subtitle, provider.title, from + 1, active, order.size()));
         value.setText(getString(R.string.sources_sheet_value, to + 1));
         of.setText(getString(R.string.sources_sheet_of, order.size()));
         if (Math.round(slider.getValue()) != to + 1) {

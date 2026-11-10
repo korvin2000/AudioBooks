@@ -1,5 +1,6 @@
 package com.fanok.audiobooks.source;
 
+import com.fanok.audiobooks.model.BookPages;
 import com.fanok.audiobooks.model.OtherSourceModel;
 import com.fanok.audiobooks.net.SiteHttp;
 import com.fanok.audiobooks.pojo.AudioPOJO;
@@ -318,10 +319,11 @@ public interface SourceParser {
 
     /**
      * The series of the book at {@code bookUrl} as the series tab loads them: {@link #series} of the {@link #fetch}ed
-     * book page. A site without series overrides it and fetches nothing.
+     * book page, the one this opening of the book shares ({@link BookPages}). A site without series overrides it and
+     * fetches nothing.
      */
     default ArrayList<SeriesPOJO> loadSeries(String bookUrl) throws IOException {
-        return series(fetch(bookUrl), bookUrl);
+        return series(BookPages.get(bookUrl, this::fetch), bookUrl);
     }
 
     /** The comments of the book; {@code cancelled} is polled between pages. */

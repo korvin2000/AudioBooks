@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- A row of the globe panel (fragment.SourceMenu), inset as a rounded pill: the theme's ripple; the catalog's source
+     (activated) filled in the accent; the D-pad's row (selected in the list, focused for the footer) outlined. -->
+<ripple xmlns:android="http://schemas.android.com/apk/res/android"
+    android:color="?attr/colorControlHighlight">
+    <item
+        android:id="@android:id/mask"
+        android:bottom="2dp"
+        android:left="6dp"
+        android:right="6dp"
+        android:top="2dp">
+        <shape android:shape="rectangle">
+            <corners android:radius="10dp" />
+            <solid android:color="@android:color/white" />
+        </shape>
+    </item>
+    <item
+        android:bottom="2dp"
+        android:left="6dp"
+        android:right="6dp"
+        android:top="2dp">
+        <selector>
+            <item
+                android:state_activated="true"
+                android:state_selected="true">
+                <shape android:shape="rectangle">
+                    <corners android:radius="10dp" />
+                    <solid android:color="@color/source_menu_pill" />
+                    <stroke
+                        android:width="2dp"
+                        android:color="?attr/colorPrimaryText" />
+                </shape>
+            </item>
+            <item android:state_selected="true">
+                <shape android:shape="rectangle">
+                    <corners android:radius="10dp" />
+                    <solid android:color="@color/sources_chip" />
+                    <stroke
+                        android:width="2dp"
+                        android:color="?attr/colorPrimaryText" />
+                </shape>
+            </item>
+            <item android:state_focused="true">
+                <shape android:shape="rectangle">
+                    <corners android:radius="10dp" />
+                    <solid android:color="@color/sources_chip" />
+                    <stroke
+                        android:width="2dp"
+                        android:color="?attr/colorPrimaryText" />
+                </shape>
+            </item>
+            <item android:state_activated="true">
+                <shape android:shape="rectangle">
+                    <corners android:radius="10dp" />
+                    <solid android:color="@color/source_menu_pill" />
+                </shape>
+            </item>
+        </selector>
+    </item>
+</ripple>

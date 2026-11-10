@@ -14,6 +14,7 @@ import android.widget.TextView;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.recyclerview.widget.RecyclerView;
+import com.fanok.audiobooks.FontScale;
 import com.fanok.audiobooks.R;
 import com.fanok.audiobooks.activity.NarratorActivity;
 import com.fanok.audiobooks.fragment.FavoritesSwitcher;
@@ -139,6 +140,7 @@ public class GenreListAddapter extends RecyclerView.Adapter<GenreListAddapter.My
 
         View view = LayoutInflater.from(viewGroup.getContext()).inflate(
                 R.layout.genre_recycler_item, viewGroup, false);
+        FontScale.grow(view);
 
         return new MyHolder(view);
     }

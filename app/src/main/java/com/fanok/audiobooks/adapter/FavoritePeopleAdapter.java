@@ -10,10 +10,12 @@ import android.widget.TextView;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.recyclerview.widget.RecyclerView;
+import com.fanok.audiobooks.FontScale;
 import com.fanok.audiobooks.R;
 import com.fanok.audiobooks.activity.NarratorActivity;
 import com.fanok.audiobooks.presenter.FavoritePeoplePresenter.Row;
 import com.fanok.audiobooks.search.Provider;
+import com.fanok.audiobooks.util.RussianResources;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -52,7 +54,7 @@ public class FavoritePeopleAdapter extends RecyclerView.Adapter<FavoritePeopleAd
             out.append(out.length() > 0 ? ", " : "").append(p.title);
         }
         String books = row.books > 0
-                ? context.getResources().getQuantityString(R.plurals.favorite_people_books, row.books, row.books)
+                ? RussianResources.of(context).getQuantityString(R.plurals.favorite_people_books, row.books, row.books)
                 : context.getString(R.string.favorite_people_no_books);
         return out.length() > 0 ? out.append(" · ").append(books).toString() : books;
     }
@@ -60,8 +62,9 @@ public class FavoritePeopleAdapter extends RecyclerView.Adapter<FavoritePeopleAd
     @NonNull
     @Override
     public Holder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
-        return new Holder(LayoutInflater.from(parent.getContext())
-                .inflate(R.layout.genre_recycler_item, parent, false));
+        View row = LayoutInflater.from(parent.getContext()).inflate(R.layout.genre_recycler_item, parent, false);
+        FontScale.grow(row);
+        return new Holder(row);
     }
 
     @Override

@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- A source's place in the globe panel (fragment.SourceMenu): on the accent badge for the catalog's source. -->
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:color="@color/sources_on_accent" android:state_activated="true" />
+    <item android:color="@color/sources_text_secondary" />
+</selector>

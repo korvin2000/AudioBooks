@@ -36,6 +36,7 @@ import com.bumptech.glide.Glide;
 import com.bumptech.glide.RequestManager;
 import com.fanok.audiobooks.App;
 import com.fanok.audiobooks.Consts;
+import com.fanok.audiobooks.FontScale;
 import com.fanok.audiobooks.R;
 import com.fanok.audiobooks.Url;
 import com.fanok.audiobooks.model.AudioDBModel;
@@ -556,6 +557,9 @@ public class BooksListAddapter extends RecyclerView.Adapter<BooksListAddapter.My
                 big ? R.layout.books_recycler_item_big : R.layout.books_recycler_item, viewGroup, false);
         if (medium) {
             medium(view);
+        } else {
+            // the row's fixed height holds larger text: the row and its cover grow with the font scale
+            FontScale.grow(view, view.findViewById(R.id.imageView), view.findViewById(R.id.donutProgress));
         }
         return new MyHolder(view);
     }
@@ -775,11 +779,13 @@ public class BooksListAddapter extends RecyclerView.Adapter<BooksListAddapter.My
                             ArrayList<AudioListPOJO> list = audioListModel.get(url);
                             if (list != null && !list.isEmpty()) {
                                 int count = 0;
-                                // A chapter counts as downloaded when its row records an app-written copy, when it is an
-                                // imported local file, or when its Media3 download (resolved by chapter identity) is complete.
+                                // A chapter counts as downloaded when its row's app-written copy or imported local file
+                                // still exists, or when its Media3 download (resolved by chapter identity) is complete.
                                 java.util.Set<String> withCopy = new java.util.HashSet<>();
                                 for (com.fanok.audiobooks.room.BooksAudioEntity row : audioListModel.getRows(url)) {
-                                    if (row.localUri != null && !row.localUri.isEmpty()) withCopy.add(row.urlAudio);
+                                    if (com.fanok.audiobooks.util.DownloadStorageHelper.localCopyOf(ctx, row) != null) {
+                                        withCopy.add(row.urlAudio);
+                                    }
                                 }
                                 java.util.Map<String, Download> downloads = java.util.Collections.emptyMap();
                                 if (downloadIndex != null) {
@@ -795,12 +801,8 @@ public class BooksListAddapter extends RecyclerView.Adapter<BooksListAddapter.My
                                     if (pojo == null) continue;
                                     String aUrl = pojo.getAudioUrl();
                                     boolean isTrackDownloaded = withCopy.contains(aUrl);
-                                    if (!isTrackDownloaded && aUrl != null && !aUrl.isEmpty()) {
-                                        if (aUrl.startsWith("content://") || aUrl.startsWith("file://")) {
-                                            isTrackDownloaded = true;
-                                        } else if (aUrl.startsWith("/")) {
-                                            isTrackDownloaded = new java.io.File(aUrl).exists();
-                                        }
+                                    if (!isTrackDownloaded && aUrl != null && aUrl.startsWith("/")) {
+                                        isTrackDownloaded = new java.io.File(aUrl).exists();
                                     }
                                     if (!isTrackDownloaded) {
                                         Download d = downloads.get(aUrl);

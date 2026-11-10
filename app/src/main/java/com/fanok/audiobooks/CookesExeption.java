@@ -7,7 +7,7 @@ public class CookesExeption extends IllegalArgumentException {
         super(s);
     }
 
-    /** What to tell the user: only baza-knig has a session the user can renew in the settings. */
+    /** What to tell the user: baza-knig's check is passed in the app, where its lists and books offer it. */
     public static int messageFor(String url) {
         return Url.isHost(url, Url.SERVER_BAZA_KNIG) ? R.string.cookes_baza_knig_exeption : R.string.site_challenge;
     }

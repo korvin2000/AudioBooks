@@ -1,5 +1,6 @@
 package com.fanok.audiobooks.activity;
 
+import com.fanok.audiobooks.FontScale;
 import android.content.ActivityNotFoundException;
 import android.content.Context;
 import android.content.Intent;
@@ -34,6 +35,12 @@ import io.reactivex.schedulers.Schedulers;
  * lists open it from the mark beside a reader fantlab knows.
  */
 public class NarratorActivity extends AppCompatActivity {
+
+    /** The screen at the chosen font scale (FontScale). */
+    @Override
+    protected void attachBaseContext(Context newBase) {
+        super.attachBaseContext(FontScale.wrap(newBase));
+    }
 
     private static final String EXTRA_NAME = "name", EXTRA_URL = "url";
 

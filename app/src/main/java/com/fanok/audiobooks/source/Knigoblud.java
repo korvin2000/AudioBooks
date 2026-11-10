@@ -9,6 +9,7 @@ import static com.fanok.audiobooks.source.Html.href;
 import static com.fanok.audiobooks.source.Html.lastPage;
 import static com.fanok.audiobooks.source.Html.text;
 
+import com.fanok.audiobooks.BookRemovedException;
 import com.fanok.audiobooks.R;
 import com.fanok.audiobooks.Url;
 import com.fanok.audiobooks.model.OtherArtistModel;
@@ -232,6 +233,9 @@ public final class Knigoblud implements SourceParser {
         boolean hasMore = lastPage(document.select(".PageNavLine1 a[data-page]")) > page;
         Element listParent = document.getElementById("BL");
         if (listParent == null) {
+            listParent = document.selectFirst(".BookList"); // a series page has no #BL
+        }
+        if (listParent == null) {
             return ProviderPage.empty();
         }
         ArrayList<BookPOJO> result = cards(listParent.getElementsByClass("bookListItem"), book -> {
@@ -265,6 +269,8 @@ public final class Knigoblud implements SourceParser {
                     bookPOJO.setGenre(genre.text());
                 }
             }
+            boolean authorRead = false;
+            boolean readerRead = false;
             for (Element metaBlock : book.getElementsByClass("bookListItemMetaBlock")) {
                 String metaBlocktext = metaBlock.text();
                 if (metaBlocktext.contains("📚")) {
@@ -278,25 +284,24 @@ public final class Knigoblud implements SourceParser {
                         }
                     }
                 } else {
-                    boolean author = metaBlocktext.contains("✍");
-                    boolean reader = metaBlocktext.contains("🎙");
-                    Element first = child(metaBlock, 1);
-                    Element second = child(metaBlock, 3);
-                    if (author && first != null) {
-                        if (!first.attr("href").isEmpty()) {
-                            bookPOJO.setUrlAutor(Url.SERVER_KNIGOBLUD + first.attr("href"));
+                    // read by marker: a second author also follows a ✍, so a position is not the reader
+                    for (Element span : metaBlock.getElementsByTag("span")) {
+                        Element link = span.nextElementSibling();
+                        if (link == null || !link.tagName().equals("a")) {
+                            continue;
                         }
-                        if (!first.text().isEmpty()) {
-                            bookPOJO.setAutor(first.text());
-                        }
-                    }
-                    Element readerElement = author ? second : first;
-                    if (reader && readerElement != null) {
-                        if (!readerElement.attr("href").isEmpty()) {
-                            bookPOJO.setUrlArtist(Url.SERVER_KNIGOBLUD + readerElement.attr("href"));
-                        }
-                        if (!readerElement.text().isEmpty()) {
-                            bookPOJO.setArtist(readerElement.text());
+                        if (span.text().contains("✍") && !authorRead) {
+                            authorRead = true;
+                            if (!link.attr("href").isEmpty()) {
+                                bookPOJO.setUrlAutor(Url.SERVER_KNIGOBLUD + link.attr("href"));
+                            }
+                            bookPOJO.setAutor(link.text());
+                        } else if (span.text().contains("🎙") && !readerRead) {
+                            readerRead = true;
+                            if (!link.attr("href").isEmpty()) {
+                                bookPOJO.setUrlArtist(Url.SERVER_KNIGOBLUD + link.attr("href"));
+                            }
+                            bookPOJO.setArtist(link.text());
                         }
                     }
                 }
@@ -304,10 +309,6 @@ public final class Knigoblud implements SourceParser {
             return bookPOJO;
         });
         return ProviderPage.of(result, hasMore);
-    }
-
-    private static Element child(Element parent, int index) {
-        return parent != null && parent.childrenSize() > index ? parent.child(index) : null;
     }
 
     public static DescriptionPOJO parseDescription(Document document) {
@@ -432,10 +433,14 @@ public final class Knigoblud implements SourceParser {
         return bookPOJO;
     }
 
-    /** The {@code KB.playerInit} playlist. */
+    /** The {@code KB.playerInit} playlist; a LitRes trial ({@code litres.ru} chapter) is a {@link BookRemovedException}. */
     public static ArrayList<AudioPOJO> parseTracks(Document doc, String bookUrl) {
-        return Players.xsPlaylist(Json.object(Players.playerScript(doc, "KB.playerInit(", '{')), bookUrl,
-                text(doc.selectFirst("h1")), "knigoblud player");
+        ArrayList<AudioPOJO> tracks = Players.xsPlaylist(Json.object(Players.playerScript(doc, "KB.playerInit(", '{')),
+                bookUrl, text(doc.selectFirst("h1")), "knigoblud player");
+        if (tracks.get(0).getUrl().contains("litres.ru/")) {
+            throw new BookRemovedException(bookUrl);
+        }
+        return tracks;
     }
 
     /** The series block of the book page, the open book included (without a link). */

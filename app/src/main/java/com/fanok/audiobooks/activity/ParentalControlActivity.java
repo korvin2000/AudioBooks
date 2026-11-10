@@ -1,5 +1,7 @@
 package com.fanok.audiobooks.activity;
 
+import android.content.Context;
+import com.fanok.audiobooks.FontScale;
 import android.os.Bundle;
 import android.text.Editable;
 import android.text.TextWatcher;
@@ -28,6 +30,12 @@ import org.xmlpull.v1.XmlPullParser;
 
 
 public class ParentalControlActivity extends AppCompatActivity {
+
+    /** The screen at the chosen font scale (FontScale). */
+    @Override
+    protected void attachBaseContext(Context newBase) {
+        super.attachBaseContext(FontScale.wrap(newBase));
+    }
 
     public static final String PARENTAL_CONTROL_PREFERENCES = ParentalControl.PREFERENCES;
 
@@ -103,6 +111,12 @@ public class ParentalControlActivity extends AppCompatActivity {
         parentalControl = Objects.requireNonNull(switshMenuItem.getActionView()).findViewById(R.id.switchView);
         parentalControl.setOnCheckedChangeListener(
                 (compoundButton, b) -> {
+                    if (b && !ParentalControl.hasPin(mStore)) {
+                        // a drag turns it on without the click: on only through the new-PIN dialog
+                        compoundButton.setChecked(false);
+                        mAlertDialog.show();
+                        return;
+                    }
                     mAddapter.setEnabled(b);
                     ParentalControl.setEnabled(mStore, b);
                 });

@@ -76,6 +76,15 @@ public class App extends Application {
         }
     }
 
+    /** Builds every screen of the app anew: a setting they are built with (the font scale) changed. Main thread only. */
+    public static void recreateActivities() {
+        for (android.app.Activity activity : new java.util.ArrayList<>(LIVE_ACTIVITIES)) {
+            if (!activity.isFinishing()) {
+                androidx.core.app.ActivityCompat.recreate(activity); // a stopped one too, on every API
+            }
+        }
+    }
+
     private static void appendCapped(File file, String content, int maxBytes) {
         try {
             StringBuilder sb = new StringBuilder();

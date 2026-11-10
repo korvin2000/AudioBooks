@@ -28,6 +28,7 @@ import androidx.recyclerview.widget.ItemTouchHelper;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 import com.fanok.audiobooks.GridSpacingItemDecoration;
+import com.fanok.audiobooks.FontScale;
 import com.fanok.audiobooks.R;
 import com.fanok.audiobooks.activity.MainActivity;
 import com.fanok.audiobooks.adapter.ListFocus;
@@ -36,6 +37,7 @@ import com.fanok.audiobooks.search.Genre;
 import com.fanok.audiobooks.search.GenrePicks;
 import com.fanok.audiobooks.search.Provider;
 import com.fanok.audiobooks.search.Sources;
+import com.fanok.audiobooks.util.RussianResources;
 import com.google.android.material.bottomsheet.BottomSheetDialog;
 import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 import com.google.android.material.navigation.NavigationView;
@@ -323,7 +325,7 @@ public class FavoriteGenresFragment extends Fragment {
     @NonNull
     private static String describe(@NonNull Context context, @NonNull Map<String, ?> counts, @NonNull Genre genre) {
         int opens = GenrePicks.opens(counts, genre);
-        return opens > 0 ? context.getResources().getQuantityString(R.plurals.favorite_genres_picks, opens, opens)
+        return opens > 0 ? RussianResources.of(context).getQuantityString(R.plurals.favorite_genres_picks, opens, opens)
                 : context.getString(R.string.favorite_genres_never);
     }
 
@@ -414,8 +416,9 @@ public class FavoriteGenresFragment extends Fragment {
         @NonNull
         @Override
         public Holder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
-            return new Holder(LayoutInflater.from(parent.getContext())
-                    .inflate(R.layout.genre_recycler_item, parent, false));
+            View row = LayoutInflater.from(parent.getContext()).inflate(R.layout.genre_recycler_item, parent, false);
+            FontScale.grow(row);
+            return new Holder(row);
         }
 
         @Override

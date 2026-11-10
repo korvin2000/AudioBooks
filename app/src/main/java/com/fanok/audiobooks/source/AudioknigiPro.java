@@ -7,6 +7,7 @@ import static com.fanok.audiobooks.source.Html.text;
 
 import androidx.annotation.Nullable;
 
+import com.fanok.audiobooks.model.BookPages;
 import com.fanok.audiobooks.BookRemovedException;
 import com.fanok.audiobooks.net.SiteHttp;
 import com.fanok.audiobooks.pojo.AudioPOJO;
@@ -175,7 +176,7 @@ public final class AudioknigiPro implements SourceParser {
 
     @Override
     public ArrayList<ComentsPOJO> comments(String bookUrl, BooleanSupplier cancelled) throws Exception {
-        return parseComments(fetch(bookUrl));
+        return parseComments(BookPages.get(bookUrl, this::fetch));
     }
 
     // ---------------------------------------------------------------- URLs

@@ -9,6 +9,7 @@ import static com.fanok.audiobooks.source.Html.text;
 import static com.fanok.audiobooks.source.Json.object;
 import static com.fanok.audiobooks.source.Players.playerScript;
 
+import com.fanok.audiobooks.BookRemovedException;
 import com.fanok.audiobooks.Url;
 import com.fanok.audiobooks.model.OtherArtistModel;
 import com.fanok.audiobooks.model.OtherSourceModel;
@@ -553,10 +554,17 @@ public final class Izibuk implements SourceParser {
         return bookPOJO;
     }
 
-    /** The {@code new XSPlayer({...})} playlist: files under {@code mp3_url_prefix}, signed with {@code sign}. */
+    /**
+     * The {@code new XSPlayer({...})} playlist: files under {@code mp3_url_prefix}, signed with {@code sign}. A LitRes
+     * trial (a {@code litres.ru} track, «Ознакомительный фрагмент») is a {@link BookRemovedException}.
+     */
     public static ArrayList<AudioPOJO> parseTracks(Document doc, String bookUrl) {
-        return Players.xsTracks(object(playerScript(doc, "new XSPlayer(", '{')), bookUrl,
+        ArrayList<AudioPOJO> tracks = Players.xsTracks(object(playerScript(doc, "new XSPlayer(", '{')), bookUrl,
                 text(doc.selectFirst("[itemprop=name]")), "izibuk player");
+        if (tracks.get(0).getUrl().contains("litres.ru/")) {
+            throw new BookRemovedException(bookUrl);
+        }
+        return tracks;
     }
 
     /** The series block of the book page, the open book included (without a link). */

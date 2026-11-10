@@ -22,6 +22,84 @@ public class BalanceAudioProcessorTest {
     public void centre() {
         BalanceAudioProcessor.setBalance(0);
         BalanceAudioProcessor.setNightSound(false);
+        BalanceAudioProcessor.setBass(0);
+    }
+
+    @Test
+    public void bassLiftsTheVoiceAndLeavesTheTrebleAsItWas() throws Exception {
+        BalanceAudioProcessor.setBass(BalanceAudioProcessor.BASS_MAX);
+        assertEquals(2_000 * 2.818, steadyPeak(2, 150, 2_000), 60); //+9 dB
+        assertEquals(2_000, steadyPeak(2, 3_000, 2_000), 20); //nothing else is turned down, unlike audiofx BassBoost
+        assertEquals(2_000 * 2.818, steadyPeak(1, 150, 2_000), 60);
+    }
+
+    @Test
+    public void bassThatWouldClipIsHeldJustUnderFullScale() throws Exception {
+        BalanceAudioProcessor processor = processor(2);
+        BalanceAudioProcessor.setBass(BalanceAudioProcessor.BASS_MAX);
+        for (int b = 0; b < 60; b++) {
+            short[] played = play(processor, wave(2, 20_000, 150, b)); //lifted to 56 000
+            for (int i = 4; i < played.length; i++) { //a sine's top, not the flat top of a clipped one
+                assertFalse(Math.abs(played[i]) >= 32_766 && Math.abs(played[i - 2]) >= 32_766
+                        && Math.abs(played[i - 4]) >= 32_766);
+            }
+            assertTrue(b < 20 || peak(played) > 30_000); //held under full scale, not turned down for good
+        }
+    }
+
+    @Test
+    public void bassGoesOffWithoutAClick() throws Exception {
+        BalanceAudioProcessor processor = processor(2);
+        BalanceAudioProcessor.setBass(BalanceAudioProcessor.BASS_MAX);
+        short[] last = new short[0];
+        for (int b = 0; b < 80; b++) {
+            if (b == 40) {
+                BalanceAudioProcessor.setBass(0);
+            }
+            short[] played = play(processor, wave(2, 2_000, 150, b));
+            short[] both = join(last, played);
+            for (int i = 2; i < both.length; i++) { //a 150 Hz tone of 5 600 moves at most 120 a sample
+                assertTrue(Math.abs(both[i] - both[i - 2]) < 200);
+            }
+            last = played;
+        }
+        assertEquals(2_000, peak(last), 2); //and plays as it is again
+    }
+
+    @Test
+    public void bassOffForgetsWhatItLifted() throws Exception {
+        BalanceAudioProcessor processor = processor(2);
+        BalanceAudioProcessor.setBass(BalanceAudioProcessor.BASS_MAX);
+        short[] tone = Arrays.copyOf(wave(2, 10_000, 150, 0), 2 * 220); //220-frame buffers: the fade ends at 0 exactly
+        for (int b = 0; b < 20; b++) {
+            play(processor, tone);
+        }
+        BalanceAudioProcessor.setBass(0);
+        play(processor, tone);
+        short[] silence = new short[2 * 220];
+        play(processor, silence);
+        BalanceAudioProcessor.setBass(BalanceAudioProcessor.BASS_MAX);
+        assertArrayEquals(silence, play(processor, silence)); //no ringing of the old tone comes back
+    }
+
+    @Test
+    public void aSideTurnedDownDoesNotHoldTheOtherDown() throws Exception {
+        BalanceAudioProcessor processor = processor(2);
+        BalanceAudioProcessor.setBass(BalanceAudioProcessor.BASS_MAX);
+        BalanceAudioProcessor.setBalance(BalanceAudioProcessor.MAX); //all right
+        int right = 0;
+        for (int b = 0; b < 60; b++) {
+            short[] loud = wave(2, 20_000, 150, b);
+            short[] quiet = wave(2, 1_000, 3_000, b);
+            for (int i = 1; i < loud.length; i += 2) {
+                loud[i] = quiet[i]; //loud bass on the left, a quiet treble on the right
+            }
+            short[] played = play(processor, loud);
+            for (int i = 1; b >= 40 && i < played.length; i += 2) {
+                right = Math.max(right, Math.abs(played[i]));
+            }
+        }
+        assertEquals(1_000, right, 20);
     }
 
     @Test
@@ -152,6 +230,34 @@ public class BalanceAudioProcessorTest {
     private static final int FRAMES = 1152;
 
     /** A buffer of a 441 Hz sine (100 frames a period at 44.1 kHz), the same on every channel. */
+    private static short[] join(short[] a, short[] b) {
+        short[] all = Arrays.copyOf(a, a.length + b.length);
+        System.arraycopy(b, 0, all, a.length, b.length);
+        return all;
+    }
+
+    /** The peak played of a continuous {@code hz} tone after 1 s, once the bass filter has settled. */
+    private static int steadyPeak(int channels, double hz, int amplitude) throws Exception {
+        BalanceAudioProcessor processor = processor(channels);
+        int peak = 0;
+        for (int b = 0; b < 60; b++) {
+            short[] played = play(processor, wave(channels, amplitude, hz, b));
+            if (b >= 40) {
+                peak = Math.max(peak, peak(played));
+            }
+        }
+        return peak;
+    }
+
+    /** Buffer {@code b} of a continuous {@code hz} tone at 44.1 kHz. */
+    private static short[] wave(int channels, int amplitude, double hz, int b) {
+        short[] samples = new short[channels * FRAMES];
+        for (int i = 0; i < samples.length; i++) {
+            samples[i] = (short) Math.round(amplitude * Math.sin(2 * Math.PI * hz * (b * FRAMES + i / channels) / 44_100));
+        }
+        return samples;
+    }
+
     private static short[] tone(int channels, int amplitude) {
         short[] samples = new short[channels * FRAMES];
         for (int i = 0; i < samples.length; i++) {

@@ -1,5 +1,6 @@
 package com.fanok.audiobooks.activity;
 
+import com.fanok.audiobooks.FontScale;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
@@ -44,6 +45,12 @@ import java.util.Locale;
 import java.util.Objects;
 
 public class SleepTimerActivity extends MvpAppCompatActivity implements SleepTimerView {
+
+    /** The screen at the chosen font scale (FontScale). */
+    @Override
+    protected void attachBaseContext(Context newBase) {
+        super.attachBaseContext(FontScale.wrap(newBase));
+    }
 
     /** From the player service. Extras: "time" (remaining ms), "endAt" (epoch ms, 0 for end-of-chapter),
      * "paused" (boolean), "mode" ({@code SleepTimerPresenter.MODE_*}). */

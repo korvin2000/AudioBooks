@@ -82,7 +82,6 @@
     <string name="sources_section_active">Активные</string>
     <string name="sources_section_inactive">Неактивные</string>
     <string name="sources_section_count">%1$d из %2$d</string>
-    <string name="sources_section_limit">лимит</string>
     <string name="sources_section_inactive_note">Не участвуют в поиске и не могут быть каталогом</string>
     <string name="sources_position_short">№ %1$d</string>
     <string name="sources_menu_proxy">Через прокси</string>
@@ -116,7 +115,6 @@
     <string name="sources_active_on">Участвует в поиске и каталоге · %1$d-й из %2$d активных</string>
     <string name="sources_active_only">Единственный активный источник — выключить нельзя</string>
     <string name="sources_active_off">Не участвует в поиске. Включённый встанет %1$d-м — последним активным</string>
-    <string name="sources_active_limit">Лимит %1$d из %1$d. Включённый встанет %1$d-м, а «%2$s» уйдёт в неактивные</string>
     <string name="sources_meter_count">Активных %1$d из %2$d</string>
     <string name="sources_meter_free">свободно %1$d</string>
     <string name="sources_position_title">Место в списке</string>
@@ -191,7 +189,25 @@
     <!-- a site in the source filter of the favorites, the history, the downloads: its title and its books there -->
     <string name="sources_filter_value">%1$s · %2$d</string>
 
-    <!-- Настройки → Общие: the most active sources (search.Sources.PREF_MAX) -->
-    <string name="sources_max_title">Лимит источников</string>
-    <string name="sources_max_summary">Активными могут быть до %1$s сайтов одновременно (от 3 до 20)</string>
+    <!-- Настройки → Источники и сеть: «Активные источники», the row and its dialog (fragment.SourceCountDialogFragment) -->
+    <string name="sources_count_title">Активные источники</string>
+    <string name="sources_count_summary_one">Активен %1$d из %2$d: %3$s</string>
+    <string name="sources_count_summary">Активны %1$d из %2$d: %3$s</string>
+    <string name="sources_count_caption">Сколько первых сайтов вашего списка работают</string>
+    <string name="sources_count_fast">1 · быстрее поиск</string>
+    <string name="sources_count_full">полнее поиск · %1$d</string>
+    <!-- the snackbar: «Активных источников: 20 (+7): Aknigi24, Lis10book и ещё 5» -->
+    <string name="sources_count_done">Активных источников: %1$d (%2$s): %3$s</string>
+    <!-- the status line (SourceCountDialogFragment.statusLine): unchanged — some, only one, all; switching on one,
+         several; switching off one, several; the catalog moving to the first site -->
+    <string-array name="sources_count_status">
+        <item>Работают сайты № 1–%1$d вашего списка</item>
+        <item>Работает только № 1 — %1$s</item>
+        <item>Активны все %1$d: поиск идёт по каждому сайту</item>
+        <item>Включится: %1$s</item>
+        <item>Включатся: %1$s</item>
+        <item>Выключится: %1$s</item>
+        <item>Выключатся: %1$s</item>
+        <item>каталог перейдёт на %1$s</item>
+    </string-array>
 </resources>

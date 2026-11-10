@@ -292,7 +292,7 @@ public final class BazaKnig implements SourceParser {
         return cookies();
     }
 
-    /** The session the user pasted in the settings ({@code ActivityCookies}). */
+    /** The session of the browser check the user passed ({@code ActivityCookies}). */
     @Override
     public Map<String, String> cookies() {
         String session = Consts.getBazaKnigCookies();
@@ -453,7 +453,7 @@ public final class BazaKnig implements SourceParser {
     /** Index, categories, rankings and search results. */
     public static ProviderPage<BookPOJO> parseListing(Document doc, int page) {
         boolean hasMore = lastPage(doc.select(".page-nav .navigation a, .page-nav .navigation span")) > page
-                || !doc.select(".page-nav .pnext").isEmpty();
+                || !doc.select(".page-nav a > .pnext").isEmpty(); // the last page keeps it, unlinked
         Element conteiner = doc.getElementById("dle-content");
         if (conteiner == null) {
             return ProviderPage.empty();

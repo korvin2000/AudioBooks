@@ -551,9 +551,7 @@ public class SourcesDialogFragment extends DialogFragment {
         int divider = Rows.divider(rows);
         int to = action == MENU_UP ? position - 1 : action == MENU_DOWN ? position + 1 : divider;
         if (!Rows.canMove(rows, position, to)) {
-            Context context = requireContext();
-            Toast.makeText(context, position < divider ? context.getString(R.string.sources_min)
-                    : context.getString(R.string.sources_max, Sources.maxActive()), Toast.LENGTH_SHORT).show();
+            Toast.makeText(requireContext(), R.string.sources_min, Toast.LENGTH_SHORT).show();
             return;
         }
         List<Provider> before = Rows.active(rows);
@@ -565,7 +563,7 @@ public class SourcesDialogFragment extends DialogFragment {
      * A focused view stays enabled, only dimmed: disabled, it would send a TV remote's focus to the dialog's top (the
      * stepper ignores a press past its end).
      */
-    private static void enable(@NonNull View view, boolean enabled) {
+    static void enable(@NonNull View view, boolean enabled) {
         view.setEnabled(enabled || view.isFocused());
         view.setAlpha(enabled ? 1 : 0.38f);
     }
@@ -593,23 +591,16 @@ public class SourcesDialogFragment extends DialogFragment {
             return rows.indexOf(DIVIDER);
         }
 
-        /** The most sources of {@code total} that can be active. */
-        static int limit(int total) {
-            return Math.min(Sources.maxActive(), total);
-        }
-
         /**
          * True when the source at {@code from} may move to {@code to}: always on its own side of the divider; onto or
-         * across it only while 1..{@link #limit} sources stay active. The divider itself never moves by itself.
+         * across it unless it is the only active source. The divider itself never moves by itself.
          */
         static boolean canMove(@NonNull List<Object> rows, int from, int to) {
             int divider = divider(rows);
             if (from < 0 || to < 0 || from >= rows.size() || to >= rows.size() || from == divider) {
                 return false;
             }
-            boolean across = from < divider ? to >= divider : to <= divider;
-            int active = from < divider ? divider - 1 : divider + 1;
-            return !across || (active >= 1 && active <= limit(rows.size() - 1));
+            return from > divider || to < divider || divider > 1;
         }
 
         /** Moves the row at {@code from} to {@code to}; the rows between shift by one, as notifyItemMoved shows it. */
@@ -690,9 +681,9 @@ public class SourcesDialogFragment extends DialogFragment {
         private void bindDivider(@NonNull DividerHolder holder) {
             int active = Rows.divider(rows);
             holder.label.setText(holder.label.getContext().getString(R.string.sources_active, active,
-                    Sources.maxActive()));
+                    rows.size() - 1));
             enable(holder.less, active > 1);
-            enable(holder.more, active < Rows.limit(rows.size() - 1));
+            enable(holder.more, active < rows.size() - 1);
             holder.less.setOnClickListener(v -> step(-1));
             holder.more.setOnClickListener(v -> step(1));
         }

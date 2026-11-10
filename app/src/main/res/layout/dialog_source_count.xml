@@ -1,0 +1,190 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- «Активные источники» (fragment.SourceCountDialogFragment): how many of the first sites of the user's order are
+     active, picked with − / + or the slider and previewed on the strip of every site with the line after the active
+     ones; who stands at the line under it. Nothing is stored before «Применить». -->
+<androidx.core.widget.NestedScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:theme="@style/ThemeOverlay.App.Sources"
+    tools:viewBindingIgnore="true">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:paddingStart="20dp"
+        android:paddingTop="4dp"
+        android:paddingEnd="20dp">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="@string/sources_count_caption"
+                android:textColor="@color/sources_text_secondary"
+                android:textSize="14sp" />
+
+            <ImageButton
+                android:id="@+id/sourceCountLess"
+                android:layout_width="44dp"
+                android:layout_height="44dp"
+                android:layout_marginStart="8dp"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:contentDescription="@string/sources_less"
+                android:padding="2dp"
+                android:scaleType="fitCenter"
+                app:srcCompat="@drawable/ic_minus_circle_outline"
+                app:tint="@color/sources_text_secondary" />
+
+            <LinearLayout
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:gravity="center"
+                android:minWidth="52dp"
+                android:orientation="vertical">
+
+                <TextView
+                    android:id="@+id/sourceCountValue"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:fontFeatureSettings="tnum"
+                    android:includeFontPadding="false"
+                    android:textColor="?attr/colorPrimaryText"
+                    android:textSize="28sp"
+                    android:textStyle="bold"
+                    tools:text="13" />
+
+                <TextView
+                    android:id="@+id/sourceCountOf"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:textColor="@color/sources_text_secondary"
+                    android:textSize="12sp"
+                    tools:text="из 29" />
+            </LinearLayout>
+
+            <ImageButton
+                android:id="@+id/sourceCountMore"
+                android:layout_width="44dp"
+                android:layout_height="44dp"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:contentDescription="@string/sources_more"
+                android:padding="2dp"
+                android:scaleType="fitCenter"
+                app:srcCompat="@drawable/ic_plus_circle_outline"
+                app:tint="@color/sources_text_secondary" />
+        </LinearLayout>
+
+        <TextView
+            android:id="@+id/sourceCountStatus"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:accessibilityLiveRegion="polite"
+            android:minLines="2"
+            android:textColor="@color/sources_text_secondary"
+            android:textSize="13sp"
+            tools:text="Работают сайты № 1–13 вашего списка" />
+
+        <!-- the slider lies on the strip, its thumb the line after the cells picked: value v is v cells of the track,
+             so it starts at 0 (the dialog keeps it at 1 or more) and the strip is padded to the track in code -->
+        <FrameLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="18dp">
+
+            <com.fanok.audiobooks.fragment.SourceSegmentsView
+                android:id="@+id/sourceCountStrip"
+                android:layout_width="match_parent"
+                android:layout_height="22dp"
+                android:layout_gravity="center_vertical" />
+
+            <com.google.android.material.slider.Slider
+                android:id="@+id/sourceCountSlider"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:contentDescription="@string/sources_count_title"
+                android:stepSize="1"
+                android:valueFrom="0"
+                android:valueTo="29"
+                app:thumbColor="?attr/colorPrimaryText"
+                app:thumbElevation="0dp"
+                app:thumbHeight="38dp"
+                app:thumbTrackGapSize="0dp"
+                app:thumbWidth="4dp"
+                app:tickVisible="false"
+                app:trackColorActive="@android:color/transparent"
+                app:trackColorInactive="@android:color/transparent"
+                app:trackStopIndicatorSize="0dp" />
+        </FrameLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal">
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="@string/sources_count_fast"
+                android:textColor="@color/sources_text_secondary"
+                android:textSize="11sp" />
+
+            <TextView
+                android:id="@+id/sourceCountFull"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:textColor="@color/sources_text_secondary"
+                android:textSize="11sp"
+                tools:text="полнее поиск · 29" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="10dp"
+            android:gravity="center_vertical"
+            android:importantForAccessibility="noHideDescendants"
+            android:orientation="horizontal">
+
+            <TextView
+                android:id="@+id/sourceCountLeft"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:ellipsize="start"
+                android:gravity="end"
+                android:singleLine="true"
+                android:textColor="?attr/colorPrimaryText"
+                android:textSize="12sp"
+                tools:text="12 Aknig.xyz   13 Аудиокнига Life" />
+
+            <View
+                android:layout_width="2dp"
+                android:layout_height="18dp"
+                android:layout_marginStart="8dp"
+                android:layout_marginEnd="8dp"
+                android:background="?attr/colorPrimaryText" />
+
+            <TextView
+                android:id="@+id/sourceCountRight"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:ellipsize="end"
+                android:singleLine="true"
+                android:textColor="@color/sources_text_secondary"
+                android:textSize="12sp"
+                tools:text="14 Aknigi24   15 Lis10book" />
+        </LinearLayout>
+    </LinearLayout>
+</androidx.core.widget.NestedScrollView>

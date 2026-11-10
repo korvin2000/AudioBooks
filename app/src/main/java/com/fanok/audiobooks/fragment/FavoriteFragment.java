@@ -229,6 +229,10 @@ public class FavoriteFragment extends MvpAppCompatFragment implements FavoriteVi
                     }else {
                         menu.findItem(R.id.date).setChecked(true);
                     }
+                    MenuItem picked = menu.findItem(mPresenter.getSortId()); // the order picked here stays
+                    if (picked != null && picked.isVisible()) {
+                        picked.setChecked(true);
+                    }
                 }
 
                 setColorPrimeriTextInIconItemMenu(menu.findItem(R.id.app_bar_search), requireContext());
@@ -602,7 +606,8 @@ public class FavoriteFragment extends MvpAppCompatFragment implements FavoriteVi
                     @Override
                     public void onDismissed(Snackbar transientBottomBar, int event) {
                         if (event != DISMISS_EVENT_ACTION) {
-                            mPresenter.commitRemove();
+                            // this bar's book only: a newer swipe's bar replaced it and offers its own undo
+                            mPresenter.commitRemove(book);
                         }
                     }
                 })

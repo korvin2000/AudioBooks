@@ -217,7 +217,7 @@ public final class Aknigi24 implements SourceParser {
     /** The comments on the book page, then the further pages its "load more" button names. */
     @Override
     public ArrayList<ComentsPOJO> comments(String bookUrl, BooleanSupplier cancelled) throws Exception {
-        Document page = fetch(bookUrl);
+        Document page = BookPages.get(bookUrl, this::fetch);
         ArrayList<ComentsPOJO> result = parseComments(page.select("#comments-list " + COMMENT)).comments;
         Element more = page.selectFirst("#comments-load-more");
         // the site's script reads page 2 when the button names none

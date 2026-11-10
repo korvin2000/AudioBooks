@@ -2,6 +2,7 @@ package com.fanok.audiobooks.activity;
 
 import static com.fanok.audiobooks.Consts.handleUserInput;
 
+import com.fanok.audiobooks.FontScale;
 import android.app.Activity;
 import android.app.SearchManager;
 import android.content.Context;
@@ -94,6 +95,12 @@ import java.util.Set;
 import org.jetbrains.annotations.NotNull;
 
 public class SearchableActivity extends MvpAppCompatActivity implements SearchableView {
+
+    /** The screen at the chosen font scale (FontScale). */
+    @Override
+    protected void attachBaseContext(Context newBase) {
+        super.attachBaseContext(FontScale.wrap(newBase));
+    }
 
     private static final String TAG = "SearchableActivity";
 
@@ -580,6 +587,8 @@ public class SearchableActivity extends MvpAppCompatActivity implements Searchab
             startActivity(intent);
             return;
         }
+        // a search typed here carries only the query: a relaunch (rotation) must keep this screen's list kind
+        intent.putExtra(Consts.ARG_MODEL, mModelId);
         setIntent(intent);
         handleIntent(intent);
         if (binding != null) {
@@ -1486,12 +1495,7 @@ public class SearchableActivity extends MvpAppCompatActivity implements Searchab
 
     @Override
     public boolean dispatchKeyEvent(KeyEvent event) {
-        if (event.getAction() == KeyEvent.ACTION_DOWN) {
-            if (handleUserInput(getApplicationContext(), event.getKeyCode())) {
-                return true;
-            }
-        }
-        return super.dispatchKeyEvent(event);
+        return handleUserInput(this, event) || super.dispatchKeyEvent(event);
     }
 
 

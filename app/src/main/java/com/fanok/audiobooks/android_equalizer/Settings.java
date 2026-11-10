@@ -3,6 +3,7 @@ package com.fanok.audiobooks.android_equalizer;
 import android.media.audiofx.Equalizer;
 import android.media.audiofx.PresetReverb;
 import androidx.annotation.NonNull;
+import com.fanok.audiobooks.service.BalanceAudioProcessor;
 import java.util.Arrays;
 
 public class Settings {
@@ -66,6 +67,14 @@ public class Settings {
     /** Bass boost runs only above "off": at the knob's minimum the effect is disabled, not run at a low strength. */
     public static boolean isBassOn(short strength) {
         return isEqualizerEnabled && bassStep(strength) > 0;
+    }
+
+    /**
+     * Plays the knob's bass while the equalizer is on: the sink's ({@link BalanceAudioProcessor}), not audiofx
+     * BassBoost, which turns everything else down by up to 9 dB to make room for it.
+     */
+    public static void applyBass(short strength) {
+        BalanceAudioProcessor.setBass(isBassOn(strength) ? strength : 0);
     }
 
     /** An insert reverb runs only with a room chosen: even at PRESET_NONE it takes over the session's volume. */

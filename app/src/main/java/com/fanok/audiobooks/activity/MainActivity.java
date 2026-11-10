@@ -2,6 +2,7 @@ package com.fanok.audiobooks.activity;
 
 import static com.fanok.audiobooks.Consts.handleUserInput;
 
+import com.fanok.audiobooks.FontScale;
 import android.Manifest;
 import android.content.pm.PackageManager;
 import android.os.Build;
@@ -20,11 +21,11 @@ import android.net.Uri;
 import android.os.Bundle;
 import android.os.PowerManager;
 import android.util.Log;
+import androidx.media3.exoplayer.offline.DownloadService;
 import android.util.TypedValue;
 import android.view.KeyEvent;
 import android.view.MenuItem;
 import android.view.View;
-import android.widget.EditText;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -62,6 +63,7 @@ import com.fanok.audiobooks.net.ProxyFinder;
 import com.fanok.audiobooks.pojo.BookPOJO;
 import com.fanok.audiobooks.pojo.StorageUtil;
 import com.fanok.audiobooks.presenter.MainPresenter;
+import com.fanok.audiobooks.service.ExoDownloadService;
 import com.fanok.audiobooks.service.MediaPlayerService;
 import com.fanok.audiobooks.region.AppRegion;
 import com.fanok.audiobooks.search.Provider;
@@ -79,6 +81,12 @@ import org.jetbrains.annotations.NotNull;
 
 public class MainActivity extends MvpAppCompatActivity
         implements NavigationView.OnNavigationItemSelectedListener, MainView {
+
+    /** The screen at the chosen font scale (FontScale). */
+    @Override
+    protected void attachBaseContext(Context newBase) {
+        super.attachBaseContext(FontScale.wrap(newBase));
+    }
     private static final String TAG = "MainActivity";
     private static final String EXSTRA_FRAGMENT = "startFragment";
     private static final String EXSTRA_URL = "url";
@@ -95,6 +103,8 @@ public class MainActivity extends MvpAppCompatActivity
     private static final String EXTRA_UNDO_AFTER = "sourcesUndoAfter";
     private static final String EXTRA_UNDO_TEXT = "sourcesUndoText";
     private static final int SNACKBAR_MS = 6000;
+    /** In {@link #preferences}: the notification permission was put to the user once (either answer). */
+    private static final String PREF_NOTIFICATION_ASKED = "notification_asked";
     private static boolean closeApp = false;
     /** True on a fresh creation only: a restored activity keeps its fragments and has had its first-launch dialogs. */
     private boolean freshStart = false;
@@ -171,12 +181,13 @@ public class MainActivity extends MvpAppCompatActivity
     }
 
     /**
-     * The app anew on the catalog source's "Аудиокниги", in place of {@code activity}'s task: after the source was
-     * switched or switched off. Not a launch, so «Слушать последнюю книгу» does not start the book again.
+     * The app anew on the catalog source's {@code section} ({@code Consts.FRAGMENT_*}: "Аудиокниги", or the list the
+     * source was switched from), in place of {@code activity}'s task: after the source was switched. Not a launch, so
+     * «Слушать последнюю книгу» does not start the book again.
      */
-    public static void restartOnCatalog(@NonNull Activity activity) {
+    public static void restartOnCatalog(@NonNull Activity activity, int section) {
         activity.startActivity(new Intent(activity, MainActivity.class)
-                .putExtra(EXSTRA_FRAGMENT, Consts.FRAGMENT_AUDIOBOOK)
+                .putExtra(EXSTRA_FRAGMENT, section)
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK));
         activity.finish();
     }
@@ -327,6 +338,7 @@ public class MainActivity extends MvpAppCompatActivity
         }
     }
 
+    @androidx.annotation.OptIn(markerClass = androidx.media3.common.util.UnstableApi.class)
     @Override
     protected void onStart() {
         super.onStart();
@@ -335,6 +347,13 @@ public class MainActivity extends MvpAppCompatActivity
             return;
         }
         freshStart = false;
+        try {
+            // a new process has its download manager paused until the service is created: what a restart
+            // interrupted goes on (a pause of the user's is a stop reason of its own and stays)
+            DownloadService.start(this, ExoDownloadService.class);
+        } catch (IllegalStateException e) {
+            Log.w(TAG, "downloads not resumed", e);
+        }
 
         Intent intent = getIntent();
         int fragment = intent.getIntExtra(EXSTRA_FRAGMENT, -1);
@@ -363,6 +382,7 @@ public class MainActivity extends MvpAppCompatActivity
             dialogs.add(this::showPrivacyDialog);
         }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU
+                && !preferences.getBoolean(PREF_NOTIFICATION_ASKED, false)
                 && ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS)
                 != PackageManager.PERMISSION_GRANTED) {
             dialogs.add(this::showNotificationRationale);
@@ -562,16 +582,21 @@ public class MainActivity extends MvpAppCompatActivity
                 .show();
     }
 
+    /** Asked once: either answer is remembered, so it does not come back with every new main screen. */
     private void showNotificationRationale(@NonNull Runnable done) {
         new AlertDialog.Builder(this)
                 .setTitle(R.string.app_name)
                 .setMessage(R.string.notification_permission_rationale)
                 .setCancelable(false)
                 .setPositiveButton(R.string.continue_, (dialog, which) -> {
+                    preferences.edit().putBoolean(PREF_NOTIFICATION_ASKED, true).apply();
                     permissionDone = done;
                     notificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS);
                 })
-                .setNegativeButton(R.string.cancel, (dialog, which) -> done.run())
+                .setNegativeButton(R.string.cancel, (dialog, which) -> {
+                    preferences.edit().putBoolean(PREF_NOTIFICATION_ASKED, true).apply();
+                    done.run();
+                })
                 .show();
     }
 
@@ -898,13 +923,7 @@ public class MainActivity extends MvpAppCompatActivity
 
     @Override
     public boolean dispatchKeyEvent(KeyEvent event) {
-        // media keys are not shortcuts while the user types (UI-16)
-        if (event.getAction() == KeyEvent.ACTION_DOWN && !(getCurrentFocus() instanceof EditText)) {
-            if (handleUserInput(getApplicationContext(), event.getKeyCode())) {
-                return true;
-            }
-        }
-        return super.dispatchKeyEvent(event);
+        return handleUserInput(this, event) || super.dispatchKeyEvent(event);
     }
 
     /**

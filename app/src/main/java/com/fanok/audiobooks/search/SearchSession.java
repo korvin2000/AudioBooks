@@ -502,6 +502,8 @@ public final class SearchSession<T> {
                 && s.caseRetry() && caseTried.add(s)) {
             queryOf.put(s, variant);
             nextPage.put(s, 1);
+            // not answered yet, the other case decides: cut short, the site counts as stopped and is asked again
+            statuses.remove(s);
             // one search of the site, in two letter cases: its wait goes on from the first ask
             run(Collections.singletonList(s), startedAt.get(s), 0);
             return;

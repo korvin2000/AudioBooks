@@ -255,16 +255,8 @@ public class BooksFragment extends MvpAppCompatFragment implements BooksView {
                 if (provider != null) {
                     fillOrderMenu(menu, provider.parser.sorts(listing));
                 }
-                fillSourceMenu(menu);
-                MenuItem about = menu.findItem(R.id.source_about);
-                if (about != null) {
-                    about.setVisible(provider != null);
-                    if (provider != null) {
-                        about.setTitle(getString(R.string.sources_about_listing, provider.title));
-                    }
-                }
 
-                if (modelID != Consts.MODEL_BOOKS || mUrl.contains("reader") || mUrl.contains("author")
+                if (modelID != Consts.MODEL_BOOKS ? !isSectionRoot() : mUrl.contains("reader") || mUrl.contains("author")
                         || mUrl.contains("genre") || mUrl.contains("serie") || mUrl.contains("performer")
                         || mUrl.contains("narrator") || mUrl.contains("xfsearch") || mUrl.contains("/tags/")
                         || mUrl.contains("zhanr")) {
@@ -298,10 +290,6 @@ public class BooksFragment extends MvpAppCompatFragment implements BooksView {
 
                             @Override
                             public void onPrepareMenu(@NonNull Menu menu) {
-                MenuItem item = menu.findItem(SOURCE_ITEM_BASE + Consts.getSOURCE());
-                if (item != null) {
-                    item.setChecked(true);
-                }
                 prepareFilterMenu(menu);
                 MenuItem genreSort = menu.findItem(GENRE_SORT_ITEM_BASE + getPresenter().getGenreSort().ordinal());
                 if (genreSort != null) {
@@ -317,11 +305,8 @@ public class BooksFragment extends MvpAppCompatFragment implements BooksView {
                 if (item.getGroupId() == R.id.genre_sort_group) {
                     item.setChecked(true);
                     getPresenter().onGenreSortSelected(GenreSort.values()[item.getItemId() - GENRE_SORT_ITEM_BASE]);
-                } else if (item.getItemId() == R.id.source_about) {
-                    Provider site = Provider.ofUrl(mUrl);
-                    if (site != null) {
-                        SourceActivity.start(requireContext(), site);
-                    }
+                } else if (item.getItemId() == R.id.source) {
+                    showSourceMenu();
                 } else if (!onFilterItemSelected(item)) {
                     getPresenter().onOptionItemSelected(item.getItemId());
                 }
@@ -388,7 +373,7 @@ public class BooksFragment extends MvpAppCompatFragment implements BooksView {
                     int lastVisible = ((LinearLayoutManager) Objects.requireNonNull(
                             recyclerView.getLayoutManager())).findLastVisibleItemPosition();
                     if (lastVisible > getCount() - 15) {
-                        getPresenter().loadBoks();
+                        getPresenter().loadOnScroll();
                     }
                 } else if (dy == 0) {
                     fillScreen(); // a layout changed the visible range: a page came, the view came back, a resize
@@ -466,10 +451,27 @@ public class BooksFragment extends MvpAppCompatFragment implements BooksView {
         binding = null;
     }
 
+    /**
+     * This list is the drawer's «Жанры», «Авторы» or «Исполнители» of the catalog source, not a list opened from
+     * another screen: the source can be switched from it, as from «Аудиокниги».
+     */
+    private boolean isSectionRoot() {
+        Provider source = Provider.current();
+        Bundle args = getArguments();
+        if (source == null || args != null && args.getString(ARG_GENRE) != null) {
+            return false;
+        }
+        return mUrl.equals(modelID == Consts.MODEL_GENRE ? source.sections
+                : modelID == Consts.MODEL_AUTOR ? source.authors : source.performers);
+    }
+
+    /** After a source switch: the same drawer section of the new source. */
     @Override
     public void recreate() {
         if (getActivity() == null) return;
-        MainActivity.restartOnCatalog(getActivity());
+        MainActivity.restartOnCatalog(getActivity(), modelID == Consts.MODEL_GENRE ? Consts.FRAGMENT_GENRE
+                : modelID == Consts.MODEL_AUTOR ? Consts.FRAGMENT_AUTOR
+                : modelID == Consts.MODEL_ARTIST ? Consts.FRAGMENT_ARTIST : Consts.FRAGMENT_AUDIOBOOK);
     }
 
     @Override
@@ -745,7 +747,7 @@ public class BooksFragment extends MvpAppCompatFragment implements BooksView {
         }
     }
 
-    /** Item ids of the generated source submenu: {@code SOURCE_ITEM_BASE + sourceId} (the period items use Menu.FIRST + n). */
+    /** What a source of the globe's list is to the presenter: {@code SOURCE_ITEM_BASE + sourceId} (the period items use Menu.FIRST + n). */
     private static final int SOURCE_ITEM_BASE = Menu.FIRST + 100;
 
     /** The provider a source menu item selects, or null for any other item. */
@@ -772,17 +774,26 @@ public class BooksFragment extends MvpAppCompatFragment implements BooksView {
         return itemId < SOURCE_ITEM_BASE ? null : Provider.ofSource(itemId - SOURCE_ITEM_BASE);
     }
 
-    /** The "source" submenu: one checkable item per active source ({@link Sources}), in the user's order. */
-    private static void fillSourceMenu(@NonNull Menu menu) {
-        MenuItem source = menu.findItem(R.id.source);
-        SubMenu sub = source == null ? null : source.getSubMenu();
-        if (sub == null) {
+    /**
+     * The globe's panel ({@link SourceMenu}): the active sources in the user's order and, under them, the card of the
+     * listing's site.
+     */
+    private void showSourceMenu() {
+        View anchor = requireActivity().findViewById(R.id.source);
+        if (anchor == null) {
             return;
         }
-        for (Provider provider : Sources.active()) {
-            sub.add(R.id.source_group, SOURCE_ITEM_BASE + provider.sourceId, Menu.NONE, provider.title);
-        }
-        sub.setGroupCheckable(R.id.source_group, true, true);
+        SourceMenu.show(anchor, Provider.ofUrl(mUrl), new SourceMenu.Listener() {
+            @Override
+            public void onSource(@NonNull Provider source) {
+                getPresenter().onOptionItemSelected(SOURCE_ITEM_BASE + source.sourceId);
+            }
+
+            @Override
+            public void onAbout(@NonNull Provider site) {
+                SourceActivity.start(requireContext(), site);
+            }
+        });
     }
 
     /** Item ids of the genre list's sort submenu: {@code GENRE_SORT_ITEM_BASE + GenreSort.ordinal()}. */
@@ -1012,8 +1023,9 @@ public class BooksFragment extends MvpAppCompatFragment implements BooksView {
     public void onResume() {
         super.onResume();
         mListFocus.onResume(false);
-        if (getPresenter().isInactiveSourceRoot()) {
-            // its site was switched off (in the settings, maybe opened from a book): the app opens on the selected one
+        if (getPresenter().isInactiveSourceRoot() && Sources.isActive(Provider.current())) {
+            // its site was switched off (in the settings, maybe opened from a book): the app opens on the selected one;
+            // a selected source that is itself inactive would open this same screen again, over and over
             recreate();
             return;
         }

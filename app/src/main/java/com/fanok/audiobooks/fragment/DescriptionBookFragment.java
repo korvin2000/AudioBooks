@@ -40,6 +40,7 @@ import com.arellomobile.mvp.presenter.InjectPresenter;
 import com.arellomobile.mvp.presenter.ProvidePresenter;
 import com.fanok.audiobooks.Consts;
 import com.fanok.audiobooks.MarginItemDecoration;
+import com.fanok.audiobooks.FontScale;
 import com.fanok.audiobooks.R;
 import com.fanok.audiobooks.activity.BookActivity;
 import com.fanok.audiobooks.activity.BookFavorites;
@@ -440,6 +441,7 @@ public class DescriptionBookFragment extends MvpAppCompatFragment
         mAuthorLabel = view.findViewById(R.id.authorLabel);
         mArtistLabel = view.findViewById(R.id.artistLabel);
         mSeriesLabel = view.findViewById(R.id.seriesLabel);
+        FontScale.grow(mAuthorLabel, mArtistLabel, mSeriesLabel); // their fixed width keeps the values in a column
         mTimeProgressRow = view.findViewById(R.id.timeProgressRow);
         mTimeProgress = view.findViewById(R.id.timeProgress);
         mTimeNote = view.findViewById(R.id.timeNote);

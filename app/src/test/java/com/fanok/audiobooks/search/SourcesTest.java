@@ -2,6 +2,7 @@ package com.fanok.audiobooks.search;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
 import com.fanok.audiobooks.Consts;
@@ -40,8 +41,7 @@ public class SourcesTest {
         Sources.State state = Sources.parse(Sources.format(order, 3));
         assertEquals(order, state.order);
         assertEquals(3, state.active);
-        assertEquals("as many active as allowed", Math.min(Sources.maxActive(), order.size()),
-                Sources.parse(Sources.format(order, order.size())).active);
+        assertEquals("all can be active", order.size(), Sources.parse(Sources.format(order, order.size())).active);
     }
 
     @Test
@@ -54,7 +54,7 @@ public class SourcesTest {
     }
 
     @Test
-    public void theActiveCountStaysBetweenOneAndTheMaximum() {
+    public void theActiveCountStaysBetweenOneAndAll() {
         assertEquals("none active: the first one is", 1, Sources.parse("|abook,uknig").active);
         assertEquals(1, Sources.parse(Sources.format(Arrays.asList(Provider.values()), 0)).active);
         assertEquals(1, Sources.parse("garbage").active);
@@ -62,7 +62,7 @@ public class SourcesTest {
         for (Provider provider : Provider.values()) {
             all.append(provider.prefValue).append(',');
         }
-        assertTrue(Sources.parse(all.toString()).active <= Sources.maxActive());
+        assertEquals("no bar: every listed one", Provider.values().length, Sources.parse(all.toString()).active);
     }
 
     @Test
@@ -77,6 +77,18 @@ public class SourcesTest {
         assertEquals(Arrays.asList(Provider.IZIBUK, Provider.AKNIGA), Sources.active());
         assertFalse(Sources.isActive(Provider.UKNIG));
         assertTrue("the rest follow, inactive", Sources.all().containsAll(Arrays.asList(Provider.values())));
+    }
+
+    /** Nothing stored: the default catalog (Akniga) counts as selected, so switching it off selects another one. */
+    @Test
+    public void switchingOffTheDefaultCatalogWithNothingStoredSelectsTheFirstActiveOne() {
+        FakePrefs prefs = new FakePrefs();
+        Sources.load(prefs);
+        assertNull("the default is active: nothing is written", prefs.getString(Sources.SELECTED, null));
+        assertTrue(Sources.setActive(prefs, Provider.AKNIGA, false));
+        Provider first = Sources.active().get(0);
+        assertEquals(first.prefValue, prefs.getString(Sources.SELECTED, null));
+        assertEquals(first.sourceId, Consts.getSOURCE());
     }
 
     @Test
@@ -113,76 +125,87 @@ public class SourcesTest {
     }
 
     @Test
-    public void atTheLimitASourceSwitchedOnTakesTheLastActivePlace() {
-        Sources.State full = Sources.parse(null);
-        Provider last = full.order.get(Sources.DEFAULT_MAX_ACTIVE - 1);
-        Provider extra = full.order.get(Sources.DEFAULT_MAX_ACTIVE + 2);
-        Sources.State on = Sources.switched(full, extra, true);
-        assertEquals(Sources.DEFAULT_MAX_ACTIVE, on.active);
-        assertEquals(extra, on.order.get(Sources.DEFAULT_MAX_ACTIVE - 1));
-        assertEquals("the last active one is the first inactive", last, on.order.get(Sources.DEFAULT_MAX_ACTIVE));
+    public void aSourceSwitchedOnPushesNoSiteOut() {
+        Sources.State before = Sources.parse(null);
+        Provider extra = before.order.get(Sources.DEFAULT_MAX_ACTIVE + 2);
+        Sources.State on = Sources.switched(before, extra, true);
+        assertEquals(Sources.DEFAULT_MAX_ACTIVE + 1, on.active);
+        assertEquals(extra, on.order.get(Sources.DEFAULT_MAX_ACTIVE));
+        assertEquals("the active ones stay", before.order.subList(0, Sources.DEFAULT_MAX_ACTIVE),
+                on.order.subList(0, Sources.DEFAULT_MAX_ACTIVE));
+        Sources.State all = new Sources.State(before.order, before.order.size() - 1);
+        assertEquals("the last one too", all.order.size(),
+                Sources.switched(all, all.order.get(all.order.size() - 1), true).active);
     }
 
     @Test
-    public void theLimitIsReadClampedAndFallsBackToTheDefault() {
+    public void aCountActivatesTheFirstSitesAndARoundTripRestoresTheSameSet() {
         FakePrefs prefs = new FakePrefs();
-        assertEquals("missing", Sources.DEFAULT_MAX_ACTIVE, Sources.readMax(prefs));
-        prefs.edit().putString(Sources.PREF_MAX, "2").apply();
-        assertEquals(Sources.MIN_LIMIT, Sources.readMax(prefs));
-        prefs.edit().putString(Sources.PREF_MAX, "99").apply();
-        assertEquals(Sources.MAX_LIMIT, Sources.readMax(prefs));
-        prefs.edit().putString(Sources.PREF_MAX, "abc").apply();
-        assertEquals(Sources.DEFAULT_MAX_ACTIVE, Sources.readMax(prefs));
-        prefs.edit().putInt(Sources.PREF_MAX, 5).apply();
-        assertEquals("a wrongly typed value", Sources.DEFAULT_MAX_ACTIVE, Sources.readMax(prefs));
+        Sources.load(prefs);
+        List<Provider> order = Sources.all();
+        List<Provider> thirteen = new ArrayList<>(Sources.active());
+        Sources.save(prefs, Sources.all(), 5);
+        assertEquals(order.subList(0, 5), Sources.active());
+        Sources.save(prefs, Sources.all(), 13);
+        assertEquals(thirteen, Sources.active());
+        assertEquals("the order never changes", order, Sources.all());
+        Sources.save(prefs, Sources.all(), order.size());
+        assertEquals("all can be active", order, Sources.active());
     }
 
     @Test
-    public void aLowerLimitCutsTheActiveSourcesAndARaisedOneBringsThemBack() {
-        FakePrefs prefs = new FakePrefs();
-        List<Provider> order = Arrays.asList(Provider.values());
-        String stored = Sources.format(order, 13);
-        prefs.edit().putString(Sources.PREF, stored).putString(Sources.PREF_MAX, "5").apply();
-        Sources.load(prefs);
-        assertEquals(5, Sources.maxActive());
-        assertEquals(5, Sources.activeCount());
-        assertEquals("the order stays", order, Sources.all());
-        assertEquals("the stored list is not rewritten", stored, prefs.getString(Sources.PREF, null));
-        prefs.edit().putString(Sources.PREF_MAX, "20").apply();
-        Sources.load(prefs);
-        assertEquals(13, Sources.activeCount());
-        assertEquals(order.subList(0, 13), Sources.active());
-    }
-
-    @Test
-    public void aHigherLimitSwitchesNothingOnButLetsMoreBeSwitchedOn() {
-        FakePrefs prefs = new FakePrefs();
-        prefs.edit().putString(Sources.PREF_MAX, "20").apply();
-        Sources.load(prefs);
-        assertEquals(Sources.DEFAULT_MAX_ACTIVE, Sources.activeCount());
-        while (Sources.activeCount() < 20) {
-            int before = Sources.activeCount();
-            Sources.setActive(prefs, Sources.all().get(before), true);
-            assertEquals(before + 1, Sources.activeCount());
-        }
-        Provider last = Sources.active().get(19);
-        Provider extra = Sources.all().get(21);
-        Sources.setActive(prefs, extra, true);
-        assertEquals("at the limit", 20, Sources.activeCount());
-        assertEquals(extra, Sources.active().get(19));
-        assertEquals("the last active one is the first inactive", last, Sources.all().get(20));
-    }
-
-    @Test
-    public void aLowerLimitThatCutsTheSelectedSourceSelectsTheFirstActiveOne() {
+    public void aCountBelowTheCatalogSourceSelectsTheFirstSite() {
         FakePrefs prefs = new FakePrefs();
         Sources.load(prefs);
         Provider eighth = Sources.active().get(7);
         prefs.edit().putString(Sources.SELECTED, eighth.prefValue).apply();
         Consts.setSOURCE(eighth.prefValue);
-        prefs.edit().putString(Sources.PREF_MAX, "5").apply();
+        assertFalse("still active", Sources.save(prefs, Sources.all(), 8));
+        assertTrue(Sources.save(prefs, Sources.all(), 7));
+        Provider first = Sources.all().get(0);
+        assertEquals(first.prefValue, prefs.getString(Sources.SELECTED, null));
+        assertEquals(first.sourceId, Consts.getSOURCE());
+    }
+
+    @Test
+    public void theOldLimitCutsTheStoredCountOnceAndGoes() {
+        FakePrefs prefs = new FakePrefs();
+        List<Provider> order = Arrays.asList(Provider.values());
+        prefs.edit().putString(Sources.PREF, Sources.format(order, 20)).putString(Sources.OLD_LIMIT, "13").apply();
+        Sources.load(prefs);
+        assertEquals(13, Sources.activeCount());
+        assertEquals("the order stays", order, Sources.all());
+        assertEquals("stored", Sources.format(order, 13), prefs.getString(Sources.PREF, null));
+        assertFalse("removed", prefs.contains(Sources.OLD_LIMIT));
+        Sources.save(prefs, order, 20);
+        Sources.load(prefs);
+        assertEquals("once: no limit after it", 20, Sources.activeCount());
+    }
+
+    @Test
+    public void theOldLimitSwitchesNothingOnAndAnUnreadableOneIsTheOldDefault() {
+        FakePrefs prefs = new FakePrefs();
+        prefs.edit().putString(Sources.PREF, "otrub,abook|uknig").putString(Sources.OLD_LIMIT, "20").apply();
+        Sources.load(prefs);
+        assertEquals(Arrays.asList(Provider.OTRUB, Provider.AKNIGA), Sources.active());
+        prefs = new FakePrefs();
+        prefs.edit().putString(Sources.PREF, Sources.format(Arrays.asList(Provider.values()), 20))
+                .putInt(Sources.OLD_LIMIT, 5).apply();
+        Sources.load(prefs);
+        assertEquals("a wrongly typed value", Sources.DEFAULT_MAX_ACTIVE, Sources.activeCount());
+        assertFalse(prefs.contains(Sources.OLD_LIMIT));
+    }
+
+    @Test
+    public void theOldLimitThatCutsTheSelectedSourceSelectsTheFirstActiveOne() {
+        FakePrefs prefs = new FakePrefs();
+        Sources.load(prefs);
+        Provider eighth = Sources.active().get(7);
+        prefs.edit().putString(Sources.SELECTED, eighth.prefValue).putString(Sources.OLD_LIMIT, "5").apply();
+        Consts.setSOURCE(eighth.prefValue);
         Sources.load(prefs);
         Provider first = Sources.active().get(0);
+        assertEquals(5, Sources.activeCount());
         assertEquals(first.prefValue, prefs.getString(Sources.SELECTED, null));
         assertEquals(first.sourceId, Consts.getSOURCE());
     }

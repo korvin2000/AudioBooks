@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The globe panel (fragment.SourceMenu): the theme's item colour, as the books' cards and the source sheet, a
+     hairline that holds it apart from the cards under it, rounded corners. Its outline casts the popup's shadow. -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <solid android:color="?attr/backgroundItem" />
+    <stroke
+        android:width="1dp"
+        android:color="@color/source_menu_outline" />
+    <corners android:radius="16dp" />
+</shape>

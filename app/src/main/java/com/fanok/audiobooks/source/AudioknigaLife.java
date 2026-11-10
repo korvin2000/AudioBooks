@@ -3,6 +3,7 @@ package com.fanok.audiobooks.source;
 import static com.fanok.audiobooks.source.Html.text;
 
 import com.fanok.audiobooks.BookRemovedException;
+import com.fanok.audiobooks.model.BookPages;
 import com.fanok.audiobooks.net.JsonSlice;
 import com.fanok.audiobooks.pojo.AudioPOJO;
 import com.fanok.audiobooks.pojo.BookPOJO;
@@ -59,6 +60,8 @@ public final class AudioknigaLife implements SourceParser {
     public static final String INDEX = SERVER + "/";
     /** Any page carries the genre list; the index is the lightest. */
     public static final String GENRES = SERVER + "/";
+    /** Bound of the pages read for a book's series tab (16 books each). */
+    static final int MAX_SERIES_PAGES = 10;
 
     /** DLE category ids by the last segment of the genre URL, probed live; {@code /f/cat=<id>/} ranks inside it. */
     static final Map<String, Integer> CATEGORY_IDS = new HashMap<>();
@@ -167,15 +170,27 @@ public final class AudioknigaLife implements SourceParser {
         return parseTracks(page, base);
     }
 
+    /** The series listing read page by page (16 books each), in the cycle's order. */
     @Override
     public ArrayList<SeriesPOJO> series(Document page, String bookUrl) throws IOException {
+        ArrayList<SeriesPOJO> result = new ArrayList<>();
         String series = parseSeriesUrl(page);
-        return series.isEmpty() ? new ArrayList<>() : parseSeries(fetch(series));
+        for (int no = 1; !series.isEmpty() && no <= MAX_SERIES_PAGES; no++) {
+            Document doc = fetch(pageUrl(series, no));
+            result.addAll(parseSeries(doc));
+            if (!parseBooks(doc, no).hasMore) {
+                break;
+            }
+        }
+        Collections.sort(result, (x, y) -> Integer.compare(number(x.getNumber(), Integer.MAX_VALUE),
+                number(y.getNumber(), Integer.MAX_VALUE)));
+        return result;
     }
 
     @Override
     public ArrayList<ComentsPOJO> comments(String bookUrl, BooleanSupplier cancelled) throws Exception {
-        return parseComments(fetch(bookUrl));
+        // the page the description and the chapters were read from, not a second request to the site
+        return parseComments(BookPages.get(bookUrl, this::fetch));
     }
 
     // ---------------------------------------------------------------- listings

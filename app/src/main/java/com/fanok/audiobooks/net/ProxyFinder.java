@@ -364,7 +364,9 @@ public final class ProxyFinder {
     @NonNull
     public synchronized State state() {
         int spares = current != null ? verified.size() - index - 1 : 0;
-        return new State(phase, tested, total, found, current, spares, lastScanAt, refused, unreachable, site,
+        // a search tried offline kept the proxy in use: back online, it is in use again
+        Phase shown = phase == Phase.NO_NETWORK && current != null && online.getAsBoolean() ? Phase.READY : phase;
+        return new State(shown, tested, total, found, current, spares, lastScanAt, refused, unreachable, site,
                 sitePassed, exhaustedAt);
     }
 

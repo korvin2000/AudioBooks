@@ -1261,6 +1261,11 @@ public class DownloadStorageHelper {
                 booksDBModel.addSaved(book);
             }
 
+            // the chapter lengths the player learned (the percent counts them) survive the rewrite
+            java.util.Map<String, Integer> times = new java.util.HashMap<>();
+            for (BooksAudioEntity row : audioListDBModel.getRows(fakeUrl)) {
+                if (row.urlAudio != null && row.time > 0) times.put(row.urlAudio, row.time);
+            }
             audioListDBModel.remove(fakeUrl);
             for (String[] track : tracks) {
                 com.fanok.audiobooks.pojo.AudioListPOJO audioPOJO = new com.fanok.audiobooks.pojo.AudioListPOJO();
@@ -1271,6 +1276,8 @@ public class DownloadStorageHelper {
                 if (dotPos > 0) nameNoExt = nameNoExt.substring(0, dotPos);
                 audioPOJO.setAudioName(nameNoExt);
                 audioPOJO.setAudioUrl(track[1]);
+                Integer time = times.get(track[1]);
+                if (time != null) audioPOJO.setTime(time);
                 audioListDBModel.add(audioPOJO);
             }
         });
@@ -1348,7 +1355,9 @@ public class DownloadStorageHelper {
                 Outcome outcome = applyPlan(app, model, bookUrl, bookRows, chosen, true, removedIds);
                 deleted = outcome.deleted;
                 if (total > 0 && outcome.failed == 0 && !anyStillNeeded(app, bookUrl, model.getRows(bookUrl), removedIds)) {
-                    model.remove(bookUrl);
+                    if (DeletionPlanner.isImportedBook(bookUrl)) {
+                        model.remove(bookUrl); // an online book keeps its chapters: a cold start resumes it
+                    }
                     new BooksDBModel(app).removeSavedByUrl(bookUrl);
                 }
             } catch (Exception e) {

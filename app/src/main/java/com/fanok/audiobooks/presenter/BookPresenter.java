@@ -144,6 +144,9 @@ public class BookPresenter extends MvpPresenter<Activity> implements ActivityPre
 
     private Throwable mLastError = null;
 
+    /** Numbers the chapter loads: an offline result is dropped once a newer load started or the screen is gone. */
+    private int mAudioLoadId;
+
     /** The chapter load and the other-readers lookup under way: a repeated {@link #getAudio} replaces them. */
     private Disposable mAudioLoad;
     private Disposable mOtherArtistLoad;
@@ -382,6 +385,7 @@ public class BookPresenter extends MvpPresenter<Activity> implements ActivityPre
     /** Called by Moxy when the screen is gone for good; playback is the service's business and goes on. */
     @Override
     public void onDestroy() {
+        mAudioLoadId++; // an offline load still running finds nothing to hand its chapters to
         mDisposables.dispose();
         unbindPlayerService();
         mAudioDBModel.closeDB();
@@ -651,7 +655,9 @@ public class BookPresenter extends MvpPresenter<Activity> implements ActivityPre
     /** The player's chapter: when it is this book's, the progress that follows is in it. */
     @Override
     public void setSelected(int pos, @NonNull String name) {
-        getViewState().setSelected(pos, name);
+        if (playsThisBook()) { // another book's chapter of the same number and name is not this one's
+            getViewState().setSelected(pos, name);
+        }
         mPlayingChapter = playsThisBook() && mAudioPOJO != null && pos >= 0 && pos < mAudioPOJO.size()
                 && name.equals(mAudioPOJO.get(pos).getName()) ? ordinal(mOrdinals, pos) : -1;
     }
@@ -731,6 +737,7 @@ public class BookPresenter extends MvpPresenter<Activity> implements ActivityPre
         error = false;
         mIsOfflineFallback = false;
         mLastError = null;
+        final int load = ++mAudioLoadId;
         getViewState().showProgres(true);
 
         // For imported/local books — skip network, load from DB directly
@@ -771,7 +778,7 @@ public class BookPresenter extends MvpPresenter<Activity> implements ActivityPre
             new Thread(new Runnable() {
                 @Override
                 public void run() {
-                    loadOfflineLocalAudioSync();
+                    loadOfflineLocalAudioSync(load);
                 }
             }, "offline-fallback-thread").start();
             return;
@@ -793,7 +800,7 @@ public class BookPresenter extends MvpPresenter<Activity> implements ActivityPre
                         new Thread(new Runnable() {
                             @Override
                             public void run() {
-                                loadOfflineLocalAudioSync();
+                                loadOfflineLocalAudioSync(load);
                             }
                         }, "offline-fallback-thread").start();
                     }
@@ -855,7 +862,7 @@ public class BookPresenter extends MvpPresenter<Activity> implements ActivityPre
     }
 
     @OptIn(markerClass = UnstableApi.class)
-    private void loadOfflineLocalAudioSync() {
+    private void loadOfflineLocalAudioSync(int load) {
         ArrayList<AudioPOJO> localAudio = new ArrayList<>();
         ArrayList<Integer> localOrdinals = new ArrayList<>();
 
@@ -926,6 +933,9 @@ public class BookPresenter extends MvpPresenter<Activity> implements ActivityPre
         new android.os.Handler(android.os.Looper.getMainLooper()).post(new Runnable() {
             @Override
             public void run() {
+                if (load != mAudioLoadId) {
+                    return; // the screen is gone, or a newer load replaced this one
+                }
                 mIsOfflineFallback = true;
                 mAudioPOJO = finalLocalAudio;
                 mOrdinals = finalOrdinals;
