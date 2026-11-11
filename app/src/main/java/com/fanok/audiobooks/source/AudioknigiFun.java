@@ -506,6 +506,6 @@ public final class AudioknigiFun implements SourceParser {
         }
         Element copy = text.clone();
         copy.select("h2").remove();
-        return copy.text().trim();
+        return Html.paragraphs(copy);
     }
 }

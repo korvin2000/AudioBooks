@@ -485,7 +485,7 @@ public final class Knigavuhe implements SourceParser {
         Elements descriptionElements = document.getElementsByAttributeValue("itemprop",
                 "description");
         if (descriptionElements.size() != 0) {
-            descriptionPOJO.setDescription(descriptionElements.first().text().trim());
+            descriptionPOJO.setDescription(Html.paragraphs(descriptionElements.first()));
         }
 
         Elements genreConteiner = document.getElementsByClass("book_genre_pretitle");
@@ -645,7 +645,7 @@ public final class Knigavuhe implements SourceParser {
 
         Elements desc = document.getElementsByClass("book_description");
         if (desc != null && !desc.isEmpty()) {
-            bookPOJO.setDesc(desc.first().text());
+            bookPOJO.setDesc(Html.paragraphs(desc.first()));
         }
 
         return bookPOJO;

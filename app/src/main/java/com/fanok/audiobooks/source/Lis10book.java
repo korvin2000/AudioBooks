@@ -35,7 +35,6 @@ import java.util.regex.Pattern;
 
 import okhttp3.HttpUrl;
 
-import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 
 /**
@@ -505,7 +504,7 @@ public final class Lis10book implements SourceParser {
         d.setTime(time(o.get("totalDurationSec")));
         double stars = stars(o);
         d.setReiting(stars > 0 ? BookPOJO.formatRating((float) stars, string(o, "uknigRatingsCount")) : "");
-        d.setDescription(Jsoup.parseBodyFragment(string(o, "description")).text());
+        d.setDescription(Html.paragraphs(string(o, "description")));
         ArrayList<OtherArtistPOJO> others = parseOtherReaders(page);
         d.setOtherReader(!others.isEmpty());
         if (!others.isEmpty()) {

@@ -191,6 +191,7 @@ public class UknigTest {
         assertEquals("10 ч. 28 мин.", d.getTime());
         assertEquals("4.38", d.getReiting());
         assertFalse(d.getDescription().isEmpty());
+        assertTrue(d.getDescription().contains("\nРассказы Честертона об отце Брауне"));
 
         BookPOJO book = Uknig.parseBook(page("book.html", "https://uknig.com/books/849527"),
                 "https://uknig.com/books/849527");

@@ -419,7 +419,7 @@ public final class AudioknigaOnline implements SourceParser {
         }
         Element box = heading.parent().clone();
         box.select(".nav-title").remove();
-        return box.text().trim();
+        return Html.paragraphs(box);
     }
 
     /** "Похожие аудиокниги". */

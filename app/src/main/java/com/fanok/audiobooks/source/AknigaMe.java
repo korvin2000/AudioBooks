@@ -33,7 +33,6 @@ import java.util.regex.Pattern;
 
 import okhttp3.HttpUrl;
 
-import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
 
@@ -443,7 +442,7 @@ public final class AknigaMe implements SourceParser {
         JsonObject rating = object(props, "book_rating");
         double stars = decimal(rating, "average");
         d.setReiting(stars > 0 ? BookPOJO.formatRating((float) stars, string(rating, "votes")) : "");
-        d.setDescription(Jsoup.parseBodyFragment(string(album, "description")).text());
+        d.setDescription(Html.paragraphs(string(album, "description")));
         ArrayList<OtherArtistPOJO> others = parseOtherReaders(page);
         d.setOtherReader(!others.isEmpty());
         if (!others.isEmpty()) {

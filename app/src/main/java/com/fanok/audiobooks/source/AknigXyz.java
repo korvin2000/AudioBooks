@@ -346,7 +346,7 @@ public final class AknigXyz implements SourceParser {
         }
         description.setTime(duration(doc.select(".main-news-stat-r > div, .fmlstat > div")));
         description.setReiting(text(doc, ".full-news-rating .ratingtypeplusminus, .mflf-rating-n"));
-        description.setDescription(text(doc, "div.full-news-text.obr"));
+        description.setDescription(Html.paragraphs(doc.selectFirst("div.full-news-text.obr")));
         return description;
     }
 

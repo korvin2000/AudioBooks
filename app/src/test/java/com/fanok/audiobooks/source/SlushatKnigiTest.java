@@ -356,6 +356,7 @@ public class SlushatKnigiTest {
         assertEquals("4.6", d.getReiting());
         assertTrue(d.getDescription(), d.getDescription().startsWith("🔍 Добро пожаловать на slushat-knigi"));
         assertFalse("the review is not the annotation", d.getDescription().contains("Рецензия"));
+        assertTrue(d.getDescription().contains("\nМастер и Маргарита - это великолепное произведение"));
 
         BookPOJO card = parser.book(page, BOOK);
         assertEquals(BOOK, card.getUrl());

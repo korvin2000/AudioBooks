@@ -268,7 +268,7 @@ public final class AudioknigiPro implements SourceParser {
         description.setSeriesUrl(href(row, "a"));
         description.setTime(afterLabel(info(doc, "Продолжительность")));
         description.setReiting(text(doc, ".full-rating"));
-        description.setDescription(text(doc, ".full-desc"));
+        description.setDescription(Html.paragraphs(doc.selectFirst(".full-desc")));
         return description;
     }
 

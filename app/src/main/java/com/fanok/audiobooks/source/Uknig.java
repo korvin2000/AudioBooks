@@ -343,7 +343,7 @@ public final class Uknig implements SourceParser {
         }
         description.setTime(text(info, ".book-duration"));
         description.setReiting(text(doc, ".book-details .rating-number"));
-        description.setDescription(text(doc, ".book-details .description"));
+        description.setDescription(Html.paragraphs(doc.selectFirst(".book-details .description")));
         return description;
     }
 

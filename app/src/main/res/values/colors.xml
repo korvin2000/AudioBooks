@@ -41,6 +41,18 @@
     <color name="imageTint">#80000000</color>
 
 
+    <!-- chapter names in the player (digits, symbols) and the book page's collection links, per theme: warm digits
+         against the theme's cool hue, symbols in that hue, collections green, apart from hrefColor's blue -->
+    <color name="chapterDigit">#FFCC80</color>
+    <color name="chapterSymbol">#80CBC4</color>
+    <color name="collectionLink">#A5D6A7</color>
+    <color name="chapterDigitBlack">#FFD54F</color>
+    <color name="chapterSymbolBlack">#B0BEC5</color>
+    <color name="collectionLinkBlack">#C5E1A5</color>
+    <color name="chapterDigitLight">#752B00</color>
+    <color name="chapterSymbolLight">#00695C</color>
+    <color name="collectionLinkLight">#2E7D32</color>
+
     <color name="primaryColorBlack">#202022</color>
     <color name="primaryDarkColorBlack">#1A1A1B</color>
     <color name="backgroundSelectedBlack">#5C5C60</color>

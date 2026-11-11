@@ -391,6 +391,7 @@ public class Lis10bookTest {
         assertEquals(BookPOJO.formatRating(4.43f, "40"), d.getReiting());
         assertTrue(d.getDescription(), d.getDescription().startsWith("Никто не ожидал, что Вайолет Сорренгейл"));
         assertFalse(d.getDescription().contains("<p>"));
+        assertTrue(d.getDescription().contains("\nЧто ж, добро пожаловать в революцию!\n"));
         assertFalse(d.isOtherReader());
 
         BookPOJO card = SITE.book(book("book.json", "zheleznoe-plamya"), BOOK);

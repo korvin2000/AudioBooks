@@ -273,6 +273,7 @@ public class FourReadTest {
         assertEquals("5", d.getReiting());
         assertEquals(S + "/uploads/posts/2026-10/medium/bd0ec0798d_photo_2026-10-23_18-44-23.jpg", d.getPoster());
         assertTrue(d.getDescription(), d.getDescription().startsWith("У психологічному трилері"));
+        assertTrue(d.getDescription().contains("\nРоман став основою для телесеріалу «Клуб помсти»"));
         assertEquals("", d.getSeries());
         BookPOJO card = parser.book(page, HLS_BOOK);
         assertEquals("Клуб Отелло", card.getName());

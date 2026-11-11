@@ -408,6 +408,7 @@ public class AudioknigaOnlineTest {
         assertEquals("3254", d.getLike());
         assertEquals("464", d.getDisLike());
         assertTrue(d.getDescription().startsWith("Великий роман-эпопея Льва Толстого"));
+        assertTrue(d.getDescription().contains("\nВсе эти картины, сплетаясь, образуют"));
         assertFalse(d.getDescription().contains("Аннотация"));
     }
 

@@ -1,15 +1,12 @@
 package com.fanok.audiobooks.fragment;
 
 import static android.content.Context.CLIPBOARD_SERVICE;
-import static android.content.Context.UI_MODE_SERVICE;
 
-import android.app.UiModeManager;
 import android.content.ActivityNotFoundException;
 import android.content.ClipData;
 import android.content.ClipboardManager;
 import android.content.Context;
 import android.content.Intent;
-import android.content.res.Configuration;
 import android.net.Uri;
 import android.os.Bundle;
 import android.os.PowerManager;
@@ -117,10 +114,7 @@ public class AboutFragment extends PreferenceFragmentCompat {
         preferenceClickListner("disable_battary_optimize", preference -> {
             boolean enabled;
             PowerManager pm = (PowerManager) requireContext().getSystemService(Context.POWER_SERVICE);
-            UiModeManager uiModeManager = (UiModeManager) requireContext().getSystemService(
-                    UI_MODE_SERVICE);
-            if (uiModeManager != null && uiModeManager.getCurrentModeType()
-                    == Configuration.UI_MODE_TYPE_TELEVISION) {
+            if (ListFocus.isTv()) {
                 enabled = false;
 
             } else if (pm != null) {

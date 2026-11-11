@@ -186,6 +186,7 @@ public class BookDescriptionModelTest {
         assertEquals("https://audioboo.org/xfsearch/cikl/%D0%A1%D0%BE%D0%BB%D0%BE/", a.getSeriesUrl());
         assertEquals("https://audioboo.org/xfsearch/avtora/%D0%9C%D0%B0%D1%85%D0%B0%D0%BD%D0%B5%D0%BD%D0%BA%D0%BE"
                 + "%20%D0%92%D0%B0%D1%81%D0%B8%D0%BB%D0%B8%D0%B9/", a.getAutorUrl());
+        assertTrue(a.getDescription(), a.getDescription().startsWith("Соло 06\nГод выпуска аудиокниги: 2026\n"));
         // the related block lists the series, this book included: it is left out
         ArrayList<BookPOJO> books = BookDescriptionModel.parseBooks(boo, audioboo);
         assertEquals(5, books.size());

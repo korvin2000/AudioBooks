@@ -403,7 +403,7 @@ public class BookishTest {
         assertTrue(many.getAutor().endsWith(", Другие авторы"));
         assertEquals("days are counted in the hours", time("255:50:44"), many.getTime());
         assertEquals("Аудиоспектакль", many.getGenre());
-        assertTrue(many.getDescription().startsWith("Александр Блок - Незнакомка Александр Грибоедов"));
+        assertTrue(many.getDescription().startsWith("Александр Блок - Незнакомка\nАлександр Грибоедов - Горе от ума\n"));
     }
 
     @Test

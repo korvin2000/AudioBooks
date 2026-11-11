@@ -151,6 +151,8 @@ public class OtrubSelectorsTest {
         assertFalse(description.getGenre().isEmpty());
         assertFalse(description.getPoster().isEmpty());
         assertFalse(description.getDescription().isEmpty());
+        // the block's heading «Описание» is no line of the description
+        assertTrue(description.getDescription().startsWith("Перерождение малость не задалось."));
 
         Document series = fixture("series.html");
         renameGeneratedClasses(series);

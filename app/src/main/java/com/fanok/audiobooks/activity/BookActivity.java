@@ -10,7 +10,6 @@ import static com.fanok.audiobooks.service.MediaPlayerService.countAudioWereShow
 import com.fanok.audiobooks.FontScale;
 import android.annotation.SuppressLint;
 import android.app.PendingIntent;
-import android.app.UiModeManager;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
@@ -44,6 +43,7 @@ import android.view.ViewGroup;
 import android.view.ViewParent;
 import android.widget.Button;
 import android.widget.ImageButton;
+import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.ProgressBar;
 import android.widget.SeekBar;
@@ -78,6 +78,8 @@ import com.fanok.audiobooks.R;
 import com.fanok.audiobooks.TvSeekBar;
 import com.fanok.audiobooks.Url;
 import com.fanok.audiobooks.adapter.AudioAdapter;
+import com.fanok.audiobooks.adapter.BooksListAddapter;
+import com.fanok.audiobooks.adapter.ListFocus;
 import com.fanok.audiobooks.download.DownloadStatus;
 import com.fanok.audiobooks.download.DownloadStatusText;
 import com.fanok.audiobooks.adapter.SectionsPagerAdapter;
@@ -88,14 +90,20 @@ import com.fanok.audiobooks.pojo.BookPOJO;
 import com.fanok.audiobooks.pojo.OtherArtistPOJO;
 import com.fanok.audiobooks.pojo.StorageUtil;
 import com.fanok.audiobooks.policy.DefaultCover;
+import com.fanok.audiobooks.policy.EmbeddedCover;
 import com.fanok.audiobooks.policy.ParentalControl;
 import com.fanok.audiobooks.presenter.BookPresenter;
+import com.fanok.audiobooks.service.Checkpoint;
 import com.fanok.audiobooks.service.MediaPlayerService;
 import com.fanok.audiobooks.service.SeekStep;
 import com.fanok.audiobooks.util.BookProgress;
+import com.fanok.audiobooks.util.ChapterText;
+import com.fanok.audiobooks.util.DownloadStorageHelper;
+import com.fanok.audiobooks.util.RemainingTime;
 import com.fanok.audiobooks.android_equalizer.DialogEqualizerFragment;
 import com.google.android.gms.tasks.Task;
 import com.google.android.material.bottomsheet.BottomSheetBehavior;
+import com.google.android.material.color.MaterialColors;
 import com.google.android.material.snackbar.Snackbar;
 import com.google.android.material.tabs.TabLayout;
 import com.google.android.material.tabs.TabLayoutMediator;
@@ -149,6 +157,52 @@ public class BookActivity extends MvpAppCompatActivity implements Activity {
     private boolean mShowingCount;
     private ImageButton mDelete;
     private ImageButton mDownland;
+    /** Under the playing chapter's name: where the book stands ({@link #bindProgress}); none on TV and tablets. */
+    @Nullable
+    private TextView mNameSub;
+    /** Whether that line fits the top row under the name at this font size. */
+    private boolean mNameSubFits;
+    /** A chapter name's digits and other symbols in the theme's colours ({@link ChapterText#colored}). */
+    private int mDigitColor;
+    private int mSymbolColor;
+    /**
+     * The book's block above the chapters (beside them in landscape): cover, title, author, reader and the whole
+     * book's progress, shown or hidden by {@link #mCoverToggle}; none on TV and tablets.
+     */
+    @Nullable
+    private View mPlayerBook;
+    /** The row under the progress line, and the block and chapters under the row ({@link #liftPlayer}). */
+    @Nullable
+    private View mPlayerTopRow;
+    @Nullable
+    private View mPlayerBody;
+    @Nullable
+    private ImageButton mCoverToggle;
+    private ImageView mPlayerCover;
+    private ProgressBar mPlayerBookProgress;
+    private TextView mPlayerBookProgressText;
+    private boolean mPlayerBookShown;
+    /** The block's cover was loaded; and the book whose default cover it shows until one is read from its audio. */
+    private boolean mPlayerCoverBound;
+    @Nullable
+    private String mPlayerCoverWanted;
+    private final EmbeddedCover.Listener mEmbeddedCover = (key, cover) -> {
+        if (EmbeddedCover.isOf(key, mPlayerCoverWanted)) {
+            bindPlayerCover();
+        }
+    };
+    /** Where the book was left, read once per start; the playing book's place comes from BookProgress. */
+    @Nullable
+    private Checkpoint mCheckpoint;
+    @Nullable
+    private RemainingTime mRemaining;
+    @Nullable
+    private int[] mRemainingOf;
+    private final BookProgress.Listener mBookProgress = bookUrl -> {
+        if (bookUrl.equals(this.mBookPOJO.getUrl())) {
+            bindProgress();
+        }
+    };
 
     public static String getShowingView() {
         return showingView;
@@ -159,6 +213,11 @@ public class BookActivity extends MvpAppCompatActivity implements Activity {
     private static final long SWITCH_BOOK_HOLD_MS = 2500;
     private static final String PREF_SEEK_BUTTONS = "seekButtonsPref";
     private static final String PREF_SAFE_NAVIGATION = "safeNavigationPref";
+    /** The book's block above the chapters is shown (its toggle in the open player's top row); off by default. */
+    private static final String PREF_PLAYER_COVER = "playerCoverPref";
+    /** From this font scale the block has no reader line; from the larger one only the title and the author. */
+    private static final float PLAYER_BOOK_NO_READER_SCALE = 1.3f;
+    private static final float PLAYER_BOOK_COMPACT_SCALE = 1.5f;
     /**
      * Holding rewind/forward scrubs at {@code START_SPEED} times real time, doubling every {@code DOUBLING_MS} up to
      * {@code MAX_SPEED}; a chapter of many hours allows up to {@code MAX_SPEED_LONG}, crossing it in about
@@ -476,7 +535,6 @@ public class BookActivity extends MvpAppCompatActivity implements Activity {
         pref = PreferenceManager
                 .getDefaultSharedPreferences(this);
 
-        UiModeManager uiModeManager = (UiModeManager) getApplicationContext().getSystemService(UI_MODE_SERVICE);
         setContentView(R.layout.activity_book);
         mButtonCollapse = findViewById(R.id.buttonCollapse);
         mTopButtonsControls = findViewById(R.id.topButtonsControls);
@@ -506,6 +564,9 @@ public class BookActivity extends MvpAppCompatActivity implements Activity {
         mPlayBottom = findViewById(R.id.playBottom);
         mNextBottom = findViewById(R.id.nextBottom);
         mForward = findViewById(R.id.forward);
+        mDigitColor = MaterialColors.getColor(mNameCurent, R.attr.chapterDigitColor);
+        mSymbolColor = MaterialColors.getColor(mNameCurent, R.attr.chapterSymbolColor);
+        setUpPlayerBook();
 
         MainActivity.setCloseApp(false);
 
@@ -572,8 +633,7 @@ public class BookActivity extends MvpAppCompatActivity implements Activity {
         ViewGroup.LayoutParams playerParams = mPlayer.getLayoutParams();
         if (playerParams instanceof CoordinatorLayout.LayoutParams
                 && ((CoordinatorLayout.LayoutParams) playerParams).getBehavior() instanceof BottomSheetBehavior
-                && (uiModeManager == null
-                || uiModeManager.getCurrentModeType() != Configuration.UI_MODE_TYPE_TELEVISION)) {
+                && !ListFocus.isTv()) {
             bottomSheetBehavior = BottomSheetBehavior.from(mPlayer);
 
 
@@ -602,6 +662,7 @@ public class BookActivity extends MvpAppCompatActivity implements Activity {
 
                         @Override
                         public void onSlide(@NonNull View bottomSheet, float slideOffset) {
+                            liftPlayer(slideOffset);
                             float alpha = 1 - slideOffset * 2;
                             if (mTopButtonsControls != null) {
                                 mTopButtonsControls.animate().alpha(alpha).setDuration(0);
@@ -610,6 +671,9 @@ public class BookActivity extends MvpAppCompatActivity implements Activity {
                                 mProgressBar.animate().alpha(alpha).setDuration(0);
                             }
                             mNameCurent.animate().alpha(alpha).setDuration(0);
+                            if (mNameSub != null) {
+                                mNameSub.animate().alpha(alpha).setDuration(0);
+                            }
                             if (alpha <= 0.0) {
                                 mTopButtonsControls.setVisibility(View.GONE);
                                 mProgressBar.setVisibility(View.INVISIBLE);
@@ -627,7 +691,7 @@ public class BookActivity extends MvpAppCompatActivity implements Activity {
                                 float alphaCollapse = (float) ((slideOffset - Consts.COLLAPS_BUTTON_VISIBLE)
                                         / Consts.COLLAPS_BUTTON_VISIBLE_STEP);
                                 for (View view : new View[] {mButtonCollapse, mSelectionClose, mRadioAll, mDownland,
-                                        mDelete, mNameCurent}) {
+                                        mDelete, mNameCurent, mNameSub, mCoverToggle}) {
                                     if (view != null) {
                                         view.animate().alpha(alphaCollapse).setDuration(0);
                                     }
@@ -823,6 +887,7 @@ public class BookActivity extends MvpAppCompatActivity implements Activity {
 
         mAudioAdapter.endSelection();
         bindSelectionBar(false);
+        liftPlayer(0);
         broadcastSend(new Intent(Broadcast_SHOW_TITLE));
     }
 
@@ -845,6 +910,7 @@ public class BookActivity extends MvpAppCompatActivity implements Activity {
             mButtonCollapse.setVisibility(View.VISIBLE);
         }
         bindSelectionBar(true);
+        liftPlayer(1);
 
         int selected = mAudioAdapter.getIndexSelected();
         boolean b = pref.getBoolean("scrollToSelectedPref", false);
@@ -862,6 +928,179 @@ public class BookActivity extends MvpAppCompatActivity implements Activity {
         if (mProgressBar != null) {
             mProgressBar.setVisibility(View.VISIBLE);
         }
+    }
+
+    /**
+     * The phones' player: whether the line under the chapter's name fits, and the book's block with its toggle. The
+     * block is as the toggle left it last time ({@link #PREF_PLAYER_COVER}), hidden until it is asked for; beside the
+     * chapters in landscape, where the list is short; with a large font it keeps to the title and the author, so the
+     * list keeps its rows. TV and tablets in landscape have their own player, without these views.
+     */
+    private void setUpPlayerBook() {
+        mNameSub = findViewById(R.id.name_sub);
+        mPlayerBook = findViewById(R.id.playerBook);
+        mCoverToggle = findViewById(R.id.coverToggle);
+        if (mNameSub == null || mPlayerBook == null || mCoverToggle == null) {
+            return;
+        }
+        View row = (View) mNameSub.getParent().getParent();
+        int room = getResources().getDimensionPixelSize(R.dimen.player_row_height) - heightOf(mProgressBar)
+                - row.getPaddingTop() - row.getPaddingBottom();
+        mNameSubFits = heightOf(mNameCurent) + heightOf(mNameSub) <= room;
+
+        mPlayerCover = findViewById(R.id.playerCover);
+        mPlayerBookProgress = findViewById(R.id.playerBookProgress);
+        mPlayerBookProgressText = findViewById(R.id.playerBookProgressText);
+        float scale = getResources().getConfiguration().fontScale;
+        if (scale >= PLAYER_BOOK_COMPACT_SCALE) {
+            mPlayerBookProgress = null; // the book's progress is not shown: bindProgress leaves it alone
+        }
+        bindBookLine(R.id.playerBookTitle, mBookPOJO.getName());
+        bindBookLine(R.id.playerBookAuthor, mBookPOJO.getAutor());
+        String reader = mBookPOJO.getArtist() == null ? "" : mBookPOJO.getArtist().trim();
+        bindBookLine(R.id.playerBookReader, reader.isEmpty() || scale >= PLAYER_BOOK_NO_READER_SCALE ? null
+                : getString(R.string.player_reader, reader));
+        if (getResources().getConfiguration().orientation == Configuration.ORIENTATION_LANDSCAPE) {
+            ((LinearLayout) findViewById(R.id.playerBody)).setOrientation(LinearLayout.HORIZONTAL);
+            ViewGroup.LayoutParams book = mPlayerBook.getLayoutParams();
+            book.width = getResources().getDimensionPixelSize(R.dimen.player_book_side_width);
+            book.height = ViewGroup.LayoutParams.MATCH_PARENT;
+            mPlayerBookProgressText.setMaxLines(2); // the narrow block's line wraps
+        }
+        mCoverToggle.setOnClickListener(view -> {
+            pref.edit().putBoolean(PREF_PLAYER_COVER, !mPlayerBookShown).apply();
+            // the list gets shorter under the block: the playing chapter, when in view, stays in view
+            int playing = mAudioAdapter.getIndexSelected();
+            boolean inView = playing >= mLinearLayoutManager.findFirstVisibleItemPosition()
+                    && playing <= mLinearLayoutManager.findLastCompletelyVisibleItemPosition();
+            showPlayerBook(!mPlayerBookShown);
+            if (mPlayerBookShown && inView) {
+                mList.scrollToPosition(playing);
+            }
+        });
+        showPlayerBook(pref.getBoolean(PREF_PLAYER_COVER, false));
+        mPlayerTopRow = findViewById(R.id.playerTopRow);
+        mPlayerBody = findViewById(R.id.playerBody);
+        liftPlayer(0);
+    }
+
+    /**
+     * The open player hides the progress line, and its place is not left empty: the row moves up into it, and what
+     * follows the row starts that much higher (the layout's negative margin). Folded, the row is under the line and
+     * the rest under the row. {@code open} is the sheet's slide, 0 folded to 1 open; nothing on TV and tablets.
+     */
+    private void liftPlayer(float open) {
+        if (mPlayerTopRow == null || mPlayerBody == null) {
+            return;
+        }
+        float line = getResources().getDimension(R.dimen.player_progress_line);
+        float opened = Math.max(0, Math.min(1, open));
+        mPlayerTopRow.setTranslationY(-line * opened);
+        mPlayerBody.setTranslationY(line * (1 - opened));
+        if (mDownloadStatus != null) {
+            mDownloadStatus.setTranslationY(line * (1 - opened));
+        }
+    }
+
+    /** A text line of the book's block; gone when the book has none. */
+    private void bindBookLine(int id, @Nullable String text) {
+        TextView line = findViewById(id);
+        String shown = text == null ? "" : text.trim();
+        line.setText(shown);
+        line.setVisibility(shown.isEmpty() ? View.GONE : View.VISIBLE);
+    }
+
+    /** The book's block and its toggle, in the accent colour while the block shows; the cover loads when first shown. */
+    private void showPlayerBook(boolean shown) {
+        mPlayerBookShown = shown;
+        show(mPlayerBook, shown);
+        if (mCoverToggle != null) {
+            if (shown) {
+                mCoverToggle.setColorFilter(
+                        MaterialColors.getColor(mCoverToggle, androidx.appcompat.R.attr.colorAccent));
+            } else {
+                mCoverToggle.clearColorFilter();
+            }
+            mCoverToggle.setContentDescription(
+                    getString(shown ? R.string.player_cover_hide : R.string.player_cover_show));
+        }
+        if (shown && !mPlayerCoverBound) {
+            bindPlayerCover();
+        }
+    }
+
+    /**
+     * The block's cover, as the lists show it ({@link BooksListAddapter#loadCover}: the parental control's mask, the
+     * default cover or the one read from the audio, the list's own image from its cache); a downloaded book's cover
+     * file first, as on the description page. A book without any has no image, the texts take its place.
+     */
+    private void bindPlayerCover() {
+        if (mPlayerCover == null) {
+            return;
+        }
+        mPlayerCoverBound = true;
+        String local = DownloadStorageHelper.findLocalCoverForBook(this, mBookPOJO);
+        String photo = local != null && !local.isEmpty() ? local : mBookPOJO.getPhoto();
+        boolean none = (photo == null || photo.trim().isEmpty()) && !DefaultCover.replaces(mBookPOJO.getUrl())
+                && ParentalControl.coverMask(this, mBookPOJO) == null;
+        show(mPlayerCover, !none);
+        mPlayerCoverWanted = none ? null : BooksListAddapter.loadCover(mPlayerCover, mBookPOJO, photo);
+    }
+
+    /**
+     * Where the book stands, reckoned as the description's time line is ({@link RemainingTime}): the line under the
+     * playing chapter's name and the block's progress. It follows the progress this screen already receives while
+     * the book plays, else its saved place; the views change only when their text does, about once a minute.
+     */
+    private void bindProgress() {
+        String url = mBookPOJO.getUrl();
+        if (mNameSub == null || url == null) {
+            return;
+        }
+        int[] seconds = BookProgress.seconds(url);
+        if (seconds != null && seconds != mRemainingOf) { // evicted lengths: the last known ones stay
+            mRemainingOf = seconds;
+            mRemaining = new RemainingTime(seconds);
+        }
+        if (mRemaining == null) {
+            return;
+        }
+        String playing = MediaPlayerService.currentBookUrl();
+        boolean other = playing != null && !playing.equals(url); // the name above is that book's chapter, not this one's
+        boolean live = url.equals(playing) && BookProgress.chapter(url) >= 0;
+        int chapter = live ? BookProgress.chapter(url) : mCheckpoint != null ? mCheckpoint.chapterIndex : -1;
+        long position = live ? BookProgress.positionMs(url) : mCheckpoint != null ? mCheckpoint.positionMs : 0;
+        RemainingTime.Line line = mRemaining.at(chapter, position, BookPresenter.getSpeed());
+        String subtitle = other ? "" : ChapterText.subtitle(line, mRemaining.total());
+        if (!subtitle.contentEquals(mNameSub.getText())) {
+            mNameSub.setText(subtitle);
+            show(mNameSub, !mShowingCount && mNameSubFits && !subtitle.isEmpty());
+        }
+        if (mPlayerBookProgress == null) {
+            return;
+        }
+        String progress = ChapterText.progress(line, mRemaining.total());
+        if (!progress.contentEquals(mPlayerBookProgressText.getText())) {
+            mPlayerBookProgressText.setText(progress);
+            show(mPlayerBookProgress, !progress.isEmpty());
+            show(mPlayerBookProgressText, !progress.isEmpty());
+        }
+        mPlayerBookProgress.setProgress(line.permille);
+    }
+
+    /** Shows the view or takes it out of the layout; nothing when it is so already, or absent in this layout. */
+    private static void show(@Nullable View view, boolean shown) {
+        int visibility = shown ? View.VISIBLE : View.GONE;
+        if (view != null && view.getVisibility() != visibility) {
+            view.setVisibility(visibility);
+        }
+    }
+
+    /** The height the view takes for what it shows now, laid out or not. */
+    private static int heightOf(@NonNull View view) {
+        int unspecified = View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED);
+        view.measure(unspecified, unspecified);
+        return view.getMeasuredHeight();
     }
 
     /** The favourites of this book and its people; the ★ tab, the description and the cover's sheet use it too. */
@@ -1055,10 +1294,21 @@ public class BookActivity extends MvpAppCompatActivity implements Activity {
         registerInternalReceiver(showEqualizer, Broadcast_SHOW_EQUALIZER);
         broadcastSend(new Intent(Broadcast_SHOW_TITLE));
         if (mAudioAdapter != null) mAudioAdapter.startLive();
+        if (mNameSub != null && mBookPOJO.getUrl() != null) {
+            mCheckpoint = new StorageUtil(this).loadCheckpoint(mBookPOJO.getUrl());
+            BookProgress.addListener(mBookProgress);
+            bindProgress();
+            EmbeddedCover.listen(mEmbeddedCover);
+            if (mPlayerBookShown && mPlayerCoverWanted != null) {
+                bindPlayerCover(); // the cover may have been read from the audio while this screen was away
+            }
+        }
     }
 
     @Override
     protected void onStop() {
+        BookProgress.removeListener(mBookProgress);
+        EmbeddedCover.unlisten(mEmbeddedCover);
         if (mAudioAdapter != null) mAudioAdapter.stopLive();
         unregisterReceiver(setImage);
         unregisterReceiver(setProgress);
@@ -1496,7 +1746,7 @@ public class BookActivity extends MvpAppCompatActivity implements Activity {
     @Override
     public void showTitle(@NotNull @NonNull String name) {
         if (!mShowingCount) {
-            mNameCurent.setText(name);
+            mNameCurent.setText(ChapterText.colored(name, mDigitColor, mSymbolColor));
         }
     }
 
@@ -1517,6 +1767,9 @@ public class BookActivity extends MvpAppCompatActivity implements Activity {
         if (mButtonCollapse != null && shown && bottomSheetBehavior != null) {
             mButtonCollapse.setVisibility(selecting ? View.GONE : View.VISIBLE);
         }
+        // the block's toggle only over the open list; the line under the name gives way to the chosen count
+        show(mCoverToggle, shown && !selecting);
+        show(mNameSub, !selecting && mNameSubFits && mNameSub != null && mNameSub.length() > 0);
         if (!selecting) {
             if (mShowingCount) {
                 mShowingCount = false;

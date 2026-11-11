@@ -450,7 +450,7 @@ public final class Izibuk implements SourceParser {
 
         Elements descriptionList = document.getElementsByAttributeValue("itemprop", "description");
         if (descriptionList.size() != 0) {
-            descriptionPOJO.setDescription(descriptionList.first().text());
+            descriptionPOJO.setDescription(Html.paragraphs(descriptionList.first()));
         }
 
         return descriptionPOJO;
@@ -546,10 +546,7 @@ public final class Izibuk implements SourceParser {
 
         Elements descriptionList = document.getElementsByAttributeValue("itemprop", "description");
         if (descriptionList != null && descriptionList.size() != 0) {
-            String text = descriptionList.first().text();
-            if (text != null) {
-                bookPOJO.setDesc(text);
-            }
+            bookPOJO.setDesc(Html.paragraphs(descriptionList.first()));
         }
         return bookPOJO;
     }

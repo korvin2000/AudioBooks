@@ -602,7 +602,7 @@ public final class Audioboo implements SourceParser {
                 descriptionPOJO.setPoster(img.absUrl("data-src"));
             }
             String descText = descContainer.text();
-            descriptionPOJO.setDescription(descText);
+            descriptionPOJO.setDescription(Html.paragraphs(descContainer));
 
             if (descText.contains("Продолжительность:")) {
                 String timeStr = descText.substring(descText.indexOf("Продолжительность:") + "Продолжительность:".length()).trim();
@@ -675,7 +675,7 @@ public final class Audioboo implements SourceParser {
                 bookPOJO.setPhoto(img.absUrl("data-src"));
             }
             String descText = descContainer.text();
-            bookPOJO.setDesc(descText);
+            bookPOJO.setDesc(Html.paragraphs(descContainer));
 
             if (descText.contains("Продолжительность:")) {
                 String timeStr = descText.substring(descText.indexOf("Продолжительность:") + "Продолжительность:".length()).trim();

@@ -19,9 +19,7 @@ import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 
 import org.jsoup.Connection;
-import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
-import org.jsoup.nodes.Element;
 
 import java.io.IOException;
 import java.io.UnsupportedEncodingException;
@@ -704,7 +702,7 @@ public final class Yakniga implements SourceParser {
         d.setTime(time(heard > 0 ? heard : Json.seconds(o.get("duration"))));
         d.setLike(String.valueOf(number(o, "likesCount")));
         d.setDisLike(String.valueOf(number(o, "dislikesCount")));
-        d.setDescription(text(string(o, "description")));
+        d.setDescription(Html.paragraphs(string(o, "description")));
         return d;
     }
 
@@ -755,22 +753,6 @@ public final class Yakniga implements SourceParser {
             seconds += Json.seconds(chapter.get("duration"));
         }
         return seconds;
-    }
-
-    /** The paragraphs of the description's HTML, one a line. */
-    static String text(String html) {
-        if (html.trim().isEmpty()) {
-            return "";
-        }
-        Document body = Jsoup.parseBodyFragment(html);
-        List<String> paragraphs = new ArrayList<>();
-        for (Element p : body.select("p")) {
-            String line = p.text().trim();
-            if (!line.isEmpty()) {
-                paragraphs.add(line);
-            }
-        }
-        return paragraphs.isEmpty() ? body.text().trim() : join(paragraphs, "\n");
     }
 
     /** "7" for 7.0, "2.5" for 2.5; "" for none. */

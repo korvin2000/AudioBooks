@@ -605,6 +605,63 @@ public final class Akniga implements SourceParser {
         return books;
     }
 
+    /**
+     * The overview of a book page, made of its {@code description__article-main} sections, as {annotation, notes}:
+     * the annotation with its paragraphs, one a line, and the site's notes, an empty line between them: a caption
+     * with its lines under it («Другие названия», a title a line) or a caption alone ("Добавлено 19 октября 2026").
+     * Left out: the «Описание» caption, the other narrations and the collections
+     * ({@code …about-block-samebook}: the «Озвучки» tab and {@link #collections} show them) and the narrator's
+     * social networks, whose links are icons.
+     */
+    static String[] overview(Elements sections) {
+        String annotation = "";
+        StringBuilder notes = new StringBuilder();
+        for (Element section : sections) {
+            if (section.hasClass("caption__article--about-block-samebook")
+                    || section.closest(".social--users") != null) {
+                continue;
+            }
+            Element body = section.clone();
+            String caption = Html.text(body, ".content__main__book--item--caption");
+            body.select(".content__main__book--item--caption").remove();
+            String text = Html.paragraphs(body);
+            if (caption.isEmpty() || caption.equals("Описание")) {
+                annotation = annotation.isEmpty() ? text : annotation + (text.isEmpty() ? "" : "\n" + text);
+                continue;
+            }
+            if (caption.equals("Другие названия") || caption.equals("Другое название")) {
+                text = text.replaceAll("\\s*;\\s*", "\n"); // the site lists the titles in one line
+            }
+            notes.append(notes.length() == 0 ? "" : "\n\n").append(caption).append(text.isEmpty() ? "" : "\n" + text);
+        }
+        return new String[]{annotation, notes.toString()};
+    }
+
+    /** An {@link #overview} as one text: the annotation, an empty line, the notes. */
+    static String overviewText(String[] overview) {
+        return overview[0] + (overview[0].isEmpty() || overview[1].isEmpty() ? "" : "\n\n") + overview[1];
+    }
+
+    /**
+     * The collections ("Входит в подборки") a book page lists: the name, the collection's listing
+     * ({@link #opensAsListing}) and the site's note ("9 аудиокниг") as the description.
+     */
+    static ArrayList<GenrePOJO> collections(Document document) {
+        return rows(document.select(".alt-voices--collections a.alt-voices__item"), item -> {
+            String name = Html.text(item, ".alt-voices__name");
+            String url = item.absUrl("href");
+            if (name.isEmpty() || !url.contains("/collection/")) {
+                return null;
+            }
+            GenrePOJO collection = new GenrePOJO(name, url);
+            String note = Html.text(item, ".alt-voices__meta");
+            if (!note.isEmpty()) {
+                collection.setDescription(note); // an empty one is refused
+            }
+            return collection;
+        });
+    }
+
     public static DescriptionPOJO parseDescription(Document document, String bookUrl) {
         DescriptionPOJO descriptionPOJO = new DescriptionPOJO();
         String autor = "";
@@ -689,14 +746,10 @@ public final class Akniga implements SourceParser {
 
         Elements descriptionElements = document.getElementsByClass("description__article-main");
         if (descriptionElements.size() != 0) {
-            StringBuilder descBuilder = new StringBuilder();
-            for (Element element : descriptionElements) {
-                String t = element.text().trim();
-                if (!t.isEmpty()) {
-                    descBuilder.append(t).append("\n");
-                }
-            }
-            descriptionPOJO.setDescription(descBuilder.toString().trim());
+            String[] overview = overview(descriptionElements);
+            descriptionPOJO.setDescription(overviewText(overview));
+            descriptionPOJO.setNotes(overview[1]);
+            descriptionPOJO.setCollections(collections(document));
         } else {
             Elements scripts = document.getElementsByTag("script");
             for (Element script : scripts) {
@@ -862,7 +915,7 @@ public final class Akniga implements SourceParser {
 
         Elements descriptionElements = document.getElementsByClass("description__article-main");
         if (descriptionElements.size() != 0) {
-            bookPOJO.setDesc(descriptionElements.first().text().trim());
+            bookPOJO.setDesc(overviewText(overview(descriptionElements)));
         } else {
             descriptionElements = document.getElementsByAttributeValue("itemprop", "description");
             if (descriptionElements.size() != 0) {

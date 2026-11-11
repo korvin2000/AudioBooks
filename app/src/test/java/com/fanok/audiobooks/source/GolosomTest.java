@@ -196,6 +196,7 @@ public class GolosomTest {
         assertEquals("Александр Теренков", d.getArtist());
         assertTrue(d.getArtistUrl().startsWith("https://golosom.org/performer/"));
         assertTrue(d.getDescription(), d.getDescription().startsWith("Жанровая уникальность «Мастера и Маргариты»"));
+        assertTrue(d.getDescription().contains("\nОчень хорошо это подметил американский литературовед"));
         assertTrue(GOLOSOM.series(page("book.html", Golosom.SERVER), Golosom.SERVER).isEmpty());
 
         BookPOJO book = GOLOSOM.book(page("book.html", Golosom.SERVER + "/book/master-i-margarita"),

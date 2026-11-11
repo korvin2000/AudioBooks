@@ -349,7 +349,7 @@ public final class Biblus implements SourceParser {
             description.setSeries(series.text().trim());
             description.setSeriesUrl(series.absUrl("href"));
         }
-        description.setDescription(text(book, "[itemprop=description]"));
+        description.setDescription(Html.paragraphs(book.selectFirst("[itemprop=description]")));
         return description;
     }
 

@@ -330,7 +330,7 @@ public final class Golosknig implements SourceParser {
         if (content != null) {
             content = content.clone();
             content.select(".block-sametitle").remove();
-            d.setDescription(content.text().trim());
+            d.setDescription(Html.paragraphs(content));
         }
         d.setOtherReader(!parseOtherReaders(doc).isEmpty());
         return d;

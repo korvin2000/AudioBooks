@@ -66,6 +66,35 @@ public class DescriptionPOJO {
         this.otherReader = otherReaders != null && !otherReaders.isEmpty();
     }
 
+    /**
+     * The site's collections the book is in: the name, the collection's listing and the site's note ("9 аудиокниг")
+     * as the description. Empty for a site without collections and for a saved book: never persisted.
+     */
+    private transient ArrayList<GenrePOJO> collections = new ArrayList<>();
+
+    public ArrayList<GenrePOJO> getCollections() {
+        return collections;
+    }
+
+    public void setCollections(ArrayList<GenrePOJO> collections) {
+        this.collections = collections;
+    }
+
+    /**
+     * The end of {@link #getDescription the description} that is not the annotation: the site's notes (the book's
+     * other titles, the date it was added), an empty line between them, which the screen shows apart, under the
+     * collections. "" when the description is the annotation alone, and for a saved book: never persisted.
+     */
+    private transient String notes = "";
+
+    public String getNotes() {
+        return notes;
+    }
+
+    public void setNotes(String notes) {
+        this.notes = notes;
+    }
+
     public String getDisLike() {
         return disLike;
     }
