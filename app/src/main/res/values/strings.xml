@@ -610,6 +610,8 @@
     <string name="download_control_button">Возобновить/Пауза</string>
     <string name="more_options">Дополнительно</string>
     <string name="download_chapters_label">Главы:</string>
+    <string name="player_chapters">Главы</string>
+    <string name="player_chapter_number">Глава %1$s</string>
     <string name="download_chapters_value">скачано %1$d из %2$d, выбрано %3$d</string>
     <string name="download_exported_label">Копии в папке:</string>
     <string name="download_exported_none">нет</string>

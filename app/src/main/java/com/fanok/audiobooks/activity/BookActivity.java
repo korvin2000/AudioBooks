@@ -44,6 +44,7 @@ import android.view.ViewGroup;
 import android.view.ViewParent;
 import android.widget.Button;
 import android.widget.ImageButton;
+import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.ProgressBar;
 import android.widget.SeekBar;
@@ -83,6 +84,7 @@ import com.fanok.audiobooks.download.DownloadStatusText;
 import com.fanok.audiobooks.adapter.SectionsPagerAdapter;
 import com.fanok.audiobooks.interface_pacatge.book_content.Activity;
 import com.fanok.audiobooks.model.FavoritePeople;
+import com.fanok.audiobooks.net.Covers;
 import com.fanok.audiobooks.pojo.AudioPOJO;
 import com.fanok.audiobooks.pojo.BookPOJO;
 import com.fanok.audiobooks.pojo.OtherArtistPOJO;
@@ -102,6 +104,7 @@ import com.google.android.material.tabs.TabLayoutMediator;
 import com.google.android.play.core.review.ReviewInfo;
 import com.google.android.play.core.review.ReviewManager;
 import com.google.android.play.core.review.ReviewManagerFactory;
+import com.bumptech.glide.Glide;
 import com.google.gson.GsonBuilder;
 import com.squareup.picasso.Picasso;
 import com.squareup.picasso.Target;
@@ -143,6 +146,7 @@ public class BookActivity extends MvpAppCompatActivity implements Activity {
     private ImageButton mButtonCollapse;
     private LinearLayout mTopButtonsControls;
     private LinearLayout mPlayer;
+    private ImageView mPlayerCover;
     private TextView mRadioAll;
     private ImageButton mSelectionClose;
     /** The top row shows how many chapters are chosen, not the playing chapter (bindSelectionBar). */
@@ -481,6 +485,15 @@ public class BookActivity extends MvpAppCompatActivity implements Activity {
         mButtonCollapse = findViewById(R.id.buttonCollapse);
         mTopButtonsControls = findViewById(R.id.topButtonsControls);
         mPlayer = findViewById(R.id.player);
+        mPlayerCover = findViewById(R.id.playerCover);
+        bindPlayerCover();
+        TextView playerTitle = findViewById(R.id.playerBookTitle);
+        TextView playerAuthor = findViewById(R.id.playerBookAuthor);
+        if (playerTitle != null && mBookPOJO != null) {
+            playerTitle.setText(mBookPOJO.getName());
+            playerAuthor.setText(mBookPOJO.getAutor());
+            if (android.text.TextUtils.isEmpty(mBookPOJO.getAutor())) playerAuthor.setVisibility(View.GONE);
+        }
         mRadioAll = findViewById(R.id.radioAll);
         mSelectionClose = findViewById(R.id.selectionClose);
         mDelete = findViewById(R.id.delete);
@@ -804,6 +817,39 @@ public class BookActivity extends MvpAppCompatActivity implements Activity {
 
 
 
+    }
+
+    /**
+     * The player's cover, shown above the chapters: the book's cover, the mask the parental control puts on it, or the
+     * default cover of a site whose covers are never requested; hidden when the book has no cover at all.
+     */
+    private void bindPlayerCover() {
+        if (mPlayerCover == null) {
+            return;
+        }
+        String photo = mBookPOJO == null ? null : mBookPOJO.getPhoto();
+        String bookUrl = mBookPOJO == null ? null : mBookPOJO.getUrl();
+        boolean empty = photo == null || photo.trim().isEmpty();
+        if (DefaultCover.replaces(photo) || empty && DefaultCover.replaces(bookUrl)) {
+            mPlayerCover.setVisibility(View.VISIBLE);
+            mPlayerCover.setImageDrawable(DefaultCover.drawable(this, bookUrl));
+            return;
+        }
+        if (empty) {
+            mPlayerCover.setVisibility(View.GONE);
+            return;
+        }
+        mPlayerCover.setVisibility(View.VISIBLE);
+        Drawable mask = ParentalControl.coverMask(this, mBookPOJO);
+        if (mask != null) {
+            Glide.with(this).load(mask).into(mPlayerCover);
+        } else if (photo.startsWith("content://")) {
+            Glide.with(this).load(Uri.parse(photo)).into(mPlayerCover);
+        } else if (photo.startsWith("/") || photo.contains(":\\")) {
+            Glide.with(this).load(new java.io.File(photo)).into(mPlayerCover);
+        } else {
+            Glide.with(this).load(Covers.glide(photo)).into(mPlayerCover);
+        }
     }
 
     @Override
@@ -1496,7 +1542,8 @@ public class BookActivity extends MvpAppCompatActivity implements Activity {
     @Override
     public void showTitle(@NotNull @NonNull String name) {
         if (!mShowingCount) {
-            mNameCurent.setText(name);
+            mNameCurent.setText(!name.isEmpty() && android.text.TextUtils.isDigitsOnly(name)
+                    ? getString(R.string.player_chapter_number, name) : name);
         }
     }
 
