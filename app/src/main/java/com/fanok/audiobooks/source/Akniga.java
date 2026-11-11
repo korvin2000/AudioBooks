@@ -605,6 +605,25 @@ public final class Akniga implements SourceParser {
         return books;
     }
 
+    /** Turns an element's HTML into readable text, keeping paragraph breaks from {@code <br>} and block tags. */
+    private static String htmlToText(Element element) {
+        String html = element.html();
+        html = html.replaceAll("(?i)<br\\s*/?>", "\n");
+        // turn block-level tags into line breaks before stripping them
+        html = html.replaceAll("(?i)</(p|div|li|h[1-6])>", "\n");
+        String text = html.replaceAll("<[^>]+>", "");
+        text = org.jsoup.parser.Parser.unescapeEntities(text, true);
+        // collapse spaces on each line and drop empty lines' surrounding whitespace
+        StringBuilder out = new StringBuilder();
+        for (String line : text.split("\n", -1)) {
+            String trimmed = line.replaceAll("\\s+", " ").trim();
+            out.append(trimmed).append("\n");
+        }
+        // collapse 3+ newlines into a single blank line
+        String result = out.toString().replaceAll("\n{3,}", "\n\n");
+        return result.trim();
+    }
+
     public static DescriptionPOJO parseDescription(Document document, String bookUrl) {
         DescriptionPOJO descriptionPOJO = new DescriptionPOJO();
         String autor = "";
@@ -691,9 +710,59 @@ public final class Akniga implements SourceParser {
         if (descriptionElements.size() != 0) {
             StringBuilder descBuilder = new StringBuilder();
             for (Element element : descriptionElements) {
-                String t = element.text().trim();
-                if (!t.isEmpty()) {
-                    descBuilder.append(t).append("\n");
+                if (element.hasClass("caption__article--about-block-samebook")) {
+                    Element collections = element.selectFirst(".alt-voices--collections");
+                    if (collections != null) {
+                        StringBuilder section = new StringBuilder(Html.text(collections, ".alt-voices__caption"));
+                        for (Element item : collections.select(".alt-voices__item")) {
+                            String name = Html.text(item, ".alt-voices__name");
+                            String meta = Html.text(item, ".alt-voices__meta");
+                            String entry = name.isEmpty() ? item.text().trim()
+                                    : (name + (meta.isEmpty() ? "" : " " + meta));
+                            if (!entry.isEmpty()) section.append("\n").append(entry);
+                        }
+                        if (section.length() > 0) {
+                            if (descBuilder.length() > 0) descBuilder.append("\n\n");
+                            descBuilder.append(section);
+                        }
+                    }
+                    continue;
+                }
+                Element captionEl = element.selectFirst(".content__main__book--item--caption");
+                String caption = captionEl == null ? "" : captionEl.text().trim();
+                String captionLower = caption.toLowerCase();
+                if (captionLower.contains("озвуч") || captionLower.contains("другие озвуч")
+                        || captionLower.contains("другие исполн")) {
+                    continue;
+                }
+                Element bodyEl = element.clone();
+                if (captionEl != null) {
+                    Element toRemove = bodyEl.selectFirst(".content__main__book--item--caption");
+                    if (toRemove != null) toRemove.remove();
+                }
+                String body = htmlToText(bodyEl).trim();
+                if (caption.equals("Другие названия") || caption.equals("Другое название")) {
+                    body = body.replaceAll("\\s*;\\s*", "\n").trim();
+                }
+                // a heading with no content (e.g. an empty "Описание") is not worth showing
+                if (body.isEmpty() && !caption.matches(".*\\d.*")) {
+                    continue;
+                }
+                StringBuilder section = new StringBuilder();
+                if (!caption.isEmpty() && !caption.equals("Описание")) {
+                    section.append(caption);
+                }
+                if (!body.isEmpty()) {
+                    if (section.length() > 0) {
+                        section.append("\n");
+                    }
+                    section.append(body);
+                }
+                if (section.length() > 0) {
+                    if (descBuilder.length() > 0) {
+                        descBuilder.append("\n\n");
+                    }
+                    descBuilder.append(section);
                 }
             }
             descriptionPOJO.setDescription(descBuilder.toString().trim());

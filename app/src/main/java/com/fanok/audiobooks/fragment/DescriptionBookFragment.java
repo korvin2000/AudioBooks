@@ -7,6 +7,7 @@ import android.app.UiModeManager;
 import android.content.ClipData;
 import android.content.ClipboardManager;
 import android.content.res.Configuration;
+import android.graphics.Typeface;
 import android.os.Build;
 import android.os.Bundle;
 import android.text.Selection;
@@ -16,6 +17,7 @@ import android.text.Spanned;
 import android.text.TextPaint;
 import android.text.method.LinkMovementMethod;
 import android.text.style.ClickableSpan;
+import android.text.style.StyleSpan;
 import android.util.Log;
 import android.view.KeyEvent;
 import android.view.LayoutInflater;
@@ -757,11 +759,23 @@ public class DescriptionBookFragment extends MvpAppCompatFragment
 
             descText = description.getDescription();
             final String text = descText;
-            ExpandableText.bind(mDesc, mShowMore, mCopyDesc, text, MAX_LINES, descExpanded);
+            CharSequence displayText = text;
+            if (text != null && Provider.ofUrl(bookUrl()) == Provider.AKNIGA) {
+                SpannableStringBuilder styled = new SpannableStringBuilder(text);
+                java.util.regex.Matcher headings = java.util.regex.Pattern.compile(
+                        "(?m)^(Входит в подборки|Другие названия|Другое название)$").matcher(text);
+                while (headings.find()) {
+                    styled.setSpan(new StyleSpan(Typeface.BOLD), headings.start(), headings.end(),
+                            Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+                }
+                displayText = styled;
+            }
+            final CharSequence formattedText = displayText;
+            ExpandableText.bind(mDesc, mShowMore, mCopyDesc, formattedText, MAX_LINES, descExpanded);
             mShowMore.setOnClickListener(view1 -> {
                 descExpanded = !descExpanded;
                 if (mDesc != null) {
-                    ExpandableText.bind(mDesc, mShowMore, mCopyDesc, text, MAX_LINES, descExpanded);
+                    ExpandableText.bind(mDesc, mShowMore, mCopyDesc, formattedText, MAX_LINES, descExpanded);
                 }
             });
             if (mCopyDesc != null) {
