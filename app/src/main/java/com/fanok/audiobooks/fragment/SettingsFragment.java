@@ -577,7 +577,7 @@ public class SettingsFragment extends PreferenceFragmentCompat implements
                 Context.POWER_SERVICE);
         if (pm != null) {
 
-            UiModeManager uiModeManager = (UiModeManager) requireContext().getSystemService(
+            UiModeManager uiModeManager = (UiModeManager) requireContext().getApplicationContext().getSystemService(
                     UI_MODE_SERVICE);
 
             if (uiModeManager == null || uiModeManager.getCurrentModeType()

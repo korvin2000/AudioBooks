@@ -471,7 +471,7 @@ public class DescriptionBookFragment extends MvpAppCompatFragment
         mRecommendedBooks.addItemDecoration(new MarginItemDecoration(margin));
         mBookUrl = bookUrl();
         bindFavoriteControls();
-        UiModeManager uiModeManager = (UiModeManager) requireContext().getSystemService(UI_MODE_SERVICE);
+        UiModeManager uiModeManager = (UiModeManager) requireContext().getApplicationContext().getSystemService(UI_MODE_SERVICE);
         mTv = uiModeManager.getCurrentModeType() == Configuration.UI_MODE_TYPE_TELEVISION;
         if (!mTv) {
             // the header's author and title are links (on TV the labels do it: links would trap the D-pad);

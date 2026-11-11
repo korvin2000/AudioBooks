@@ -236,7 +236,7 @@ public class BooksFragment extends MvpAppCompatFragment implements BooksView {
 
         binding = FragmentBooksBinding.inflate(inflater, container, false);
 
-        UiModeManager uiModeManager = (UiModeManager) requireContext().getSystemService(UI_MODE_SERVICE);
+        UiModeManager uiModeManager = (UiModeManager) requireContext().getApplicationContext().getSystemService(UI_MODE_SERVICE);
         isTelevision = (uiModeManager != null && uiModeManager.getCurrentModeType() == Configuration.UI_MODE_TYPE_TELEVISION);
         mListFocus.attach(isTelevision, savedInstanceState);
 

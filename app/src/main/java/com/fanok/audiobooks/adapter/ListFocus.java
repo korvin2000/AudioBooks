@@ -52,7 +52,7 @@ public final class ListFocus {
     private View.OnLayoutChangeListener mRestore;
 
     public static boolean isTv(@NonNull Context context) {
-        UiModeManager modes = (UiModeManager) context.getSystemService(Context.UI_MODE_SERVICE);
+        UiModeManager modes = (UiModeManager) context.getApplicationContext().getSystemService(Context.UI_MODE_SERVICE);
         return modes != null && modes.getCurrentModeType() == Configuration.UI_MODE_TYPE_TELEVISION;
     }
 

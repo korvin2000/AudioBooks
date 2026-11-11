@@ -35,7 +35,7 @@ public final class AppThemes {
                 : AppCompatDelegate.MODE_NIGHT_NO);
         // Android 12+ draws the starting window before the app runs: told the app's mode, it takes the matching color
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            UiModeManager uiMode = context.getSystemService(UiModeManager.class);
+            UiModeManager uiMode = context.getApplicationContext().getSystemService(UiModeManager.class);
             if (uiMode != null) {
                 uiMode.setApplicationNightMode(night ? UiModeManager.MODE_NIGHT_YES : UiModeManager.MODE_NIGHT_NO);
             }

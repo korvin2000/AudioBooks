@@ -117,7 +117,7 @@ public class AboutFragment extends PreferenceFragmentCompat {
         preferenceClickListner("disable_battary_optimize", preference -> {
             boolean enabled;
             PowerManager pm = (PowerManager) requireContext().getSystemService(Context.POWER_SERVICE);
-            UiModeManager uiModeManager = (UiModeManager) requireContext().getSystemService(
+            UiModeManager uiModeManager = (UiModeManager) requireContext().getApplicationContext().getSystemService(
                     UI_MODE_SERVICE);
             if (uiModeManager != null && uiModeManager.getCurrentModeType()
                     == Configuration.UI_MODE_TYPE_TELEVISION) {
