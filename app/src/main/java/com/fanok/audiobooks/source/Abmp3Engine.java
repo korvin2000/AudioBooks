@@ -372,7 +372,7 @@ public class Abmp3Engine implements SourceParser {
             d.setPoster(p.cover.absUrl("src"));
         }
         if (p.about != null) {
-            d.setDescription(p.about.ownText());
+            d.setDescription(Html.ownParagraphs(p.about));
         }
         if (p.author != null) {
             d.setAutor(p.author.text());
@@ -416,7 +416,7 @@ public class Abmp3Engine implements SourceParser {
             book.setPhoto(p.cover.absUrl("src"));
         }
         if (p.about != null) {
-            book.setDesc(p.about.ownText());
+            book.setDesc(Html.ownParagraphs(p.about));
         }
         if (p.author != null) {
             book.setAutor(p.author.text());

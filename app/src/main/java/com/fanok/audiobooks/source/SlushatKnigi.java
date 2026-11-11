@@ -356,7 +356,7 @@ public final class SlushatKnigi implements SourceParser {
         if (!rating.isEmpty() && !rating.equals("0")) {
             description.setReiting(rating);
         }
-        description.setDescription(text(doc, ".page__text.js-hide-text"));
+        description.setDescription(Html.paragraphs(doc.selectFirst(".page__text.js-hide-text")));
         return description;
     }
 

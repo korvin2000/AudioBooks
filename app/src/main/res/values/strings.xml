@@ -56,6 +56,7 @@
     <string name="autor">Автор</string>
     <string name="artist">Чтец</string>
     <string name="series">Серия</string>
+    <string name="book_collections">Входит в подборки</string>
     <string name="show_more">Читать дальше</string>
     <string name="other_recomended_books">Рекомендуемые книги</string>
     <string name="try_again">Попробовать еще</string>
@@ -849,4 +850,7 @@
     <string name="selection_clear_all">Снять выбор</string>
     <string name="selection_close">Закрыть выбор</string>
     <string name="selection_shared_file">Эти главы — один файл: они скачиваются и удаляются вместе</string>
+    <string name="player_cover_show">Показать обложку</string>
+    <string name="player_cover_hide">Скрыть обложку</string>
+    <string name="player_reader">читает %1$s</string>
 </resources>

@@ -11,9 +11,13 @@
     app:layout_behavior="@string/bottom_sheet_behavior">
 
 
+    <!-- the folded player: the progress line, then the row. The open player hides the line, and its place is not
+         left empty: what follows starts that much higher (the negative margin), and BookActivity.liftPlayer moves
+         the row up into the line's place as the sheet opens and keeps the rest below the row while it is folded -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="@dimen/player_row_height"
+        android:layout_marginBottom="@dimen/player_progress_line_lift"
         android:orientation="vertical"
         tools:showIn="@layout/fragment_book_coments">
 
@@ -22,14 +26,19 @@
             android:id="@+id/progressBar"
             style="?android:attr/progressBarStyleHorizontal"
             android:layout_width="match_parent"
-            android:layout_height="wrap_content" />
+            android:layout_height="@dimen/player_progress_line" />
 
+        <!-- centred in the row's height: the small vertical padding only leaves the chapter's two lines their room -->
         <LinearLayout
+            android:id="@+id/playerTopRow"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
             android:gravity="center_vertical"
             android:orientation="horizontal"
-            android:padding="@dimen/text_margin">
+            android:paddingStart="@dimen/text_margin"
+            android:paddingTop="2dp"
+            android:paddingEnd="@dimen/text_margin"
+            android:paddingBottom="2dp">
 
             <ImageButton
                 android:id="@+id/buttonCollapse"
@@ -67,16 +76,35 @@
                 android:textColor="?attr/colorPrimaryText"
                 android:visibility="gone" />
 
-            <TextView
-                android:id="@+id/name_curent"
+            <!-- the playing chapter and, under it, where the book stands (BookActivity.bindProgress) -->
+            <LinearLayout
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_marginStart="@dimen/text_margin"
                 android:layout_weight="1"
-                android:maxLines="1"
-                android:singleLine="true"
-                android:textColor="?attr/colorPrimaryText"
-                tools:text="0001" />
+                android:orientation="vertical">
+
+                <TextView
+                    android:id="@+id/name_curent"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:maxLines="1"
+                    android:singleLine="true"
+                    android:textColor="?attr/colorPrimaryText"
+                    tools:text="0001" />
+
+                <TextView
+                    android:id="@+id/name_sub"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:ellipsize="end"
+                    android:maxLines="1"
+                    android:textColor="?attr/subTextColor"
+                    android:textSize="@dimen/subTextSize"
+                    android:visibility="gone"
+                    tools:text="Глава 3 из 16 · осталось 1 ч. 32 мин."
+                    tools:visibility="visible" />
+            </LinearLayout>
 
 
             <ImageButton
@@ -96,6 +124,20 @@
                 android:background="?selectableItemBackgroundBorderless"
                 android:contentDescription="@string/delete"
                 android:src="@drawable/ic_delete"
+                android:visibility="gone" />
+
+            <!-- shows or hides the book's block above the chapters (playerBook); only over the open list, and not
+                 while chapters are chosen; the padding is its touch area, the margin keeps the icon in the 16dp column -->
+            <ImageButton
+                android:id="@+id/coverToggle"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="4dp"
+                android:layout_marginEnd="-12dp"
+                android:background="?selectableItemBackgroundBorderless"
+                android:contentDescription="@string/player_cover_show"
+                android:padding="12dp"
+                android:src="@drawable/ic_image_outline"
                 android:visibility="gone" />
 
             <LinearLayout
@@ -171,11 +213,110 @@
             tools:progress="30" />
     </LinearLayout>
 
-    <androidx.recyclerview.widget.RecyclerView
-        android:id="@+id/list"
+    <!-- the book's block, when coverToggle shows it, and the chapters: the block above the list, beside it in
+         landscape (BookActivity.setUpPlayerBook) -->
+    <LinearLayout
+        android:id="@+id/playerBody"
         android:layout_width="match_parent"
         android:layout_height="0dp"
-        android:layout_weight="1" />
+        android:layout_weight="1"
+        android:orientation="vertical">
+
+        <!-- as tall as its cover: with the progress line's place it takes three chapter rows, unless a large font
+             needs more; the row above leaves the gap over the cover -->
+        <LinearLayout
+            android:id="@+id/playerBook"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:paddingStart="@dimen/text_margin"
+            android:paddingEnd="@dimen/text_margin"
+            android:paddingBottom="6dp"
+            android:visibility="gone"
+            tools:visibility="visible">
+
+            <ImageView
+                android:id="@+id/playerCover"
+                android:layout_width="@dimen/player_cover_width"
+                android:layout_height="@dimen/player_cover_height"
+                android:layout_marginEnd="12dp"
+                android:contentDescription="@string/book_cover"
+                android:scaleType="fitStart" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical">
+
+                <TextView
+                    android:id="@+id/playerBookTitle"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:ellipsize="end"
+                    android:includeFontPadding="false"
+                    android:maxLines="2"
+                    android:textColor="?attr/colorPrimaryText"
+                    android:textSize="@dimen/titleSize"
+                    android:textStyle="bold"
+                    tools:text="На берегу" />
+
+                <TextView
+                    android:id="@+id/playerBookAuthor"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="2dp"
+                    android:ellipsize="end"
+                    android:includeFontPadding="false"
+                    android:maxLines="1"
+                    android:textColor="?attr/subTextColor"
+                    android:textSize="13sp"
+                    tools:text="Невил Шют" />
+
+                <TextView
+                    android:id="@+id/playerBookReader"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="2dp"
+                    android:ellipsize="end"
+                    android:includeFontPadding="false"
+                    android:maxLines="1"
+                    android:textColor="?attr/subTextColor"
+                    android:textSize="@dimen/subTextSize"
+                    tools:text="читает Имя Чтеца" />
+
+                <ProgressBar
+                    android:id="@+id/playerBookProgress"
+                    style="?android:attr/progressBarStyleHorizontal"
+                    android:layout_width="match_parent"
+                    android:layout_height="@dimen/book_time_bar_height"
+                    android:layout_marginTop="6dp"
+                    android:max="1000"
+                    android:visibility="gone"
+                    tools:progress="150"
+                    tools:visibility="visible" />
+
+                <TextView
+                    android:id="@+id/playerBookProgressText"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="2dp"
+                    android:ellipsize="end"
+                    android:includeFontPadding="false"
+                    android:maxLines="1"
+                    android:textColor="?attr/subTextColor"
+                    android:textSize="@dimen/subTextSize"
+                    android:visibility="gone"
+                    tools:text="Прослушано 15 % из 2 ч. 41 мин."
+                    tools:visibility="visible" />
+            </LinearLayout>
+        </LinearLayout>
+
+        <!-- takes what the block leaves: the height under it, the width beside it -->
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/list"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent" />
+    </LinearLayout>
 
     <LinearLayout
         android:layout_width="match_parent"

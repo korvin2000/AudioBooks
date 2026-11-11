@@ -335,12 +335,18 @@ public final class Otrub implements SourceParser {
 
         Elements desc = document.select("div[itemprop=description]");
         if (desc.size() > 0) {
-            descriptionPOJO.setDescription(desc.first().text());
+            descriptionPOJO.setDescription(description(desc.first()));
         }
         return descriptionPOJO;
     }
 
     /** A book opened by its link. */
+    /** The description block's paragraphs, one a line, without the block's own heading «Описание». */
+    private static String description(Element block) {
+        String text = Html.paragraphs(block) + "\n";
+        return (text.startsWith("Описание\n") ? text.substring("Описание\n".length()) : text).trim();
+    }
+
     public static BookPOJO parseBook(Document document, String url) {
         BookPOJO bookPOJO = new BookPOJO();
 
@@ -388,7 +394,7 @@ public final class Otrub implements SourceParser {
 
         Elements desc = document.select("div[itemprop=description]");
         if (desc.size() > 0) {
-            bookPOJO.setDesc(desc.first().text());
+            bookPOJO.setDesc(description(desc.first()));
         }
 
         return bookPOJO;

@@ -322,7 +322,7 @@ public final class Knigoblud implements SourceParser {
 
         Elements desc = document.getElementsByClass("BookDescriptionContent");
         if (desc.size() != 0) {
-            descriptionPOJO.setDescription(desc.first().ownText());
+            descriptionPOJO.setDescription(Html.ownParagraphs(desc.first()));
         }
 
         Elements clock = document.getElementsByClass("PageTitle_Subtitle");
@@ -379,7 +379,7 @@ public final class Knigoblud implements SourceParser {
 
         Elements desc = document.getElementsByClass("BookDescriptionContent");
         if (desc.size() != 0) {
-            bookPOJO.setDesc(desc.first().ownText());
+            bookPOJO.setDesc(Html.ownParagraphs(desc.first()));
         }
 
         Elements clock = document.getElementsByClass("PageTitle_Subtitle");

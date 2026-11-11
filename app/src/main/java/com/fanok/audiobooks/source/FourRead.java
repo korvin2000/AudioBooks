@@ -357,7 +357,7 @@ public final class FourRead implements SourceParser {
             description.setSeriesUrl(href(series, "a"));
         }
         description.setReiting(text(article, ".pmovie__rating-score"));
-        description.setDescription(text(article, ".pmovie__book-description"));
+        description.setDescription(Html.paragraphs(article.selectFirst(".pmovie__book-description")));
         return description;
     }
 

@@ -9,14 +9,12 @@ import android.os.Build;
 import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.core.content.ContextCompat;
-import android.app.UiModeManager;
 import android.app.Activity;
 import android.content.ActivityNotFoundException;
 import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.SharedPreferences;
-import android.content.res.Configuration;
 import android.net.Uri;
 import android.os.Bundle;
 import android.os.PowerManager;
@@ -562,10 +560,7 @@ public class MainActivity extends MvpAppCompatActivity
         if (pm == null || pm.isIgnoringBatteryOptimizations(getPackageName())) {
             return false;
         }
-        UiModeManager uiModeManager = (UiModeManager) getApplicationContext().getSystemService(UI_MODE_SERVICE);
-        boolean dontShow = new StorageUtil(this).loadBattaryOptimizeDisenbled();
-        return uiModeManager != null
-                && uiModeManager.getCurrentModeType() != Configuration.UI_MODE_TYPE_TELEVISION && !dontShow;
+        return !ListFocus.isTv() && !new StorageUtil(this).loadBattaryOptimizeDisenbled();
     }
 
     private void showPrivacyDialog(@NonNull Runnable done) {

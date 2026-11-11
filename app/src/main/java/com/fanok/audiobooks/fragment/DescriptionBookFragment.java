@@ -1,12 +1,10 @@
 package com.fanok.audiobooks.fragment;
 
 import static android.content.Context.CLIPBOARD_SERVICE;
-import static android.content.Context.UI_MODE_SERVICE;
 
-import android.app.UiModeManager;
+import android.graphics.Typeface;
 import android.content.ClipData;
 import android.content.ClipboardManager;
-import android.content.res.Configuration;
 import android.os.Build;
 import android.os.Bundle;
 import android.text.Selection;
@@ -16,6 +14,8 @@ import android.text.Spanned;
 import android.text.TextPaint;
 import android.text.method.LinkMovementMethod;
 import android.text.style.ClickableSpan;
+import android.text.style.ForegroundColorSpan;
+import android.text.style.StyleSpan;
 import android.util.Log;
 import android.view.KeyEvent;
 import android.view.LayoutInflater;
@@ -49,10 +49,12 @@ import com.fanok.audiobooks.activity.MainActivity;
 import com.fanok.audiobooks.activity.SourceActivity;
 import com.fanok.audiobooks.adapter.BooksOtherAdapter;
 import com.fanok.audiobooks.adapter.ExpandableText;
+import com.fanok.audiobooks.adapter.ListFocus;
 import com.fanok.audiobooks.interface_pacatge.book_content.Description;
 import com.fanok.audiobooks.model.FavoritePeople;
 import com.fanok.audiobooks.pojo.BookPOJO;
 import com.fanok.audiobooks.pojo.DescriptionPOJO;
+import com.fanok.audiobooks.pojo.GenrePOJO;
 import com.fanok.audiobooks.pojo.OtherArtistPOJO;
 import com.fanok.audiobooks.pojo.StorageUtil;
 import com.fanok.audiobooks.policy.DefaultCover;
@@ -105,6 +107,11 @@ public class DescriptionBookFragment extends MvpAppCompatFragment
     private ProgressBar mTimeProgress;
     private TextView mTimeNote;
     private LinearLayout mSeriesConteiner;
+    /** Its heading, then a link for each collection the book is in (bindCollections). */
+    private LinearLayout mCollections;
+    /** The site's notes under the collections, and the description's text above them (bindNotes). */
+    private TextView mDescNotes;
+    private String mDescShown;
     /** The book's site beside the cover, which opens its card; absent on TV. */
     @Nullable
     private TextView mSource;
@@ -450,6 +457,8 @@ public class DescriptionBookFragment extends MvpAppCompatFragment
         mDesc = view.findViewById(R.id.desc);
         mShowMore = view.findViewById(R.id.showMore);
         mCopyDesc = view.findViewById(R.id.copyDesc);
+        mCollections = view.findViewById(R.id.collections);
+        mDescNotes = view.findViewById(R.id.descNotes);
         mRecommendedBooks = view.findViewById(R.id.recommendedBooks);
         mRecommendedBooksTitle = view.findViewById(R.id.recommendedBooksTitle);
         mScrollView = view.findViewById(R.id.scrollView);
@@ -471,8 +480,7 @@ public class DescriptionBookFragment extends MvpAppCompatFragment
         mRecommendedBooks.addItemDecoration(new MarginItemDecoration(margin));
         mBookUrl = bookUrl();
         bindFavoriteControls();
-        UiModeManager uiModeManager = (UiModeManager) requireContext().getSystemService(UI_MODE_SERVICE);
-        mTv = uiModeManager.getCurrentModeType() == Configuration.UI_MODE_TYPE_TELEVISION;
+        mTv = ListFocus.isTv();
         if (!mTv) {
             // the header's author and title are links (on TV the labels do it: links would trap the D-pad);
             // the release ending a long press (a copy) is not a tap
@@ -614,6 +622,8 @@ public class DescriptionBookFragment extends MvpAppCompatFragment
         mDesc = null;
         mShowMore = null;
         mCopyDesc = null;
+        mCollections = null;
+        mDescNotes = null;
         mRecommendedBooks = null;
         mRecommendedBooksTitle = null;
         mScrollView = null;
@@ -757,11 +767,13 @@ public class DescriptionBookFragment extends MvpAppCompatFragment
 
             descText = description.getDescription();
             final String text = descText;
-            ExpandableText.bind(mDesc, mShowMore, mCopyDesc, text, MAX_LINES, descExpanded);
+            bindCollections(description.getCollections());
+            bindNotes(description.getNotes());
+            bindDescription();
             mShowMore.setOnClickListener(view1 -> {
                 descExpanded = !descExpanded;
                 if (mDesc != null) {
-                    ExpandableText.bind(mDesc, mShowMore, mCopyDesc, text, MAX_LINES, descExpanded);
+                    bindDescription();
                 }
             });
             if (mCopyDesc != null) {
@@ -846,6 +858,76 @@ public class DescriptionBookFragment extends MvpAppCompatFragment
         }
     }
 
+    /**
+     * The description folded or unfolded and, under an unfolded one, the collections the book is in and the site's
+     * notes: they are a part of the description, so a folded one hides them with the rest of its text, and it has
+     * its "read more" for them even when its own lines fit.
+     */
+    private void bindDescription() {
+        ExpandableText.bind(mDesc, mShowMore, mCopyDesc, mDescShown, MAX_LINES, descExpanded);
+        boolean collections = mCollections.getChildCount() > 1;
+        boolean notes = mDescNotes.length() > 0;
+        mCollections.setVisibility(descExpanded && collections ? View.VISIBLE : View.GONE);
+        mDescNotes.setVisibility(descExpanded && notes ? View.VISIBLE : View.GONE);
+        if (!collections && !notes) {
+            return;
+        }
+        mDesc.post(() -> { // after ExpandableText has measured whether the text is cut
+            if (mShowMore != null && mShowMore.getVisibility() != View.VISIBLE) {
+                // the text fits its lines, but there is more under it: the toggle unfolds that
+                mShowMore.setVisibility(View.VISIBLE);
+                if (mCopyDesc != null) {
+                    mCopyDesc.setVisibility(descExpanded ? View.VISIBLE : View.GONE);
+                }
+            }
+        });
+    }
+
+    /**
+     * The site's notes, shown under the collections: {@code notes} is the end of the description, so the text
+     * above is the annotation alone. A note with lines under it (the book's other titles) has its caption, the first
+     * line, in bold. A description without an annotation is left whole.
+     */
+    private void bindNotes(@NonNull String notes) {
+        boolean apart = !notes.isEmpty() && descText != null && descText.length() > notes.length()
+                && descText.endsWith(notes);
+        mDescShown = apart ? descText.substring(0, descText.length() - notes.length()).trim() : descText;
+        SpannableStringBuilder text = new SpannableStringBuilder(apart ? notes : "");
+        int caption = MaterialColors.getColor(mDescNotes, R.attr.colorPrimaryText);
+        for (int start = 0; start < text.length(); ) {
+            int end = notes.indexOf("\n\n", start);
+            end = end < 0 ? notes.length() : end;
+            int line = notes.indexOf('\n', start);
+            if (line >= 0 && line < end) {
+                text.setSpan(new StyleSpan(Typeface.BOLD), start, line, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+                text.setSpan(new ForegroundColorSpan(caption), start, line, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+            }
+            start = end + 2;
+        }
+        mDescNotes.setText(text);
+    }
+
+    /**
+     * The rows of the collections the site lists the book in: a link each ("name · 9 аудиокниг") to the collection's
+     * books, as the author's link opens the author's. {@link #bindDescription} shows them.
+     */
+    private void bindCollections(@NonNull List<GenrePOJO> collections) {
+        if (mCollections.getTag() == collections) {
+            return; // the description shown again (its other narrations were found): the rows, and a TV's focus, stay
+        }
+        mCollections.setTag(collections);
+        mCollections.removeViews(1, mCollections.getChildCount() - 1); // all but the heading
+        LayoutInflater inflater = LayoutInflater.from(mCollections.getContext());
+        for (GenrePOJO collection : collections) {
+            TextView link = (TextView) inflater.inflate(R.layout.book_collection_item, mCollections, false);
+            String note = collection.getDescription();
+            link.setText(note.isEmpty() ? collection.getName() : collection.getName() + " · " + note);
+            link.setOnClickListener(view -> MainActivity.startMainActivity(requireContext(),
+                    Consts.FRAGMENT_AUDIOBOOK, collection.getUrl()));
+            mCollections.addView(link);
+        }
+    }
+
     /** Nothing is recommended below: the description unfolds instead of leaving the space below empty. */
     private void expandDescription() {
         if (descExpanded) {
@@ -853,7 +935,7 @@ public class DescriptionBookFragment extends MvpAppCompatFragment
         }
         descExpanded = true;
         if (mDesc != null && descText != null) {
-            ExpandableText.bind(mDesc, mShowMore, mCopyDesc, descText, MAX_LINES, true);
+            bindDescription();
         }
     }
 

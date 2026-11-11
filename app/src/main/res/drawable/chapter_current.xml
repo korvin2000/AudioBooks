@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- the playing chapter's row in the player's list: a rounded plate with the accent bar at its start; the row's own
+     16dp start padding keeps the name clear of the bar -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item
+        android:end="6dp"
+        android:start="6dp">
+        <shape>
+            <solid android:color="?attr/backgroundItem" />
+            <corners android:radius="8dp" />
+        </shape>
+    </item>
+    <item
+        android:width="3dp"
+        android:bottom="8dp"
+        android:gravity="start|fill_vertical"
+        android:start="6dp"
+        android:top="8dp">
+        <shape>
+            <solid android:color="?attr/colorAccent" />
+            <corners android:radius="2dp" />
+        </shape>
+    </item>
+</layer-list>

@@ -26,7 +26,6 @@ import java.util.Locale;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 
 /**
@@ -347,7 +346,7 @@ public final class Bookinfo implements SourceParser {
         int votes = number(o, "rating_count");
         d.setReiting(votes > 0 ? BookPOJO.formatRating((float) decimal(o, "rating"), String.valueOf(votes)) : "");
         String text = string(o, "description");
-        d.setDescription(text.contains("<") ? Jsoup.parseBodyFragment(text).text() : text.trim());
+        d.setDescription(text.contains("<") ? Html.paragraphs(text) : text.trim());
         return d;
     }
 

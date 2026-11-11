@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- a collection the book is in, on its page: a row the D-pad stops on, framed while focused -->
+<TextView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content"
+    android:background="@drawable/focusable"
+    android:ellipsize="end"
+    android:focusable="true"
+    android:focusableInTouchMode="true"
+    android:gravity="center_vertical"
+    android:maxLines="2"
+    android:minHeight="@dimen/book_label_row_height"
+    android:textColor="?attr/collectionColor"
+    android:textSize="@dimen/textSizeBookDescription"
+    tools:text="Последние люди на Земле · 9 аудиокниг" />

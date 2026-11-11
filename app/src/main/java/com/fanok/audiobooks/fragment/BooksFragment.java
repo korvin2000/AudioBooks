@@ -1,6 +1,5 @@
 package com.fanok.audiobooks.fragment;
 
-import static android.content.Context.UI_MODE_SERVICE;
 import static com.fanok.audiobooks.Consts.MODEL_ARTIST;
 import static com.fanok.audiobooks.Consts.MODEL_AUTOR;
 import static com.fanok.audiobooks.Consts.MODEL_BOOKS;
@@ -9,7 +8,6 @@ import static com.fanok.audiobooks.Consts.setColorPrimeriTextInIconItemMenu;
 
 import android.annotation.SuppressLint;
 import android.app.Activity;
-import android.app.UiModeManager;
 import android.content.Context;
 import android.content.Intent;
 import android.content.res.Configuration;
@@ -236,8 +234,7 @@ public class BooksFragment extends MvpAppCompatFragment implements BooksView {
 
         binding = FragmentBooksBinding.inflate(inflater, container, false);
 
-        UiModeManager uiModeManager = (UiModeManager) requireContext().getSystemService(UI_MODE_SERVICE);
-        isTelevision = (uiModeManager != null && uiModeManager.getCurrentModeType() == Configuration.UI_MODE_TYPE_TELEVISION);
+        isTelevision = ListFocus.isTv();
         mListFocus.attach(isTelevision, savedInstanceState);
 
 

@@ -1,13 +1,11 @@
 package com.fanok.audiobooks.adapter;
 
-import static android.content.Context.UI_MODE_SERVICE;
 import static android.view.KeyEvent.KEYCODE_DPAD_CENTER;
 import static android.view.KeyEvent.KEYCODE_ENTER;
 import static android.view.KeyEvent.KEYCODE_NUMPAD_ENTER;
 
 import android.annotation.SuppressLint;
-import android.app.UiModeManager;
-import android.content.res.Configuration;
+import android.graphics.Typeface;
 import android.util.Log;
 import android.util.TypedValue;
 import android.view.KeyEvent;
@@ -21,6 +19,7 @@ import android.widget.TextView;
 import android.widget.Toast;
 import androidx.annotation.NonNull;
 import androidx.annotation.OptIn;
+import androidx.core.graphics.ColorUtils;
 import androidx.media3.common.util.UnstableApi;
 import androidx.media3.exoplayer.offline.Download;
 import androidx.media3.exoplayer.offline.DownloadIndex;
@@ -31,15 +30,16 @@ import com.fanok.audiobooks.R;
 import com.fanok.audiobooks.download.DownloadMonitor;
 import com.fanok.audiobooks.download.DownloadStatus;
 import com.fanok.audiobooks.pojo.AudioPOJO;
+import com.fanok.audiobooks.util.ChapterText;
 import com.fanok.audiobooks.util.DeletionPlanner;
 import com.fanok.audiobooks.util.DownloadUtil;
 import com.github.lzyzsd.circleprogress.DonutProgress;
+import com.google.android.material.color.MaterialColors;
 
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 
 /** @noinspection ClassEscapesDefinedScope*/
@@ -64,6 +64,20 @@ public class AudioAdapter extends RecyclerView.Adapter<AudioAdapter.ViewHolder> 
 
     /** Change payload: only the chapter's download state is redrawn. */
     private static final Object LIVE = new Object();
+
+    /**
+     * The chapters before the playing one, of 255: as dim as their digits and symbols still read (4.5:1 and 3:1 on
+     * each theme's background).
+     */
+    private static final int BEHIND_ALPHA = 184;
+
+    /** The theme's colours of a name's letters, the length, a name's digits and its other symbols (bindName). */
+    private int mText;
+    private int mDigit;
+    private int mSymbol;
+    /** The name's typeface as the row has it, and the playing chapter's; null until the first row is bound. */
+    private Typeface mRegular;
+    private Typeface mMedium;
 
     public interface OnStatusListener {
         /** The book's download status, after every index read and every monitor tick. */
@@ -355,21 +369,9 @@ public class AudioAdapter extends RecyclerView.Adapter<AudioAdapter.ViewHolder> 
     public void onBindViewHolder(@NonNull ViewHolder viewHolder, @SuppressLint("RecyclerView") int i) {
         Log.d(TAG, "onBindViewHolder: called");
 
-        if (mData.get(i).getTime() != 0) {
-            int totalSecs = mData.get(i).getTime();
-            int hours = totalSecs / 3600;
-            int minutes = (totalSecs % 3600) / 60;
-            int seconds = totalSecs % 60;
-            String timeString = String.format(Locale.forLanguageTag("UK"), "%02d:%02d:%02d", hours,
-                    minutes, seconds);
+        viewHolder.mTime.setVisibility(mData.get(i).getTime() != 0 ? View.VISIBLE : View.GONE);
 
-            viewHolder.mTime.setText(timeString);
-            viewHolder.mTime.setVisibility(View.VISIBLE);
-        } else {
-            viewHolder.mTime.setVisibility(View.GONE);
-        }
-
-        viewHolder.mTitle.setText(mData.get(i).getName());
+        bindName(viewHolder, i);
 
         viewHolder.mView.setOnClickListener(view -> click(view, i));
 
@@ -395,8 +397,7 @@ public class AudioAdapter extends RecyclerView.Adapter<AudioAdapter.ViewHolder> 
             return true;
         });
 
-        UiModeManager uiModeManager = (UiModeManager) viewHolder.mView.getContext().getApplicationContext().getSystemService(UI_MODE_SERVICE);
-        if (uiModeManager.getCurrentModeType() == Configuration.UI_MODE_TYPE_TELEVISION) {
+        if (ListFocus.isTv()) {
             // --- Логика для ТВ ---
             // Устанавливаем OnKeyListener для эмуляции долгого нажатия
             viewHolder.mView.setOnKeyListener(new View.OnKeyListener() {
@@ -443,13 +444,44 @@ public class AudioAdapter extends RecyclerView.Adapter<AudioAdapter.ViewHolder> 
             viewHolder.mView.getContext().getTheme().resolveAttribute(
                     android.R.attr.selectableItemBackground, outValue, true);
             viewHolder.mView.setBackgroundResource(outValue.resourceId);
-        } else {
+        } else if (ListFocus.isTv()) {
+            // the TV row starts 7dp from the edge, no room for the plate's bar: the plain fill
             viewHolder.mView.setBackgroundColor(
                     Consts.getAttributeColor(viewHolder.mView.getContext(), R.attr.backgroundItem));
+        } else {
+            viewHolder.mView.setBackgroundResource(R.drawable.chapter_current);
         }
 
         viewHolder.mRadioButton.setVisibility(mSelecting ? View.VISIBLE : View.GONE);
         viewHolder.mRadioButton.setChecked(url != null && mSelectedItems.contains(url));
+    }
+
+    /**
+     * The chapter's name in three colours: the playing chapter in a medium weight, the chapters before it dimmed
+     * (there is no listened mark per chapter: what is before the playing one counts as behind).
+     */
+    private void bindName(@NonNull ViewHolder viewHolder, int position) {
+        if (mMedium == null) {
+            // once: the theme does not change under a list
+            mText = MaterialColors.getColor(viewHolder.mView, R.attr.colorPrimaryText);
+            mDigit = MaterialColors.getColor(viewHolder.mView, R.attr.chapterDigitColor);
+            mSymbol = MaterialColors.getColor(viewHolder.mView, R.attr.chapterSymbolColor);
+            mRegular = viewHolder.mTitle.getTypeface();
+            mMedium = Typeface.create("sans-serif-medium", Typeface.NORMAL);
+        }
+        boolean current = position == indexSelected;
+        boolean behind = position < indexSelected;
+        viewHolder.mTitle.setText(ChapterText.colored(mData.get(position).getName(), dim(mDigit, behind),
+                dim(mSymbol, behind)));
+        viewHolder.mTitle.setTextColor(dim(mText, behind));
+        viewHolder.mTitle.setTypeface(current ? mMedium : mRegular);
+        // the length is digits too: in their colour, its colons in the symbols'
+        viewHolder.mTime.setText(ChapterText.colored(ChapterText.duration(mData.get(position).getTime()),
+                dim(mDigit, behind), dim(mSymbol, behind)));
+    }
+
+    private static int dim(int color, boolean behind) {
+        return behind ? ColorUtils.setAlphaComponent(color, BEHIND_ALPHA) : color;
     }
 
     @Override

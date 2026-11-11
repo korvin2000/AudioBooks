@@ -6,11 +6,17 @@ import com.fanok.audiobooks.pojo.BookPOJO;
 import com.fanok.audiobooks.pojo.GenrePOJO;
 import com.fanok.audiobooks.pojo.SeriesPOJO;
 
+import org.jsoup.Jsoup;
 import org.jsoup.nodes.Element;
+import org.jsoup.nodes.Node;
+import org.jsoup.nodes.TextNode;
 import org.jsoup.select.Elements;
+import org.jsoup.select.NodeTraversor;
+import org.jsoup.select.NodeVisitor;
 
 import java.util.ArrayList;
 import java.util.logging.Logger;
+import java.util.regex.Pattern;
 
 /**
  * What every HTML source does with a page: lists of cards or rows where one broken item is skipped (never the page),
@@ -19,6 +25,12 @@ import java.util.logging.Logger;
 public final class Html {
 
     private static final Logger LOG = Logger.getLogger("parsers");
+
+    /** A run of spaces, the no-break one included ({@code \s} alone leaves it). */
+    private static final Pattern SPACES = Pattern.compile("[\\s\\u00A0]+");
+
+    /** What jsoup's {@code text()} leaves out too: the zero-width space and the soft hyphen. */
+    private static final Pattern INVISIBLE = Pattern.compile("[\\u200B\\u00AD]");
 
     private Html() {
     }
@@ -100,6 +112,73 @@ public final class Html {
     /** Trimmed text of the first match of {@code css} under {@code scope}; "" when either is absent. */
     public static String text(@Nullable Element scope, String css) {
         return scope == null ? "" : text(scope.selectFirst(css));
+    }
+
+    /**
+     * The text of {@code root} with its paragraphs kept, one a line: a {@code <br>} and the edges of a block element
+     * (p, div, li, a heading) end the line; an empty line is dropped, as are the spaces around one. The same words as
+     * {@link Element#text()}, which glues them into one line: for a book's description. "" when {@code root} is null.
+     */
+    public static String paragraphs(@Nullable Element root) {
+        return root == null ? "" : lines(root, true);
+    }
+
+    /** {@link #paragraphs(Element)} of an HTML fragment: a JSON field holding markup. */
+    public static String paragraphs(@Nullable String html) {
+        return html == null || html.trim().isEmpty() ? "" : lines(Jsoup.parseBodyFragment(html).body(), true);
+    }
+
+    /**
+     * As {@link #paragraphs(Element)}, of {@code root}'s own text alone ({@link Element#ownText()}): what its child
+     * elements say (a label, a link, a "read more") is left out, a {@code <br>} still ends the line.
+     */
+    public static String ownParagraphs(@Nullable Element root) {
+        return root == null ? "" : lines(root, false);
+    }
+
+    private static String lines(Element root, boolean deep) {
+        StringBuilder raw = new StringBuilder();
+        if (deep) {
+            NodeTraversor.traverse(new NodeVisitor() { // no recursion: a page nests as deep as it likes
+                @Override
+                public void head(Node node, int depth) {
+                    appendLine(node, raw);
+                }
+
+                @Override
+                public void tail(Node node, int depth) {
+                    if (node instanceof Element && ((Element) node).isBlock()) {
+                        raw.append('\n');
+                    }
+                }
+            }, root);
+        } else {
+            for (Node child : root.childNodes()) {
+                appendLine(child, raw);
+            }
+        }
+        StringBuilder out = new StringBuilder();
+        for (String line : INVISIBLE.matcher(raw).replaceAll("").split("\n")) {
+            String text = SPACES.matcher(line).replaceAll(" ").trim();
+            if (!text.isEmpty()) {
+                out.append(out.length() == 0 ? "" : "\n").append(text);
+            }
+        }
+        return out.toString();
+    }
+
+    /**
+     * What {@code node} itself adds to the text: a text node its text, where a line break of the markup is a space
+     * (kept inside a {@code <pre>}), a {@code <br>} and the start of a block element a {@code \n}.
+     */
+    private static void appendLine(Node node, StringBuilder out) {
+        if (node instanceof TextNode) {
+            String text = ((TextNode) node).getWholeText();
+            boolean pre = node.parent() instanceof Element && ((Element) node.parent()).tag().preserveWhitespace();
+            out.append(pre ? text : text.replace('\n', ' '));
+        } else if (node instanceof Element && (((Element) node).nameIs("br") || ((Element) node).isBlock())) {
+            out.append('\n');
+        }
     }
 
     /** True for a link to a path of the page's own site ({@code /x}); false for another host, {@code //host/x} included. */

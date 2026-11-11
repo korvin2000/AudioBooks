@@ -15,5 +15,10 @@
         <attr name="deleteColor" format="color" />
         <!-- "My favourite" (a favourite author/reader/book) in content; toolbars keep white icons -->
         <attr name="favoriteColor" format="color" />
+        <!-- a chapter's name in the player: its digits and its other symbols, beside the letters' colorPrimaryText -->
+        <attr name="chapterDigitColor" format="color" />
+        <attr name="chapterSymbolColor" format="color" />
+        <!-- a collection the book is in, on its page: a link of its own colour, not hrefColor's -->
+        <attr name="collectionColor" format="color" />
     </declare-styleable>
 </resources>

@@ -211,7 +211,8 @@ public final class Golosom implements SourceParser {
                 description.setArtistUrl(href(readers, "a"));
             }
         }
-        description.setDescription(text(doc, "#BookDescriptionContent .BookDescriptionContentInner"));
+        description.setDescription(
+                Html.paragraphs(doc.selectFirst("#BookDescriptionContent .BookDescriptionContentInner")));
         return description;
     }
 

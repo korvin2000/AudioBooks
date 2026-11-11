@@ -62,4 +62,13 @@
     <!-- the progress line under the time: under its text, past the 18dp icon and its 4dp padding -->
     <dimen name="book_time_bar_inset">22dp</dimen>
     <dimen name="book_time_bar_height">3dp</dimen>
+    <!-- the book's block in the player (playerBook): its cover's box, and the block's width beside the chapters in
+         landscape -->
+    <dimen name="player_cover_width">100dp</dimen>
+    <dimen name="player_cover_height">120dp</dimen>
+    <!-- the folded player's progress line (the platform's horizontal bar is as tall), and how much higher the open
+         player's content starts for it: the same, negative -->
+    <dimen name="player_progress_line">16dp</dimen>
+    <dimen name="player_progress_line_lift">-16dp</dimen>
+    <dimen name="player_book_side_width">280dp</dimen>
 </resources>

@@ -337,6 +337,34 @@
                 android:textSize="@dimen/textSizeBookDescription"
                 tools:text="Гарри Поттер с нетерпением ждет окончания каникул и начала пятого учебного года в Хогвартсе. Юный волшебник как никогда страдает от одиночества, а насмешки и придирки Дурслей стали совсем невыносимы. К тому же он уверен, что Волан-де-Морт возродился и скоро начнет действовать. Вас снова ждут опасные и захватывающие приключения, жестокая борьба, верные друзья и волшебный мир Гарри Поттера." />
 
+            <!-- the site's collections the book is in, a link each, under the unfolded description (bindDescription) -->
+            <LinearLayout
+                android:id="@+id/collections"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/text_margin"
+                android:orientation="vertical"
+                android:visibility="gone">
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="@string/book_collections"
+                    android:textColor="?attr/colorPrimaryText"
+                    android:textSize="@dimen/textSizeBookDescription"
+                    android:textStyle="bold" />
+            </LinearLayout>
+
+            <!-- the site's notes under the collections: the book's other titles, the date it was added (bindNotes) -->
+            <TextView
+                android:id="@+id/descNotes"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/text_margin"
+                android:textColor="?attr/subTextColor"
+                android:textSize="@dimen/textSizeBookDescription"
+                android:visibility="gone" />
+
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"

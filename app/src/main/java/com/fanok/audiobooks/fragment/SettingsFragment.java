@@ -1,19 +1,16 @@
 package com.fanok.audiobooks.fragment;
 
-import static android.content.Context.UI_MODE_SERVICE;
 import static android.os.Build.VERSION.SDK_INT;
 import static android.provider.Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS;
 
 import android.Manifest;
 import android.annotation.SuppressLint;
-import android.app.UiModeManager;
 import android.content.ActivityNotFoundException;
 import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
-import android.content.res.Configuration;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
@@ -577,11 +574,7 @@ public class SettingsFragment extends PreferenceFragmentCompat implements
                 Context.POWER_SERVICE);
         if (pm != null) {
 
-            UiModeManager uiModeManager = (UiModeManager) requireContext().getSystemService(
-                    UI_MODE_SERVICE);
-
-            if (uiModeManager == null || uiModeManager.getCurrentModeType()
-                    == Configuration.UI_MODE_TYPE_TELEVISION) {
+            if (ListFocus.isTv()) {
                 ignor = true;
             } else {
                 ignor = pm.isIgnoringBatteryOptimizations(requireContext().getPackageName());

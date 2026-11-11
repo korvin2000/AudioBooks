@@ -419,6 +419,7 @@ public class BiblusTest {
         assertEquals(S + "/readers/gerasimov-vjacheslav.html", d.getArtistUrl());
         assertEquals("9 ч. 39 мин.", d.getTime());
         assertTrue(d.getDescription(), d.getDescription().startsWith("Достигнув определенного уровня развития"));
+        assertTrue(d.getDescription().contains("\nСуровые и аскетические законы «Вечности»"));
         assertEquals("", d.getSeries());
         assertEquals("", d.getReiting());
         assertTrue(BIBLUS.series(page("book.html", BOOK), BOOK).isEmpty());

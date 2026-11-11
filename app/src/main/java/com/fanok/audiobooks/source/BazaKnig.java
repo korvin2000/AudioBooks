@@ -605,7 +605,7 @@ public final class BazaKnig implements SourceParser {
 
         Elements desc = document.getElementsByClass("short-text");
         if (desc.size() > 0) {
-            descriptionPOJO.setDescription(desc.first().ownText());
+            descriptionPOJO.setDescription(Html.ownParagraphs(desc.first()));
         }
 
         Elements comentsClass = document.getElementsByClass("short-rate main-sliders-rate ignore-select");
@@ -756,8 +756,7 @@ public final class BazaKnig implements SourceParser {
 
         Elements desc = document.getElementsByClass("short-text");
         if (desc != null && !desc.isEmpty()) {
-            String text = desc.first().ownText();
-            bookPOJO.setDesc(text);
+            bookPOJO.setDesc(Html.ownParagraphs(desc.first()));
         }
 
         Elements coments = document.getElementsByClass("comments");

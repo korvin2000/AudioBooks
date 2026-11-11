@@ -51,12 +51,19 @@ public final class ListFocus {
     /** A preference screen's {@link #restore} waiting for its list's layout; null when none or its view went. */
     private View.OnLayoutChangeListener mRestore;
 
+    /**
+     * The app runs on a TV. The service is the application's, never a screen's: Android 14 registers a callback in
+     * each UiModeManager that the system then holds, and with it the context the manager was asked from, so one asked
+     * from an activity keeps that activity after it is closed. The app asks for this service here and in AppThemes
+     * only (UiModeBoundaryTest).
+     */
     public static boolean isTv(@NonNull Context context) {
-        UiModeManager modes = (UiModeManager) context.getSystemService(Context.UI_MODE_SERVICE);
+        UiModeManager modes = (UiModeManager) context.getApplicationContext()
+                .getSystemService(Context.UI_MODE_SERVICE);
         return modes != null && modes.getCurrentModeType() == Configuration.UI_MODE_TYPE_TELEVISION;
     }
 
-    /** The app runs on a TV: list adapters keep their rows across updates there (touch devices are left as they were). */
+    /** {@link #isTv(Context)}, asked once: list adapters keep their rows across updates there (touch devices are left as they were). */
     public static boolean isTv() {
         if (sTv == null) {
             sTv = isTv(App.getInstance());

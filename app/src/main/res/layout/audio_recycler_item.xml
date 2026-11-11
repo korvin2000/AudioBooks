@@ -1,4 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- a chapter in the player's list: the name starts in the top row's 16dp column; the playing chapter's plate
+     (drawable/chapter_current) and the three colours of the name are set by AudioAdapter -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:custom="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
@@ -6,7 +8,10 @@
     android:layout_height="wrap_content"
     android:background="?android:selectableItemBackground"
     android:orientation="horizontal"
-    android:padding="@dimen/text_margin_book_description"
+    android:paddingStart="@dimen/text_margin"
+    android:paddingTop="@dimen/text_margin_book_description"
+    android:paddingEnd="12dp"
+    android:paddingBottom="@dimen/text_margin_book_description"
     tools:background="@color/colorBackgraund"
     tools:viewBindingIgnore="true">
 
@@ -17,7 +22,6 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_gravity="center"
-        android:layout_marginStart="9dp"
         android:layout_marginEnd="@dimen/text_margin_book_description"
         android:button="@null"
         android:drawableStart="@drawable/radio_select"
@@ -27,18 +31,24 @@
         android:id="@+id/title"
         android:layout_width="0dp"
         android:layout_height="wrap_content"
+        android:layout_gravity="center_vertical"
         android:layout_weight="1"
+        android:ellipsize="end"
+        android:maxLines="2"
         android:textColor="?attr/colorPrimaryText"
         android:textSize="@dimen/titleSize"
         tools:text="05-22" />
 
+    <!-- "10:09": smaller than the name, figures of one width so the column stays even -->
     <TextView
         android:id="@+id/time"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
+        android:layout_gravity="center_vertical"
         android:layout_marginStart="@dimen/text_margin"
+        android:fontFeatureSettings="tnum"
         android:textColor="?attr/subTextColor"
-        android:textSize="@dimen/titleSize"
+        android:textSize="14sp"
         tools:text="14:05" />
 
     <RelativeLayout

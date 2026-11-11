@@ -417,7 +417,7 @@ public final class Bookish implements SourceParser {
         if (text != null) {
             Element own = text.clone();
             own.select("script, noindex, .attachment_position, .fsubtitle").remove();
-            description.setDescription(own.text());
+            description.setDescription(Html.paragraphs(own));
         }
         return description;
     }

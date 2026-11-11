@@ -244,6 +244,7 @@ public class GolosknigTest {
         assertEquals("", d.getSeries());
         assertEquals("", d.getReiting());
         assertTrue(d.getDescription().startsWith("В стокгольмскую больницу после жестокого избиения"));
+        assertTrue(d.getDescription().contains("\nКомиссар Гренс берётся за расследование"));
         assertTrue(d.getDescription().endsWith("Tекст читает Ирина Ерисанова."));
         assertFalse(d.isOtherReader());
 

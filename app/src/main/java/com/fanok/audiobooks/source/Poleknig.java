@@ -285,7 +285,7 @@ public final class Poleknig implements SourceParser {
 
         Elements desc = document.select("div#description[itemprop=description]");
         if (desc.size() > 0) {
-            descriptionPOJO.setDescription(desc.first().text());
+            descriptionPOJO.setDescription(Html.paragraphs(desc.first()));
         }
         return descriptionPOJO;
     }

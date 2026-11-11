@@ -1,15 +1,12 @@
 package com.fanok.audiobooks.adapter;
 
 import static android.content.Context.MODE_PRIVATE;
-import static android.content.Context.UI_MODE_SERVICE;
 import static com.fanok.audiobooks.activity.ParentalControlActivity.PARENTAL_CONTROL_PREFERENCES;
 
 import android.annotation.SuppressLint;
-import android.app.UiModeManager;
 import android.content.Context;
 import android.content.ContextWrapper;
 import android.content.SharedPreferences;
-import android.content.res.Configuration;
 import android.graphics.Bitmap;
 import android.graphics.drawable.Drawable;
 import android.os.Looper;
@@ -107,6 +104,43 @@ public class BooksListAddapter extends RecyclerView.Adapter<BooksListAddapter.My
                 }
             }
         });
+    }
+
+    /**
+     * Shows the cover of {@code book} in {@code view}, as every list does (the book screen's player too): the parental
+     * control's mask; for a site whose covers are never requested the one read from its audio, else the default one;
+     * {@code photo} (a URL, a file or a content URI); else the gallery icon.
+     *
+     * @return the book's URL while its default cover shows for want of the one from its audio, else null
+     */
+    @Nullable
+    public static String loadCover(@NonNull ImageView view, @NonNull BookPOJO book, @Nullable String photo) {
+        Drawable mask = com.fanok.audiobooks.policy.ParentalControl.coverMask(view.getContext(), book);
+        if (mask != null) {
+            Glide.with(view).load(mask).into(view);
+        } else if (DefaultCover.replaces(photo)
+                || (photo == null || photo.isEmpty()) && DefaultCover.replaces(book.getUrl())) {
+            Drawable gradient = DefaultCover.gradient(view.getContext(), book.getUrl());
+            Bitmap read = EmbeddedCover.memory(book.getUrl());
+            File saved = read == null ? EmbeddedCover.saved(view.getContext(), book.getUrl()) : null;
+            RequestManager glide = Glide.with(view);
+            (read != null ? glide.load(read) : saved != null ? glide.load(saved) : glide.load(gradient))
+                    .placeholder(gradient).into(view);
+            if (read == null && saved == null) {
+                return book.getUrl();
+            }
+        } else if (photo != null && !photo.isEmpty()) {
+            if (photo.startsWith("content://")) {
+                Glide.with(view).load(android.net.Uri.parse(photo)).into(view);
+            } else if (photo.startsWith("/") || photo.contains(":\\")) {
+                Glide.with(view).load(new java.io.File(photo)).into(view);
+            } else {
+                Glide.with(view).load(com.fanok.audiobooks.net.Covers.glide(photo)).into(view);
+            }
+        } else {
+            view.setImageDrawable(ContextCompat.getDrawable(view.getContext(), android.R.drawable.ic_menu_gallery));
+        }
+        return null;
     }
 
     /** A cover read anywhere (the book screen, the player, a row) shows at once in this list's rows of the book. */
@@ -337,35 +371,7 @@ public class BooksListAddapter extends RecyclerView.Adapter<BooksListAddapter.My
          * cover shows and the row, while in the list, asks for it ({@link #ask}).
          */
         void bindCover(BookPOJO book) {
-            String wanted = null;
-            String photo = book.getPhoto();
-            Drawable mask = com.fanok.audiobooks.policy.ParentalControl.coverMask(mImageView.getContext(), book);
-            if (mask != null) {
-                Glide.with(mImageView).load(mask).into(mImageView);
-            } else if (DefaultCover.replaces(photo)
-                    || (photo == null || photo.isEmpty()) && DefaultCover.replaces(book.getUrl())) {
-                Drawable gradient = DefaultCover.gradient(mImageView.getContext(), book.getUrl());
-                Bitmap read = EmbeddedCover.memory(book.getUrl());
-                File saved = read == null ? EmbeddedCover.saved(mImageView.getContext(), book.getUrl()) : null;
-                RequestManager glide = Glide.with(mImageView);
-                (read != null ? glide.load(read) : saved != null ? glide.load(saved) : glide.load(gradient))
-                        .placeholder(gradient).into(mImageView);
-                if (read == null && saved == null) {
-                    wanted = book.getUrl();
-                }
-            } else if (photo != null && !photo.isEmpty()) {
-                if (photo.startsWith("content://")) {
-                    Glide.with(mImageView).load(android.net.Uri.parse(photo)).into(mImageView);
-                } else if (photo.startsWith("/") || photo.contains(":\\")) {
-                    Glide.with(mImageView).load(new java.io.File(photo)).into(mImageView);
-                } else {
-                    Glide.with(mImageView).load(com.fanok.audiobooks.net.Covers.glide(photo)).into(mImageView);
-                }
-            } else {
-                mImageView.setImageDrawable(
-                        ContextCompat.getDrawable(mImageView.getContext(), android.R.drawable.ic_menu_gallery));
-            }
-            mCoverOf = wanted;
+            mCoverOf = loadCover(mImageView, book, book.getPhoto());
             ask(); // rebound in the list (a payload, a status): asks again, or no more
         }
 
