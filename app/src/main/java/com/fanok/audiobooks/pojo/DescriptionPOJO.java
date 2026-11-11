@@ -24,6 +24,13 @@ public class DescriptionPOJO {
 
     private String description = "";
 
+    private transient ArrayList<OtherArtistPOJO> collectionLinks = new ArrayList<>();
+
+    public ArrayList<OtherArtistPOJO> getCollectionLinks() {
+        if (collectionLinks == null) collectionLinks = new ArrayList<>();
+        return collectionLinks;
+    }
+
     private String autorUrl = "";
 
     private String artistUrl = "";

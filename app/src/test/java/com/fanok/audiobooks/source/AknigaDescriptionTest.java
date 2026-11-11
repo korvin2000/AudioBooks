@@ -78,6 +78,19 @@ public class AknigaDescriptionTest {
     }
 
     @Test
+    public void collectionLinksPreserveNamesAndUrls() {
+        String html = "<div class='description__article-main caption__article--about-block-samebook'>"
+                + "<div class='alt-voices--collections'><div class='alt-voices__caption'>Входит в подборки</div>"
+                + "<a class='alt-voices__item' href='/collection/first/'><span class='alt-voices__name'>Первая</span></a>"
+                + "<a class='alt-voices__item' href='/collection/second/'><span class='alt-voices__name'>Вторая</span></a>"
+                + "</div></div>";
+        DescriptionPOJO d = Akniga.parseDescription(Jsoup.parse(html, BOOK_URL), BOOK_URL);
+        assertTrue(d.getCollectionLinks().size() == 2);
+        assertTrue(d.getCollectionLinks().get(0).getName().equals("Первая"));
+        assertTrue(d.getCollectionLinks().get(1).getUrl().equals("https://akniga.org/collection/second/"));
+    }
+
+    @Test
     public void fallbackUsesLdJsonWhenNoSections() throws IOException {
         String html = "<html><head><script type=\"application/ld+json\">"
                 + "{\"description\":\"Fallback annotation text.\"}</script></head><body></body></html>";

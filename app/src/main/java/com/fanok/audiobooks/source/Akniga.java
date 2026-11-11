@@ -720,6 +720,13 @@ public final class Akniga implements SourceParser {
                             String entry = name.isEmpty() ? item.text().trim()
                                     : (name + (meta.isEmpty() ? "" : " " + meta));
                             if (!entry.isEmpty()) section.append("\n").append(entry);
+                            String link = item.absUrl("href");
+                            if (!name.isEmpty() && link.startsWith(Url.SERVER_AKNIGA + "/collection/")) {
+                                OtherArtistPOJO collection = new OtherArtistPOJO();
+                                collection.setName(name);
+                                collection.setUrl(link);
+                                descriptionPOJO.getCollectionLinks().add(collection);
+                            }
                         }
                         if (section.length() > 0) {
                             if (descBuilder.length() > 0) descBuilder.append("\n\n");

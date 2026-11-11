@@ -768,10 +768,27 @@ public class DescriptionBookFragment extends MvpAppCompatFragment
                     styled.setSpan(new StyleSpan(Typeface.BOLD), headings.start(), headings.end(),
                             Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
                 }
+                int collectionAt = text.indexOf("Входит в подборки\n");
+                int nextSection = collectionAt < 0 ? -1 : text.indexOf("\n\n", collectionAt);
+                int searchFrom = collectionAt < 0 ? text.length() : collectionAt + "Входит в подборки\n".length();
+                int sectionEnd = nextSection < 0 ? text.length() : nextSection;
+                for (OtherArtistPOJO collection : description.getCollectionLinks()) {
+                    String name = collection.getName();
+                    int start = text.indexOf(name, searchFrom);
+                    if (start < 0 || start + name.length() > sectionEnd) continue;
+                    final String url = collection.getUrl();
+                    styled.setSpan(new ClickableSpan() {
+                        @Override public void onClick(@NonNull View widget) {
+                            MainActivity.startMainActivity(requireContext(), Consts.FRAGMENT_AUDIOBOOK, url);
+                        }
+                    }, start, start + name.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+                    searchFrom = start + name.length();
+                }
                 displayText = styled;
             }
             final CharSequence formattedText = displayText;
             ExpandableText.bind(mDesc, mShowMore, mCopyDesc, formattedText, MAX_LINES, descExpanded);
+            mDesc.setMovementMethod(description.getCollectionLinks().isEmpty() ? null : LinkMovementMethod.getInstance());
             mShowMore.setOnClickListener(view1 -> {
                 descExpanded = !descExpanded;
                 if (mDesc != null) {
