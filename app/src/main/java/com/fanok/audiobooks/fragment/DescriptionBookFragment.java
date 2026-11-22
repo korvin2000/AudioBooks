@@ -43,7 +43,6 @@ import com.fanok.audiobooks.MarginItemDecoration;
 import com.fanok.audiobooks.R;
 import com.fanok.audiobooks.activity.BookActivity;
 import com.fanok.audiobooks.activity.BookFavorites;
-import com.fanok.audiobooks.activity.ImageFullScreenActivity;
 import com.fanok.audiobooks.activity.MainActivity;
 import com.fanok.audiobooks.activity.SourceActivity;
 import com.fanok.audiobooks.adapter.BooksOtherAdapter;
@@ -730,12 +729,10 @@ public class DescriptionBookFragment extends MvpAppCompatFragment
 
             BookActivity activity = (BookActivity) getActivity();
 
+            // the cover with the player, also for a book whose site has no cover: its own or the default one
             String remotePoster = description.getPoster();
-            if (activity != null && remotePoster != null && !remotePoster.trim().isEmpty()) {
-                mImageView.setOnClickListener(view ->
-                        ImageFullScreenActivity.start(activity,
-                                remotePoster, description.getTitle(),
-                                mImageView, coverKey(remotePoster)));
+            if (activity != null) {
+                mImageView.setOnClickListener(view -> activity.showCoverPlayer(remotePoster));
             }
 
             if (description.getGenre() != null && !description.getGenre().isEmpty()) {

@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The cover player's buttons, the open player's five (CoverPlayer, BookActivity.bindControls): each takes a fifth of
+     the row and its full height, and the row itself takes a tap that misses them, so a near miss does not close the
+     screen. Play is the whole cell; its plate only shows it (the cell's pressed and focused state). -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/coverControls"
+    android:layout_width="match_parent"
+    android:layout_height="@dimen/cover_controls_height"
+    android:clickable="true"
+    android:focusable="false"
+    android:importantForAccessibility="no"
+    android:orientation="horizontal">
+
+    <ImageButton
+        android:id="@+id/coverRewind"
+        android:layout_width="0dp"
+        android:layout_height="match_parent"
+        android:layout_weight="1"
+        android:background="?selectableItemBackgroundBorderless"
+        android:contentDescription="@string/rewind_10"
+        android:paddingTop="@dimen/cover_glyph_pad"
+        android:paddingBottom="@dimen/cover_glyph_pad"
+        android:scaleType="fitCenter"
+        android:src="@drawable/ic_rewind_30" />
+
+    <ImageButton
+        android:id="@+id/coverPrevious"
+        android:layout_width="0dp"
+        android:layout_height="match_parent"
+        android:layout_weight="1"
+        android:background="?selectableItemBackgroundBorderless"
+        android:contentDescription="@string/previous"
+        android:paddingTop="@dimen/cover_glyph_pad"
+        android:paddingBottom="@dimen/cover_glyph_pad"
+        android:scaleType="fitCenter"
+        android:src="@drawable/ic_skip_previous" />
+
+    <FrameLayout
+        android:id="@+id/coverPlay"
+        android:layout_width="0dp"
+        android:layout_height="match_parent"
+        android:layout_weight="1"
+        android:clickable="true"
+        android:contentDescription="@string/play"
+        android:focusable="true">
+
+        <ImageView
+            android:id="@+id/coverPlayIcon"
+            android:layout_width="@dimen/cover_play_plate"
+            android:layout_height="@dimen/cover_play_plate"
+            android:layout_gravity="center"
+            android:background="@drawable/bg_play_plate"
+            android:duplicateParentState="true"
+            android:importantForAccessibility="no"
+            android:padding="@dimen/cover_play_pad"
+            android:scaleType="fitCenter"
+            android:src="@drawable/ic_play"
+            app:tint="?attr/backgraundColor" />
+    </FrameLayout>
+
+    <ImageButton
+        android:id="@+id/coverNext"
+        android:layout_width="0dp"
+        android:layout_height="match_parent"
+        android:layout_weight="1"
+        android:background="?selectableItemBackgroundBorderless"
+        android:contentDescription="@string/next"
+        android:paddingTop="@dimen/cover_glyph_pad"
+        android:paddingBottom="@dimen/cover_glyph_pad"
+        android:scaleType="fitCenter"
+        android:src="@drawable/ic_skip_next" />
+
+    <ImageButton
+        android:id="@+id/coverForward"
+        android:layout_width="0dp"
+        android:layout_height="match_parent"
+        android:layout_weight="1"
+        android:background="?selectableItemBackgroundBorderless"
+        android:contentDescription="@string/forward_30"
+        android:paddingTop="@dimen/cover_glyph_pad"
+        android:paddingBottom="@dimen/cover_glyph_pad"
+        android:scaleType="fitCenter"
+        android:src="@drawable/ic_fast_forward_30" />
+</LinearLayout>

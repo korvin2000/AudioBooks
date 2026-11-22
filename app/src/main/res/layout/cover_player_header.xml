@@ -1,0 +1,97 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The cover player's top (CoverPlayer): the playing chapter and where the book stands beside the spectrum meter,
+     under them the chapter's progress, the time played and the time left. A gauge, not a slider: no thumb, and a tap
+     on it closes the screen as anywhere off the buttons. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center_vertical"
+        android:orientation="horizontal">
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:orientation="vertical">
+
+            <TextView
+                android:id="@+id/coverChapter"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:ellipsize="end"
+                android:fontFamily="sans-serif-medium"
+                android:singleLine="true"
+                android:textColor="?attr/colorPrimaryText"
+                android:textSize="@dimen/cover_chapter_size"
+                tools:text="Глава 03" />
+
+            <TextView
+                android:id="@+id/coverLine"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:alpha="0.72"
+                android:ellipsize="end"
+                android:maxLines="2"
+                android:textColor="?attr/colorPrimaryText"
+                android:textSize="@dimen/cover_line_size"
+                android:visibility="gone"
+                tools:text="Глава 3 из 16 · осталось 1 ч. 32 мин."
+                tools:visibility="visible" />
+        </LinearLayout>
+
+        <com.fanok.audiobooks.SpectrumView
+            android:id="@+id/coverMeter"
+            android:layout_width="@dimen/cover_meter_width"
+            android:layout_height="@dimen/cover_meter_height"
+            android:layout_marginStart="16dp" />
+    </LinearLayout>
+
+    <ProgressBar
+        android:id="@+id/coverProgress"
+        style="?android:attr/progressBarStyleHorizontal"
+        android:layout_width="match_parent"
+        android:layout_height="3dp"
+        android:layout_marginTop="12dp"
+        android:importantForAccessibility="no"
+        android:visibility="invisible"
+        tools:progress="40"
+        tools:visibility="visible" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="4dp"
+        android:alpha="0.72"
+        android:orientation="horizontal">
+
+        <TextView
+            android:id="@+id/coverElapsed"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:fontFeatureSettings="tnum"
+            android:textColor="?attr/colorPrimaryText"
+            android:textSize="12sp"
+            android:visibility="invisible"
+            tools:text="12:40"
+            tools:visibility="visible" />
+
+        <TextView
+            android:id="@+id/coverLeft"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:fontFeatureSettings="tnum"
+            android:textColor="?attr/colorPrimaryText"
+            android:textSize="12sp"
+            android:visibility="invisible"
+            tools:text="−32:10"
+            tools:visibility="visible" />
+    </LinearLayout>
+</LinearLayout>

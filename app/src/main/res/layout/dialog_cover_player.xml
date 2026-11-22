@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The cover with the player (CoverPlayer), portrait: the chapter, the book's time and the meter on top, the cover as
+     large as is left, the buttons at the bottom. A tap anywhere off the buttons closes it. Landscape: layout-land. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/coverPlayer"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:clickable="true"
+    android:contentDescription="@string/close"
+    android:focusable="false"
+    android:orientation="vertical">
+
+    <include
+        layout="@layout/cover_player_header"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="20dp"
+        android:layout_marginTop="16dp"
+        android:layout_marginEnd="20dp" />
+
+    <com.github.chrisbanes.photoview.PhotoView
+        android:id="@+id/coverImage"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_margin="16dp"
+        android:layout_weight="1"
+        android:contentDescription="@string/book_cover"
+        android:focusable="false" />
+
+    <include layout="@layout/cover_player_controls" />
+</LinearLayout>
