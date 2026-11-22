@@ -316,10 +316,19 @@ public class AudioAdapter extends RecyclerView.Adapter<AudioAdapter.ViewHolder> 
         refresh();
     }
 
-    @SuppressLint("NotifyDataSetChanged")
+    /**
+     * The chapter that is playing. Only the rows it changes are redrawn: the two chapters and those between, whose
+     * dimming turns; redrawing the whole list blinked at every chapter change of a long book. The payload keeps each
+     * row's view, so nothing cross-fades.
+     */
     public void setIndexSelected(int indexSelected) {
+        int was = this.indexSelected;
         this.indexSelected = indexSelected;
-        notifyDataSetChanged();
+        int from = Math.max(0, Math.min(was, indexSelected));
+        int to = Math.min(getItemCount() - 1, Math.max(was, indexSelected));
+        if (was != indexSelected && from <= to) {
+            notifyItemRangeChanged(from, to - from + 1, Boolean.TRUE);
+        }
     }
 
     public int getIndexSelected() {
@@ -486,7 +495,7 @@ public class AudioAdapter extends RecyclerView.Adapter<AudioAdapter.ViewHolder> 
 
     @Override
     public void onBindViewHolder(@NonNull ViewHolder viewHolder, int i, @NonNull List<Object> payloads) {
-        if (payloads.contains(LIVE)) {
+        if (payloads.contains(LIVE) && !payloads.contains(Boolean.TRUE)) { // TRUE: the playing chapter changed
             bindDownloadState(viewHolder, i);
         } else {
             super.onBindViewHolder(viewHolder, i, payloads);
@@ -558,17 +567,15 @@ public class AudioAdapter extends RecyclerView.Adapter<AudioAdapter.ViewHolder> 
     }
 
     /** A tap plays the chapter; while choosing it chooses the chapter or takes it back. */
-    @SuppressLint("NotifyDataSetChanged")
     private void click(View view, int pos) {
         if (mSelecting) {
             toggle(view, pos);
             return;
         }
-        indexSelected = pos;
+        setIndexSelected(pos);
         if (mListener != null) {
             mListener.onItemSelected(view, pos);
         }
-        notifyDataSetChanged();
     }
 
     /** A long press starts choosing with this chapter alone; while choosing it is a tap. */

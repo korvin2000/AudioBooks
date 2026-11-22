@@ -50,6 +50,7 @@ import com.fanok.audiobooks.interface_pacatge.book_content.AudioModelInterfece;
 import com.fanok.audiobooks.model.AudioDBModel;
 import com.fanok.audiobooks.model.AudioListDBModel;
 import com.fanok.audiobooks.model.AudioModel;
+import com.fanok.audiobooks.model.BookmarkRules;
 import com.fanok.audiobooks.model.BooksDBModel;
 import com.fanok.audiobooks.model.OtherArtistModel;
 import com.fanok.audiobooks.model.OtherSourceModel;
@@ -59,6 +60,7 @@ import com.fanok.audiobooks.pojo.AudioPOJO;
 import com.fanok.audiobooks.pojo.BookPOJO;
 import com.fanok.audiobooks.pojo.OtherArtistPOJO;
 import com.fanok.audiobooks.pojo.StorageUtil;
+import com.fanok.audiobooks.room.BookmarkEntity;
 import com.fanok.audiobooks.service.Checkpoint;
 import com.fanok.audiobooks.service.MediaPlayerService;
 import com.fanok.audiobooks.service.PlaybackSettings;
@@ -92,6 +94,13 @@ public class BookPresenter extends MvpPresenter<Activity> implements ActivityPre
     /** The PAUSE key: pauses, never plays. */
     public static final String Broadcast_PAUSE = "Pause";
     public static final String Broadcast_SEEK_TO = "SeekTo";
+    /** Back to where the last jump started (MediaPlayerService.undoSeek). */
+    public static final String Broadcast_SEEK_UNDO = "SeekUndo";
+    /**
+     * Marks the place the player is at, in the book of the extra "url" only (MediaPlayerService.addBookmark); the
+     * service answers with BookActivity.Broadcast_BOOKMARK_ADDED.
+     */
+    public static final String Broadcast_ADD_BOOKMARK = "AddBookmark";
     public static final String Broadcast_SEEK_NEXT_30 = "SeekToNext30";
 
     public static final String Broadcast_SEEK_PREVIOUS_10 = "SeekToPrevious10";
@@ -1052,23 +1061,59 @@ public class BookPresenter extends MvpPresenter<Activity> implements ActivityPre
         }
     }
 
+    /**
+     * Goes to a mark of this book in one command: its chapter found again in the list as loaded now (offline, the
+     * downloaded chapters only), at its position; playing when the player plays or a jump resumes playback
+     * ("seekToPausePref"), else paused there. A chapter not in the list is said, not guessed: false then.
+     */
+    public boolean goToBookmark(@NonNull BookmarkEntity mark) {
+        if (mAudioPOJO == null || mAudioPOJO.isEmpty()) {
+            getViewState().showToast(R.string.bookmark_not_loaded);
+            return false;
+        }
+        List<String> names = new ArrayList<>(mAudioPOJO.size());
+        for (AudioPOJO chapter : mAudioPOJO) {
+            names.add(chapter.getName());
+        }
+        int index = BookmarkRules.resolve(names, mOrdinals, mark.chapterIndex, mark.chapterName);
+        if (index < 0) {
+            //an offline list holds the downloaded chapters only
+            getViewState().showToast(mOrdinals != null ? R.string.bookmark_not_downloaded
+                    : R.string.bookmark_chapter_gone);
+            return false;
+        }
+        last = names.get(index);
+        getViewState().showTitle(last);
+        return playAudio(index, mark.positionMs,
+                MediaPlayerService.isPlay() || pref.getBoolean("seekToPausePref", true), true);
+    }
+
     /** Hands the book to the player in one command: this chapter, this position, this intent. */
     private void playAudio(int audioIndex, long positionMs, boolean play) {
+        playAudio(audioIndex, positionMs, play, false);
+    }
+
+    /**
+     * @param exact a place the listener chose (a bookmark), played from exactly, never rewound as a resume is
+     * @return whether the player took the command
+     */
+    private boolean playAudio(int audioIndex, long positionMs, boolean play, boolean exact) {
         if (mAudioPOJO == null || audioIndex < 0 || audioIndex >= mAudioPOJO.size()) {
-            return;
+            return false;
         }
         String url = mAudioPOJO.get(audioIndex).getUrl();
         if (url == null || url.isEmpty()) {
             getViewState().showToast(mAudioPOJO.get(audioIndex).getName());
-            return;
+            return false;
         }
         try {
             MediaPlayerService.start(mContext, new MediaPlayerService.Request(mBookPOJO, mBookPOJO.getUrl(),
-                    mAudioPOJO, mOrdinals, audioIndex, positionMs, play));
+                    mAudioPOJO, mOrdinals, audioIndex, positionMs, play, exact));
         } catch (RuntimeException e) {
             Log.e(TAG, "Failed to start the player", e);
-            return;
+            return false;
         }
         bindPlayerService(new Intent(mContext, MediaPlayerService.class));
+        return true;
     }
 }

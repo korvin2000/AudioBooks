@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The folded player's play button: the same plate (bg_play_plate) at its own size in the middle of the button,
+     which stays as tall as the row and as wide as its neighbours, so a tap beside the plate still plays. -->
+<ripple xmlns:android="http://schemas.android.com/apk/res/android"
+    android:color="?attr/colorControlHighlight">
+    <item
+        android:width="@dimen/player_play_plate"
+        android:height="@dimen/player_play_plate"
+        android:gravity="center">
+        <shape android:shape="oval">
+            <solid android:color="?attr/colorAccent" />
+        </shape>
+    </item>
+</ripple>

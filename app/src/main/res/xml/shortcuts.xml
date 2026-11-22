@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- A long press on the app's icon: the history and the downloaded books. MainActivity opens the section named by
+     "startFragment" (its EXSTRA_FRAGMENT): Consts.FRAGMENT_HISTORY = 5, Consts.FRAGMENT_SAVED = 8. -->
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+    <shortcut
+        android:icon="@mipmap/ic_launcher"
+        android:shortcutId="history"
+        android:shortcutShortLabel="@string/menu_history">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:targetClass="com.fanok.audiobooks.activity.MainActivity"
+            android:targetPackage="com.fanok.books">
+            <extra
+                android:name="startFragment"
+                android:value="5" />
+        </intent>
+    </shortcut>
+    <shortcut
+        android:icon="@mipmap/ic_launcher"
+        android:shortcutId="saved"
+        android:shortcutShortLabel="@string/menu_saved">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:targetClass="com.fanok.audiobooks.activity.MainActivity"
+            android:targetPackage="com.fanok.books">
+            <extra
+                android:name="startFragment"
+                android:value="8" />
+        </intent>
+    </shortcut>
+</shortcuts>

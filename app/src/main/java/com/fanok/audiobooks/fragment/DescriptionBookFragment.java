@@ -66,6 +66,7 @@ import com.fanok.audiobooks.service.Checkpoint;
 import com.fanok.audiobooks.service.MediaPlayerService;
 import com.fanok.audiobooks.util.BookHeader;
 import com.fanok.audiobooks.util.BookProgress;
+import com.fanok.audiobooks.util.CoverCorners;
 import com.fanok.audiobooks.util.RemainingTime;
 import com.fanok.audiobooks.util.SeriesPeek;
 import com.google.android.material.color.MaterialColors;
@@ -452,6 +453,7 @@ public class DescriptionBookFragment extends MvpAppCompatFragment
 
         mTitle = view.findViewById(R.id.title);
         mImageView = view.findViewById(R.id.imageView);
+        CoverCorners.round(mImageView);
         EmbeddedCover.listen(mEmbeddedCover);
         mReting = view.findViewById(R.id.reting);
         mGenre = view.findViewById(R.id.genre);
@@ -806,9 +808,10 @@ public class DescriptionBookFragment extends MvpAppCompatFragment
             if (mCopyDesc != null) {
                 mCopyDesc.setOnClickListener(view1 -> copy("description", text));
             }
-            if (text == null || text.isEmpty()) {
-                mDescLine.setVisibility(View.GONE);
-            }
+            // the description's card (on TV the divider above it) goes when there is nothing to show in it; the
+            // collections alone still need it
+            boolean nothing = (text == null || text.isEmpty()) && mCollections.getChildCount() <= 1;
+            mDescLine.setVisibility(nothing ? View.GONE : View.VISIBLE);
 
 
             if (!description.getFavorite().equals("0")) {

@@ -642,6 +642,8 @@
     <string name="equalizer_custom">Свой</string>
     <string name="equalizer_bass">Бас</string>
     <string name="equalizer_3d" translatable="false">3D</string>
+    <string name="equalizer_boost">Усиление</string>
+    <string name="equalizer_boost_value" translatable="false">%1$d%%</string>
     <string name="equalizer_error">Ошибка эквалайзера</string>
     <string name="equalizer_band_description">Полоса %1$s</string>
     <string name="equalizer_balance">Баланс</string>
@@ -862,4 +864,8 @@
     <string name="player_cover_show">Показать обложку</string>
     <string name="player_cover_hide">Скрыть обложку</string>
     <string name="player_reader">читает %1$s</string>
+    <string name="seek_undo">Вернуться на %1$s · %2$s</string>
+    <string name="seek_undo_action">Вернуться</string>
+    <string name="seek_undo_chapter">Глава %1$s</string>
+    <string name="a11y_narrator_photo">Фото чтеца</string>
 </resources>

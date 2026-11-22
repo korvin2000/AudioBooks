@@ -9,6 +9,8 @@ import android.graphics.Color;
 public final class EqualizerFragment {
 
     public static final String Broadcast_EqualizerEnabled = "equalizer_enabled";
+    /** The 3D knob or the equalizer's switch moved: the player plays the room now in {@code Settings}. */
+    public static final String Broadcast_ReverbChanged = "equalizer_reverb";
     static int themeColor = Color.parseColor("#B24242");
 
     private EqualizerFragment() {

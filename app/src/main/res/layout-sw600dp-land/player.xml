@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
     android:id="@+id/player"
     android:layout_width="320dp"
@@ -173,9 +174,11 @@
 
     </LinearLayout>
 
+    <!-- the row keeps its height: the play button's plate is taller than the padding leaves and reaches into it -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="@dimen/player_row_height"
+        android:clipToPadding="false"
         android:gravity="center_vertical|center_horizontal"
         android:orientation="horizontal"
         android:padding="@dimen/text_margin">
@@ -203,16 +206,19 @@
             android:scaleType="centerCrop"
             android:src="@drawable/ic_skip_previous" />
 
+        <!-- as wide as before, on a round plate of the accent colour, the icon in the panel's own and as large as its
+             neighbours' glyphs: the plate is the background and the colour a tint, so both outlast the icons
+             BookActivity.setImageDrawable swaps -->
         <ImageButton
             android:id="@+id/playBottom"
-            android:layout_width="wrap_content"
-            android:layout_height="match_parent"
-            android:background="?selectableItemBackgroundBorderless"
+            android:layout_width="@dimen/player_play_plate_open"
+            android:layout_height="@dimen/player_play_plate_open"
+            android:background="@drawable/bg_play_plate"
             android:contentDescription="@string/play"
-            android:paddingStart="@dimen/text_margin"
-            android:paddingEnd="@dimen/text_margin"
-            android:scaleType="centerCrop"
-            android:src="@drawable/ic_play" />
+            android:padding="10dp"
+            android:scaleType="fitCenter"
+            android:src="@drawable/ic_play"
+            app:tint="?attr/backgraundColor" />
 
         <ImageButton
             android:id="@+id/nextBottom"

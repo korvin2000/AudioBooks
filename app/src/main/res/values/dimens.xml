@@ -72,4 +72,13 @@
     <dimen name="player_progress_line">16dp</dimen>
     <dimen name="player_progress_line_lift">-16dp</dimen>
     <dimen name="player_book_side_width">280dp</dimen>
+    <dimen name="dialog_corner_radius">12dp</dimen>
+    <!-- the book page: the cover's corners (the player's too); the cards of the description and of the recommended
+         books, their side padding (margin_small above and below) -->
+    <dimen name="book_cover_radius">8dp</dimen>
+    <dimen name="book_card_radius">12dp</dimen>
+    <dimen name="book_card_padding">10dp</dimen>
+    <!-- the play button's round plate: in the folded player's row and, larger, in the open player's -->
+    <dimen name="player_play_plate">44dp</dimen>
+    <dimen name="player_play_plate_open">56dp</dimen>
 </resources>

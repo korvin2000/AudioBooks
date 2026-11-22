@@ -4,8 +4,10 @@ import android.content.Context;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Paint;
+import android.graphics.Rect;
 import android.util.AttributeSet;
 import android.view.HapticFeedbackConstants;
+import android.view.KeyEvent;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewConfiguration;
@@ -13,12 +15,14 @@ import android.view.ViewConfiguration;
 import androidx.annotation.NonNull;
 
 import com.fanok.audiobooks.R;
+import com.fanok.audiobooks.adapter.ListFocus;
 
 /**
  * A knob of {@code 0..max} steps on a 270° arc, 0 being "off": the knob turns grey and reads "Выкл". A finger on the
  * knob sets the step under it, by its angle from the centre; past either end of the arc (the gap at the bottom) the
  * knob holds the end it is nearest to, so the minimum and the maximum are reached by overshooting them. Lifting the
- * finger changes nothing. A tap without a drag (or a click from TalkBack) steps up, from the top back to off.
+ * finger changes nothing. A tap without a drag (or a click from TalkBack) steps up, from the top back to off. On a TV
+ * a remote reaches it: OK takes the knob (its rim lights up), the arrows turn it, OK or Back lets it go.
  *
  * Created by Harjot on 23-May-16.
  */
@@ -30,6 +34,10 @@ public class AnalogController extends View {
 
     float midx, midy;
     Paint textPaint, circlePaint, circlePaint2, linePaint;
+    /** The rim of a knob a remote holds; set up once, not in onDraw. */
+    private final Paint ringPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+    /** A remote has taken the knob: the arrows turn it until OK or Back lets it go. */
+    private boolean turning;
     private int max = 19;
     private int value;
     private float downX, downY;
@@ -62,7 +70,52 @@ public class AnalogController extends View {
         mListener = listener;
     }
 
+    /** A remote: OK takes the knob, the arrows turn it, OK or Back lets it go; Back then leaves the dialog open. */
+    @Override
+    public boolean onKeyDown(int keyCode, KeyEvent event) {
+        if (isEnabled()) {
+            if (keyCode == KeyEvent.KEYCODE_DPAD_CENTER || keyCode == KeyEvent.KEYCODE_ENTER) {
+                if (event.getRepeatCount() == 0) {
+                    turning = !turning;
+                    invalidate();
+                }
+                return true;
+            }
+            if (turning) {
+                if (keyCode == KeyEvent.KEYCODE_DPAD_RIGHT || keyCode == KeyEvent.KEYCODE_DPAD_UP) {
+                    change(Math.min(max, value + 1));
+                    return true;
+                }
+                if (keyCode == KeyEvent.KEYCODE_DPAD_LEFT || keyCode == KeyEvent.KEYCODE_DPAD_DOWN) {
+                    change(Math.max(0, value - 1));
+                    return true;
+                }
+                if (keyCode == KeyEvent.KEYCODE_BACK) {
+                    turning = false;
+                    invalidate();
+                    return true;
+                }
+            }
+        }
+        return super.onKeyDown(keyCode, event);
+    }
+
+    @Override
+    protected void onFocusChanged(boolean gainFocus, int direction, Rect previouslyFocusedRect) {
+        super.onFocusChanged(gainFocus, direction, previouslyFocusedRect);
+        if (!gainFocus && turning) {
+            turning = false;
+            invalidate();
+        }
+    }
+
     void init() {
+        if (!isInEditMode() && ListFocus.isTv(getContext())) {
+            // only a remote needs the knob focusable; a touch screen keeps it as it was
+            setFocusable(true);
+            setBackgroundResource(R.drawable.focusable);
+        }
+        ringPaint.setStyle(Paint.Style.STROKE);
         textPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
         textPaint.setColor(Color.WHITE);
         textPaint.setStyle(Paint.Style.FILL);
@@ -120,6 +173,11 @@ public class AnalogController extends View {
         canvas.drawCircle(midx, midy, radius * (13f / 15), circlePaint);
         circlePaint.setColor(Color.parseColor("#000000"));
         canvas.drawCircle(midx, midy, radius * (11f / 15), circlePaint);
+        if (turning) { // the rim between the face and the dots, in the accent
+            ringPaint.setColor(linePaint.getColor());
+            ringPaint.setStrokeWidth(radius * (2f / 15));
+            canvas.drawCircle(midx, midy, radius * (12f / 15), ringPaint);
+        }
 
         int textColor = textPaint.getColor();
         if (off) {

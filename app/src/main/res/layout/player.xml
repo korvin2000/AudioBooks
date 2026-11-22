@@ -160,15 +160,18 @@
                     android:paddingEnd="@dimen/text_margin"
                     android:src="@drawable/ic_skip_previous" />
 
+                <!-- on a round plate of the accent colour, the icon in the sheet's own: the plate is the background
+                     and the colour a tint, so both outlast the icons BookActivity.setImageDrawable swaps -->
                 <ImageButton
                     android:id="@+id/playTop"
                     android:layout_width="wrap_content"
                     android:layout_height="match_parent"
-                    android:background="?selectableItemBackgroundBorderless"
+                    android:background="@drawable/bg_play_plate_folded"
                     android:contentDescription="@string/play"
                     android:paddingStart="@dimen/text_margin"
                     android:paddingEnd="@dimen/text_margin"
-                    android:src="@drawable/ic_play" />
+                    android:src="@drawable/ic_play"
+                    app:tint="?attr/backgraundColor" />
 
                 <ImageButton
                     android:id="@+id/nextTop"
@@ -372,9 +375,11 @@
 
     </LinearLayout>
 
+    <!-- the row keeps its height: the play button's plate is taller than the padding leaves and reaches into it -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="@dimen/player_row_height"
+        android:clipToPadding="false"
         android:gravity="center_vertical|center_horizontal"
         android:orientation="horizontal"
         android:padding="@dimen/text_margin">
@@ -402,16 +407,17 @@
             android:scaleType="centerCrop"
             android:src="@drawable/ic_skip_previous" />
 
+        <!-- as wide as before, on its plate (see playTop); the icon as large as its neighbours' glyphs -->
         <ImageButton
             android:id="@+id/playBottom"
-            android:layout_width="wrap_content"
-            android:layout_height="match_parent"
-            android:background="?selectableItemBackgroundBorderless"
+            android:layout_width="@dimen/player_play_plate_open"
+            android:layout_height="@dimen/player_play_plate_open"
+            android:background="@drawable/bg_play_plate"
             android:contentDescription="@string/play"
-            android:paddingStart="@dimen/text_margin"
-            android:paddingEnd="@dimen/text_margin"
-            android:scaleType="centerCrop"
-            android:src="@drawable/ic_play" />
+            android:padding="10dp"
+            android:scaleType="fitCenter"
+            android:src="@drawable/ic_play"
+            app:tint="?attr/backgraundColor" />
 
         <ImageButton
             android:id="@+id/nextBottom"

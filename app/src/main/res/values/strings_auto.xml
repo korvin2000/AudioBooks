@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Android Auto, service.BrowseTree: the library's list with the chapters of the book in the player -->
+    <string name="auto_current_book">Текущая книга</string>
+</resources>

@@ -23,6 +23,7 @@ public class BalanceAudioProcessorTest {
         BalanceAudioProcessor.setBalance(0);
         BalanceAudioProcessor.setNightSound(false);
         BalanceAudioProcessor.setBass(0);
+        BalanceAudioProcessor.setBoost(0);
     }
 
     @Test
@@ -100,6 +101,69 @@ public class BalanceAudioProcessorTest {
             }
         }
         assertEquals(1_000, right, 20);
+    }
+
+    @Test
+    public void boostLiftsAQuietRecordingByThePercentAskedAndNothingMore() throws Exception {
+        BalanceAudioProcessor.setBoost(BalanceAudioProcessor.BOOST_MAX); //double
+        assertEquals(4_000, steadyPeak(2, 1_000, 2_000), 40);
+        assertEquals(4_000, steadyPeak(1, 1_000, 2_000), 40);
+        BalanceAudioProcessor.setBoost(50);
+        assertEquals(3_000, steadyPeak(2, 1_000, 2_000), 30);
+    }
+
+    @Test
+    public void aLoudPassageIsHeldUnderFullScaleNotClipped() throws Exception {
+        BalanceAudioProcessor processor = processor(2);
+        BalanceAudioProcessor.setBoost(BalanceAudioProcessor.BOOST_MAX);
+        for (int b = 0; b < 60; b++) {
+            short[] played = play(processor, wave(2, 20_000, 1_000, b)); //doubled: 40 000, past full scale
+            for (int i = 4; i < played.length; i++) { //a sine's top, not the flat top of a clipped one
+                assertFalse(Math.abs(played[i]) >= 32_766 && Math.abs(played[i - 2]) >= 32_766
+                        && Math.abs(played[i - 4]) >= 32_766);
+            }
+            assertTrue(b < 20 || peak(played) > 30_000); //held near full scale, not turned down for good
+        }
+    }
+
+    @Test
+    public void boostOffPlaysTheSoundAsItIsAgain() throws Exception {
+        BalanceAudioProcessor processor = processor(2);
+        BalanceAudioProcessor.setBoost(BalanceAudioProcessor.BOOST_MAX);
+        for (int b = 0; b < 40; b++) {
+            play(processor, wave(2, 20_000, 1_000, b)); //held under full scale: the gain is below 1 when it goes off
+        }
+        BalanceAudioProcessor.setBoost(0);
+        short[] tone = wave(2, 2_000, 1_000, 0);
+        for (int b = 0; b < 60; b++) {
+            play(processor, tone);
+        }
+        assertArrayEquals(tone, play(processor, tone));
+    }
+
+    @Test
+    public void boostChangesWithoutAClick() throws Exception {
+        BalanceAudioProcessor processor = processor(2);
+        short[] last = new short[0];
+        for (int b = 0; b < 80; b++) {
+            if (b == 40) {
+                BalanceAudioProcessor.setBoost(BalanceAudioProcessor.BOOST_MAX);
+            }
+            short[] played = play(processor, wave(2, 2_000, 150, b));
+            short[] both = join(last, played);
+            for (int i = 2; i < both.length; i++) { //a 150 Hz tone of 4 000 moves at most 86 a sample
+                assertTrue(Math.abs(both[i] - both[i - 2]) < 200);
+            }
+            last = played;
+        }
+    }
+
+    @Test
+    public void boostIsOnTopOfTheBalanceAndTheGainsAreClamped() {
+        assertArrayEquals(new float[] {2f, 2f}, BalanceAudioProcessor.gains(0, 100), 1e-6f);
+        assertArrayEquals(new float[] {0f, 1.5f}, BalanceAudioProcessor.gains(BalanceAudioProcessor.MAX, 50), 1e-6f);
+        assertArrayEquals(new float[] {2f, 2f}, BalanceAudioProcessor.gains(0, 500), 1e-6f);
+        assertArrayEquals(new float[] {1f, 1f}, BalanceAudioProcessor.gains(0, -20), 1e-6f);
     }
 
     @Test

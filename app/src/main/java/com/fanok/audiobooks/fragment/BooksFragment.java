@@ -522,6 +522,8 @@ public class BooksFragment extends MvpAppCompatFragment implements BooksView {
             // after the layout: a page that added no card (all filtered out, or an empty page) moves no visible
             // range, so no scroll event asks for the next one
             binding.list.post(this::fillScreen);
+            mLoaded = true;
+            updateEmpty();
         } else {
             // Если адаптер еще не создан, это может быть ошибкой в логике,
             // но на всякий случай можно добавить обработку.
@@ -535,6 +537,8 @@ public class BooksFragment extends MvpAppCompatFragment implements BooksView {
             String focused = mListFocus.beforeUpdate(binding.list);
             mAddapterGenre.setItem(genres);
             mListFocus.afterUpdate(binding.list, focused, this);
+            mLoaded = true;
+            updateEmpty();
         } else {
             showToast(R.string.error_display_data);
         }
@@ -626,9 +630,33 @@ public class BooksFragment extends MvpAppCompatFragment implements BooksView {
     public void showProgres(boolean b) {
         if (b) {
             binding.mProgressBarLayout.getRoot().setVisibility(View.VISIBLE);
+            mLoaded = false;
         } else {
             binding.mProgressBarLayout.getRoot().setVisibility(View.GONE);
         }
+        updateEmpty();
+    }
+
+    /** Whether the last load brought its page: an empty list after a failed load is not "nothing here". */
+    private boolean mLoaded;
+
+    /**
+     * The empty list's message, once the layout has settled: shown while a loaded list has no item and nothing loads.
+     * Posted after {@link #fillScreen}: an empty page that asks for the next one is loading again by then.
+     */
+    private void updateEmpty() {
+        if (binding == null) {
+            return;
+        }
+        binding.list.post(() -> {
+            if (binding == null) {
+                return;
+            }
+            boolean empty = mLoaded && getCount() == 0 && !binding.refresh.isRefreshing()
+                    && binding.mProgressBarLayout.getRoot().getVisibility() != View.VISIBLE;
+            binding.placeholder.placeholderText.setText(R.string.list_empty);
+            binding.placeholder.getRoot().setVisibility(empty ? View.VISIBLE : View.GONE);
+        });
     }
 
     @Override
@@ -649,6 +677,10 @@ public class BooksFragment extends MvpAppCompatFragment implements BooksView {
     @Override
     public void showRefreshing(boolean b) {
         binding.refresh.setRefreshing(b);
+        if (b) {
+            mLoaded = false;
+        }
+        updateEmpty();
     }
 
     @Override

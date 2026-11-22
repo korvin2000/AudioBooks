@@ -1,0 +1,97 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- «Закладки» (activity.BookmarkSheet), styled as bottom_sheet_person_menu: the title and the book, «Добавить
+     закладку» (with why it is off while another book or none is in the player), then the marks in book order
+     (item_bookmark, added in code) or the empty text. -->
+<androidx.core.widget.NestedScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:background="?attr/backgraundColor"
+    tools:viewBindingIgnore="true">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:paddingBottom="8dp">
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:accessibilityHeading="true"
+            android:paddingStart="16dp"
+            android:paddingTop="16dp"
+            android:paddingEnd="16dp"
+            android:text="@string/bookmarks"
+            android:textColor="?attr/colorPrimaryText"
+            android:textSize="16sp"
+            tools:ignore="UnusedAttribute" />
+
+        <TextView
+            android:id="@+id/bookmarkBook"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:ellipsize="end"
+            android:maxLines="1"
+            android:paddingStart="16dp"
+            android:paddingEnd="16dp"
+            android:paddingBottom="16dp"
+            android:textColor="?attr/subTextColor"
+            android:textSize="14sp"
+            tools:text="Мастер и Маргарита" />
+
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1px"
+            android:alpha="0.3"
+            android:background="?attr/colorPrimaryText" />
+
+        <TextView
+            android:id="@+id/bookmarkAdd"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:background="?android:attr/selectableItemBackground"
+            android:clickable="true"
+            android:drawablePadding="30dp"
+            android:focusable="true"
+            android:gravity="center_vertical"
+            android:minHeight="56dp"
+            android:paddingStart="16dp"
+            android:paddingEnd="16dp"
+            android:text="@string/bookmark_add"
+            android:textColor="?attr/colorPrimaryText"
+            android:textSize="16sp"
+            app:drawableStartCompat="@drawable/ic_bookmark_outline"
+            app:drawableTint="?attr/colorPrimaryText" />
+
+        <!-- under the add row's text: past its icon (16 + 24 + 30 dp) -->
+        <TextView
+            android:id="@+id/bookmarkAddHint"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:paddingStart="70dp"
+            android:paddingEnd="16dp"
+            android:paddingBottom="12dp"
+            android:text="@string/bookmark_add_hint"
+            android:textColor="?attr/subTextColor"
+            android:textSize="14sp"
+            android:visibility="gone" />
+
+        <LinearLayout
+            android:id="@+id/bookmarkRows"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical" />
+
+        <TextView
+            android:id="@+id/bookmarkEmpty"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:padding="16dp"
+            android:text="@string/bookmark_empty"
+            android:textColor="?attr/subTextColor"
+            android:textSize="14sp"
+            android:visibility="gone" />
+    </LinearLayout>
+</androidx.core.widget.NestedScrollView>

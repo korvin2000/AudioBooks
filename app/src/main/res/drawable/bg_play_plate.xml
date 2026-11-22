@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The open player's play button: a round plate of the accent colour (the seek bar's), as large as the button; the
+     ripple keeps to the plate. The icon over it is tinted with the sheet's own colour (app:tint in the layout). -->
+<ripple xmlns:android="http://schemas.android.com/apk/res/android"
+    android:color="?attr/colorControlHighlight">
+    <item>
+        <shape android:shape="oval">
+            <solid android:color="?attr/colorAccent" />
+        </shape>
+    </item>
+</ripple>

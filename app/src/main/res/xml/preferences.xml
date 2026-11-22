@@ -102,6 +102,10 @@
                 android:title="@string/equalizer" />
             <CheckBoxPreference
                 android:defaultValue="false"
+                android:key="toolbar_bookmarks"
+                android:title="@string/bookmarks" />
+            <CheckBoxPreference
+                android:defaultValue="false"
                 android:key="toolbar_settings"
                 android:title="@string/book_toolbar_settings" />
             <CheckBoxPreference
