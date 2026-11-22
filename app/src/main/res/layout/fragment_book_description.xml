@@ -22,9 +22,12 @@
         android:visibility="invisible"
         tools:background="?attr/backgraundColor">
 
+        <!-- clips nothing: the cover's shadow falls into the padding -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
+            android:clipChildren="false"
+            android:clipToPadding="false"
             android:orientation="vertical"
             android:padding="@dimen/text_margin_book_description">
 
@@ -39,12 +42,15 @@
 
             <LinearLayout
                 android:layout_width="match_parent"
+                android:clipChildren="false"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="@dimen/text_margin_book_description"
                 android:orientation="horizontal">
 
                 <ImageView
                     android:id="@+id/imageView"
+                    android:elevation="@dimen/book_cover_elevation"
+                    android:outlineProvider="bounds"
                     android:layout_width="@dimen/book_cover_weight"
                     android:layout_height="wrap_content"
                     android:adjustViewBounds="true"
@@ -220,7 +226,8 @@
 
                 <TextView
                     android:id="@+id/authorLabel"
-                    android:layout_width="@dimen/text_width"
+                    android:layout_width="wrap_content"
+                    android:minWidth="@dimen/text_width"
                     android:layout_height="wrap_content"
                     android:background="?attr/selectableItemBackground"
                     android:drawablePadding="4dp"
@@ -256,7 +263,8 @@
 
                 <TextView
                     android:id="@+id/artistLabel"
-                    android:layout_width="@dimen/text_width"
+                    android:layout_width="wrap_content"
+                    android:minWidth="@dimen/text_width"
                     android:layout_height="wrap_content"
                     android:background="?attr/selectableItemBackground"
                     android:drawablePadding="4dp"
@@ -292,7 +300,8 @@
 
                 <TextView
                     android:id="@+id/seriesLabel"
-                    android:layout_width="@dimen/text_width"
+                    android:layout_width="wrap_content"
+                    android:minWidth="@dimen/text_width"
                     android:layout_height="wrap_content"
                     android:background="?attr/selectableItemBackground"
                     android:drawablePadding="4dp"

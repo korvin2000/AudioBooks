@@ -44,6 +44,7 @@ import com.fanok.audiobooks.pojo.AudioListPOJO;
 import com.fanok.audiobooks.pojo.BookPOJO;
 import com.fanok.audiobooks.policy.DefaultCover;
 import com.fanok.audiobooks.policy.EmbeddedCover;
+import com.fanok.audiobooks.policy.OwnCover;
 import com.fanok.audiobooks.search.Provider;
 import com.fanok.audiobooks.util.DownloadUtil;
 import com.github.lzyzsd.circleprogress.DonutProgress;
@@ -68,6 +69,9 @@ public class BooksListAddapter extends RecyclerView.Adapter<BooksListAddapter.My
     private final android.os.Handler mainHandler = new android.os.Handler(Looper.getMainLooper());
     private final java.util.Map<String, Integer> progressCache = new java.util.concurrent.ConcurrentHashMap<>();
     private final java.util.Map<String, Integer> downloadCache = new java.util.concurrent.ConcurrentHashMap<>();
+    /** Where else each book is ({@link BookMarks}' bits), while this list marks them ({@link #showMarks}). */
+    private final java.util.Map<String, Integer> markCache = new java.util.concurrent.ConcurrentHashMap<>();
+    private boolean mMarks;
     /** Source captions that replace the site's name, by book URL ("5 сайтов" for a group in the search). */
     private java.util.Map<String, String> mSourceLabels = java.util.Collections.emptyMap();
 
@@ -108,16 +112,19 @@ public class BooksListAddapter extends RecyclerView.Adapter<BooksListAddapter.My
 
     /**
      * Shows the cover of {@code book} in {@code view}, as every list does (the book screen's player too): the parental
-     * control's mask; for a site whose covers are never requested the one read from its audio, else the default one;
-     * {@code photo} (a URL, a file or a content URI); else the gallery icon.
+     * control's mask; the user's own cover ({@link OwnCover}); for a site whose covers are never requested the one
+     * read from its audio, else the default one; {@code photo} (a URL, a file or a content URI); else the default one.
      *
      * @return the book's URL while its default cover shows for want of the one from its audio, else null
      */
     @Nullable
     public static String loadCover(@NonNull ImageView view, @NonNull BookPOJO book, @Nullable String photo) {
         Drawable mask = com.fanok.audiobooks.policy.ParentalControl.coverMask(view.getContext(), book);
+        File own = mask == null ? OwnCover.of(view.getContext(), book.getUrl()) : null;
         if (mask != null) {
             Glide.with(view).load(mask).into(view);
+        } else if (own != null) {
+            Glide.with(view).load(own).into(view);
         } else if (DefaultCover.replaces(photo)
                 || (photo == null || photo.isEmpty()) && DefaultCover.replaces(book.getUrl())) {
             Drawable gradient = DefaultCover.gradient(view.getContext(), book.getUrl());
@@ -361,6 +368,7 @@ public class BooksListAddapter extends RecyclerView.Adapter<BooksListAddapter.My
                 mIsDownload.setContentDescription(mIsDownload.getContext().getString(R.string.download_state_full));
                 mIsDownload.setVisibility(View.VISIBLE);
             }
+            BookMarks.bind(itemView, mTitle, mMarks ? marksOf(book.getUrl()) : 0);
 
 
         }
@@ -437,6 +445,22 @@ public class BooksListAddapter extends RecyclerView.Adapter<BooksListAddapter.My
 
     public BooksListAddapter(boolean showProcent) {
         this.procent = showProcent;
+    }
+
+    /** The catalog and the search mark a book met before: in the history, the favourites, the downloads. */
+    public void showMarks(boolean show) {
+        mMarks = show;
+    }
+
+    /** The marks of the book at {@code url}, of all the books a group row stands for. */
+    private int marksOf(String url) {
+        java.util.List<String> alias = mAliases.get(url);
+        int marks = 0;
+        for (String u : alias != null ? alias : java.util.Collections.singletonList(url)) {
+            Integer m = u == null ? null : markCache.get(u);
+            marks |= m == null ? 0 : m;
+        }
+        return marks;
     }
 
     @SuppressLint("NotifyDataSetChanged")
@@ -753,6 +777,7 @@ public class BooksListAddapter extends RecyclerView.Adapter<BooksListAddapter.My
         if (newModel == null || newModel.isEmpty()) {
             progressCache.clear();
             downloadCache.clear();
+            markCache.clear();
             return;
         }
         executor.execute(() -> {
@@ -836,6 +861,11 @@ public class BooksListAddapter extends RecyclerView.Adapter<BooksListAddapter.My
                         dl = 0;
                     }
                     downloadCache.put(url, dl);
+                    if (mMarks) {
+                        markCache.put(url, (dbModel.inHistory(b) ? BookMarks.HISTORY : 0)
+                                | (dbModel.inFavorite(url) ? BookMarks.FAVORITE : 0)
+                                | (dl > 0 ? BookMarks.DOWNLOADED : 0));
+                    }
                 }
             } catch (Exception e) {
                 android.util.Log.e("ADAPT", "prefetch error", e);

@@ -2,6 +2,7 @@ package com.fanok.audiobooks.pojo;
 
 import androidx.annotation.Nullable;
 import com.fanok.audiobooks.Consts;
+import com.fanok.audiobooks.policy.DefaultCover;
 import java.util.ArrayList;
 
 public class DescriptionPOJO {
@@ -142,7 +143,7 @@ public class DescriptionPOJO {
     }
 
     public void setPoster(String poster) {
-        if (poster != null && !poster.isEmpty()) {
+        if (poster != null && !poster.isEmpty() && !DefaultCover.placeholder(poster)) {
             this.poster = poster;
         } else {
             this.poster = "";

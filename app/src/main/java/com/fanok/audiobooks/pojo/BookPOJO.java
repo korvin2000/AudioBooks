@@ -5,6 +5,7 @@ import androidx.annotation.NonNull;
 import com.fanok.audiobooks.Consts;
 import com.fanok.audiobooks.Url;
 import com.fanok.audiobooks.net.SiteHttp;
+import com.fanok.audiobooks.policy.DefaultCover;
 import com.fanok.audiobooks.search.Provider;
 import com.fanok.audiobooks.source.Akniga;
 import com.fanok.audiobooks.source.Knigavuhe;
@@ -145,7 +146,7 @@ public class BookPOJO {
     }
 
     public void setPhoto(String photo) {
-        if (photo == null || photo.isEmpty()) {
+        if (photo == null || photo.isEmpty() || DefaultCover.placeholder(photo)) {
             return;
         }
         this.photo = photo;

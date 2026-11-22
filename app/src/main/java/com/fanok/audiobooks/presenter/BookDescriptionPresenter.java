@@ -95,22 +95,27 @@ public class BookDescriptionPresenter extends MvpPresenter<Description> implemen
     }
 
     /**
-     * Offline (no network at all) a failed load is no error to report: the saved description shows quietly, and a
-     * short offline hint tells what is missing when there is no description text (nothing saved, or only the
-     * history row). Online every failure keeps its message, with the saved description as a fallback.
+     * Offline (no network at all) or with the site out of reach (no internet on the network, no answer) a failed
+     * load is no error to report when a description was saved: it shows quietly. Without its text a short hint tells
+     * what is missing (offline) or the failure is told. Any other failure keeps its message, with the saved
+     * description as a fallback.
      */
     private void onDescriptionError(Throwable e) {
         Log.w(TAG, "description not loaded", e);
         boolean offline = e instanceof IOException && Consts.isOffline(App.getInstance());
+        int message = errorMessage(e);
+        boolean unreachable = offline || message == R.string.error_site_unreachable
+                || message == R.string.error_site_no_answer;
         DescriptionPOJO fallback = mBookPOJO.getDescriptionPOJO();
         mDisposables.add(mModelDescription.getSavedDescription()
                 .subscribeOn(Schedulers.io())
                 .observeOn(AndroidSchedulers.mainThread())
                 .subscribe(saved -> {
-                            if (!offline) {
-                                tell(e);
-                            } else if (saved.getDescription() == null || saved.getDescription().isEmpty()) {
+                            boolean text = saved.getDescription() != null && !saved.getDescription().isEmpty();
+                            if (offline && !text) {
                                 getViewState().showToast(R.string.offline_description);
+                            } else if (!unreachable || !text) {
+                                tell(e);
                             }
                             showDescription(saved);
                         },

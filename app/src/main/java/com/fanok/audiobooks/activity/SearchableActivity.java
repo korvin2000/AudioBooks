@@ -270,6 +270,7 @@ public class SearchableActivity extends MvpAppCompatActivity implements Searchab
             case Consts.MODEL_BOOKS:
                 // with listening progress and download marks, as in the favourites (W23)
                 mAddapterBooks = new BooksListAddapter(true);
+                mAddapterBooks.showMarks(com.fanok.audiobooks.adapter.BookMarks.enabled(this));
                 binding.list.setAdapter(mAddapterBooks);
                 mAdapterAutors = new SearchebleAdapter();
                 mAdapterSeries = new SearchebleAdapter();

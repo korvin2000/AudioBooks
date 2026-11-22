@@ -25,6 +25,7 @@ import com.fanok.audiobooks.broadcasts.DownloadActionReceiver;
 import com.fanok.audiobooks.model.AudioListDBModel;
 import com.fanok.audiobooks.model.BooksDBModel;
 import com.fanok.audiobooks.pojo.BookPOJO;
+import com.fanok.audiobooks.policy.DefaultCover;
 import com.fanok.audiobooks.room.BooksAudioEntity;
 import com.fanok.audiobooks.search.Provider;
 import com.fanok.audiobooks.service.ExoDownloadService;
@@ -67,8 +68,17 @@ public class DownloadStorageHelper {
     private static final ExecutorService STORAGE = Executors.newSingleThreadExecutor();
 
     public static boolean openFolderPicker(@NonNull ActivityResultLauncher<Intent> launcher) {
+        return openFolderPicker(launcher, new Intent(Intent.ACTION_OPEN_DOCUMENT_TREE));
+    }
+
+    /**
+     * Launches {@code intent}, a document-tree picker (a volume's own on Android 10+, which opens right on it),
+     * asking for every volume in its side menu: some systems list neither the internal storage nor an SD card there
+     * without this.
+     */
+    public static boolean openFolderPicker(@NonNull ActivityResultLauncher<Intent> launcher, @NonNull Intent intent) {
         try {
-            Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT_TREE);
+            intent.putExtra("android.content.extra.SHOW_ADVANCED", true);
             intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION
                     | Intent.FLAG_GRANT_WRITE_URI_PERMISSION
                     | Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION);
@@ -763,6 +773,52 @@ public class DownloadStorageHelper {
     }
 
     /** Saves the book cover next to its exported chapters once (file path only); failures leave no file. */
+    /** Covers kept with downloads: their own worker, so a slow site never holds up the exports and deletions. */
+    private static final ExecutorService COVERS = Executors.newSingleThreadExecutor();
+    private static final long MAX_COVER_BYTES = 5L * 1024 * 1024;
+
+    /** The site's cover of a book kept with its download ({@link #keepCover}), shown offline. */
+    @NonNull
+    public static File keptCover(@NonNull Context context, @NonNull String bookUrl) {
+        return new File(new File(context.getFilesDir(), "kept_covers"),
+                com.fanok.audiobooks.policy.OwnCover.key(bookUrl) + ".jpg");
+    }
+
+    /** Keeps the site's cover of {@code book}, once, as its chapters are queued for download (off the main thread). */
+    public static void keepCover(@NonNull Context context, @NonNull BookPOJO book) {
+        String photo = book.getPhoto();
+        if (photo == null || !DeletionPlanner.isRemote(photo) || DefaultCover.replaces(photo)) return;
+        Context app = context.getApplicationContext();
+        COVERS.execute(() -> {
+            File cover = keptCover(app, book.getUrl());
+            if (cover.isFile()) return;
+            File temp = new File(cover.getPath() + ".part");
+            try {
+                //noinspection ResultOfMethodCallIgnored
+                cover.getParentFile().mkdirs();
+                okhttp3.Request request = new okhttp3.Request.Builder().url(photo).build();
+                try (okhttp3.Response response = com.fanok.audiobooks.App.getOkHttpClient().newCall(request).execute();
+                     java.io.FileOutputStream os = new java.io.FileOutputStream(temp)) {
+                    if (!response.isSuccessful() || response.body() == null) return;
+                    java.io.InputStream in = response.body().byteStream();
+                    byte[] buffer = new byte[16 * 1024];
+                    long total = 0;
+                    for (int n; (n = in.read(buffer)) > 0; ) {
+                        if ((total += n) > MAX_COVER_BYTES) return; // not a cover
+                        os.write(buffer, 0, n);
+                    }
+                }
+                //noinspection ResultOfMethodCallIgnored
+                temp.renameTo(cover);
+            } catch (Exception e) {
+                android.util.Log.w("DownloadStorageHelper", "Cover not kept", e);
+            } finally {
+                //noinspection ResultOfMethodCallIgnored
+                temp.delete();
+            }
+        });
+    }
+
     private static void exportCover(@NonNull Context context, @Nullable BookPOJO book, @NonNull String folder) {
         if (book == null || book.getPhoto() == null || !DeletionPlanner.isRemote(book.getPhoto())) return;
         File dir = new File(getDownloadPath(context), folder);
@@ -931,6 +987,10 @@ public class DownloadStorageHelper {
     public static String findLocalCoverForBook(@NonNull Context context, @Nullable BookPOJO book) {
         if (book == null || book.getUrl() == null || book.getUrl().isEmpty()) return null;
         try {
+            File own = com.fanok.audiobooks.policy.OwnCover.of(context, book.getUrl()); // the user's choice first
+            if (own != null) return own.getAbsolutePath();
+            File kept = keptCover(context, book.getUrl());
+            if (kept.isFile()) return kept.getAbsolutePath();
             String photo = book.getPhoto();
             if (photo != null && !photo.isEmpty()) {
                 if (photo.startsWith("content://")) {

@@ -9,6 +9,24 @@ import org.junit.Test;
 public class DefaultCoverTest {
 
     @Test
+    public void sitePlaceholdersAreNoCover() {
+        assertTrue(DefaultCover.placeholder("https://izib.uk/images/poster.png"));
+        assertTrue(DefaultCover.placeholder("https://otrub.in/images/poster.png"));
+        assertTrue(DefaultCover.placeholder("https://site.ru/templates/audiobooksdark/images/no-img.png"));
+        assertTrue(DefaultCover.placeholder("https://m1.audiomir.xyz/public/adminpanel/images/noimage.jpg"));
+        assertTrue(DefaultCover.placeholder("https://site.ru/images/editions/nocover-audio.jpg"));
+        assertTrue(DefaultCover.placeholder("https://cdn.audiobook-mp3.com/no-cover2.jpg"));
+        assertTrue(DefaultCover.placeholder("https://site.ru/images/no-poster.png?v=2"));
+        assertTrue(DefaultCover.placeholder("https://site.ru/templates/abook/dleimages/no_image.jpg"));
+        // real covers, whatever their names hold
+        assertFalse(DefaultCover.placeholder("https://r7.audioknigi.xyz/6021823c8de5c247/pic/eb46d8d98a7001f6.jpg"));
+        assertFalse(DefaultCover.placeholder("https://site.ru/uploads/posts/2020-06/1591644383_default.jpeg"));
+        assertFalse(DefaultCover.placeholder("https://site.ru/uploads/books/12/poster.png"));
+        assertFalse(DefaultCover.placeholder("https://site.ru/uploads/nocturne.jpg"));
+        assertFalse(DefaultCover.placeholder(null));
+    }
+
+    @Test
     public void audiobooCoversAreReplaced() {
         assertTrue(DefaultCover.replaces("https://audioboo.org/uploads/posts/2024-01/cover.jpg"));
         assertTrue(DefaultCover.replaces("https://www.audioboo.org/uploads/cover.webp"));

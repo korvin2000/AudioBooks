@@ -832,6 +832,7 @@ public class MediaPlayerService extends MediaBrowserServiceCompat {
         resetFlip(); //a pause ends the face-down countdown and resume, even with the player already paused
         wantPlaying = false;
         cancelRetry();
+        closeWakeWindow(); // the timer opens it after its own pause: a later pause is the user's, no shake plays on
         if (pausedAt < 0) {
             pausedAt = SystemClock.elapsedRealtime();
         }
@@ -2209,11 +2210,20 @@ public class MediaPlayerService extends MediaBrowserServiceCompat {
 
     /** One strong target per cover; a result for a cover that is no longer shown is dropped. */
     private void loadArtwork() {
-        if (image != null || imageUrl.isEmpty() || artworkTarget != null || imageUrl.equals(artworkFailedUrl)) {
+        if (image != null || artworkTarget != null) {
             return;
         }
         final String url = imageUrl;
-        if (DefaultCover.replaces(url)) {
+        // the user's own cover, else the one kept with the download (offline too), else the site's
+        java.io.File local = bookUrl == null ? null : com.fanok.audiobooks.policy.OwnCover.of(this, bookUrl);
+        if (local == null && bookUrl != null && !url.isEmpty() && !DefaultCover.replaces(url)) {
+            java.io.File kept = DownloadStorageHelper.keptCover(this, bookUrl);
+            local = kept.isFile() ? kept : null;
+        }
+        if (local == null && (url.isEmpty() || url.equals(artworkFailedUrl))) {
+            return;
+        }
+        if (local == null && DefaultCover.replaces(url)) {
             // its site's covers are never requested (its bot protection would then refuse the app's pages): the cover
             // in its audio, at once when it was read before, else when EmbeddedCover has read it (embeddedCover); asked
             // again on the next update, so a failed read is retried (EmbeddedCover drops repeats and paces retries)
@@ -2255,7 +2265,7 @@ public class MediaPlayerService extends MediaBrowserServiceCompat {
             }
         };
         try {
-            Picasso.get().load(url).into(artworkTarget);
+            (local != null ? Picasso.get().load(local) : Picasso.get().load(url)).into(artworkTarget);
         } catch (RuntimeException e) {
             Log.w(TAG, "artwork", e);
             artworkTarget = null;
@@ -2563,7 +2573,10 @@ public class MediaPlayerService extends MediaBrowserServiceCompat {
 
     /** The last stretch before a timed stop: beep bursts, a volume fade and, with "shake", the accelerometer. */
     private static final long SLEEP_WARNING_MS = SleepWarning.WARNING_MS;
-    private static final float SLEEP_MIN_VOLUME = 0.15f;
+    /** The book's share of its volume at the warning's end: the fade is heard, the last words are still understood. */
+    private static final float SLEEP_MIN_VOLUME = 0.4f;
+    /** A countdown paused this long is stale (yesterday's): playing again cancels it rather than finish it later. */
+    private static final long SLEEP_STALE_MS = 30 * 60_000L;
     /** After a timed stop with "shake": paused this long with the accelerometer on, then the full stop. */
     private static final long SLEEP_WAKE_WINDOW_MS = 60_000;
     /** A clock-mode timer that a shake extends or re-arms ends this much later. */
@@ -2571,16 +2584,24 @@ public class MediaPlayerService extends MediaBrowserServiceCompat {
     private static final float SHAKE_G = 2.4f;
     private static final long SHAKE_DEBOUNCE_MS = 1_500;
     /**
+     * A shake is {@link #SHAKE_PEAKS} jolts past {@link #SHAKE_G}, each at least {@link #SHAKE_PEAK_GAP_MS} after the
+     * last, all within {@link #SHAKE_WITHIN_MS}: picking the phone up or putting it down is one jolt, not a shake.
+     */
+    private static final int SHAKE_PEAKS = 3;
+    private static final long SHAKE_PEAK_GAP_MS = 200;
+    private static final long SHAKE_WITHIN_MS = 1_500;
+    /**
      * A beep: a DTMF tone, which lasts as long as asked (the old TONE_PROP_BEEP was cut to 35 ms whatever the
-     * duration), at full tone volume. 941 + 1633 Hz stands out of speech.
+     * duration). 941 + 1633 Hz stands out of speech. ToneGenerator's volume steps are 0.5 dB: 90 is 5 dB under the
+     * full one, about 30% quieter to the ear, and still well above the ducked book.
      */
     private static final int BEEP_TONE = ToneGenerator.TONE_DTMF_D;
-    private static final int BEEP_VOLUME = ToneGenerator.MAX_VOLUME;
+    private static final int BEEP_VOLUME = 90;
     private static final int BEEP_MS = 300;
     private static final long BEEP_PERIOD_MS = 500;
     private static final int BEEPS_PER_BURST = 4;
     /** Under a burst the book plays this share of its volume before the warning, so the beeps are heard over it. */
-    private static final float BEEP_DUCK = 0.2f;
+    private static final float BEEP_DUCK = 0.5f;
 
     /** The armed timer's {@code SleepTimerPresenter.MODE_*}, countdown duration and options, kept to re-arm it. */
     private int sleepMode;
@@ -2595,6 +2616,15 @@ public class MediaPlayerService extends MediaBrowserServiceCompat {
     private final Runnable burstEnd = this::applyWarningVolume;
     private boolean shakeListening;
     private long lastShakeAt;
+    /** The jolts of the shake under way, and when the last came (elapsedRealtime). */
+    private int shakePeaks;
+    private long firstPeakAt;
+    private long lastPeakAt;
+    private boolean shakeAbove;
+    /** When the open wake window ends (elapsedRealtime): a frozen process may miss its scheduled end. */
+    private long wakeWindowUntil;
+    /** When the countdown paused with the book (elapsedRealtime), -1 while counting or none. */
+    private long sleepPausedAt = -1;
     /** The timer paused the book with "shake" on: a shake within the window plays on and re-arms it. */
     private boolean wakeWindowOpen;
     @Nullable
@@ -2613,7 +2643,19 @@ public class MediaPlayerService extends MediaBrowserServiceCompat {
             float z = event.values[2];
             double g = Math.sqrt(x * x + y * y + z * z) / SensorManager.GRAVITY_EARTH;
             long now = SystemClock.elapsedRealtime();
-            if (g > SHAKE_G && now - lastShakeAt > SHAKE_DEBOUNCE_MS) {
+            boolean rising = g > SHAKE_G && !shakeAbove; // a jolt is counted once, however long it lasts
+            shakeAbove = g > SHAKE_G;
+            if (!rising || now - lastPeakAt < SHAKE_PEAK_GAP_MS) {
+                return;
+            }
+            if (shakePeaks == 0 || now - firstPeakAt > SHAKE_WITHIN_MS) {
+                shakePeaks = 0;
+                firstPeakAt = now;
+            }
+            shakePeaks++;
+            lastPeakAt = now;
+            if (shakePeaks >= SHAKE_PEAKS && now - lastShakeAt > SHAKE_DEBOUNCE_MS) {
+                shakePeaks = 0;
                 lastShakeAt = now;
                 onShake();
             }
@@ -2726,9 +2768,19 @@ public class MediaPlayerService extends MediaBrowserServiceCompat {
         if (sleepTimer == null || sleepMode == SleepTimerPresenter.MODE_CLOCK) {
             return;
         }
+        if (playing && sleepPausedAt >= 0 && SystemClock.elapsedRealtime() - sleepPausedAt > SLEEP_STALE_MS) {
+            // a countdown left paused for long would end a later listening out of the blue: it is cancelled
+            onSleepTimerCommand(new Intent().putExtra("start", false));
+            Toast.makeText(getApplicationContext(), R.string.sleep_timer_stale_off, Toast.LENGTH_LONG).show();
+            return;
+        }
         if (playing) {
+            sleepPausedAt = -1;
             sleepTimer.resumeTimer();
         } else {
+            if (sleepPausedAt < 0) {
+                sleepPausedAt = SystemClock.elapsedRealtime();
+            }
             sleepTimer.pauseTimer();
         }
         sendSleepTimerState(sleepTimer.getTimeRemaining());
@@ -2750,7 +2802,7 @@ public class MediaPlayerService extends MediaBrowserServiceCompat {
             }
             if (volumeBeforeWarning >= 0) {
                 int due = SleepWarning.burstsDue(remaining);
-                if (wantPlaying && beepBursts < due) {
+                if (player.isPlaying() && beepBursts < due) { // never over a call, a focus loss or buffering
                     beepBursts = due;
                     duckedUntil = SystemClock.uptimeMillis() + BEEPS_PER_BURST * BEEP_PERIOD_MS;
                     beep(BEEPS_PER_BURST);
@@ -2768,8 +2820,8 @@ public class MediaPlayerService extends MediaBrowserServiceCompat {
         if (volumeBeforeWarning < 0 || player == null || sleepTimer == null) {
             return;
         }
-        float level = volumeBeforeWarning
-                * Math.max(SLEEP_MIN_VOLUME, sleepTimer.getTimeRemaining() / (float) SLEEP_WARNING_MS);
+        float left = Math.min(1f, sleepTimer.getTimeRemaining() / (float) SLEEP_WARNING_MS);
+        float level = volumeBeforeWarning * (SLEEP_MIN_VOLUME + (1 - SLEEP_MIN_VOLUME) * left);
         if (SystemClock.uptimeMillis() < duckedUntil) {
             level = Math.min(level, volumeBeforeWarning * BEEP_DUCK);
         }
@@ -2782,6 +2834,9 @@ public class MediaPlayerService extends MediaBrowserServiceCompat {
      * was playing) or stops the service as it always did.
      */
     private void onSleepTimerFired(boolean endOfChapter) {
+        if (!endOfChapter && player != null) {
+            player.setPlayWhenReady(false); // silent before the volume comes back: no full-volume blip
+        }
         stopSleepWarning();
         SleepTimerPresenter.setTimerStarted(false);
         sendInternal(new Intent(bradcast_FinishTimer));
@@ -2791,6 +2846,7 @@ public class MediaPlayerService extends MediaBrowserServiceCompat {
         }
         if (sleepShake && wantPlaying && hasAccelerometer()) {
             pause();
+            checkpointNow(true); // the place is on disk before the system may freeze or end the paused app
             openWakeWindow();
         } else {
             stop();
@@ -2810,6 +2866,10 @@ public class MediaPlayerService extends MediaBrowserServiceCompat {
 
     /** A shake during the warning gives the timer its time back; within the wake window it plays on and re-arms. */
     private void onShake() {
+        if (wakeWindowOpen && SystemClock.elapsedRealtime() > wakeWindowUntil) {
+            onWakeWindowEnd(); // its end was missed (a frozen process): too late to play on
+            return;
+        }
         boolean clock = sleepMode == SleepTimerPresenter.MODE_CLOCK;
         if (wakeWindowOpen) {
             closeWakeWindow();
@@ -2828,6 +2888,7 @@ public class MediaPlayerService extends MediaBrowserServiceCompat {
 
     /** Cancels the timer and all it started: the fade (volume back), the accelerometer, the wake window. */
     private void releaseSleepTimer() {
+        sleepPausedAt = -1;
         if (sleepTimer != null) {
             sleepTimer.cancel();
             sleepTimer = null;
@@ -2854,6 +2915,7 @@ public class MediaPlayerService extends MediaBrowserServiceCompat {
     /** Paused, foreground and awake for {@link #SLEEP_WAKE_WINDOW_MS}, listening for a shake. */
     private void openWakeWindow() {
         wakeWindowOpen = true;
+        wakeWindowUntil = SystemClock.elapsedRealtime() + SLEEP_WAKE_WINDOW_MS;
         wakeWindowBook = bookUrl;
         holdWakeWindowLock(true);
         listenForShake(true);
@@ -2926,6 +2988,8 @@ public class MediaPlayerService extends MediaBrowserServiceCompat {
         } else {
             sensors.unregisterListener(shakeListener);
             shakeListening = false;
+            shakePeaks = 0;
+            shakeAbove = false;
         }
     }
 

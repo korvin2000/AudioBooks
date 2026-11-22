@@ -330,6 +330,7 @@ public class BooksFragment extends MvpAppCompatFragment implements BooksView {
         switch (modelID) {
             case Consts.MODEL_BOOKS:
                 mAddapterBooks = new BooksListAddapter();
+                mAddapterBooks.showMarks(com.fanok.audiobooks.adapter.BookMarks.enabled(requireContext()));
                 binding.list.setAdapter(mAddapterBooks);
                 break;
             case Consts.MODEL_GENRE:
@@ -1019,6 +1020,9 @@ public class BooksFragment extends MvpAppCompatFragment implements BooksView {
     @Override
     public void onResume() {
         super.onResume();
+        if (mAddapterBooks != null && com.fanok.audiobooks.adapter.BookMarks.enabled(requireContext())) {
+            mAddapterBooks.reloadStatuses();
+        }
         mListFocus.onResume(false);
         if (getPresenter().isInactiveSourceRoot() && Sources.isActive(Provider.current())) {
             // its site was switched off (in the settings, maybe opened from a book): the app opens on the selected one;

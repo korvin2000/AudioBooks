@@ -45,6 +45,14 @@
             android:summary="@string/history_procent_desc"
             android:title="@string/history_procent" />
 
+        <!-- marks of the books met before in the catalog and the search (BookMarks) -->
+        <CheckBoxPreference
+            android:defaultValue="true"
+            android:icon="@drawable/ic_menu_favorite"
+            android:key="book_marks_shown"
+            android:summary="@string/book_marks_desc"
+            android:title="@string/book_marks" />
+
         <!-- which book-screen actions are icons in its toolbar; the rest stay in the overflow menu -->
         <PreferenceScreen
             android:icon="@drawable/ic_menu_settings"

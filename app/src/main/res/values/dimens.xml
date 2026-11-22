@@ -21,6 +21,7 @@
     <dimen name="player_row_height">75dp</dimen>
     <dimen name="textSizeBookDescription">16sp</dimen>
     <dimen name="book_cover_weight">125dp</dimen>
+    <dimen name="book_cover_elevation">4dp</dimen>
     <dimen name="titleSizeBookDescription">20sp</dimen>
     <dimen name="text_margin_book_description">7dp</dimen>
     <dimen name="text_width">75dp</dimen>
