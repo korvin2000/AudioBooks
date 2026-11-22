@@ -918,6 +918,7 @@ public class BookPresenter extends MvpPresenter<Activity> implements ActivityPre
         return true;
     }
 
+    @OptIn(markerClass = UnstableApi.class)
     private void loadOfflineLocalAudioSync(int load, boolean siteFollows) {
         ArrayList<AudioPOJO> localAudio = new ArrayList<>();
         ArrayList<Integer> localOrdinals = new ArrayList<>();
