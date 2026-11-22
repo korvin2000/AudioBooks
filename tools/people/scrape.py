@@ -63,8 +63,67 @@ SITES = {
     'GOLOSOM': dict(list=('https://golosom.org/', 'https://golosom.org/{}', ('a[data-page]', 'data-page')),
                     author=r'^https://golosom\.org/author/.', reader=r'^https://golosom\.org/performer/.',
                     book=r'^https://golosom\.org/book/.'),
+    'SLUSHKIN': dict(list=('https://slushkin.online/', 'https://slushkin.online/page/{}/', r'/page/(\d+)/$'),
+                     author=r'^https://slushkin\.online/xfsearch/avtor/', reader=r'^https://slushkin\.online/xfsearch/ozv/',
+                     book=DLE_BOOK),
+    'AUDIOKNIGIVSE': dict(list=('https://audioknigivse.ru/', 'https://audioknigivse.ru/page/{}/', r'/page/(\d+)/$'),
+                          author=r'^https://audioknigivse\.ru/xfsearch/avtor/',
+                          reader=r'^https://audioknigivse\.ru/xfsearch/zvuk/', book=DLE_BOOK),
+    'AUDIOKNIZHKA': dict(list=('https://audioknizhka.org/', 'https://audioknizhka.org/page/{}/', r'/page/(\d+)/$'),
+                         author=r'^https://audioknizhka\.org/xfsearch/author/', reader=r'^$',   # readers are not linked
+                         book=DLE_BOOK),
+    'AUDIOKNIGI_CC': dict(list=('https://audioknigi.cc/', 'https://audioknigi.cc/page/{}/', r'/page/(\d+)/$'),
+                          author=r'^https://audioknigi\.cc/xfsearch/avtor/',
+                          reader=r'^https://audioknigi\.cc/xfsearch/ispolnitel/', book=DLE_BOOK),
+    'MDS': dict(list=('https://mds-old.ru/?sort=new', 'https://mds-old.ru/?sort=new&page={}', None), pages=74,
+                author=r'^https://mds-old\.ru/author/[^/]+$', reader=r'^$', book=r'^https://mds-old\.ru/author/[^/]+/.'),
+    'STAROERADIO': dict(list=('https://staroeradio.ru/collection/0-9', None, r'^/collection/[^/?#]+$'),
+                        titles='a:has(.mp3name)', book=r'^https://staroeradio\.ru/audio/\d+$',
+                        person='https://staroeradio.ru/search?q={}'),   # no person pages: the search for the name
 }
 CHALLENGE = re.compile(r'cf-challenge|<title>Just a moment|ddos-guard\.net/|challenge-platform', re.I)
+
+# staroeradio.ru: no person pages or links; the names are in the titles, split as Staroeradio.title splits them
+SR_GROUPS = re.compile(r'(?:\s*[-,]?\s*\((?:[^()]|\([^()]*\))*\))+\s*$')
+SR_GROUP = re.compile(r'\(((?:[^()]|\([^()]*\))*)\)')
+SR_CAST = re.compile(r'(?:^|[\s.])(?:читае?т|читают|(?:исп|уч|вед|чит)(?![а-яё])\.?:?)\s*(.+)', re.I)
+SR_NOTE = re.compile(r'(?:[,\s]+(?:[Зз]ап(?![а-яё])|ч\.\s*\d).*|,?\s+(?:18|19|20)\d\d\s*г?\.?)$')
+SR_LR = re.compile(r'ЛР\s+(\D+?)\s*(?:\d{4}|\d{2})\s*г?\.?')
+SR_LR_NEXT = re.compile(r'(\s[A-ZА-ЯЁ]\.?)\s+(?=[A-ZА-ЯЁ][a-zа-яё])')
+SR_PARTICLES = {'де', 'ди', 'да', 'дю', 'фон', 'ван', 'дер', 'ле', 'ля', 'ла', 'эль', 'аль', 'бин', 'ибн'}
+SR_NOT_A_PERSON = re.compile(r'(?:и\s+)?др\.?|\?+|и другие|авт\.\s.+|')
+
+
+def sr_names(text):
+    """{'a': authors, 'r': readers} of a staroeradio title 'Автор - Название - (исп.: А, Б), (Зап.: 1976г.)'."""
+    full = re.sub(r'\s+', ' ', re.sub(r'</?b>', '', text)).strip()
+    tail = SR_GROUPS.search(full)
+    cut = tail.start() if tail else len(full)
+    head = re.sub(r'[\s,-]+$', '', full[:cut])
+    dash = head.find(' - ')
+    who = re.sub(r'[\s,]+$', '', head[:dash]) if dash > 0 else ''
+    if not all(one.strip() and len(one.split()) <= 4 and all(w.lstrip('(«"')[:1].isupper() or w in SR_PARTICLES
+                                                              for w in one.split()) for one in who.split(',')):
+        who = ''
+    authors = [n.strip() for n in who.split(',') if n.strip()] if head else []
+    readers = []
+    for group in SR_GROUP.finditer(full[cut:] if head else ''):
+        g = group.group(1).strip()
+        cast, lr = SR_CAST.search(g), SR_LR.fullmatch(g)
+        if cast:
+            names = cast.group(1)
+        elif lr and not re.match(r'[Зз]ап(?:ись)?(?![а-яё])', lr.group(1)):
+            names = SR_LR_NEXT.sub(r'\1, ', lr.group(1))
+        else:
+            continue
+        note = SR_NOTE.search(names)
+        for one in re.split('[,;]', names[:note.start()] if note else names):
+            name = re.sub(r'\s+и\s+др\.?$', '', one.strip())
+            if re.fullmatch(r'[Аа]вт(?:оры?)?\.?', name):
+                readers += authors
+            elif not SR_NOT_A_PERSON.fullmatch(name):
+                readers.append(name)
+    return {'a': authors, 'r': readers}
 
 
 def clean(name):
@@ -119,7 +178,7 @@ class Crawl:
 
     def last(self, doc, base, pager, n):
         if pager is None:
-            return 1
+            return self.cfg.get('pages', 1)     # mds-old: load-more paging, no pager links
         if isinstance(pager, tuple):
             nums = [a.get(pager[1], '') for a in doc.select(pager[0])]
         else:
@@ -129,6 +188,13 @@ class Crawl:
     def links(self, doc, base):
         """[kind, url, name, book url or None] of every person link on a listing page."""
         cfg, out = self.cfg, []
+        if 'titles' in cfg:                                  # staroeradio: the names are in the titles, not links
+            for a in doc.select(cfg['titles']):
+                book = urljoin(base, a['href']).split('#')[0]
+                if re.search(cfg['book'], book):
+                    for kind, names in sr_names(a.select_one('.mp3name').get_text()).items():
+                        out += [[kind, cfg['person'].format(quote(n, safe='')), n, book] for n in names]
+            return out
         if 'cards' in cfg:                                   # knigoblud: uuid links, told apart by the ✍️ / 🎙️ marks
             for card in doc.select(cfg['cards']):
                 cover = card.select_one('a[href]')
@@ -173,12 +239,13 @@ class Crawl:
             out.append([kind, url, name, books(rest.replace(named.get_text(' ') if named else a.get_text(' '), '', 1))])
         return out
 
-    def run(self, max_pages=None):
+    def run(self, max_pages=None, start=1):
         for task in ('readers', 'authors', 'list'):           # the short indexes first
             if task not in self.cfg:
                 continue
             first, page, pager = self.cfg[task]
-            n, last, prev = 1, 1, None
+            n = last = start if task == 'list' else 1   # --from=N: a second process takes the tail
+            prev = None
             while n <= last and (max_pages is None or n <= max_pages):
                 if (task, n) in self.done and n > 1 and page:    # pages named by links are found as they are read
                     n += 1
@@ -284,7 +351,10 @@ if __name__ == '__main__':
         lists()
     else:
         limit = None
+        start = 1
         if args and args[0].startswith('--pages='):
             limit = int(args.pop(0)[8:])
+        if args and args[0].startswith('--from='):
+            start = int(args.pop(0)[7:])
         for row in args:
-            Crawl(row).run(limit)
+            Crawl(row).run(limit, start)

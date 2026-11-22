@@ -54,6 +54,19 @@ public class SearchUrlsTest {
         PAGE_FORMAT.put(Provider.BOOKINFO, "&page=%d");
         PAGE_FORMAT.put(Provider.FOUR_READ, "&search_start=%d&");
         PAGE_FORMAT.put(Provider.AKNIGA_ME, "&page=%d");
+        PAGE_FORMAT.put(Provider.AUDIOMIR, "&search_start=%d&");
+        PAGE_FORMAT.put(Provider.AUDIOKNIZHKA, "search_start=%d&");
+        PAGE_FORMAT.put(Provider.AUDIOKNIGIVSE, "&search_start=%d&");
+        PAGE_FORMAT.put(Provider.AUDIOBOOK24, "/page/%d/?s=");
+        PAGE_FORMAT.put(Provider.SLUSHKIN, "/page/%d/");
+        PAGE_FORMAT.put(Provider.AUDIOKNIGI_TOP, "&search_start=%d&");
+        PAGE_FORMAT.put(Provider.KNIZHIN, "&page=%d");
+        PAGE_FORMAT.put(Provider.AUDIOKNIGI_CC, "search_start=%d&");
+        PAGE_FORMAT.put(Provider.TWO_KNIGI, "&page=%d");
+        PAGE_FORMAT.put(Provider.AUKNIGA, "&page=%d");
+        PAGE_FORMAT.put(Provider.AUBOOK, "&page=%d");
+        PAGE_FORMAT.put(Provider.MDS, "&page=%d");
+        PAGE_FORMAT.put(Provider.STAROERADIO, "&page=%d");
     }
 
     private static String pageToken(Provider provider, Category category, int page) {
@@ -67,7 +80,19 @@ public class SearchUrlsTest {
         if (provider == Provider.GOLOSKNIG && page == 1) {
             return "/books/?"; // page 1 is the bare search path
         }
+        if (provider == Provider.AUDIOBOOK24 && page == 1) {
+            return ".ru/?s="; // page 1 is the bare WordPress search
+        }
         return String.format(format, page);
+    }
+
+    /** The query as the provider sends it: slushkin.online pads one under 5 characters with {@code %}, its LIKE wildcard. */
+    private static String sent(Provider provider, String query) {
+        StringBuilder q = new StringBuilder(provider == Provider.SLUSHKIN ? query.trim() : query);
+        while (provider == Provider.SLUSHKIN && q.codePointCount(0, q.length()) < 5) {
+            q.append('%');
+        }
+        return q.toString();
     }
 
     private static int count(String haystack, String needle) {
@@ -95,12 +120,13 @@ public class SearchUrlsTest {
                         assertNotNull(where, HttpUrl.parse(url));
                         assertEquals(where, provider.host(), HttpUrl.parse(url).host().replaceFirst("^www\\.", ""));
                         URI.create(url); // throws on anything left unencoded
+                        String sent = sent(provider, query);
                         String encoded = provider == Provider.BAZA_KNIG || provider == Provider.AUDIOKNIGA_LIFE
-                                ? SearchUrls.segment(query) : SearchUrls.enc(query);
+                                || provider == Provider.SLUSHKIN
+                                ? SearchUrls.segment(sent) : SearchUrls.enc(sent);
                         assertEquals(where, 1, count(url, encoded));
-                        assertFalse(where + " double-encoded", url.contains("%25") && !query.contains("%"));
-                        assertEquals(where, 1, count(url, "%25") * (query.contains("%") ? 1 : 0)
-                                + (query.contains("%") ? 0 : 1));
+                        assertFalse(where + " double-encoded", url.contains("%25") && !sent.contains("%"));
+                        assertEquals(where, count(sent, "%"), count(url, "%25"));
                         assertFalse(where, url.contains("%2525"));
                         String pageToken = pageToken(provider, category, page);
                         assertTrue(where + " lacks " + pageToken, url.contains(pageToken));
@@ -164,7 +190,7 @@ public class SearchUrlsTest {
                         continue;
                     }
                     String decoded;
-                    if (provider == Provider.AUDIOKNIGA_LIFE) {
+                    if (provider == Provider.AUDIOKNIGA_LIFE || provider == Provider.SLUSHKIN) {
                         String path = URI.create(url).getPath();
                         decoded = path.substring("/search/".length(), path.indexOf("/page/"));
                     } else if (provider == Provider.BAZA_KNIG) {
@@ -177,10 +203,11 @@ public class SearchUrlsTest {
                                 : provider == Provider.AKNIGI24 && category != Category.BOOKS ? "search"
                                 : provider == Provider.BOOKINFO
                                         ? (category == Category.BOOKS ? "search[title]" : "search[name]")
+                                : provider == Provider.AUDIOBOOK24 ? "s"
                                 : HttpUrl.parse(url).queryParameter("story") != null ? "story" : "q";
                         decoded = HttpUrl.parse(url).queryParameter(name);
                     }
-                    assertEquals(provider + "/" + category + " -> " + url, query, decoded);
+                    assertEquals(provider + "/" + category + " -> " + url, sent(provider, query), decoded);
                 }
             }
         }

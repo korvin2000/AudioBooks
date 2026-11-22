@@ -660,7 +660,7 @@ public class FavoriteFragment extends MvpAppCompatFragment implements FavoriteVi
         Drawable mask = ParentalControl.coverMask(imageView.getContext(), book);
         if (mask != null) {
             imageView.setImageDrawable(mask);
-        } else if (DefaultCover.replaces(book.getPhoto())) {
+        } else if (DefaultCover.replaces(book.getPhoto()) || book.getPhoto() == null || book.getPhoto().isEmpty()) {
             imageView.setImageDrawable(DefaultCover.drawable(imageView.getContext(), book.getUrl()));
         } else {
             Picasso.get()

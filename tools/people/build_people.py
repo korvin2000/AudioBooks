@@ -50,6 +50,8 @@ ROWS = {'BAZA_KNIG': 'authors readers', 'KNIGOBLUD': 'authors readers', 'POLEKNI
         'AKNIG_XYZ': 'authors readers', 'AUDIOKNIGA_LIFE': 'authors readers', 'BIBLUS': 'authors readers',
         'AUDIOKNIGA_ONLINE': 'authors readers', 'SLUSHAT_KNIGI': 'authors', 'BOOKISH': 'authors readers',
         'GOLOSOM': 'authors readers',
+        'AUDIOKNIZHKA': 'authors', 'AUDIOKNIGIVSE': 'authors readers', 'SLUSHKIN': 'authors readers',
+        'AUDIOKNIGI_CC': 'authors readers', 'MDS': 'authors', 'STAROERADIO': 'authors readers',
         'FANTLAB': 'readers'}  # not a site of the app: fantlab.ru's narrators, whose cards the readers lists open
 KINDS = ('authors', 'readers')
 TEXT, PCT, PCT_LOWER, SLUG, INT, UUID = range(6)

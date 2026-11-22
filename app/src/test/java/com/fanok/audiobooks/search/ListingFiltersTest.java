@@ -15,6 +15,8 @@ import org.junit.Test;
 import java.util.Arrays;
 import java.util.Calendar;
 import java.util.Collections;
+import java.util.EnumSet;
+import java.util.Set;
 
 public class ListingFiltersTest {
 
@@ -130,10 +132,11 @@ public class ListingFiltersTest {
     public void onlySitesWhoseCardsCarryADurationCanFilterByIt() {
         assertFalse(ListingFilters.listsDuration(Provider.OTRUB, Url.BEST_WEEK_OTRUB));
         assertFalse(ListingFilters.listsDuration(null, Url.INDEX));
+        // cards without a time: audiobook24, aukniga and aubook name none; staroeradio's titles carry none
+        Set<Provider> timeless = EnumSet.of(Provider.OTRUB, Provider.AUDIOBOOK24, Provider.AUKNIGA, Provider.AUBOOK,
+                Provider.STAROERADIO);
         for (Provider p : Provider.values()) {
-            if (p != Provider.OTRUB) {
-                assertTrue(p.name(), ListingFilters.listsDuration(p, Url.INDEX));
-            }
+            assertEquals(p.name(), !timeless.contains(p), ListingFilters.listsDuration(p, Url.INDEX));
         }
         // akniga's collections list collections, not books
         assertTrue(ListingFilters.listsDuration(Provider.AKNIGA, Url.BEST_WEEK_AKNIGA));

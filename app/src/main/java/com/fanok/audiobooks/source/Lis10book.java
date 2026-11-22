@@ -60,8 +60,9 @@ import org.jsoup.nodes.Document;
  * the site: the default one, the book page, is (both hosts belong to other sites too, so they are no {@link #hosts}).
  * A book whose {@code donorTier} is "fragment" has a blocked playlist.</li>
  * </ul>
+ * The engine of knizhin.net too ({@link Knizhin}): what a site differs in is data, its {@link Site}.
  */
-public final class Lis10book implements SourceParser {
+public class Lis10book implements SourceParser {
 
     public static final String SERVER = "https://lis10book.com";
     public static final String INDEX = SERVER + "/api/books?audio=full";
@@ -86,9 +87,49 @@ public final class Lis10book implements SourceParser {
     private static final int LONG_FROM = 600;
 
     private static final List<Sort.Entry> MENU = Sort.menu(Sort.NEW, Sort.POPULAR, Sort.RATING, Sort.DURATION);
-    private static final Pattern BOOK = Pattern.compile("^https?://(?:www\\.)?lis10book\\.com/audio/([^/?#]+)");
     private static final Pattern PERSON_BOOKS = Pattern.compile("^/api/(authors|narrators)/[^/]+$");
     private static final Pattern DATE = Pattern.compile("^(\\d{4})-(\\d{2})-(\\d{2})");
+
+    /**
+     * What a site on this engine differs in: its server, the path of its book pages, the folder of the covers its
+     * records name ({@code coverPath}), and whether its books API searches titles ({@code q}) or ignores it.
+     */
+    public static final class Site {
+        final String server;
+        final String index;
+        final String suggestions;
+        final String bookPath;
+        final String covers;
+        final Pattern book;
+        boolean titleSearch = true;
+
+        /** {@code bookPath} is "/audio/" or the like; {@code covers} ends with a slash. */
+        public Site(String server, String bookPath, String covers) {
+            this.server = server;
+            this.index = server + "/api/books?audio=full";
+            this.suggestions = server + "/api/search?q=";
+            this.bookPath = bookPath;
+            this.covers = covers;
+            book = Pattern.compile("^https?://(?:www\\.)?" + Pattern.quote(HttpUrl.get(server).host())
+                    + Pattern.quote(bookPath) + "([^/?#]+)");
+        }
+
+        /** The books API ignores {@code q}: the book search is the suggestions ({@link Lis10book#suggested}). */
+        public Site suggestionSearch() {
+            titleSearch = false;
+            return this;
+        }
+    }
+
+    protected final Site site;
+
+    public Lis10book() {
+        this(new Site(SERVER, "/audio/", SERVER + "/wp-content/uploads/"));
+    }
+
+    protected Lis10book(Site site) {
+        this.site = site;
+    }
 
     // ---------------------------------------------------------------- SourceParser
 
@@ -97,12 +138,16 @@ public final class Lis10book implements SourceParser {
      * without them when that second request fails; any other URL is an API call. The first page of a book search
      * that finds nothing is the header's suggestions for its words instead ({@link #suggested}): the search takes
      * the words as one phrase of the title, so an author with the title finds nothing, the suggestions find the book.
+     * A site whose books API ignores the words searches with the suggestions alone ({@link Site#suggestionSearch}).
      */
     @Override
     public Document fetch(String url) throws IOException {
-        Matcher book = BOOK.matcher(url);
+        Matcher book = site.book.matcher(url);
         if (!book.find()) {
             JsonPage page = SiteHttp.getJson(url);
+            if (url.startsWith(site.suggestions)) {
+                return suggested(page);
+            }
             String suggestions = suggestionsUrl(url, page);
             if (suggestions == null) {
                 return page;
@@ -113,7 +158,7 @@ public final class Lis10book implements SourceParser {
                 return page;
             }
         }
-        String record = SERVER + "/api/books/" + book.group(1);
+        String record = site.server + "/api/books/" + book.group(1);
         JsonPage page = SiteHttp.getJson(record);
         try {
             withSimilar(page, SiteHttp.getJson(record + "/similar"));
@@ -142,7 +187,7 @@ public final class Lis10book implements SourceParser {
     @Override
     public String sortUrl(Sort sort, String listingUrl) {
         String value = sortValue(sort);
-        return value == null ? null : withSort(INDEX, value);
+        return value == null ? null : withSort(site.index, value);
     }
 
     /** The books of a genre, an author or a reader without sort and page: the server ranks each of them itself. */
@@ -172,6 +217,12 @@ public final class Lis10book implements SourceParser {
                 .build().toString();
     }
 
+    /** The suggestions that make a search of a {@link Site#suggestionSearch} site have no durations. */
+    @Override
+    public boolean listsDuration(String url) {
+        return !url.startsWith(site.suggestions);
+    }
+
     @Override
     public ProviderPage<GenrePOJO> genres(Document page, String url, int pageNo) {
         return ProviderPage.of(parseGenres(page), false);
@@ -186,9 +237,14 @@ public final class Lis10book implements SourceParser {
     public String searchUrl(SearchUrls.Category category, String query, int page) {
         String base;
         switch (category) {
-            case BOOKS: base = INDEX + "&q="; break;
-            case AUTHORS: base = AUTHORS + "?q="; break;
-            default: base = READERS + "?q="; break;
+            case BOOKS:
+                if (!site.titleSearch) {
+                    return suggestionsUrl(query) + "&page=" + page;
+                }
+                base = site.index + "&q=";
+                break;
+            case AUTHORS: base = site.server + "/api/authors?q="; break;
+            default: base = site.server + "/api/narrators?q="; break;
         }
         return base + SearchUrls.enc(query) + "&page=" + page;
     }
@@ -216,7 +272,7 @@ public final class Lis10book implements SourceParser {
         if ("fragment".equals(string(book, "donorTier"))) {
             throw new BookRemovedException(bookUrl(slug));
         }
-        return parseTracks(SiteHttp.getJson(SERVER + "/api/p/" + slug), bookUrl(slug));
+        return parseTracks(SiteHttp.getJson(site.server + "/api/p/" + slug), bookUrl(slug));
     }
 
     @Override
@@ -228,11 +284,11 @@ public final class Lis10book implements SourceParser {
     @Override
     public ArrayList<ComentsPOJO> comments(String bookUrl, BooleanSupplier cancelled) throws Exception {
         ArrayList<ComentsPOJO> all = new ArrayList<>();
-        Matcher book = BOOK.matcher(bookUrl);
+        Matcher book = site.book.matcher(bookUrl);
         if (!book.find()) {
             return all;
         }
-        String comments = SERVER + "/api/books/" + book.group(1) + "/comments?limit=" + COMMENTS_PAGE + "&offset=";
+        String comments = site.server + "/api/books/" + book.group(1) + "/comments?limit=" + COMMENTS_PAGE + "&offset=";
         int offset = 0;
         for (int no = 0; no < MAX_COMMENT_PAGES && !cancelled.getAsBoolean(); no++) {
             Document page = fetch(comments + offset);
@@ -270,26 +326,32 @@ public final class Lis10book implements SourceParser {
         return OtherSourceModel.query(book.getName());
     }
 
-    /** The search with the most cards a page holds: the lookup reads one page. */
+    /** The search with the most cards a page holds: the lookup reads one page (the suggestions have their limit). */
     @Override
     public String otherSourceSearchUrl(String terms, int page) {
-        return searchUrl(SearchUrls.Category.BOOKS, terms, page) + "&limit=" + MAX_LIMIT;
+        String search = searchUrl(SearchUrls.Category.BOOKS, terms, page);
+        return site.titleSearch ? search + "&limit=" + MAX_LIMIT : search;
     }
 
     // ---------------------------------------------------------------- URLs
 
     /** The public page of the book {@code slug}: what the app stores, shows and deep-links. */
-    public static String bookUrl(String slug) {
-        return SERVER + "/audio/" + slug + "/";
+    public String bookUrl(String slug) {
+        return site.server + site.bookPath + slug + "/";
     }
 
-    private static String genreUrl(String slug) {
-        return INDEX + "&genre=" + slug;
+    private String genreUrl(String slug) {
+        return site.index + "&genre=" + slug;
     }
 
     /** The books of the author or reader {@code slug} ({@code kind} "authors" or "narrators"); "" without one. */
-    private static String personUrl(String kind, String slug) {
-        return slug.isEmpty() ? "" : SERVER + "/api/" + kind + "/" + slug + "?audio=full";
+    private String personUrl(String kind, String slug) {
+        return slug.isEmpty() ? "" : site.server + "/api/" + kind + "/" + slug + "?audio=full";
+    }
+
+    /** The header's suggestions for {@code words}, as many as the site gives. */
+    private String suggestionsUrl(String words) {
+        return site.suggestions + SearchUrls.enc(words) + "&limit=" + SUGGESTIONS_LIMIT;
     }
 
     /**
@@ -304,7 +366,7 @@ public final class Lis10book implements SourceParser {
                 || arrayOf(object(page), "items").size() > 0) {
             return null;
         }
-        return SUGGESTIONS + SearchUrls.enc(words) + "&limit=" + SUGGESTIONS_LIMIT;
+        return suggestionsUrl(words);
     }
 
     /** {@code /api/books} (not a search), an author's or a reader's books. */
@@ -357,7 +419,7 @@ public final class Lis10book implements SourceParser {
     // ---------------------------------------------------------------- listings
 
     /** Index, sorts, genre, search, an author's, a reader's or a series' books. */
-    public static ProviderPage<BookPOJO> parseListing(Document page) {
+    public ProviderPage<BookPOJO> parseListing(Document page) {
         JsonObject root = object(page);
         JsonElement books = root.get("books");
         JsonObject list = books != null && books.isJsonObject() ? books.getAsJsonObject() : root;
@@ -411,7 +473,7 @@ public final class Lis10book implements SourceParser {
         return (long) number(list, "page") * number(list, "limit") < number(list, "total");
     }
 
-    private static ArrayList<BookPOJO> cards(List<JsonObject> items) {
+    private ArrayList<BookPOJO> cards(List<JsonObject> items) {
         ArrayList<BookPOJO> books = new ArrayList<>();
         for (JsonObject item : items) {
             BookPOJO book = card(item);
@@ -422,7 +484,7 @@ public final class Lis10book implements SourceParser {
         return books;
     }
 
-    private static BookPOJO card(JsonObject o) {
+    private BookPOJO card(JsonObject o) {
         BookPOJO book = new BookPOJO();
         String slug = string(o, "slug");
         if (!slug.isEmpty()) {
@@ -441,8 +503,11 @@ public final class Lis10book implements SourceParser {
         return book;
     }
 
-    /** The list of {@code /api/genres}, with each genre's book count. */
-    public static ArrayList<GenrePOJO> parseGenres(Document page) {
+    /**
+     * The list of {@code /api/genres}, with each genre's book count; a genre counted with no book at all lists
+     * nothing (knizhin.net keeps such genres), so it is left out.
+     */
+    public ArrayList<GenrePOJO> parseGenres(Document page) {
         JsonElement root = JsonPage.of(page);
         if (!root.isJsonArray()) {
             throw new IllegalStateException("not a genre list: " + page.location());
@@ -455,16 +520,21 @@ public final class Lis10book implements SourceParser {
             if (name.isEmpty() || slug.isEmpty()) {
                 continue;
             }
-            GenrePOJO genre = new GenrePOJO(name, genreUrl(slug));
             JsonElement count = o.get("_count");
-            genre.setReting(count != null && count.isJsonObject() ? number(count.getAsJsonObject(), "books") : 0);
+            boolean counted = count != null && count.isJsonObject() && count.getAsJsonObject().has("books");
+            int books = counted ? number(count.getAsJsonObject(), "books") : 0;
+            if (counted && books == 0) {
+                continue;
+            }
+            GenrePOJO genre = new GenrePOJO(name, genreUrl(slug));
+            genre.setReting(books);
             genres.add(genre);
         }
         return genres;
     }
 
     /** A page of the authors or readers index or of their search: name, books and the book count. */
-    public static ProviderPage<GenrePOJO> parsePeople(Document page, boolean performers) {
+    public ProviderPage<GenrePOJO> parsePeople(Document page, boolean performers) {
         JsonObject root = object(page);
         ArrayList<GenrePOJO> people = new ArrayList<>();
         for (JsonObject o : objects(root, "items")) {
@@ -482,7 +552,7 @@ public final class Lis10book implements SourceParser {
     // ---------------------------------------------------------------- book
 
     /** The book record: the first genre and series, all authors and readers, the other narrations. */
-    public static DescriptionPOJO parseDescription(Document page) {
+    public DescriptionPOJO parseDescription(Document page) {
         JsonObject o = object(page);
         DescriptionPOJO d = new DescriptionPOJO();
         d.setTitle(string(o, "title"));
@@ -499,7 +569,7 @@ public final class Lis10book implements SourceParser {
         JsonObject series = first(o, "series");
         if (series != null) {
             d.setSeries(string(series, "title"));
-            d.setSeriesUrl(SERVER + "/api/series/" + string(series, "slug"));
+            d.setSeriesUrl(site.server + "/api/series/" + string(series, "slug"));
         }
         d.setTime(time(o.get("totalDurationSec")));
         double stars = stars(o);
@@ -520,12 +590,12 @@ public final class Lis10book implements SourceParser {
     }
 
     /** The similar books {@link #fetch} added to the record; none when it could not. */
-    public static ArrayList<BookPOJO> parseRecommendations(Document page) {
+    public ArrayList<BookPOJO> parseRecommendations(Document page) {
         return cards(objects(object(page), SIMILAR));
     }
 
     /** The books of the book's first series, with their numbers, in the site's order. */
-    public static ArrayList<SeriesPOJO> parseSeries(Document page) {
+    public ArrayList<SeriesPOJO> parseSeries(Document page) {
         JsonObject o = object(page);
         String slug = slugOf(first(o, "series"));
         ArrayList<SeriesPOJO> out = new ArrayList<>();
@@ -549,7 +619,7 @@ public final class Lis10book implements SourceParser {
     }
 
     /** The other narrations of the record that play in full. */
-    public static ArrayList<OtherArtistPOJO> parseOtherReaders(Document page) {
+    public ArrayList<OtherArtistPOJO> parseOtherReaders(Document page) {
         ArrayList<OtherArtistPOJO> out = new ArrayList<>();
         for (JsonObject alt : objects(object(page), "altNarrations")) {
             if (string(alt, "slug").isEmpty() || flag(alt, "fragment")) {
@@ -660,9 +730,18 @@ public final class Lis10book implements SourceParser {
         return out.toString();
     }
 
-    private static String cover(JsonObject o) {
+    /**
+     * The cover the record names ({@code coverPath}); a record without one whose cover has a {@code coverHash} has it
+     * as {@code covers/<playlistId>.jpg}, where lis10book.com keeps the covers of its recent books (knizhin.net's own
+     * copies answer 410). Cards name neither on knizhin.net, so they have none.
+     */
+    private String cover(JsonObject o) {
         String path = string(o, "coverPath");
-        return flag(o, "hasCover") && !path.isEmpty() ? SERVER + "/wp-content/uploads/" + path : "";
+        int playlist = number(o, "playlistId");
+        if (path.isEmpty() && !string(o, "coverHash").isEmpty() && playlist > 0) {
+            path = "covers/" + playlist + ".jpg";
+        }
+        return flag(o, "hasCover") && !path.isEmpty() ? site.covers + path : "";
     }
 
     /** H:MM:SS of a number of seconds; "" for none. */

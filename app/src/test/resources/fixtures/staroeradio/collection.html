@@ -1,0 +1,126 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Коллекция | Старое Радио</title>
+<link href="/css/master.css?v=20260906-05" media="screen" rel="stylesheet" type="text/css" />
+<link href="/css/grid.css" media="screen" rel="stylesheet" type="text/css" />
+<link href="/css/mobile.css?v=20260906-06" media="screen" rel="stylesheet" type="text/css" />
+<link rel="manifest" href="/receiver/assets/site.webmanifest" />
+<script type="text/javascript" src="/js/jquery.js"></script>
+<script type="text/javascript" src="/js/scripts.js"></script>
+<script type="text/javascript">
+function callReceiver(st){
+	var x = window.screen.availWidth;
+	var y = window.screen.availHeight;
+	x = (x-330)/2; y = (y-400)/2;
+	var addparam = 'width=330, height=250, scrollbars=0, resizable=no, left='+x+' ,top='+y;
+	var href='/receiver/receiver.php?s='+st;
+	recwin = window.open(href, 'ReceiverWin', addparam);
+	if(recwin === null) window.location = href;
+	else recwin.focus();
+};
+</script>
+<!--
+<link rel="stylesheet" href="/sifr3/css/sifr.css" type="text/css">
+<script src="/sifr3/js/sifr.js" type="text/javascript"></script>
+<script src="/sifr3/js/sifr-config.js" type="text/javascript"></script>
+-->
+</head>
+
+<body>
+<div class="container container_9">
+<div class="grid_3">
+	<a href="/" class="logo"></a>
+</div>
+<div class="grid_4">
+	<input type="checkbox" id="mobile-menu-toggle" class="mobile-menu-toggle" />
+	<label for="mobile-menu-toggle" class="mobile-menu-button" aria-label="Меню"><span></span><span></span><span></span></label>
+	<ul class="menu">
+		<li><a href="JavaScript:callReceiver(1)">Слушать Старое радио</a></li>
+		<li><a href="JavaScript:callReceiver(2)">Слушать Детское радио</a></li>
+		<li><a href="JavaScript:callReceiver(3)">Слушать Музыку</a></li>
+		<li><a href="/collection">Коллекция</a></li>
+		<li><a href="/program">Программа передач</a></li>
+		<li><a href="https://audiopedia.su/">Аудиопедия</a></li>
+		<li><a href="/shfh">Школьная фонохрестоматия</a></li>
+		<li><a href="/about">О нас</a></li>
+	</ul>
+</div>
+<div class="grid_2">
+	<a href="https://audiopedia.su/" class="ap-logo"></a>
+</div>
+<div class='clear'>&nbsp;</div>
+<div class="grid_9 letters">
+<h1>Коллекция</h1>
+<div class="label">По буквам</div>
+<a href="/collection/0-9">0-9</a> | <a href="/collection/%D0%90">А</a> | <a href="/collection/%D0%91">Б</a> | <a href="/collection/%D0%92">В</a> | <a href="/collection/%D0%93">Г</a> | <a href="/collection/%D0%94">Д</a> | <a href="/collection/%D0%95">Е</a> | <a href="/collection/%D0%96">Ж</a> | <a href="/collection/%D0%97">З</a> | <a href="/collection/%D0%98">И</a> | <a href="/collection/%D0%9A">К</a> | <a href="/collection/%D0%9B">Л</a> | <a href="/collection/%D0%9C">М</a> | <a href="/collection/%D0%9D">Н</a> | <a href="/collection/%D0%9E">О</a> | <a href="/collection/%D0%9F">П</a> | <a href="/collection/%D0%A0">Р</a> | <a href="/collection/%D0%A1">С</a> | <a href="/collection/%D0%A2">Т</a> | <a href="/collection/%D0%A3">У</a> | <a href="/collection/%D0%A4">Ф</a> | <a href="/collection/%D0%A5">Х</a> | <a href="/collection/%D0%A6">Ц</a> | <a href="/collection/%D0%A7">Ч</a> | <a href="/collection/%D0%A8">Ш</a> | <a href="/collection/%D0%A9">Щ</a> | <a href="/collection/%D0%AD">Э</a> | <a href="/collection/%D0%AE">Ю</a> | <a href="/collection/%D0%AF">Я</a><div class="search">
+<div class="label">Поиск</div>
+<input type="text" value=""></div>
+</div>
+<div class="clear">&nbsp;</div>
+<div class="mp3list grid_9">
+</div><div class="grid_9 footer">
+	<table cellspacing="0" border="0" id="players">
+	<tr>
+		<td></td>
+		<td><img src="/i/players/windowsmedia.gif"></td>
+		<td><img src="/i/players/winamp.gif"></td>
+		<td><img src="/i/players/realplayer.gif"></td>
+		<td><img src="/i/players/applequicktime.gif"></td>
+	</tr>
+	<tr>
+		<td class="hcol"><img src="/i/players/staroe.gif"></td>
+		<td class="acol"><a target="_blank" href="/ices128.asx"><img src="/i/players/128k.gif" alt="Слушать Старое Радио в Windows Media Player в высоком качестве (128 kbit)"></a></td>
+		<td class="acol"><a target="_blank" href="/ices128.m3u"><img src="/i/players/128k.gif" alt="Слушать Старое Радио в WinAmp в высоком качестве (128 kbit)"></a></td>
+		<td class="acol"><a target="_blank" href="/ices128.ram"><img src="/i/players/128k.gif" alt="Слушать Старое Радио в RealPlayer в высоком качестве (128 kbit)"></a></td>
+		<td class="acol"><a target="_blank" href="/ices128.qtl"><img src="/i/players/128k.gif" alt="Слушать Старое Радио в QuickTime в высоком качестве (128 kbit)"></a></td>
+	</tr>
+	<tr>
+		<td class="hcol"><img src="/i/players/detskoe.gif"></td>
+		<td class="acol"><a target="_blank" href="/detskoe128.asx"><img src="/i/players/128k.gif" alt="Слушать Детское Радио в Windows Media Player в высоком качестве (128 kbit)"></a></td>
+		<td class="acol"><a target="_blank" href="/detskoe128.m3u"><img src="/i/players/128k.gif" alt="Слушать Детское Радио в WinAmp в высоком качестве (128 kbit)"></a></td>
+		<td class="acol"><a target="_blank" href="/detskoe128.ram"><img src="/i/players/128k.gif" alt="Слушать Детское Радио в RealPlayer в высоком качестве (128 kbit)"></a></td>
+		<td class="acol"><a target="_blank" href="/detskoe128.qtl"><img src="/i/players/128k.gif" alt="Слушать Детское Радио в QuickTime в высоком качестве (128 kbit)"></a></td>
+	</tr>
+	<tr>
+		<td class="hcol"><img src="/i/players/music.gif"></td>
+		<td class="acol"><a target="_blank" href="/music128.asx"><img src="/i/players/128k.gif" alt="Слушать Музыку в Windows Media Player в высоком качестве (128 kbit)"></a></td>
+		<td class="acol"><a target="_blank" href="/music128.m3u"><img src="/i/players/128k.gif" alt="Слушать Музыку в WinAmp в высоком качестве (128 kbit)"></a></td>
+		<td class="acol"><a target="_blank" href="/music128.ram"><img src="/i/players/128k.gif" alt="Слушать Музыку в RealPlayer в высоком качестве (128 kbit)"></a></td>
+		<td class="acol"><a target="_blank" href="/music128.qtl"><img src="/i/players/128k.gif" alt="Слушать Музыку в QuickTime в высоком качестве (128 kbit)"></a></td>
+	</tr>
+</table>
+
+	<!--LiveInternet counter--><script type="text/javascript"><!--
+	document.write("<a href='http://www.liveinternet.ru/click' "+
+	"target=_blank><img src='http://counter.yadro.ru/hit?t16.6;r"+
+	escape(document.referrer)+((typeof(screen)=="undefined")?"":
+	";s"+screen.width+"*"+screen.height+"*"+(screen.colorDepth?
+	screen.colorDepth:screen.pixelDepth))+";u"+escape(document.URL)+
+	";h"+escape(document.title.substring(0,80))+";"+Math.random()+
+	"' alt='' title='LiveInternet: показано число просмотров за 24"+
+	" часа, посетителей за 24 часа и за сегодня' "+
+	"border=0 width=88 height=31><\/a>")//--></script><!--/LiveInternet-->
+
+	<a href="http://top.germany.ru" alt="TOP.germany.ru" target="_top"><img src="http://top.germany.ru/cgi-bin/links/top.cgi?ID=7065&v=12" border=0></a>
+<br />
+</div>
+<div class='clear'>&nbsp;</div>
+</div>
+<!-- Yandex.Metrika counter -->
+<script type="text/javascript">
+    (function(m,e,t,r,i,k,a){
+        m[i]=m[i]||function(){(m[i].a=m[i].a||[]).push(arguments)};
+        m[i].l=1*new Date();
+        for (var j = 0; j < document.scripts.length; j++) {if (document.scripts[j].src === r) { return; }}
+        k=e.createElement(t),a=e.getElementsByTagName(t)[0],k.async=1,k.src=r,a.parentNode.insertBefore(k,a)
+    })(window, document,'script','https://mc.yandex.ru/metrika/tag.js?id=105451883', 'ym');
+
+    ym(105451883, 'init', {ssr:true, webvisor:true, clickmap:true, ecommerce:"dataLayer", accurateTrackBounce:true, trackLinks:true});
+</script>
+<noscript><div><img src="https://mc.yandex.ru/watch/105451883" style="position:absolute; left:-9999px;" alt="" /></div></noscript>
+<!-- /Yandex.Metrika counter -->
+</body>
+</html>

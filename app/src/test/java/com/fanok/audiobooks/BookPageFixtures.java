@@ -52,6 +52,23 @@ public final class BookPageFixtures {
                     + "v-akademii-lda-i-ognja-julija-hanevskaja"},
             {"4read/book-hls.html", "https://4read.org/8628-klub-otello-dzhej-di-pennington.html"},
             {"akniga-me/book.json", "https://akniga.me/book/ryadom-s-toboy"},
+            {"audiomir/book.html", "https://m1.audiomir.xyz/55980-nikolay-skiba-eger-serdce-stai-kniga-5.html"},
+            {"audioknizhka/book.html", "https://audioknizhka.org/detektiv/41978-poslednij-den-goda-obuhova-lena.html"},
+            {"audioknigivse/book.html",
+                    "https://audioknigivse.ru/audioknigi_-vsem_popadanci/22602-chernaja-luna-aleksandr-izotov-5.html"},
+            {"audiobook24/book.html", "https://www.audiobook24.ru/aleksandr-shuvalov-dzhoker/"},
+            {"slushkin/book.html", "https://slushkin.online/70930-vij-20.html"},
+            {"audioknigi-top/book.html", "https://audioknigi.top/master-run-kniga-12"},
+            {"knizhin/book.json", "https://knizhin.net/book/ne-vyklyuchaj-svet/"},
+            {"audioknigi-cc/book.html", "https://audioknigi.cc/popadancy/9092444-beglyj.html"},
+            {"two-knigi/book.json", "https://2knigi.net/kniga/2409897-syn-pomeschika-kniga-14_semin-nikita"},
+            {"aukniga/book.html", "https://aukniga.com/b/"
+                    + "poisk-prednaznacheniya-ili-dvadcat-sedmaya-teorema-etiki-arkadiy-i-boris-strugackie"},
+            {"aubook/book.html", "https://aubook.org/book/"
+                    + "poisk-prednaznacheniya-ili-dvadcat-sedmaya-teorema-etiki-arkadiy-i-boris-strugackie"},
+            {"mds/book.html", "https://mds-old.ru/author/%D0%94%D0%B6%D0%BE%D0%BD_%D0%92%D0%B0%D1%80%D0%BB%D0%B8/"
+                    + "%D0%A0%D0%BE%D0%B1%D0%B8%D0%BD%D0%B7%D0%BE%D0%BD_%D0%9A%D1%80%D1%83%D0%B7%D0%BE"},
+            {"staroeradio/book.html", "https://staroeradio.ru/audio/37323"},
     };
 
     private BookPageFixtures() {

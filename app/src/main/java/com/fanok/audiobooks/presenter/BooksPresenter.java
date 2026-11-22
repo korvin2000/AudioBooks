@@ -456,7 +456,8 @@ public class BooksPresenter extends MvpPresenter<BooksView> implements
         if (mask != null) {
             ImageView imageView = layout.findViewById(R.id.imageView);
             imageView.setImageDrawable(mask);
-        } else if (DefaultCover.replaces(books.get(position).getPhoto())) {
+        } else if (DefaultCover.replaces(books.get(position).getPhoto()) || books.get(position).getPhoto() == null
+                || books.get(position).getPhoto().isEmpty()) { // no cover: the default one
             ImageView imageView = layout.findViewById(R.id.imageView);
             imageView.setImageDrawable(DefaultCover.drawable(imageView.getContext(), books.get(position).getUrl()));
         } else if (books.get(position).getPhoto() != null) {

@@ -63,8 +63,9 @@ public class BooksOtherAdapter extends RecyclerView.Adapter<BooksOtherAdapter.Vi
                     .placeholder(android.R.drawable.ic_menu_gallery)
                     .error(android.R.drawable.ic_menu_gallery)
                     .into(viewHolder.mImageView);
-        } else {
-            viewHolder.mImageView.setImageResource(android.R.drawable.ic_menu_gallery);
+        } else { // a book without a cover (knizhin's lists): the default one
+            viewHolder.mImageView.setImageDrawable(
+                    DefaultCover.drawable(viewHolder.mImageView.getContext(), book.getUrl()));
         }
         viewHolder.mTitle.setText(book.getName());
     }

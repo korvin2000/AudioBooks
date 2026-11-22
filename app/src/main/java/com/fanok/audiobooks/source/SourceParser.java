@@ -57,7 +57,8 @@ public interface SourceParser {
     /**
      * Hosts that other sites use too (a shared CDN, each with its subdomains) whose requests need {@link #referer}
      * when they carry none, e.g. hotlink-guarded covers. Unlike {@link #hosts} they keep the global proxy route and
-     * never make a request or a link the site's; the first site naming a host gives it its Referer
+     * never make a request or a link the site's, even a subdomain of the site's own server (knizhin.net's
+     * {@code s2.knizhin.net} also serves lis10book.com); the first site naming a host gives it its Referer
      * ({@link com.fanok.audiobooks.search.Provider#refererOf}). Empty by default.
      */
     default Set<String> refererHosts() {
