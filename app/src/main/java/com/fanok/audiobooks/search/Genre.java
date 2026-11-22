@@ -32,7 +32,7 @@ public enum Genre {
             + "detective thriller crime mystery mysteri noir suspense spy espion"),
     ACTION(R.string.genre_action, "боевик экшн action"),
     TRUE_CRIME(R.string.genre_true_crime, "крайм трукрайм true+crime"),
-    HORROR(R.string.genre_horror, "ужас хоррор жахи жахлив мистик мистич готи зомби вампир привиден сплаттер треш страшил "
+    HORROR(R.string.genre_horror, "ужас хоррор жахи жахлив мистик мистич готи зомби вампир привиден сплаттер треш страшил страшн "
             + "horror supernatural ghost gothic zombie vampire"),
     ADVENTURE(R.string.genre_adventure, "приключ пригод вестерн пират путешеств морск adventure western travel "
             + "pirate nautic"),
@@ -40,7 +40,7 @@ public enum Genre {
     EROTICA(R.string.genre_erotica, "эроти взросл 18 erotic sex секс"),
     PROSE(R.string.genre_prose, "~роман ~проз ~литератур ~повест ~рассказ ~истории ~произведен ~fiction ~literatur "
             + "~novel ~stories ~story ~оповидан новелл драм трагед сага деревн реализм постмодерн сюрреал психодел филгуд "
-            + "saga tragedy feelgood drama"),
+            + "saga tragedy feelgood drama зарубежн+современн российск+современн"),
     CLASSIC(R.string.genre_classic, "~класси ~classic"),
     HUMOR(R.string.genre_humor, "юмор гумор сатир комеди комич анекдот иронич humor humour comedy satire funny"),
     KIDS(R.string.genre_kids, "детей дети детям детск дитяч ребен ребят малыш сказк сказоч казк аудиоказк стишк колыбел колиск "

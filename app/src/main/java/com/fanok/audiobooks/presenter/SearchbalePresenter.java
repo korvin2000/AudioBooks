@@ -1173,7 +1173,8 @@ public class SearchbalePresenter extends MvpPresenter<SearchableView> implements
         }
         if (mask != null) {
             imageView.setImageDrawable(mask);
-        } else if (DefaultCover.replaces(bookPOJO.getPhoto())) {
+        } else if (DefaultCover.replaces(bookPOJO.getPhoto()) || bookPOJO.getPhoto() == null
+                || bookPOJO.getPhoto().isEmpty()) { // no cover: the default one, never Picasso's empty path
             imageView.setImageDrawable(DefaultCover.drawable(imageView.getContext(), bookPOJO.getUrl()));
         } else {
             Picasso.get()

@@ -8,17 +8,25 @@ import androidx.annotation.Nullable;
 import com.fanok.audiobooks.Consts;
 import com.fanok.audiobooks.Url;
 import com.fanok.audiobooks.source.Abmp3;
-import com.fanok.audiobooks.source.AknigXyz;
 import com.fanok.audiobooks.source.Akniga;
 import com.fanok.audiobooks.source.AknigaMe;
 import com.fanok.audiobooks.source.Aknigi24;
-import com.fanok.audiobooks.source.AudioKnigaBiz;
+import com.fanok.audiobooks.source.AknigXyz;
+import com.fanok.audiobooks.source.Aubook;
 import com.fanok.audiobooks.source.Audioboo;
+import com.fanok.audiobooks.source.Audiobook24;
+import com.fanok.audiobooks.source.AudioKnigaBiz;
 import com.fanok.audiobooks.source.AudioknigaLife;
 import com.fanok.audiobooks.source.AudioknigaOne;
 import com.fanok.audiobooks.source.AudioknigaOnline;
+import com.fanok.audiobooks.source.AudioknigiCc;
 import com.fanok.audiobooks.source.AudioknigiFun;
 import com.fanok.audiobooks.source.AudioknigiPro;
+import com.fanok.audiobooks.source.AudioknigiTop;
+import com.fanok.audiobooks.source.Audioknigivse;
+import com.fanok.audiobooks.source.Audioknizhka;
+import com.fanok.audiobooks.source.Audiomir;
+import com.fanok.audiobooks.source.Aukniga;
 import com.fanok.audiobooks.source.BazaKnig;
 import com.fanok.audiobooks.source.BazaKnigInfo;
 import com.fanok.audiobooks.source.Biblus;
@@ -30,11 +38,16 @@ import com.fanok.audiobooks.source.Golosom;
 import com.fanok.audiobooks.source.Izibuk;
 import com.fanok.audiobooks.source.Knigavuhe;
 import com.fanok.audiobooks.source.Knigoblud;
+import com.fanok.audiobooks.source.Knizhin;
 import com.fanok.audiobooks.source.Lis10book;
+import com.fanok.audiobooks.source.Mds;
 import com.fanok.audiobooks.source.Otrub;
 import com.fanok.audiobooks.source.Poleknig;
 import com.fanok.audiobooks.source.SlushatKnigi;
+import com.fanok.audiobooks.source.Slushkin;
 import com.fanok.audiobooks.source.SourceParser;
+import com.fanok.audiobooks.source.Staroeradio;
+import com.fanok.audiobooks.source.TwoKnigi;
 import com.fanok.audiobooks.source.Uknig;
 import com.fanok.audiobooks.source.Yakniga;
 
@@ -121,7 +134,36 @@ public enum Provider {
     FOUR_READ(FourRead.SERVER, "4Read (укр)", "four_read", "search_four_read", 27, "FourRead",
             FourRead.INDEX, FourRead.GENRES, FourRead.AUTHORS, FourRead.READERS, new FourRead()),
     AKNIGA_ME(AknigaMe.SERVER, "Akniga.me", "akniga_me", "search_akniga_me", 28, "AknigaMe",
-            AknigaMe.INDEX, AknigaMe.GENRES, AknigaMe.AUTHORS, AknigaMe.READERS, new AknigaMe());
+            AknigaMe.INDEX, AknigaMe.GENRES, AknigaMe.AUTHORS, AknigaMe.READERS, new AknigaMe()),
+    AUDIOMIR(Audiomir.SERVER, "Audiomir", "audiomir", "search_audiomir", 29, "Audiomir",
+            Audiomir.INDEX, Audiomir.GENRES, Audiomir.AUTHORS, Audiomir.READERS, new Audiomir()),
+    AUDIOKNIZHKA(Audioknizhka.SERVER, "Аудиокнижка", "audioknizhka", "search_audioknizhka", 30, "Audioknizhka",
+            Audioknizhka.INDEX, Audioknizhka.GENRES, Audioknizhka.AUTHORS, Audioknizhka.READERS, new Audioknizhka()),
+    AUDIOKNIGIVSE(Audioknigivse.SERVER, "Аудиокниги всем", "audioknigivse", "search_audioknigivse", 31,
+            "Audioknigivse", Audioknigivse.INDEX, Audioknigivse.GENRES, Audioknigivse.AUTHORS,
+            Audioknigivse.READERS, new Audioknigivse()),
+    AUDIOBOOK24(Audiobook24.SERVER, "Audiobook24", "audiobook24", "search_audiobook24", 32, "Audiobook24",
+            Audiobook24.INDEX, Audiobook24.GENRES, Audiobook24.AUTHORS, Audiobook24.READERS, new Audiobook24()),
+    SLUSHKIN(Slushkin.SERVER, "Слушкин", "slushkin", "search_slushkin", 33, "Slushkin",
+            Slushkin.INDEX, Slushkin.GENRES, Slushkin.AUTHORS, Slushkin.READERS, new Slushkin(), KNIGAVUHE),
+    AUDIOKNIGI_TOP(AudioknigiTop.SERVER, "Audioknigi.top", "audioknigi_top", "search_audioknigi_top", 34,
+            "AudioknigiTop", AudioknigiTop.INDEX, AudioknigiTop.GENRES, AudioknigiTop.AUTHORS, AudioknigiTop.READERS,
+            new AudioknigiTop()),
+    KNIZHIN(Knizhin.SERVER, "Knizhin", "knizhin", "search_knizhin", 35, "Knizhin",
+            Knizhin.INDEX, Knizhin.GENRES, Knizhin.AUTHORS, Knizhin.READERS, new Knizhin()),
+    AUDIOKNIGI_CC(AudioknigiCc.SERVER, "Audioknigi.cc", "audioknigi_cc", "search_audioknigi_cc", 36, "AudioknigiCc",
+            AudioknigiCc.INDEX, AudioknigiCc.GENRES, AudioknigiCc.AUTHORS, AudioknigiCc.READERS, new AudioknigiCc(),
+            AUDIOKNIGA_ONLINE),
+    TWO_KNIGI(TwoKnigi.SERVER, "2knigi", "two_knigi", "search_two_knigi", 37, "TwoKnigi",
+            TwoKnigi.INDEX, TwoKnigi.GENRES, TwoKnigi.AUTHORS, TwoKnigi.READERS, new TwoKnigi(), YAKNIGA),
+    AUKNIGA(Aukniga.SERVER, "Aukniga", "aukniga", "search_aukniga", 38, "Aukniga",
+            Aukniga.INDEX, Aukniga.GENRES, Aukniga.AUTHORS, Aukniga.READERS, new Aukniga()),
+    AUBOOK(Aubook.SERVER, "Aubook", "aubook", "search_aubook", 39, "Aubook",
+            Aubook.INDEX, Aubook.GENRES, Aubook.AUTHORS, Aubook.READERS, new Aubook(), AUKNIGA),
+    MDS(Mds.SERVER, "Модель для сборки", "mds", "search_mds", 40, "Mds",
+            Mds.INDEX, Mds.GENRES, Mds.AUTHORS, Mds.READERS, new Mds()),
+    STAROERADIO(Staroeradio.SERVER, "Старое радио", "staroeradio", "search_staroeradio", 41, "Staroeradio",
+            Staroeradio.INDEX, Staroeradio.GENRES, Staroeradio.AUTHORS, Staroeradio.READERS, new Staroeradio());
 
     /** {@code https://host} without a trailing slash. */
     public final String server;
@@ -238,7 +280,7 @@ public enum Provider {
         }
         String current = Url.hostOf(Url.canonical("https://" + host + "/")); // a former host is the site's
         for (Provider p : values()) {
-            if (isUnder(current, p.host())) {
+            if (isUnder(current, p.host()) && !isAnyUnder(current, p.parser.refererHosts())) {
                 return p;
             }
             for (String own : p.parser.hosts()) {
@@ -280,6 +322,16 @@ public enum Provider {
     /** {@code host} is {@code domain} or one of its subdomains. */
     private static boolean isUnder(String host, String domain) {
         return host.equals(domain) || host.endsWith("." + domain);
+    }
+
+    /** {@code host} is one of {@code domains} or a subdomain of one: a shared CDN under the site's own domain. */
+    private static boolean isAnyUnder(String host, java.util.Set<String> domains) {
+        for (String domain : domains) {
+            if (isUnder(host, domain)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /** {@link #ofUrl}, but an unknown host is an error, not "no data". */

@@ -226,6 +226,25 @@ public final class Players {
         return "";
     }
 
+    /**
+     * Playerjs {@code #2} text whose base64 carries the player's separator keys as {@code "//" + base64(key)} pieces,
+     * one sometimes inserted inside another (audiomir.xyz, aukniga.com). {@code junk} are those pieces as the site's
+     * player writes them (its {@code bk0..bk4}); they are cut out until none is left, then the rest is decoded. The
+     * result is whatever the player holds (a playlist URL, a JSON config); a site that changes its keys yields text
+     * that is neither, which the caller rejects.
+     */
+    public static String playerjsKeyed(String file, String... junk) {
+        String body = file.trim().replaceFirst("^#2", "");
+        String before;
+        do {
+            before = body;
+            for (String piece : junk) {
+                body = body.replace(piece, "");
+            }
+        } while (!body.equals(before));
+        return base64Text(body);
+    }
+
     // ---------------------------------------------------------------- helpers
 
     /**

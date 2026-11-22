@@ -45,7 +45,7 @@ public class PeopleIndexTest {
                 lists++;
             }
         }
-        assertEquals("ten sites, poleknig and slushat-knigi without readers", 18, lists);
+        assertEquals("sixteen sites; poleknig, slushat-knigi, audioknizhka and mds without readers", 28, lists);
         assertFalse(index.has(Provider.OTRUB.name(), false));
     }
 
@@ -73,6 +73,6 @@ public class PeopleIndexTest {
                 checked++;
             }
         }
-        assertEquals("the 18 drawer lists and fantlab's narrators", 19, checked);
+        assertEquals("the 28 drawer lists and fantlab's narrators", 29, checked);
     }
 }

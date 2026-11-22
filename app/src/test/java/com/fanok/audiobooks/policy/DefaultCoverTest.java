@@ -14,6 +14,8 @@ public class DefaultCoverTest {
         assertTrue(DefaultCover.replaces("https://www.audioboo.org/uploads/cover.webp"));
         // saved before the move to audioboo.org
         assertTrue(DefaultCover.replaces("https://audioboo.ru/uploads/cover.jpg"));
+        // staroeradio's pictures are real covers
+        assertFalse(DefaultCover.replaces("https://staroeradio.ru/ap/staroeradio/images/pics/078167.jpg"));
     }
 
     @Test

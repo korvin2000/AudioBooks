@@ -120,6 +120,8 @@ public class Url {
         HOST_ALIASES.put("sweetbook.net", "golosknig.com");
         // the Ukrainian address of audio-kniga.biz: the same catalog, ids and slugs (blocked from Russia)
         HOST_ALIASES.put("audioknigi.com.ua", "audio-kniga.biz");
+        // audiomir.xyz answers 302 to the m1. mirror with the path kept
+        HOST_ALIASES.put("audiomir.xyz", "m1.audiomir.xyz");
     }
 
     /** Lower-case host of {@code url} without a leading {@code www.}; empty when unparsable. */

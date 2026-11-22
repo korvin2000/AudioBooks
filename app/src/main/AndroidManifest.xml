@@ -260,6 +260,33 @@
                 <data android:host="www.4read.org" />
                 <data android:host="akniga.me" />
                 <data android:host="www.akniga.me" />
+                <data android:host="audiomir.xyz" />
+                <data android:host="www.audiomir.xyz" />
+                <data android:host="m1.audiomir.xyz" />
+                <data android:host="audioknizhka.org" />
+                <data android:host="www.audioknizhka.org" />
+                <data android:host="audioknigivse.ru" />
+                <data android:host="www.audioknigivse.ru" />
+                <data android:host="audiobook24.ru" />
+                <data android:host="www.audiobook24.ru" />
+                <data android:host="slushkin.online" />
+                <data android:host="www.slushkin.online" />
+                <data android:host="audioknigi.top" />
+                <data android:host="www.audioknigi.top" />
+                <data android:host="knizhin.net" />
+                <data android:host="www.knizhin.net" />
+                <data android:host="audioknigi.cc" />
+                <data android:host="www.audioknigi.cc" />
+                <data android:host="2knigi.net" />
+                <data android:host="www.2knigi.net" />
+                <data android:host="aukniga.com" />
+                <data android:host="www.aukniga.com" />
+                <data android:host="aubook.org" />
+                <data android:host="www.aubook.org" />
+                <data android:host="mds-old.ru" />
+                <data android:host="www.mds-old.ru" />
+                <data android:host="staroeradio.ru" />
+                <data android:host="www.staroeradio.ru" />
             </intent-filter>
             <!-- a text shared from another app (Telegram, a browser): its first link to a site of the app opens -->
             <intent-filter>

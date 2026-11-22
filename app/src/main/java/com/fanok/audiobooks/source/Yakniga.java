@@ -27,6 +27,7 @@ import java.net.URLDecoder;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.EnumMap;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -37,17 +38,20 @@ import java.util.Set;
 import okhttp3.HttpUrl;
 
 /**
- * yakniga.org (probed live, 2026-11-04): a Nuxt front over a public GraphQL API, {@code POST /graphql}, no login, no
- * challenge. The app keeps the site's own URLs and {@link #fetch} reads each of them as one GraphQL query, answered
- * as JSON; the parse methods read {@code data.x}, the alias every query gives its answer.
+ * yakniga.org (probed live, 2026-11-04) and the engine of its backend's other fronts ({@link TwoKnigi}): a Nuxt front
+ * over a public GraphQL API, {@code POST /graphql}, no login, no challenge. The app keeps the site's own URLs and
+ * {@link #fetch} reads each of them as one GraphQL query, answered as JSON; the parse methods read {@code data.x}, the
+ * alias every query gives its answer. What a front differs in is its {@link Site}: its server, the routes of its pages
+ * and the field that names a record in them; the code never asks which site it serves.
  * <ul>
- * <li>Every request carries {@code Origin: https://yakniga.org}: without it the server ignores the sort (the order is
- * random from one request to the next) and lists the books of another front-end.</li>
+ * <li>Every request carries the site's {@code Origin}: without it the server ignores the sort (the order is random
+ * from one request to the next) and lists the books of another front-end.</li>
  * <li>Of 312,630 entries about 79% are LitRes trial stubs ({@code source} "litres": one short chapter), "author_today"
  * fragments (one 20-minute chapter whatever the book's duration says) or paid "biblio" entries without chapters. The
  * books that play in full come from {@link #FULL_SOURCES} (63,180): every listing asks for them alone
  * ({@code by_source}), and the cards are checked again ({@link #playable}), since the filter lets some stubs through
- * (the answer to this origin shows the full sources as {@code null}). A copyright-blocked book is left out as well.</li>
+ * (the answer to this origin shows the full sources as {@code null}). A copyright-blocked book and one without
+ * chapters are left out as well.</li>
  * <li>Listings {@code books(query, page, perPage)}, also of a genre, an author, a reader or a series; the query JSON
  * sorts: {@code by_date} (newest, the default of the site's genre and people pages), {@code by_pop} (the site's
  * "По рейтингу"), {@code by_alphabet} and {@code by_fixed_top} (the curated "Популярные" list of {@code /top}).
@@ -64,7 +68,7 @@ import okhttp3.HttpUrl;
  * duration is its chapters' sum (the page's other figures disagree).</li>
  * </ul>
  */
-public final class Yakniga implements SourceParser {
+public class Yakniga implements SourceParser {
 
     public static final String SERVER = "https://yakniga.org";
     /** Every full book, newest first: the catalog. */
@@ -72,7 +76,6 @@ public final class Yakniga implements SourceParser {
     public static final String GENRES = SERVER + "/genres";
     public static final String AUTHORS = SERVER + "/authors";
     public static final String READERS = SERVER + "/readers";
-    static final String API = SERVER + "/graphql";
 
     /** The sources of the books that play in full; "litres", "author_today" and "biblio" are stubs. */
     static final List<String> FULL_SOURCES = Collections.unmodifiableList(
@@ -94,42 +97,115 @@ public final class Yakniga implements SourceParser {
     /** A search page past the first: the search answers in one page. */
     static final String NOTHING_FOUND = "{\"data\":{\"x\":[]}}";
 
+    /** What an app URL of the site is. */
+    enum Kind { ALL, GENRE, AUTHOR, READER, SERIES, BOOK, GENRES, AUTHORS, READERS, SEARCH }
+
+    /**
+     * What one front of the engine differs in, the codec of its URLs: its server (the API is its {@code /graphql}),
+     * the route of each {@link Kind} of page and the field that names a record in it. A route is a path with
+     * {@code *} for each name of the record ({@code genres/*}; {@code *} alone for yakniga's author pages); the route
+     * with the most fixed segments that matches a path tells what it is ({@code /genres} before {@code /<author>}).
+     */
+    static final class Site {
+        final String server;
+        final String api;
+        /** The field that names a genre, an author or a reader in its URL and the argument that looks it up. */
+        final String key;
+        /** The selection that names a record: its alias, and its {@link #key} when that is another field. */
+        final String names;
+        final Map<Kind, String[]> routes = new EnumMap<>(Kind.class);
+        /** The book's fields its URL names, in route order ({@code $a}, {@code $b}), and the lookup by them. */
+        String[] bookKeys = {"aliasName"};
+        String bookArgs = "aliasName:$a";
+        /** The book's own field naming its author when it lists none; null when it has none. */
+        String bookAuthor;
+
+        Site(String server, String key) {
+            this.server = server;
+            this.api = server + "/graphql";
+            this.key = key;
+            this.names = key.equals("aliasName") ? key : "aliasName " + key;
+        }
+
+        Site route(Kind kind, String route) {
+            routes.put(kind, route.split("/"));
+            return this;
+        }
+
+        Site book(String args, String... keys) {
+            bookArgs = args;
+            bookKeys = keys;
+            return this;
+        }
+
+        Site bookAuthor(String field) {
+            bookAuthor = field;
+            return this;
+        }
+    }
+
+    /** yakniga.org's own routes: an author's page is {@code /<alias>}, a book's {@code /<authorAlias>/<alias>}. */
+    static final Site YAKNIGA = new Site(SERVER, "aliasName")
+            .route(Kind.GENRES, "genres").route(Kind.AUTHORS, "authors").route(Kind.READERS, "readers")
+            .route(Kind.SEARCH, "search").route(Kind.GENRE, "genres/*").route(Kind.AUTHOR, "*")
+            .route(Kind.READER, "reader/*").route(Kind.SERIES, "series/*").route(Kind.BOOK, "*/*")
+            .book("aliasName:$b,authorAliasName:$a", "authorAlias", "aliasName")
+            .bookAuthor("authorAlias");
+
+    final Site site;
+
     // ---------------------------------------------------------------- GraphQL documents
 
-    private static final String BOOK_FIELDS = "id title aliasName authorAlias authorName duration source isBiblio"
-            + " copyrightBlock cover cover360";
-    private static final String PEOPLE_FIELDS = "seriesNum authors{name aliasName} readers{name aliasName}"
-            + " genres{collection{name aliasName}}";
-    private static final String CARD = BOOK_FIELDS + " " + PEOPLE_FIELDS + " series{name aliasName}";
     private static final String PAGING = "metadata{currentPage nextPage totalPages totalEntries}";
-    private static final String BOOKS = "books(query:$q,page:$p,perPage:$n){collection{" + CARD + "} " + PAGING + "}";
-    static final String LIST_ALL = "query($q:JSON,$p:Int,$n:Int){x:" + BOOKS + "}";
-    static final String GENRE_LIST = "query{x:genres(page:1,perPage:200){collection{id name aliasName position"
-            + " parent{aliasName}} " + PAGING + "}}";
     private static final String COUNT = "books(query:$s,page:1,perPage:1){metadata{totalEntries}}";
-    static final String SEARCH_BOOKS = "query($t:String!,$src:[String!]){x:search(term:$t,source:$src,"
-            + "ebookCheck:[false]){__typename ... on Book{" + CARD + "}}}";
-    static final String SEARCH_PEOPLE = "query($t:String!,$src:[String!],$s:JSON){x:search(term:$t,source:$src,"
-            + "ebookCheck:[false]){__typename ... on Author{name aliasName " + COUNT + "} ... on Reader{name aliasName "
-            + COUNT + "}}}";
-    static final String BOOK = "query($a:String,$b:String,$s:JSON,$n:Int){x:book(aliasName:$b,authorAliasName:$a){"
-            + BOOK_FIELDS + " " + PEOPLE_FIELDS + " description likesCount dislikesCount"
-            + " chapters{collection{name duration fileUrl}} series{name aliasName"
-            + " books(query:$s,page:1,perPage:$n){collection{" + BOOK_FIELDS + " seriesNum}}}}}";
+    private final String bookFields;
+    private final String books;
+    final String listAllQuery;
+    final String genresQuery;
+    final String searchBooksQuery;
+    final String searchPeopleQuery;
+    final String bookQuery;
 
-    /** The books of one {@code kind} ("genre", "author", "reader", "series") named by its alias. */
-    static String listIn(String kind) {
-        return "query($a:String,$q:JSON,$p:Int,$n:Int){x:" + kind + "(aliasName:$a){name " + BOOKS + "}}";
+    public Yakniga() {
+        this(YAKNIGA);
+    }
+
+    Yakniga(Site site) {
+        this.site = site;
+        String n = site.names;
+        bookFields = "id title " + n + " authorAlias authorName duration chaptersCount source isBiblio copyrightBlock"
+                + " cover cover360";
+        String people = "seriesNum authors{name " + n + "} readers{name " + n + "} genres{collection{name " + n + "}}";
+        String card = bookFields + " " + people + " series{name aliasName}";
+        books = "books(query:$q,page:$p,perPage:$n){collection{" + card + "} " + PAGING + "}";
+        listAllQuery = "query($q:JSON,$p:Int,$n:Int){x:" + books + "}";
+        genresQuery = "query{x:genres(page:1,perPage:200){collection{id name " + n + " position parent{aliasName}} "
+                + PAGING + "}}";
+        searchBooksQuery = "query($t:String!,$src:[String!]){x:search(term:$t,source:$src,ebookCheck:[false])"
+                + "{__typename ... on Book{" + card + "}}}";
+        searchPeopleQuery = "query($t:String!,$src:[String!],$s:JSON){x:search(term:$t,source:$src,"
+                + "ebookCheck:[false]){__typename ... on Author{name " + n + " " + COUNT + "} ... on Reader{name " + n
+                + " " + COUNT + "}}}";
+        StringBuilder vars = new StringBuilder();
+        for (int i = 0; i < site.bookKeys.length; i++) {
+            vars.append("$").append((char) ('a' + i)).append(":String,");
+        }
+        bookQuery = "query(" + vars + "$s:JSON,$n:Int){x:book(" + site.bookArgs + "){" + bookFields + " " + people
+                + " description likesCount dislikesCount chapters{collection{name duration fileUrl}} series{name"
+                + " aliasName books(query:$s,page:1,perPage:$n){collection{" + bookFields + " seriesNum}}}}}";
+    }
+
+    /** The books of one {@code kind} ("genre", "author", "reader", "series") named in its URL. */
+    String listIn(String kind) {
+        String lookup = kind.equals("series") ? "aliasName" : site.key; // a series is named by its alias everywhere
+        return "query($a:String,$q:JSON,$p:Int,$n:Int){x:" + kind + "(" + lookup + ":$a){name " + books + "}}";
     }
 
     /** A page of the authors or readers ({@code kind}), each with the count of their full books. */
-    static String peopleList(String kind) {
-        return "query($p:Int,$n:Int,$s:JSON){x:" + kind + "(page:$p,perPage:$n){collection{name aliasName " + COUNT
-                + "} " + PAGING + "}}";
+    String peopleList(String kind) {
+        return "query($p:Int,$n:Int,$s:JSON){x:" + kind + "(page:$p,perPage:$n){collection{name " + site.names + " "
+                + COUNT + "} " + PAGING + "}}";
     }
-
-    /** What an app URL of the site is. */
-    enum Kind { ALL, GENRE, AUTHOR, READER, SERIES, BOOK, GENRES, AUTHORS, READERS, SEARCH }
 
     // ---------------------------------------------------------------- SourceParser
 
@@ -141,7 +217,7 @@ public final class Yakniga implements SourceParser {
         }
         JsonObject request = request(url);
         if (request == null) {
-            throw new IOException("not a page of yakniga.org: " + url);
+            throw new IOException("not a page of " + site.server + ": " + url);
         }
         return post(request);
     }
@@ -172,7 +248,7 @@ public final class Yakniga implements SourceParser {
         if (param == null) {
             return null;
         }
-        String siteWide = SERVER + "/?" + param;
+        String siteWide = site.server + "/?" + param;
         String scope = genreOf(listingUrl);
         String same = scope == null ? siteWide : inGenre(siteWide, scope);
         return same.equals(withoutPage(listingUrl)) ? listingUrl : siteWide;
@@ -185,7 +261,7 @@ public final class Yakniga implements SourceParser {
         if (kind != Kind.GENRE && kind != Kind.AUTHOR && kind != Kind.READER) {
             return null;
         }
-        return SERVER + "/" + join(path(url), "/");
+        return site.server + "/" + join(path(url), "/");
     }
 
     @Override
@@ -217,7 +293,7 @@ public final class Yakniga implements SourceParser {
             case PERFORMERS: type = "type=readers&"; break;
             default: type = ""; break;
         }
-        return SERVER + "/search?" + type + "q=" + SearchUrls.enc(query) + "&page=" + page;
+        return url(Kind.SEARCH) + "?" + type + "q=" + SearchUrls.enc(query) + "&page=" + page;
     }
 
     @Override
@@ -248,59 +324,53 @@ public final class Yakniga implements SourceParser {
     // ---------------------------------------------------------------- requests and URLs
 
     /** POSTs a GraphQL request; an answer without its data (a book or a person that is gone) is an error. */
-    static JsonPage post(JsonObject request) throws IOException {
-        JsonPage page = SiteHttp.json(SiteHttp.connect(API)
+    JsonPage post(JsonObject request) throws IOException {
+        JsonPage page = SiteHttp.json(SiteHttp.connect(site.api)
                 .method(Connection.Method.POST)
                 .header("Content-Type", "application/json")
-                .header("Origin", SERVER)
-                .referrer(SERVER + "/")
+                .header("Origin", site.server)
+                .referrer(site.server + "/")
                 .requestBody(request.toString()));
         String error = error(page);
         if (error != null) {
-            throw new IOException(API + ": " + error);
+            throw new IOException(site.api + ": " + error);
         }
         return page;
     }
 
     /** The request ({@code query} and {@code variables}) that reads the app URL {@code url}; null for another page. */
-    static JsonObject request(String url) {
+    JsonObject request(String url) {
         Kind kind = kind(url);
         if (kind == null) {
             return null;
         }
-        List<String> path = path(url);
+        List<String> names = named(kind, path(url));
         JsonObject v = new JsonObject();
+        for (int i = 0; i < names.size(); i++) {
+            v.addProperty(String.valueOf((char) ('a' + i)), names.get(i));
+        }
         String query;
         switch (kind) {
             case ALL:
-                query = LIST_ALL;
+                query = listAllQuery;
                 v.add("q", filter(url));
                 break;
             case GENRE:
             case READER:
-                query = listIn(kind == Kind.GENRE ? "genre" : "reader");
-                v.addProperty("a", path.get(1));
+            case AUTHOR:
+                query = listIn(kind.name().toLowerCase(Locale.ROOT));
                 v.add("q", filter(url));
                 break;
             case SERIES:
                 query = listIn("series");
-                v.addProperty("a", path.get(1));
                 v.add("q", sources()); // by the numbers in the series
                 break;
-            case AUTHOR:
-                query = listIn("author");
-                v.addProperty("a", path.get(0));
-                v.add("q", filter(url));
-                break;
             case BOOK:
-                query = BOOK;
-                v.addProperty("a", path.get(0));
-                v.addProperty("b", path.get(1));
                 v.add("s", sources());
                 v.addProperty("n", SERIES_MAX);
-                return body(query, v);
+                return body(bookQuery, v);
             case GENRES:
-                return body(GENRE_LIST, v);
+                return body(genresQuery, v);
             case AUTHORS:
             case READERS:
                 return peopleRequest(kind == Kind.READERS, page(url));
@@ -311,7 +381,7 @@ public final class Yakniga implements SourceParser {
                 if (people) {
                     v.add("s", sources());
                 }
-                return body(people ? SEARCH_PEOPLE : SEARCH_BOOKS, v);
+                return body(people ? searchPeopleQuery : searchBooksQuery, v);
         }
         v.addProperty("p", page(url));
         v.addProperty("n", PER_PAGE);
@@ -322,12 +392,12 @@ public final class Yakniga implements SourceParser {
      * Page {@code pageNo} of the authors or readers with full books: page {@code pageNo + skipped} of the site's list;
      * a page without any is skipped (up to {@link #MAX_PEOPLE_PAGES} in a row), so the list never shows an empty page.
      */
-    static ProviderPage<GenrePOJO> walkPeople(BookPages.Fetch pages, int pageNo, boolean performers,
-            PeopleCursor cursor) throws IOException {
+    ProviderPage<GenrePOJO> walkPeople(BookPages.Fetch pages, int pageNo, boolean performers, PeopleCursor cursor)
+            throws IOException {
         if (pageNo <= 1) {
             cursor.skipped = 0;
         }
-        String list = performers ? READERS : AUTHORS;
+        String list = url(performers ? Kind.READERS : Kind.AUTHORS);
         ProviderPage<GenrePOJO> rows = ProviderPage.empty();
         for (int read = 0; read < MAX_PEOPLE_PAGES; read++) {
             String page = ListingFilters.withParam(list, "page", String.valueOf(pageNo + cursor.skipped));
@@ -341,7 +411,7 @@ public final class Yakniga implements SourceParser {
     }
 
     /** API page {@code page} of the authors or readers with their full-book counts. */
-    static JsonObject peopleRequest(boolean performers, int page) {
+    JsonObject peopleRequest(boolean performers, int page) {
         JsonObject v = new JsonObject();
         v.addProperty("p", page);
         v.addProperty("n", PEOPLE_PER_PAGE);
@@ -404,33 +474,68 @@ public final class Yakniga implements SourceParser {
         }
     }
 
-    /** What the app URL {@code url} is; null for another page of the site. */
-    static Kind kind(String url) {
+    /** What the app URL {@code url} is: the route with the most fixed segments that matches; null for another page. */
+    Kind kind(String url) {
         List<String> path = path(url);
         if (path == null) {
             return null;
         }
-        switch (path.size()) {
-            case 0:
-                return Kind.ALL;
-            case 1:
-                switch (path.get(0)) {
-                    case "genres": return Kind.GENRES;
-                    case "authors": return Kind.AUTHORS;
-                    case "readers": return Kind.READERS;
-                    case "search": return Kind.SEARCH;
-                    default: return Kind.AUTHOR;
-                }
-            case 2:
-                switch (path.get(0)) {
-                    case "genres": return Kind.GENRE;
-                    case "reader": return Kind.READER;
-                    case "series": return Kind.SERIES;
-                    default: return Kind.BOOK;
-                }
-            default:
-                return null;
+        if (path.isEmpty()) {
+            return Kind.ALL;
         }
+        Kind found = null;
+        int best = -1;
+        for (Map.Entry<Kind, String[]> route : site.routes.entrySet()) {
+            int fixed = matches(route.getValue(), path);
+            if (fixed > best) {
+                best = fixed;
+                found = route.getKey();
+            }
+        }
+        return found;
+    }
+
+    /** The fixed segments of {@code route} when it matches {@code path}; -1 when it does not. */
+    private static int matches(String[] route, List<String> path) {
+        if (route.length != path.size()) {
+            return -1;
+        }
+        int fixed = 0;
+        for (int i = 0; i < route.length; i++) {
+            if (!route[i].equals("*")) {
+                if (!route[i].equals(path.get(i))) {
+                    return -1;
+                }
+                fixed++;
+            }
+        }
+        return fixed;
+    }
+
+    /** The names a path of {@code kind} gives its record, in route order ({@code $a}, {@code $b}). */
+    private List<String> named(Kind kind, List<String> path) {
+        List<String> names = new ArrayList<>();
+        String[] route = site.routes.get(kind);
+        for (int i = 0; route != null && i < route.length; i++) {
+            if (route[i].equals("*")) {
+                names.add(path.get(i));
+            }
+        }
+        return names;
+    }
+
+    /** The URL of the page of {@code kind} that {@code names} name; "" without one of them. */
+    String url(Kind kind, String... names) {
+        StringBuilder url = new StringBuilder(site.server);
+        int next = 0;
+        for (String segment : site.routes.get(kind)) {
+            String name = segment.equals("*") ? names[next++] : segment;
+            if (name.isEmpty()) {
+                return "";
+            }
+            url.append('/').append(name);
+        }
+        return url.toString();
     }
 
     /** The path segments of {@code url}, empty ones left out; null when it is no URL. */
@@ -475,31 +580,25 @@ public final class Yakniga implements SourceParser {
         }
     }
 
-    /** The page of the book by {@code author} with the alias {@code alias}; "" without either. */
-    public static String bookUrl(String author, String alias) {
-        return author.isEmpty() || alias.isEmpty() ? "" : SERVER + "/" + author + "/" + alias;
+    /** The page of the book {@code o}; "" when it lacks a name its URL needs. */
+    String bookUrl(JsonObject o) {
+        String[] names = new String[site.bookKeys.length];
+        for (int i = 0; i < names.length; i++) {
+            names[i] = string(o, site.bookKeys[i]);
+        }
+        return url(Kind.BOOK, names);
     }
 
-    static String genreUrl(String alias) {
-        return alias.isEmpty() ? "" : SERVER + "/genres/" + alias + "?" + NEWEST;
-    }
-
-    static String authorUrl(String alias) {
-        return alias.isEmpty() ? "" : SERVER + "/" + alias + "?" + NEWEST;
-    }
-
-    static String readerUrl(String alias) {
-        return alias.isEmpty() ? "" : SERVER + "/reader/" + alias + "?" + NEWEST;
-    }
-
-    static String seriesUrl(String alias) {
-        return alias.isEmpty() ? "" : SERVER + "/series/" + alias;
+    /** A listing of {@code kind} for the record named {@code name}, newest first; "" without the name. */
+    private String newest(Kind kind, String name) {
+        String url = url(kind, name);
+        return url.isEmpty() ? "" : url + "?" + NEWEST;
     }
 
     // ---------------------------------------------------------------- listings
 
     /** The catalog, its sorts, a genre, an author, a reader or a series: the full books of the page. */
-    public static ProviderPage<BookPOJO> parseListing(Document page) {
+    public ProviderPage<BookPOJO> parseListing(Document page) {
         JsonObject x = record(page);
         JsonObject list = x.has("collection") ? x : object(x, "books");
         if (list == null) {
@@ -510,17 +609,22 @@ public final class Yakniga implements SourceParser {
     }
 
     /** The books of a search, at most 20, in one page. */
-    public static ProviderPage<BookPOJO> parseSearch(Document page) {
+    public ProviderPage<BookPOJO> parseSearch(Document page) {
         List<JsonObject> books = found(page, "Book");
         return ProviderPage.of(cards(books), false, books.size());
     }
 
     /**
      * True for a book that plays in full: of one of the {@link #FULL_SOURCES} (shown as none to this origin), not paid,
-     * not blocked, with a duration.
+     * not blocked, with a duration and chapters. Some full books (5 of the first 60 by title, 2026-11-21) list a duration
+     * but no chapter at all ({@code chaptersCount} 0, the book page has none either); the count is otherwise one more than
+     * the chapters at times, so only its zero is trusted.
      */
     static boolean playable(JsonObject o) {
-        return !stub(o) && !flag(o, "copyrightBlock") && Json.seconds(o.get("duration")) > 0;
+        JsonElement chapters = o.get("chaptersCount");
+        boolean none = chapters != null && chapters.isJsonPrimitive() && chapters.getAsJsonPrimitive().isNumber()
+                && chapters.getAsInt() == 0;
+        return !stub(o) && !flag(o, "copyrightBlock") && Json.seconds(o.get("duration")) > 0 && !none;
     }
 
     /** A LitRes trial, an author.today fragment or a paid book. */
@@ -534,7 +638,7 @@ public final class Yakniga implements SourceParser {
         return meta != null && number(meta, "currentPage") < number(meta, "totalPages");
     }
 
-    private static ArrayList<BookPOJO> cards(List<JsonObject> items) {
+    private ArrayList<BookPOJO> cards(List<JsonObject> items) {
         ArrayList<BookPOJO> books = new ArrayList<>();
         for (JsonObject item : items) {
             if (playable(item)) {
@@ -547,25 +651,25 @@ public final class Yakniga implements SourceParser {
         return books;
     }
 
-    private static BookPOJO card(JsonObject o) {
+    private BookPOJO card(JsonObject o) {
         BookPOJO book = new BookPOJO();
-        book.setUrl(bookUrl(string(o, "authorAlias"), string(o, "aliasName")));
+        book.setUrl(bookUrl(o));
         book.setName(clean(string(o, "title")));
         book.setPhoto(cover(o));
         book.setAutor(authors(o));
-        book.setUrlAutor(authorUrl(authorAlias(o)));
+        book.setUrlAutor(newest(Kind.AUTHOR, authorKey(o)));
         book.setArtist(names(objects(o, "readers")));
-        book.setUrlArtist(readerUrl(firstAlias(objects(o, "readers"))));
+        book.setUrlArtist(newest(Kind.READER, firstKey(objects(o, "readers"))));
         book.setTime(time(Json.seconds(o.get("duration"))));
         JsonObject genre = firstGenre(o);
         if (genre != null) {
             book.setGenre(clean(string(genre, "name")));
-            book.setUrlGenre(genreUrl(string(genre, "aliasName")));
+            book.setUrlGenre(newest(Kind.GENRE, string(genre, site.key)));
         }
         JsonObject series = object(o, "series");
         if (series != null) {
             book.setSeries(clean(string(series, "name")));
-            book.setUrlSeries(seriesUrl(string(series, "aliasName")));
+            book.setUrlSeries(url(Kind.SERIES, string(series, "aliasName")));
         }
         return book;
     }
@@ -574,7 +678,7 @@ public final class Yakniga implements SourceParser {
      * The genres, in the site's order ({@code position}): each top genre followed by its sub-genres, a sub-genre
      * described by its parents ("Фантастика / Фэнтези").
      */
-    public static ArrayList<GenrePOJO> parseGenres(Document page) {
+    public ArrayList<GenrePOJO> parseGenres(Document page) {
         List<JsonObject> all = objects(record(page), "collection");
         Set<String> aliases = new HashSet<>();
         for (JsonObject genre : all) {
@@ -601,7 +705,7 @@ public final class Yakniga implements SourceParser {
         return out;
     }
 
-    private static void addGenres(ArrayList<GenrePOJO> out, List<JsonObject> genres,
+    private void addGenres(ArrayList<GenrePOJO> out, List<JsonObject> genres,
             Map<String, List<JsonObject>> children, String parents, int depth) {
         Collections.sort(genres, (a, b) -> {
             int byPosition = Integer.compare(number(a, "position"), number(b, "position"));
@@ -609,16 +713,16 @@ public final class Yakniga implements SourceParser {
         });
         for (JsonObject genre : genres) {
             String name = clean(string(genre, "name"));
-            String alias = string(genre, "aliasName");
-            if (name.isEmpty() || alias.isEmpty()) {
+            String url = newest(Kind.GENRE, string(genre, site.key));
+            if (name.isEmpty() || url.isEmpty()) {
                 continue;
             }
-            GenrePOJO pojo = new GenrePOJO(name, genreUrl(alias));
+            GenrePOJO pojo = new GenrePOJO(name, url);
             if (!parents.isEmpty()) {
                 pojo.setDescription(parents);
             }
             out.add(pojo);
-            List<JsonObject> sub = children.get(alias);
+            List<JsonObject> sub = children.get(string(genre, "aliasName"));
             if (sub != null && depth < 3) {
                 addGenres(out, sub, children, parents.isEmpty() ? name : parents + " / " + name, depth + 1);
             }
@@ -626,26 +730,26 @@ public final class Yakniga implements SourceParser {
     }
 
     /** A page of the authors or readers: those with full books, their count as the rating. */
-    public static ProviderPage<GenrePOJO> parsePeople(Document page, boolean performers) {
+    public ProviderPage<GenrePOJO> parsePeople(Document page, boolean performers) {
         JsonObject list = record(page);
         List<JsonObject> items = objects(list, "collection");
         return ProviderPage.of(people(items, performers), hasMore(list), items.size());
     }
 
     /** The authors or readers a search found, at most 10, in one page. */
-    public static ProviderPage<GenrePOJO> parsePeopleSearch(Document page, boolean performers) {
+    public ProviderPage<GenrePOJO> parsePeopleSearch(Document page, boolean performers) {
         List<JsonObject> found = found(page, performers ? "Reader" : "Author");
         return ProviderPage.of(people(found, performers), false, found.size());
     }
 
-    private static ArrayList<GenrePOJO> people(List<JsonObject> items, boolean performers) {
+    private ArrayList<GenrePOJO> people(List<JsonObject> items, boolean performers) {
         ArrayList<GenrePOJO> people = new ArrayList<>();
         for (JsonObject o : items) {
             String name = clean(string(o, "name"));
-            String alias = string(o, "aliasName");
+            String url = newest(performers ? Kind.READER : Kind.AUTHOR, string(o, site.key));
             int books = fullBooks(o);
-            if (!name.isEmpty() && !alias.isEmpty() && books > 0) {
-                GenrePOJO person = new GenrePOJO(name, performers ? readerUrl(alias) : authorUrl(alias));
+            if (!name.isEmpty() && !url.isEmpty() && books > 0) {
+                GenrePOJO person = new GenrePOJO(name, url);
                 person.setReting(books);
                 people.add(person);
             }
@@ -677,26 +781,26 @@ public final class Yakniga implements SourceParser {
     // ---------------------------------------------------------------- book
 
     /** The book: all authors and readers, the first genre, the series with the book's number, likes. */
-    public static DescriptionPOJO parseDescription(Document page) {
+    public DescriptionPOJO parseDescription(Document page) {
         JsonElement x = data(page);
         JsonObject o = x != null && x.isJsonObject() ? x.getAsJsonObject() : new JsonObject();
         DescriptionPOJO d = new DescriptionPOJO();
         d.setTitle(clean(string(o, "title")));
         d.setPoster(cover(o));
         d.setAutor(authors(o));
-        d.setAutorUrl(authorUrl(authorAlias(o)));
+        d.setAutorUrl(newest(Kind.AUTHOR, authorKey(o)));
         d.setArtist(names(objects(o, "readers")));
-        d.setArtistUrl(readerUrl(firstAlias(objects(o, "readers"))));
+        d.setArtistUrl(newest(Kind.READER, firstKey(objects(o, "readers"))));
         JsonObject genre = firstGenre(o);
         if (genre != null) {
             d.setGenre(clean(string(genre, "name")));
-            d.setGenreUrl(genreUrl(string(genre, "aliasName")));
+            d.setGenreUrl(newest(Kind.GENRE, string(genre, site.key)));
         }
         JsonObject series = object(o, "series");
         if (series != null) {
             String number = seriesNumber(o);
             d.setSeries(clean(string(series, "name")) + (number.isEmpty() ? "" : " (" + number + ")"));
-            d.setSeriesUrl(seriesUrl(string(series, "aliasName")));
+            d.setSeriesUrl(url(Kind.SERIES, string(series, "aliasName")));
         }
         int heard = chapterSeconds(o);
         d.setTime(time(heard > 0 ? heard : Json.seconds(o.get("duration"))));
@@ -710,13 +814,13 @@ public final class Yakniga implements SourceParser {
      * The chapters, an MP3 each; a stub (a trial, a fragment, a paid book) or a book its rights holder blocked is a
      * {@link BookRemovedException}, as the site refuses to play them.
      */
-    public static ArrayList<AudioPOJO> parseTracks(Document page) {
+    public ArrayList<AudioPOJO> parseTracks(Document page) {
         JsonObject o = record(page);
-        String bookUrl = bookUrl(string(o, "authorAlias"), string(o, "aliasName"));
+        String bookUrl = bookUrl(o);
         if (stub(o) || flag(o, "copyrightBlock")) {
             throw new BookRemovedException(bookUrl);
         }
-        Players.Chapters chapters = new Players.Chapters(clean(string(o, "title")), SERVER + "/");
+        Players.Chapters chapters = new Players.Chapters(clean(string(o, "title")), site.server + "/");
         JsonObject list = object(o, "chapters");
         chapters.each(list == null ? new JsonArray() : Json.arrayOf(list, "collection"), item -> {
             JsonObject c = item.getAsJsonObject();
@@ -726,12 +830,12 @@ public final class Yakniga implements SourceParser {
     }
 
     /** The full books of the book's series, in the series' order, with their numbers. */
-    public static ArrayList<SeriesPOJO> parseSeries(Document page) {
+    public ArrayList<SeriesPOJO> parseSeries(Document page) {
         JsonObject series = object(record(page), "series");
         JsonObject books = series == null ? null : object(series, "books");
         ArrayList<SeriesPOJO> out = new ArrayList<>();
         for (JsonObject b : books == null ? Collections.<JsonObject>emptyList() : objects(books, "collection")) {
-            String url = bookUrl(string(b, "authorAlias"), string(b, "aliasName"));
+            String url = bookUrl(b);
             String name = clean(string(b, "title"));
             if (!playable(b) || url.isEmpty() || name.isEmpty()) {
                 continue;
@@ -837,8 +941,8 @@ public final class Yakniga implements SourceParser {
         return all.isEmpty() ? null : all.get(0);
     }
 
-    private static String firstAlias(List<JsonObject> people) {
-        return people.isEmpty() ? "" : string(people.get(0), "aliasName");
+    private String firstKey(List<JsonObject> people) {
+        return people.isEmpty() ? "" : string(people.get(0), site.key);
     }
 
     /** The authors, or the one the book names when it lists none. */
@@ -847,9 +951,10 @@ public final class Yakniga implements SourceParser {
         return names.isEmpty() ? clean(string(o, "authorName")) : names;
     }
 
-    private static String authorAlias(JsonObject o) {
-        String alias = firstAlias(objects(o, "authors"));
-        return alias.isEmpty() ? string(o, "authorAlias") : alias;
+    /** The name of the first author's page, or of the one the book names when it lists none. */
+    private String authorKey(JsonObject o) {
+        String key = firstKey(objects(o, "authors"));
+        return key.isEmpty() && site.bookAuthor != null ? string(o, site.bookAuthor) : key;
     }
 
     /**
@@ -875,12 +980,12 @@ public final class Yakniga implements SourceParser {
     }
 
     /** The 360-pixel cover, else the original one, absolute. */
-    private static String cover(JsonObject o) {
+    private String cover(JsonObject o) {
         String path = string(o, "cover360");
         if (path.isEmpty()) {
             path = string(o, "cover");
         }
-        return path.startsWith("/") ? SERVER + path : path.startsWith("https://") ? path : "";
+        return path.startsWith("/") ? site.server + path : path.startsWith("https://") ? path : "";
     }
 
     /** H:MM:SS of a number of seconds; "" for none. */

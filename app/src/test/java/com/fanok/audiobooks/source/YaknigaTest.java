@@ -48,7 +48,7 @@ public class YaknigaTest {
     }
 
     private static ProviderPage<BookPOJO> listing(String name) throws IOException {
-        return Yakniga.parseListing(json(name));
+        return SITE.parseListing(json(name));
     }
 
     private static List<String> urls(List<BookPOJO> books) {
@@ -119,7 +119,7 @@ public class YaknigaTest {
                 urls(rating.items).contains(S + "/vladimir-korchagin/tayna-reki-zlyh-duhov"));
         assertFalse("a LitRes trial", urls(rating.items).contains(S + "/viktor-smirnov/bagrovye-kovyli"));
 
-        ProviderPage<BookPOJO> search = Yakniga.parseSearch(json("search.json"));
+        ProviderPage<BookPOJO> search = SITE.parseSearch(json("search.json"));
         assertFalse(urls(search.items).contains(S + "/andrey-panchenko/shans"));
 
         JsonPage stubs = JsonPage.parse(API, "{\"data\":{\"x\":{\"collection\":["
@@ -127,12 +127,23 @@ public class YaknigaTest {
                 + "{\"title\":\"Шаг\",\"aliasName\":\"shag\",\"authorAlias\":\"a\",\"duration\":1200,"
                 + "\"source\":\"author_today\"},"
                 + "{\"title\":\"Путь\",\"aliasName\":\"put\",\"authorAlias\":\"a\",\"duration\":900,\"source\":null,"
-                + "\"isBiblio\":true}],"
+                + "\"isBiblio\":true},"
+                + "{\"title\":\"Сто\",\"aliasName\":\"sto\",\"authorAlias\":\"a\",\"duration\":40605,\"source\":null,"
+                + "\"chaptersCount\":0}],"
                 + "\"metadata\":{\"currentPage\":3,\"totalPages\":9}}}}");
-        ProviderPage<BookPOJO> none = Yakniga.parseListing(stubs);
+        ProviderPage<BookPOJO> none = SITE.parseListing(stubs);
         assertEquals(ProviderPage.Status.OK, none.status);
         assertTrue(none.items.isEmpty());
         assertTrue("its next page stays", none.hasMore);
+
+        JsonObject book = new JsonObject();
+        book.addProperty("duration", 6709);
+        assertTrue("no count asked for: kept", Yakniga.playable(book));
+        book.addProperty("chaptersCount", 1);
+        assertTrue(Yakniga.playable(book));
+        book.addProperty("chaptersCount", 0);
+        assertFalse("a duration but no chapter", Yakniga.playable(book));
+        assertTrue("listings ask for the count", SITE.listAllQuery.contains(" chaptersCount "));
     }
 
     @Test
@@ -203,15 +214,15 @@ public class YaknigaTest {
         assertEquals("Cannot return null for non-nullable field Query.book", Yakniga.error(gone));
         assertNull(Yakniga.error(json("book.json")));
         assertNull(Yakniga.error(json("search-none.json")));
-        assertEquals("no book on the page", "", Yakniga.parseDescription(gone).getTitle());
+        assertEquals("no book on the page", "", SITE.parseDescription(gone).getTitle());
         try {
-            Yakniga.parseListing(gone);
+            SITE.parseListing(gone);
             fail("no answer is no listing");
         } catch (IllegalStateException expected) {
             assertTrue(expected.getMessage(), expected.getMessage().contains("Query.book"));
         }
         try {
-            Yakniga.parseListing(Jsoup.parse("<html><body>Проверка браузера</body></html>", S + "/"));
+            SITE.parseListing(Jsoup.parse("<html><body>Проверка браузера</body></html>", S + "/"));
             fail("an HTML page is not an answer");
         } catch (IllegalStateException expected) {
             assertTrue(expected.getMessage(), expected.getMessage().contains("not a JSON page"));
@@ -222,7 +233,7 @@ public class YaknigaTest {
 
     @Test
     public void genres() throws IOException {
-        ArrayList<GenrePOJO> genres = Yakniga.parseGenres(json("genres.json"));
+        ArrayList<GenrePOJO> genres = SITE.parseGenres(json("genres.json"));
         assertEquals(55, genres.size());
         assertEquals("Фантастика", genres.get(0).getName());
         assertEquals(GENRE, genres.get(0).getUrl());
@@ -251,12 +262,12 @@ public class YaknigaTest {
         assertEquals(1, authors.items.get(0).getReting());
         assertEquals("a leading space trimmed", "Кривушенкова Фарида", authors.items.get(1).getName());
 
-        ProviderPage<GenrePOJO> nobody = Yakniga.parsePeople(json("authors-tail.json"), false);
+        ProviderPage<GenrePOJO> nobody = SITE.parsePeople(json("authors-tail.json"), false);
         assertEquals(ProviderPage.Status.OK, nobody.status);
         assertTrue(nobody.items.isEmpty());
         assertTrue(nobody.hasMore);
 
-        ProviderPage<GenrePOJO> readers = Yakniga.parsePeople(json("readers-p1.json"), true);
+        ProviderPage<GenrePOJO> readers = SITE.parsePeople(json("readers-p1.json"), true);
         assertEquals(83, readers.items.size());
         assertEquals("Потапов Павел", readers.items.get(0).getName());
         assertEquals(S + "/reader/potapov-pavel?by_date=desc", readers.items.get(0).getUrl());
@@ -274,17 +285,17 @@ public class YaknigaTest {
             asked.add(url);
             return json(answers[asked.size() - 1]);
         };
-        assertEquals(51, Yakniga.walkPeople(pages, 1, false, cursor).items.size());
-        ProviderPage<GenrePOJO> two = Yakniga.walkPeople(pages, 2, false, cursor);
+        assertEquals(51, SITE.walkPeople(pages, 1, false, cursor).items.size());
+        ProviderPage<GenrePOJO> two = SITE.walkPeople(pages, 2, false, cursor);
         assertEquals(47, two.items.size());
         assertEquals("Котова Ирина", two.items.get(0).getName());
         assertEquals(1, cursor.skipped);
-        Yakniga.walkPeople(pages, 3, false, cursor);
+        SITE.walkPeople(pages, 3, false, cursor);
         assertEquals(Arrays.asList(Yakniga.AUTHORS + "?page=1", Yakniga.AUTHORS + "?page=2",
                 Yakniga.AUTHORS + "?page=3", Yakniga.AUTHORS + "?page=4"), asked);
 
-        JsonObject request = Yakniga.request(Yakniga.READERS + "?page=7");
-        assertEquals(Yakniga.peopleList("readers"), Json.string(request, "query"));
+        JsonObject request = SITE.request(Yakniga.READERS + "?page=7");
+        assertEquals(SITE.peopleList("readers"), Json.string(request, "query"));
         assertEquals("{\"p\":7,\"n\":100,\"s\":" + FULL + "}}", request.get("variables").toString());
     }
 
@@ -294,8 +305,8 @@ public class YaknigaTest {
         assertEquals(S + "/search?type=authors&q=%D0%9A%D0%B8%D0%BD%D0%B3&page=1", king);
         assertEquals(S + "/search?type=readers&q=%D0%9A%D0%B8%D0%BD%D0%B3&page=1",
                 SITE.searchUrl(SearchUrls.Category.PERFORMERS, "Кинг", 1));
-        JsonObject request = Yakniga.request(king);
-        assertEquals(Yakniga.SEARCH_PEOPLE, Json.string(request, "query"));
+        JsonObject request = SITE.request(king);
+        assertEquals(SITE.searchPeopleQuery, Json.string(request, "query"));
         assertEquals("Кинг", Json.string(request.getAsJsonObject("variables"), "t"));
 
         ProviderPage<GenrePOJO> authors = SITE.searchPeople(json("search-people.json"), 1, false);
@@ -317,8 +328,8 @@ public class YaknigaTest {
     public void search() throws IOException {
         String url = SITE.searchUrl(SearchUrls.Category.BOOKS, "Панченко", 1);
         assertEquals(S + "/search?q=%D0%9F%D0%B0%D0%BD%D1%87%D0%B5%D0%BD%D0%BA%D0%BE&page=1", url);
-        JsonObject request = Yakniga.request(url);
-        assertEquals(Yakniga.SEARCH_BOOKS, Json.string(request, "query"));
+        JsonObject request = SITE.request(url);
+        assertEquals(SITE.searchBooksQuery, Json.string(request, "query"));
         assertEquals("{\"t\":\"Панченко\",\"src\":[\"manual\",\"knigavuhe\",\"akniga\",\"aknig\"]}",
                 request.get("variables").toString());
 
@@ -342,9 +353,9 @@ public class YaknigaTest {
         Document past = SITE.fetch(two); // no request: the search answers in one page
         assertEquals(ProviderPage.Status.EMPTY, SITE.searchResults(past, 2).status);
 
-        assertEquals("Мастер и Маргарита", Json.string(Yakniga.request(SITE.searchUrl(SearchUrls.Category.BOOKS,
+        assertEquals("Мастер и Маргарита", Json.string(SITE.request(SITE.searchUrl(SearchUrls.Category.BOOKS,
                 "Мастер и Маргарита", 1)).getAsJsonObject("variables"), "t"));
-        assertEquals("c++", Json.string(Yakniga.request(SITE.searchUrl(SearchUrls.Category.BOOKS, "c++", 1))
+        assertEquals("c++", Json.string(SITE.request(SITE.searchUrl(SearchUrls.Category.BOOKS, "c++", 1))
                 .getAsJsonObject("variables"), "t"));
         assertTrue("a search is not re-sorted", SITE.sorts(url).isEmpty());
     }
@@ -454,36 +465,36 @@ public class YaknigaTest {
 
     @Test
     public void requests() {
-        JsonObject index = Yakniga.request(Yakniga.INDEX);
-        assertEquals(Yakniga.LIST_ALL, Json.string(index, "query"));
+        JsonObject index = SITE.request(Yakniga.INDEX);
+        assertEquals(SITE.listAllQuery, Json.string(index, "query"));
         assertEquals("{\"q\":" + FULL + ",\"by_date\":\"desc\"},\"p\":1,\"n\":30}", index.get("variables").toString());
         assertEquals("{\"q\":" + FULL + ",\"by_date\":\"desc\"},\"p\":2,\"n\":30}",
-                Yakniga.request(SITE.pageUrl(Yakniga.INDEX, 2)).get("variables").toString());
+                SITE.request(SITE.pageUrl(Yakniga.INDEX, 2)).get("variables").toString());
         assertEquals("the curated list, newest first, as the site asks for it",
                 "{\"q\":" + FULL + ",\"by_fixed_top\":\"desc\",\"by_date\":\"desc\"},\"p\":1,\"n\":30}",
-                Yakniga.request(S + "/?by_fixed_top=desc").get("variables").toString());
+                SITE.request(S + "/?by_fixed_top=desc").get("variables").toString());
 
-        JsonObject genre = Yakniga.request(S + "/genres/fantastika?by_pop=desc&page=3");
-        assertEquals(Yakniga.listIn("genre"), Json.string(genre, "query"));
+        JsonObject genre = SITE.request(S + "/genres/fantastika?by_pop=desc&page=3");
+        assertEquals(SITE.listIn("genre"), Json.string(genre, "query"));
         assertEquals("{\"a\":\"fantastika\",\"q\":" + FULL + ",\"by_pop\":\"desc\"},\"p\":3,\"n\":30}",
                 genre.get("variables").toString());
-        JsonObject author = Yakniga.request(S + "/panchenko-andrey?by_alphabet=asc");
-        assertEquals(Yakniga.listIn("author"), Json.string(author, "query"));
+        JsonObject author = SITE.request(S + "/panchenko-andrey?by_alphabet=asc");
+        assertEquals(SITE.listIn("author"), Json.string(author, "query"));
         assertEquals("{\"a\":\"panchenko-andrey\",\"q\":" + FULL + ",\"by_alphabet\":\"asc\"},\"p\":1,\"n\":30}",
                 author.get("variables").toString());
-        assertEquals(Yakniga.listIn("reader"), Json.string(Yakniga.request(READER), "query"));
-        JsonObject series = Yakniga.request(SERIES);
-        assertEquals(Yakniga.listIn("series"), Json.string(series, "query"));
+        assertEquals(SITE.listIn("reader"), Json.string(SITE.request(READER), "query"));
+        JsonObject series = SITE.request(SERIES);
+        assertEquals(SITE.listIn("series"), Json.string(series, "query"));
         assertEquals("by the numbers", "{\"a\":\"avtostopom-po-galaktike\",\"q\":" + FULL + "},\"p\":1,\"n\":30}",
                 series.get("variables").toString());
 
-        JsonObject book = Yakniga.request(BOOK);
-        assertEquals(Yakniga.BOOK, Json.string(book, "query"));
+        JsonObject book = SITE.request(BOOK);
+        assertEquals(SITE.bookQuery, Json.string(book, "query"));
         assertEquals("{\"a\":\"duglas-adams\",\"b\":\"avtostopom-po-galaktike\",\"s\":" + FULL + "},\"n\":100}",
                 book.get("variables").toString());
-        assertEquals(Yakniga.GENRE_LIST, Json.string(Yakniga.request(Yakniga.GENRES), "query"));
-        assertEquals(Yakniga.peopleList("authors"), Json.string(Yakniga.request(Yakniga.AUTHORS), "query"));
-        assertNull("an ebook", Yakniga.request(S + "/raisa-ryabuha/ebooks/podarok"));
+        assertEquals(SITE.genresQuery, Json.string(SITE.request(Yakniga.GENRES), "query"));
+        assertEquals(SITE.peopleList("authors"), Json.string(SITE.request(Yakniga.AUTHORS), "query"));
+        assertNull("an ebook", SITE.request(S + "/raisa-ryabuha/ebooks/podarok"));
     }
 
     @Test
@@ -552,16 +563,16 @@ public class YaknigaTest {
 
     @Test
     public void kinds() {
-        assertEquals(Yakniga.Kind.ALL, Yakniga.kind(Yakniga.INDEX));
-        assertEquals(Yakniga.Kind.GENRES, Yakniga.kind(Yakniga.GENRES));
-        assertEquals(Yakniga.Kind.AUTHORS, Yakniga.kind(Yakniga.AUTHORS));
-        assertEquals(Yakniga.Kind.READERS, Yakniga.kind(Yakniga.READERS));
-        assertEquals(Yakniga.Kind.GENRE, Yakniga.kind(GENRE));
-        assertEquals(Yakniga.Kind.AUTHOR, Yakniga.kind(AUTHOR));
-        assertEquals(Yakniga.Kind.READER, Yakniga.kind(READER));
-        assertEquals(Yakniga.Kind.SERIES, Yakniga.kind(SERIES));
-        assertEquals(Yakniga.Kind.BOOK, Yakniga.kind(BOOK));
-        assertEquals(Yakniga.Kind.SEARCH, Yakniga.kind(SITE.searchUrl(SearchUrls.Category.BOOKS, "x", 1)));
-        assertNull(Yakniga.kind("not a url"));
+        assertEquals(Yakniga.Kind.ALL, SITE.kind(Yakniga.INDEX));
+        assertEquals(Yakniga.Kind.GENRES, SITE.kind(Yakniga.GENRES));
+        assertEquals(Yakniga.Kind.AUTHORS, SITE.kind(Yakniga.AUTHORS));
+        assertEquals(Yakniga.Kind.READERS, SITE.kind(Yakniga.READERS));
+        assertEquals(Yakniga.Kind.GENRE, SITE.kind(GENRE));
+        assertEquals(Yakniga.Kind.AUTHOR, SITE.kind(AUTHOR));
+        assertEquals(Yakniga.Kind.READER, SITE.kind(READER));
+        assertEquals(Yakniga.Kind.SERIES, SITE.kind(SERIES));
+        assertEquals(Yakniga.Kind.BOOK, SITE.kind(BOOK));
+        assertEquals(Yakniga.Kind.SEARCH, SITE.kind(SITE.searchUrl(SearchUrls.Category.BOOKS, "x", 1)));
+        assertNull(SITE.kind("not a url"));
     }
 }

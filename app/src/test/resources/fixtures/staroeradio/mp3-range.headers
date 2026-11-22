@@ -1,0 +1,14 @@
+HTTP/1.1 206 Partial Content
+Server: nginx/1.26.3
+Content-Type: audio/mpeg
+Content-Length: 1024
+Last-Modified: Sat, 02 Dec 2017 08:32:41 GMT
+Connection: keep-alive
+Content-Disposition: inline; filename=37323.mp3
+Accept-Ranges: bytes
+X-Frame-Options: SAMEORIGIN
+X-Content-Type-Options: nosniff
+Strict-Transport-Security: max-age=86400
+Referrer-Policy: strict-origin-when-cross-origin
+Content-Range: bytes 0-1023/196938631
+

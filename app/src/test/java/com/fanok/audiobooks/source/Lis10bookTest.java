@@ -44,7 +44,7 @@ public class Lis10bookTest {
     }
 
     private static ProviderPage<BookPOJO> listing(String name, String url) throws IOException {
-        return Lis10book.parseListing(json(name, url));
+        return SITE.parseListing(json(name, url));
     }
 
     private static JsonPage book(String name, String slug) throws IOException {
@@ -140,7 +140,7 @@ public class Lis10bookTest {
     @Test
     public void htmlGuardIsAnErrorNotAnEmptyPage() throws IOException {
         try {
-            Lis10book.parseListing(BookPageFixtures.load("lis10book/guard.html", S + "/"));
+            SITE.parseListing(BookPageFixtures.load("lis10book/guard.html", S + "/"));
             fail("the Turnstile guard is not a listing");
         } catch (IllegalStateException expected) {
             assertTrue(expected.getMessage(), expected.getMessage().contains("not a JSON page"));
@@ -149,7 +149,7 @@ public class Lis10bookTest {
 
     @Test
     public void genres() throws IOException {
-        ArrayList<GenrePOJO> genres = Lis10book.parseGenres(json("genres.json", Lis10book.GENRES));
+        ArrayList<GenrePOJO> genres = SITE.parseGenres(json("genres.json", Lis10book.GENRES));
         assertEquals(144, genres.size());
         assertEquals("Фантастика", genres.get(0).getName());
         assertEquals(GENRE, genres.get(0).getUrl());
@@ -276,7 +276,7 @@ public class Lis10bookTest {
         assertEquals("Антон Павлович Чехов", authors.items.get(0).getName());
         assertEquals(API + "authors/anton-chehov?audio=full", authors.items.get(0).getUrl());
         assertEquals(738, authors.items.get(0).getReting());
-        assertTrue(Lis10book.parsePeople(json("people-authors-p2.json", Lis10book.AUTHORS + "?page=2"), false).hasMore);
+        assertTrue(SITE.parsePeople(json("people-authors-p2.json", Lis10book.AUTHORS + "?page=2"), false).hasMore);
 
         ProviderPage<GenrePOJO> readers = SITE.people(json("people-readers-p1.json", Lis10book.READERS),
                 Lis10book.READERS, 1, true);
@@ -400,7 +400,7 @@ public class Lis10bookTest {
         assertEquals("Ребекка Яррос", card.getAutor());
         assertEquals("Героическое фэнтези", card.getGenre());
 
-        DescriptionPOJO fragment = Lis10book.parseDescription(book("book-fragment.json", "tajnaya-krasota"));
+        DescriptionPOJO fragment = SITE.parseDescription(book("book-fragment.json", "tajnaya-krasota"));
         assertEquals("Люсинда Райли, Гарри Уиттакер", fragment.getAutor());
         assertEquals(API + "authors/lyusinda-rajli?audio=full", fragment.getAutorUrl());
         assertEquals("", fragment.getReiting());
@@ -409,7 +409,7 @@ public class Lis10bookTest {
 
     @Test
     public void series() throws IOException {
-        DescriptionPOJO d = Lis10book.parseDescription(book("book-series.json", "a-smolin-vedmak-04-chas-polnoluniya"));
+        DescriptionPOJO d = SITE.parseDescription(book("book-series.json", "a-smolin-vedmak-04-chas-polnoluniya"));
         assertEquals("А. Смолин, ведьмак: 04. Час полнолуния", d.getTitle());
         assertEquals("Андрей Васильев", d.getAutor());
         assertEquals("Сергей Горбунов", d.getArtist());
@@ -426,24 +426,24 @@ public class Lis10bookTest {
         assertEquals(S + "/audio/perekrestok-voronov/", vedmak.get(45).getUrl());
         assertEquals("9", vedmak.get(45).getNumber());
 
-        ArrayList<SeriesPOJO> empire = Lis10book.parseSeries(book("book.json", "zheleznoe-plamya"));
+        ArrayList<SeriesPOJO> empire = SITE.parseSeries(book("book.json", "zheleznoe-plamya"));
         assertEquals(3, empire.size());
         assertEquals("Четвертое крыло", empire.get(0).getName());
         assertEquals("2", empire.get(1).getNumber());
         assertEquals(BOOK, empire.get(1).getUrl());
-        assertTrue(Lis10book.parseSeries(book("book-alt-narration.json", "master-i-margarita-7")).isEmpty());
+        assertTrue(SITE.parseSeries(book("book-alt-narration.json", "master-i-margarita-7")).isEmpty());
     }
 
     @Test
     public void otherReaders() throws IOException {
         JsonPage page = book("book-alt-narration.json", "master-i-margarita-7");
-        DescriptionPOJO d = Lis10book.parseDescription(page);
+        DescriptionPOJO d = SITE.parseDescription(page);
         assertEquals("Мастер и Маргарита", d.getTitle());
         assertEquals("10 ч. 8 мин.", d.getTime());
         assertEquals("Ужасы", d.getGenre());
         assertTrue(d.isOtherReader());
         assertEquals(1, d.getOtherReaders().size());
-        ArrayList<OtherArtistPOJO> others = Lis10book.parseOtherReaders(page);
+        ArrayList<OtherArtistPOJO> others = SITE.parseOtherReaders(page);
         assertEquals("Исполнитель Медведь Обыкновенный", others.get(0).getName());
         assertEquals(S + "/audio/master-i-margarita-8/", others.get(0).getUrl());
         assertTrue(SITE.findsOtherReaders());
@@ -460,9 +460,9 @@ public class Lis10bookTest {
         assertEquals("Ониксовый шторм", similar.get(0).getName());
         assertEquals("Ребекка Яррос", similar.get(0).getAutor());
         assertEquals(S + "/wp-content/uploads/2025/08/824266_cover.jpg", similar.get(0).getPhoto());
-        assertEquals("Железное пламя", Lis10book.parseDescription(page).getTitle());
+        assertEquals("Железное пламя", SITE.parseDescription(page).getTitle());
         assertTrue("a record without them",
-                Lis10book.parseRecommendations(book("book.json", "zheleznoe-plamya")).isEmpty());
+                SITE.parseRecommendations(book("book.json", "zheleznoe-plamya")).isEmpty());
     }
 
     @Test
@@ -532,6 +532,6 @@ public class Lis10bookTest {
             assertEquals(url, expected.getMessage());
         }
         assertEquals("Тайная красота",
-                Lis10book.parseDescription(book("book-fragment.json", "tajnaya-krasota")).getTitle());
+                SITE.parseDescription(book("book-fragment.json", "tajnaya-krasota")).getTitle());
     }
 }

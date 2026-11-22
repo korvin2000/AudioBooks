@@ -127,6 +127,11 @@ public class ProviderTest {
         assertEquals(Collections.singletonList(Provider.UKNIG), Provider.POLEKNIG.mirrors());
         assertEquals(Collections.singletonList(Provider.POLEKNIG), Provider.UKNIG.mirrors());
         assertEquals(Collections.singletonList(Provider.BAZA_KNIG_INFO), Provider.BAZA_KNIG.mirrors());
+        assertEquals(Collections.singletonList(Provider.SLUSHKIN), Provider.KNIGAVUHE.mirrors());
+        assertEquals(Collections.singletonList(Provider.AUDIOKNIGI_CC), Provider.AUDIOKNIGA_ONLINE.mirrors());
+        assertEquals(Collections.singletonList(Provider.TWO_KNIGI), Provider.YAKNIGA.mirrors());
+        assertSame(Provider.AUKNIGA, Provider.AUBOOK.original());
+        assertTrue("same engine, other catalog: not a mirror", Provider.KNIZHIN.mirrors().isEmpty());
         assertSame(Provider.BAZA_KNIG, Provider.BAZA_KNIG_INFO.original());
         assertSame(Provider.IZIBUK, Provider.GOLOSOM.original());
         assertSame(Provider.IZIBUK, Provider.KNIGOBLUD.original());
@@ -139,7 +144,9 @@ public class ProviderTest {
         assertFalse(Provider.GOLOSOM.isMirrorOf(null));
         Set<Provider> mirrored = EnumSet.of(Provider.IZIBUK, Provider.KNIGOBLUD, Provider.OTRUB, Provider.BIBLUS,
                 Provider.GOLOSOM, Provider.AKNIGA, Provider.GOLOSKNIG, Provider.POLEKNIG, Provider.UKNIG,
-                Provider.BAZA_KNIG, Provider.BAZA_KNIG_INFO);
+                Provider.BAZA_KNIG, Provider.BAZA_KNIG_INFO, Provider.KNIGAVUHE, Provider.SLUSHKIN,
+                Provider.AUDIOKNIGA_ONLINE, Provider.AUDIOKNIGI_CC, Provider.YAKNIGA, Provider.TWO_KNIGI,
+                Provider.AUKNIGA, Provider.AUBOOK);
         for (Provider p : Provider.values()) {
             assertEquals(p.name(), mirrored.contains(p), p.hasMirrors());
             if (!mirrored.contains(p)) {

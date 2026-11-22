@@ -138,7 +138,7 @@ public class BooksListAddapter extends RecyclerView.Adapter<BooksListAddapter.My
                 Glide.with(view).load(com.fanok.audiobooks.net.Covers.glide(photo)).into(view);
             }
         } else {
-            view.setImageDrawable(ContextCompat.getDrawable(view.getContext(), android.R.drawable.ic_menu_gallery));
+            view.setImageDrawable(DefaultCover.gradient(view.getContext(), book.getUrl())); // a book without a cover
         }
         return null;
     }
