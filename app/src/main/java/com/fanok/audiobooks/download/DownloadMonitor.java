@@ -565,6 +565,7 @@ public final class DownloadMonitor implements DownloadManager.Listener {
             meter.forget(id);
             if (finalException != null) failures.put(id, describe(finalException)); // not a stop reason set on it
             ended.put(id, download);
+            if (App.getInstance() != null) DownloadRenewal.failed(App.getInstance(), download, finalException);
         } else {
             ended.remove(id);
             if (download.state == Download.STATE_QUEUED) failures.remove(id); // re-added after a failure
