@@ -371,6 +371,7 @@ public class App extends Application {
             builder.proxyAuthenticator(AppProxy::proxyLogin);
             builder.addNetworkInterceptor(AppProxy::keepProxyLoginToProxy);
             okHttpClientInstance = builder.build();
+            org.jsoup.helper.OkHttpExecutor.install(okHttpClientInstance); // the pages of the sites that want HTTP/2
 
             com.squareup.picasso.Picasso picasso = new com.squareup.picasso.Picasso.Builder(this)
                     .downloader(new com.squareup.picasso.OkHttp3Downloader(okHttpClientInstance))
@@ -403,6 +404,8 @@ public class App extends Application {
         AppThemes.applyNightMode(this);
 
         Consts.setBazaKnigCookies(pref.getString("cookes_baza_knig", ""));
+        com.fanok.audiobooks.source.SlushatKnigi.setCheck(
+                pref.getString(com.fanok.audiobooks.source.SlushatKnigi.PREF_CHECK, ""));
         com.fanok.audiobooks.source.Audioboo.setClearance(
                 pref.getString(com.fanok.audiobooks.source.Audioboo.PREF_CLEARANCE, ""),
                 pref.getString(com.fanok.audiobooks.source.Audioboo.PREF_AGENT, ""));

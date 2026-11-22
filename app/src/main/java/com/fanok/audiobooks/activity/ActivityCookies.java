@@ -29,6 +29,7 @@ import com.fanok.audiobooks.net.AppProxy;
 import com.fanok.audiobooks.net.SiteHttp;
 import com.fanok.audiobooks.search.Provider;
 import com.fanok.audiobooks.source.Audioboo;
+import com.fanok.audiobooks.source.SlushatKnigi;
 import com.r0adkll.slidr.Slidr;
 import io.reactivex.Single;
 import io.reactivex.android.schedulers.AndroidSchedulers;
@@ -46,7 +47,8 @@ import org.jsoup.nodes.Document;
  * Lets the user pass the site's browser check in a real browser; the session is kept only once a real request of the
  * app with it returns a normal page (UI-17). Leaving early never touches the stored session. baza-knig: its session
  * cookie. audioboo: Cloudflare's clearance, bound to the browser's own User-Agent, which the
- * app then sends to that site ({@link Audioboo#saveClearance}). Opened by a list the site refused
+ * app then sends to that site ({@link Audioboo#saveClearance}). slushat-knigi: the pass of its own human check, a
+ * button to press once a day ({@link SlushatKnigi#setCheck}). Opened by a list the site refused
  * ({@link #EXTRA_PROVIDER}), it closes itself once the session is accepted, so the list loads again. The check runs on
  * the very page refused ({@link #EXTRA_URL}); audioboo's book page the app is still refused is read from this browser.
  */
@@ -77,6 +79,8 @@ public class ActivityCookies extends AppCompatActivity {
     private boolean verified;
     /** audioboo: the clearance and the browser's User-Agent, not baza-knig's session. */
     private boolean clearance;
+    /** slushat-knigi: the pass of its own human check, not baza-knig's session. */
+    private boolean humanCheck;
     private String server;
     /** What is checked: {@link #EXTRA_URL} when it is the site's, else {@link #server}. */
     private String page;
@@ -86,7 +90,7 @@ public class ActivityCookies extends AppCompatActivity {
 
     /** Whether the browser check of {@code provider} can be passed here, so a list it refused offers it. */
     public static boolean passes(@Nullable Provider provider) {
-        return provider == Provider.AUDIOBOO || provider == Provider.BAZA_KNIG;
+        return provider == Provider.AUDIOBOO || provider == Provider.BAZA_KNIG || provider == Provider.SLUSHAT_KNIGI;
     }
 
     @NonNull
@@ -112,8 +116,10 @@ public class ActivityCookies extends AppCompatActivity {
         setContentView(view);
         Slidr.attach(this);
 
-        clearance = Provider.AUDIOBOO.name().equals(getIntent().getStringExtra(EXTRA_PROVIDER));
-        server = clearance ? Audioboo.SERVER + "/" : Url.SERVER_BAZA_KNIG;
+        String site = getIntent().getStringExtra(EXTRA_PROVIDER);
+        clearance = Provider.AUDIOBOO.name().equals(site);
+        humanCheck = Provider.SLUSHAT_KNIGI.name().equals(site);
+        server = clearance ? Audioboo.SERVER + "/" : humanCheck ? SlushatKnigi.SERVER + "/" : Url.SERVER_BAZA_KNIG;
         String asked = getIntent().getStringExtra(EXTRA_URL);
         page = asked != null && Url.isHost(Url.canonical(asked), server) ? Url.canonical(asked) : server;
         book = clearance && !page.equals(server) && getIntent().getBooleanExtra(EXTRA_BOOK, false);
@@ -185,7 +191,8 @@ public class ActivityCookies extends AppCompatActivity {
      * @return whether a check went out
      */
     private boolean verifyCurrentSession() {
-        final String name = clearance ? Audioboo.CLEARANCE_COOKIE : SESSION_COOKIE;
+        final String name = clearance ? Audioboo.CLEARANCE_COOKIE : humanCheck ? SlushatKnigi.CHECK_COOKIE
+                : SESSION_COOKIE;
         final String session = cookie(CookieManager.getInstance().getCookie(server), name);
         // a clearance equal to the stored one is checked too: the site may refuse it to the app now (a new address)
         if (session.isEmpty() || session.equals(lastTried)) {
@@ -207,6 +214,11 @@ public class ActivityCookies extends AppCompatActivity {
                 .subscribe(ok -> {
                     if (clearance) {
                         Audioboo.saveClearance(ok, agent);
+                    } else if (humanCheck) {
+                        PreferenceManager.getDefaultSharedPreferences(this).edit()
+                                .putString(SlushatKnigi.PREF_CHECK, ok).apply();
+                        SlushatKnigi.setCheck(ok);
+                        SiteHttp.forget(SlushatKnigi.SERVER, SlushatKnigi.CHECK_COOKIE); // as baza-knig's below
                     } else {
                         SharedPreferences pref = PreferenceManager.getDefaultSharedPreferences(this);
                         pref.edit().putString("cookes_baza_knig", ok).apply();

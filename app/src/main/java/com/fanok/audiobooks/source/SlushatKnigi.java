@@ -38,8 +38,11 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
- * slushat-knigi.com: DataLife Engine, template "audiobooksdark" (probed live, 2026-10-31). Plain GETs, no cookies.
+ * slushat-knigi.com: DataLife Engine, template "audiobooksdark" (probed live, 2026-10-31). Plain GETs.
  * <ul>
+ * <li>human check (since 2026-11): a request without the cookie {@code bgate} is redirected to {@code /__bgate}, a
+ * button to press once a day ({@code SiteHttp}: a challenge, passed in {@code ActivityCookies}). Only an HTTP/2
+ * request with a search engine's Referer is let in without it ({@link #http2}); covers are not checked.</li>
  * <li>new: {@link #INDEX} ({@code /lastnews/}, then {@code /page/N/}; the home page is two fixed blocks), 12 cards a
  * page, pager {@code .pagination__pages}, a page past the end is a 404. Blog, quote and "what famous people read" posts
  * are mixed in; only {@code /<id>-audiokniga-<slug>.html} cards are books.</li>
@@ -85,7 +88,29 @@ public final class SlushatKnigi implements SourceParser {
     private static final String GENRE_LINKS = "ul.header__menu-hidden > li > a";
     private static final String DETAILS = "ul.page__details-list > li";
 
+    /** The cookie of the site's human check, and the preference that keeps it. */
+    public static final String CHECK_COOKIE = "bgate";
+    public static final String PREF_CHECK = "cookies_slushat_knigi";
+    private static volatile String check = "";
+
+    /** The pass of the human check the user got in the browser ({@code ActivityCookies}); "" for none. */
+    public static void setCheck(@Nullable String value) {
+        check = value == null ? "" : value;
+    }
+
     // ---------------------------------------------------------------- SourceParser
+
+    @Override
+    public Map<String, String> cookies() {
+        String pass = check;
+        return pass.isEmpty() ? Collections.<String, String>emptyMap() : Collections.singletonMap(CHECK_COOKIE, pass);
+    }
+
+    /** The site lets a visitor from a search engine in without its check only over HTTP/2, as a browser comes. */
+    @Override
+    public boolean http2() {
+        return true;
+    }
 
     @Override
     public ProviderPage<BookPOJO> listing(Document page, String url, int pageNo) {

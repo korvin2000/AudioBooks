@@ -86,6 +86,14 @@ public interface SourceParser {
         return Collections.emptyMap();
     }
 
+    /**
+     * Whether the site's pages are asked over HTTP/2, as the browser the requests claim to be asks them
+     * ({@code org.jsoup.helper.OkHttpExecutor}); false by default: jsoup's own connection, HTTP/1.1 on Android.
+     */
+    default boolean http2() {
+        return false;
+    }
+
     /** The User-Agent of the page requests to the site itself, when it must be another than the app's; null by default. */
     default String userAgent() {
         return null;
