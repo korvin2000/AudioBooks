@@ -737,15 +737,33 @@ public class SettingsFragment extends PreferenceFragmentCompat implements
             }
         }
 
-        CharSequence[] options = new CharSequence[]{"Выбрать папку (Проводник)", "Сбросить на стандартную"};
+        // a picker per mounted volume (internal storage, SD card, USB): the system's picker opens on the internal
+        // storage, where an SD card is reachable only through its side menu
+        List<CharSequence> options = new ArrayList<>();
+        List<Intent> pickers = new ArrayList<>();
+        if (SDK_INT >= Build.VERSION_CODES.Q) {
+            android.os.storage.StorageManager storage = context.getSystemService(android.os.storage.StorageManager.class);
+            for (android.os.storage.StorageVolume volume : storage != null ? storage.getStorageVolumes()
+                    : new ArrayList<android.os.storage.StorageVolume>()) {
+                if (Environment.MEDIA_MOUNTED.equals(volume.getState())) {
+                    options.add("Выбрать папку: " + volume.getDescription(context));
+                    pickers.add(volume.createOpenDocumentTreeIntent());
+                }
+            }
+        }
+        if (pickers.isEmpty()) {
+            options.add("Выбрать папку (Проводник)");
+            pickers.add(new Intent(Intent.ACTION_OPEN_DOCUMENT_TREE));
+        }
+        options.add("Сбросить на стандартную");
         AlertDialog.Builder builder = new AlertDialog.Builder(context);
         builder.setTitle("Папка для скачивания");
-        builder.setItems(options, (dialog, which) -> {
-            if (which == 0) {
-                if (!DownloadStorageHelper.openFolderPicker(folderPickerLauncher)) {
+        builder.setItems(options.toArray(new CharSequence[0]), (dialog, which) -> {
+            if (which < pickers.size()) {
+                if (!DownloadStorageHelper.openFolderPicker(folderPickerLauncher, pickers.get(which))) {
                     showFallbackFolderSelectionDialog(context);
                 }
-            } else if (which == 1) {
+            } else {
                 DownloadStorageHelper.resetToDefault(context);
                 Preference pref = findPreference(DownloadStorageHelper.PREF_DOWNLOAD_PATH);
                 if (pref != null) {

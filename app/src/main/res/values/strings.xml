@@ -35,6 +35,11 @@
     <string name="abmp3_top100">Топ100</string>
     <string name="abmp3_random">Случайная книга</string>
     <string name="open">Открыть</string>
+    <string name="paste">Вставить</string>
+    <string name="own_cover">Своя обложка…</string>
+    <string name="own_cover_replace">Выбрать другую…</string>
+    <string name="own_cover_remove">Убрать свою обложку</string>
+    <string name="own_cover_failed">Не удалось прочитать изображение</string>
     <string name="add_to_favorite">Добавить в избранное</string>
     <string name="open_author">Перейти к автору</string>
     <string name="open_genre">Перейти к жанру</string>
@@ -507,7 +512,9 @@
     <string name="menu_saved">Загруженные</string>
     <string name="clear_audio_list">Очистить список аудио файлов</string>
     <string name="confirm_clear_audio_list">Вы уверены что хотите очистить список аудио файлов</string>
-    <string name="history_procent">Отобразить процент прослушанного</string>
+    <string name="history_procent">Показать % прослушанного</string>
+    <string name="book_marks">Метки книг в каталоге</string>
+    <string name="book_marks_desc">Полоска у книг из избранного, загрузок и истории</string>
     <string name="history_procent_desc">Отображать процент прослушанного в избранном и в истории</string>
     <string name="rewind">Перемотка</string>
     <string name="rewind_desc">Перемотка назад во время долгой паузы</string>
@@ -843,6 +850,8 @@
     <!-- the timer button of the player notification -->
     <string name="sleep_timer_on_toast">Таймер сна: %d мин</string>
     <string name="sleep_timer_off_toast">Таймер сна выключен</string>
+    <string name="sleep_timer_stale_off">Таймер сна снят: книга стояла на паузе дольше 30 минут</string>
+    <string name="resume_not_held">Глава, где вы остановились, не скачана: открыта ближайшая скачанная. Место сохранится, пока вы не начнёте слушать</string>
     <string name="sleep_timer_turn_off">Выключить таймер сна</string>
     <!-- chapter selection for download/delete on the book screen -->
     <string name="selection_count">%1$d из %2$d</string>

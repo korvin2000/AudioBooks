@@ -86,7 +86,7 @@ final class BookLinks {
         EditText field = new EditText(a);
         field.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_URI);
         field.setHint(R.string.book_link_hint);
-        String clip = clipboardLink(a);
+        String clip = LoadBook.bookUrlIn(clipboardText(a));
         if (clip != null && !Url.samePage(clip, current)) {
             field.setText(clip);
         }
@@ -104,7 +104,16 @@ final class BookLinks {
                     }
                 })
                 .setNegativeButton(R.string.cancel, null)
+                .setNeutralButton(R.string.paste, null)
                 .show();
+        // pastes whatever text the clipboard holds (the check below tells a wrong one); the dialog stays open
+        dialog.getButton(DialogInterface.BUTTON_NEUTRAL).setOnClickListener(v -> {
+            CharSequence text = clipboardText(a);
+            if (text != null) {
+                field.setText(text.toString().trim());
+                field.setSelection(field.length());
+            }
+        });
         Button open = dialog.getButton(DialogInterface.BUTTON_POSITIVE);
         TextWatcher check = new TextWatcher() {
             @Override
@@ -129,9 +138,9 @@ final class BookLinks {
         check.afterTextChanged(field.getText());
     }
 
-    /** The site link the clipboard holds, on its current host; null when it holds none. */
+    /** The text (or URI) the clipboard holds; null when it holds none. */
     @Nullable
-    private static String clipboardLink(Context context) {
+    private static CharSequence clipboardText(Context context) {
         ClipboardManager clipboard = (ClipboardManager) context.getSystemService(Context.CLIPBOARD_SERVICE);
         ClipData clip = clipboard == null ? null : clipboard.getPrimaryClip();
         if (clip == null || clip.getItemCount() == 0) {
@@ -139,9 +148,7 @@ final class BookLinks {
         }
         // the text or the URI itself, never coerceToText: for a URI item it reads the provider on the main thread
         ClipData.Item item = clip.getItemAt(0);
-        CharSequence text = item.getText() != null ? item.getText()
-                : item.getUri() != null ? item.getUri().toString() : null;
-        return LoadBook.bookUrlIn(text);
+        return item.getText() != null ? item.getText() : item.getUri() != null ? item.getUri().toString() : null;
     }
 
     private static void copy(Context context, @Nullable String label, String url) {

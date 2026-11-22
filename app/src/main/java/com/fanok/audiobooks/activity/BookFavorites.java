@@ -71,6 +71,8 @@ public final class BookFavorites implements FavoritePeople.Listener {
     private final Field mAuthors = new Field();
     private final Field mReaders = new Field();
     private boolean mIsBook;
+    @Nullable
+    private Runnable mOwnCover;
     /** Counts the book's toggles: a read of its state begun before one is stale. */
     private int mBookToggles;
     @Nullable
@@ -239,6 +241,21 @@ public final class BookFavorites implements FavoritePeople.Listener {
                 v -> open(v, Consts.FRAGMENT_FAVORITE, "favorite", close));
         panel.findViewById(R.id.openHistory).setOnClickListener(
                 v -> open(v, Consts.FRAGMENT_HISTORY, "history", close));
+        View ownCover = panel.findViewById(R.id.ownCover);
+        ownCover.setVisibility(mOwnCover != null ? View.VISIBLE : View.GONE);
+        ownCover.setOnClickListener(v -> {
+            if (close != null) {
+                close.run();
+            }
+            if (mOwnCover != null) {
+                mOwnCover.run();
+            }
+        });
+    }
+
+    /** What «Своя обложка…» does (the book screen's choice); hidden without one. */
+    void setOwnCoverAction(@Nullable Runnable action) {
+        mOwnCover = action;
     }
 
     /** The screen is gone: no more FavoritePeople news, no sheet left open. */

@@ -424,6 +424,7 @@ public class DownloadUtil {
     public static int addDownloads(@NonNull Context context, @NonNull BookPOJO book, @NonNull List<AudioPOJO> chapters,
                                    @NonNull Collection<String> chosenUrls, boolean foreground) {
         if (book.getUrl() == null || book.getUrl().isEmpty()) return 0;
+        DownloadStorageHelper.keepCover(context, book); // the cover shows offline as the chapters play
         List<String> urls = new ArrayList<>(chapters.size());
         for (AudioPOJO chapter : chapters) urls.add(chapter.getUrl());
         List<DownloadIds.Entry> entries = entriesFor(context, book.getUrl(), urls);

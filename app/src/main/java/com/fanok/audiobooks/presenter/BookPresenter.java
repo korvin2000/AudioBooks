@@ -418,6 +418,11 @@ public class BookPresenter extends MvpPresenter<Activity> implements ActivityPre
             Checkpoint checkpoint = resumePoint();
             int curentTrack = checkpoint.chapterIndex;
             AudioPOJO pojo = mAudioPOJO.get(curentTrack);
+            Checkpoint saved = new StorageUtil(mContext.getApplicationContext()).loadCheckpoint(mBookPOJO.getUrl());
+            if (mOrdinals != null && saved != null
+                    && (curentTrack >= mOrdinals.length || mOrdinals[curentTrack] != saved.chapterIndex)) {
+                getViewState().showLongToast(R.string.resume_not_held); //told, not silently replaced
+            }
             //another book plays, or is read from the database to play
             boolean otherPlays = MediaPlayerService.isPlay() || restoring != null;
             if (!otherPlays) {
@@ -448,13 +453,17 @@ public class BookPresenter extends MvpPresenter<Activity> implements ActivityPre
         if (mOrdinals == null) {
             return saved.clampTo(mAudioPOJO.size());
         }
+        int nearest = 0;
         for (int i = 0; i < mOrdinals.length; i++) {
             if (mOrdinals[i] == saved.chapterIndex) {
                 return new Checkpoint(url, i, saved.positionMs);
             }
+            if (mOrdinals[i] < saved.chapterIndex) {
+                nearest = i;
+            }
         }
-        //the chapter has no offline copy: start the first one that has, from its beginning
-        return new Checkpoint(url, 0, 0);
+        //the chapter has no offline copy: the nearest one before it that has, from its beginning (else the first)
+        return new Checkpoint(url, nearest, 0);
     }
 
     /**
@@ -724,7 +733,7 @@ public class BookPresenter extends MvpPresenter<Activity> implements ActivityPre
         com.fanok.audiobooks.util.DownloadStorageHelper.deleteChapters(mContext, mBookPOJO.getUrl(), new HashSet<>(data),
                 (deleted, total) -> {
                     getViewState().showToast(mContext.getString(R.string.delete_result, deleted, total));
-                    if (isImported) {
+                    if (isImported || mIsOfflineFallback) {
                         getAudio();
                     } else {
                         getViewState().updateAdapter();
@@ -738,6 +747,10 @@ public class BookPresenter extends MvpPresenter<Activity> implements ActivityPre
         mIsOfflineFallback = false;
         mLastError = null;
         final int load = ++mAudioLoadId;
+        if (mAudioLoad != null) {
+            mDisposables.remove(mAudioLoad); // disposes it: the earlier load says nothing more
+            mAudioLoad = null;
+        }
         getViewState().showProgres(true);
 
         // For imported/local books — skip network, load from DB directly
@@ -774,55 +787,13 @@ public class BookPresenter extends MvpPresenter<Activity> implements ActivityPre
         // its site's covers are never requested: the one in its audio, at once from the chapters kept for it (online,
         // offline or after a failed page alike); its page's first chapter follows in onNext
         EmbeddedCover.fetch(mContext, mBookPOJO.getUrl(), null);
-        if (!Consts.isNetworkAvailable(mContext)) {
-            new Thread(new Runnable() {
-                @Override
-                public void run() {
-                    loadOfflineLocalAudioSync(load);
-                }
-            }, "offline-fallback-thread").start();
+        // a book whose every chapter is downloaded plays from them at once, the site's list follows quietly; any
+        // other book asks its site first and falls back to what is held (offline: at once)
+        boolean online = Consts.isNetworkAvailable(mContext);
+        new Thread(() -> loadOfflineLocalAudioSync(load, online), "offline-fallback-thread").start();
+        if (!online) {
             return;
         }
-
-        mAudioModel.getAudio(mBookPOJO.getUrl())
-                .subscribeOn(Schedulers.io())
-                .observeOn(AndroidSchedulers.mainThread())
-                .subscribe(new Observer<ArrayList<AudioPOJO>>() {
-                    @Override
-                    public void onComplete() {
-                        onCompleteAudio();
-                    }
-                    @UnstableApi
-                    @Override
-                    public void onError(@NotNull Throwable e) {
-                        Log.e(TAG, "getAudio network error: ", e);
-                        mLastError = e;
-                        new Thread(new Runnable() {
-                            @Override
-                            public void run() {
-                                loadOfflineLocalAudioSync(load);
-                            }
-                        }, "offline-fallback-thread").start();
-                    }
-
-                    @Override
-                    public void onNext(@NotNull ArrayList<AudioPOJO> bookPOJOS) {
-                        mAudioPOJO = bookPOJOS;
-                        mOrdinals = null;
-                        if (DefaultCover.replaces(mBookPOJO.getUrl()) && !bookPOJOS.isEmpty()) {
-                            // its site's covers are never requested: the one in its audio, in the background
-                            EmbeddedCover.fetch(mContext, mBookPOJO.getUrl(), bookPOJOS.get(0).getUrl());
-                        }
-                        feedChapters(secondsOf(mAudioPOJO));
-                        getViewState().showData(mAudioPOJO, mBookPOJO.getUrl(), mAudioPOJO.size());
-                        error = false;
-                    }
-
-                    @Override
-                    public void onSubscribe(@NotNull Disposable d) {
-                        mAudioLoad = replace(mAudioLoad, d);
-                    }
-                });
 
         mOtherSourceModel.getOtherArtist(mBookPOJO)
                 .subscribeOn(Schedulers.io())
@@ -862,7 +833,83 @@ public class BookPresenter extends MvpPresenter<Activity> implements ActivityPre
     }
 
     @OptIn(markerClass = UnstableApi.class)
-    private void loadOfflineLocalAudioSync(int load) {
+    /**
+     * The book's chapters from its site. {@code quiet}: a downloaded book already plays from its own list, which the
+     * site's replaces only when its chapters changed (added or removed); a failure then says nothing.
+     */
+    private void fetchAudio(int load, boolean quiet) {
+        mAudioModel.getAudio(mBookPOJO.getUrl())
+                .subscribeOn(Schedulers.io())
+                .observeOn(AndroidSchedulers.mainThread())
+                .subscribe(new Observer<ArrayList<AudioPOJO>>() {
+                    private boolean kept;
+
+                    @Override
+                    public void onComplete() {
+                        if (load != mAudioLoadId || kept) {
+                            return;
+                        }
+                        if (quiet) {
+                            // the player keeps its queue, whose places the added chapters leave as they were
+                            mAudioListDBModel.syncChapters(mBookPOJO, mAudioPOJO);
+                        } else {
+                            onCompleteAudio();
+                        }
+                    }
+                    @UnstableApi
+                    @Override
+                    public void onError(@NotNull Throwable e) {
+                        Log.e(TAG, "getAudio network error: ", e);
+                        if (quiet || load != mAudioLoadId) {
+                            return;
+                        }
+                        mLastError = e;
+                        new Thread(() -> loadOfflineLocalAudioSync(load, false), "offline-fallback-thread").start();
+                    }
+
+                    @Override
+                    public void onNext(@NotNull ArrayList<AudioPOJO> bookPOJOS) {
+                        if (load != mAudioLoadId) {
+                            return;
+                        }
+                        if (quiet && !appended(mAudioPOJO, bookPOJOS)) {
+                            // the same chapters, or ones changed in place: the downloaded list the player has stays
+                            kept = true;
+                            return;
+                        }
+                        mIsOfflineFallback = false;
+                        mAudioPOJO = bookPOJOS;
+                        mOrdinals = null;
+                        if (DefaultCover.replaces(mBookPOJO.getUrl()) && !bookPOJOS.isEmpty()) {
+                            // its site's covers are never requested: the one in its audio, in the background
+                            EmbeddedCover.fetch(mContext, mBookPOJO.getUrl(), bookPOJOS.get(0).getUrl());
+                        }
+                        feedChapters(secondsOf(mAudioPOJO));
+                        getViewState().showData(mAudioPOJO, mBookPOJO.getUrl(), mAudioPOJO.size());
+                        error = false;
+                    }
+
+                    @Override
+                    public void onSubscribe(@NotNull Disposable d) {
+                        mAudioLoad = replace(mAudioLoad, d);
+                    }
+                });
+    }
+
+    /** Whether {@code site} is {@code held} with chapters added at its end, the held ones in place by name. */
+    private static boolean appended(@Nullable List<AudioPOJO> held, @NonNull List<AudioPOJO> site) {
+        if (held == null || site.size() <= held.size()) {
+            return false;
+        }
+        for (int i = 0; i < held.size(); i++) {
+            if (!java.util.Objects.equals(held.get(i).getName(), site.get(i).getName())) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private void loadOfflineLocalAudioSync(int load, boolean siteFollows) {
         ArrayList<AudioPOJO> localAudio = new ArrayList<>();
         ArrayList<Integer> localOrdinals = new ArrayList<>();
 
@@ -936,6 +983,11 @@ public class BookPresenter extends MvpPresenter<Activity> implements ActivityPre
                 if (load != mAudioLoadId) {
                     return; // the screen is gone, or a newer load replaced this one
                 }
+                boolean whole = finalRowsTotal > 0 && finalLocalAudio.size() == finalRowsTotal;
+                if (siteFollows && !whole) {
+                    fetchAudio(load, false); // not all of it is downloaded: the site's list first
+                    return;
+                }
                 mIsOfflineFallback = true;
                 mAudioPOJO = finalLocalAudio;
                 mOrdinals = finalOrdinals;
@@ -949,6 +1001,9 @@ public class BookPresenter extends MvpPresenter<Activity> implements ActivityPre
                     }
                     error = false;
                     onCompleteAudio();
+                    if (siteFollows) {
+                        fetchAudio(load, true); // playing already: the site's list only if its chapters changed
+                    }
                 } else if (mLastError instanceof BookRemovedException) {
                     getViewState().showLongToast(R.string.book_taken_down);
                     error = true;

@@ -40,7 +40,6 @@ import com.arellomobile.mvp.presenter.InjectPresenter;
 import com.arellomobile.mvp.presenter.ProvidePresenter;
 import com.fanok.audiobooks.Consts;
 import com.fanok.audiobooks.MarginItemDecoration;
-import com.fanok.audiobooks.FontScale;
 import com.fanok.audiobooks.R;
 import com.fanok.audiobooks.activity.BookActivity;
 import com.fanok.audiobooks.activity.BookFavorites;
@@ -85,6 +84,9 @@ public class DescriptionBookFragment extends MvpAppCompatFragment
 
     private TextView mTitle;
     private ImageView mImageView;
+    /** The cover the site gives ("" for none), once the description shows; null before. */
+    @Nullable
+    private String mSitePoster;
     /** The default cover is shown: the one read from the book's audio replaces it when it comes. */
     private boolean mDefaultCoverShown;
     private final EmbeddedCover.Listener mEmbeddedCover = (key, cover) -> {
@@ -276,6 +278,18 @@ public class DescriptionBookFragment extends MvpAppCompatFragment
     }
 
     /** A favourite: the label in favoriteColor with a star for its icon, so it reads without colour too. */
+    /** Each label as wide as the widest needs at any font size (never cut), so the values keep their column. */
+    private static void alignLabels(TextView... labels) {
+        int widest = 0;
+        for (TextView label : labels) {
+            label.measure(View.MeasureSpec.UNSPECIFIED, View.MeasureSpec.UNSPECIFIED);
+            widest = Math.max(widest, label.getMeasuredWidth());
+        }
+        for (TextView label : labels) {
+            label.setMinWidth(widest);
+        }
+    }
+
     private void bindLabel(TextView label, BookFavorites favorites, int kind, @DrawableRes int icon) {
         boolean on = favorites.any(kind);
         label.setTextColor(MaterialColors.getColor(label, on ? R.attr.favoriteColor : R.attr.subTextColor));
@@ -448,7 +462,7 @@ public class DescriptionBookFragment extends MvpAppCompatFragment
         mAuthorLabel = view.findViewById(R.id.authorLabel);
         mArtistLabel = view.findViewById(R.id.artistLabel);
         mSeriesLabel = view.findViewById(R.id.seriesLabel);
-        FontScale.grow(mAuthorLabel, mArtistLabel, mSeriesLabel); // their fixed width keeps the values in a column
+        alignLabels(mAuthorLabel, mArtistLabel, mSeriesLabel);
         mTimeProgressRow = view.findViewById(R.id.timeProgressRow);
         mTimeProgress = view.findViewById(R.id.timeProgress);
         mTimeNote = view.findViewById(R.id.timeNote);
@@ -637,6 +651,50 @@ public class DescriptionBookFragment extends MvpAppCompatFragment
         super.onDestroyView();
     }
 
+    /** The book's cover: the user's own or a downloaded one, else the site's, else the default one. */
+    private void showPoster() {
+        String poster = mSitePoster;
+        String localCover = getLocalCoverFallback();
+        if (localCover != null && !localCover.isEmpty()) {
+            poster = localCover;
+        }
+        mDefaultCoverShown = poster != null && DefaultCover.replaces(poster);
+        if (poster != null && !poster.trim().isEmpty()) {
+            if (DefaultCover.replaces(poster)) {
+                Picasso.get().cancelRequest(mImageView);
+                mImageView.setImageDrawable(DefaultCover.drawable(mImageView.getContext(), coverKey(poster)));
+            } else if (poster.startsWith("content://")) {
+                Picasso.get()
+                        .load(android.net.Uri.parse(poster))
+                        .placeholder(android.R.drawable.ic_menu_gallery)
+                        .error(android.R.drawable.ic_menu_gallery)
+                        .into(mImageView);
+            } else if (poster.startsWith("/") || poster.contains(":\\")) {
+                Picasso.get()
+                        .load(new java.io.File(poster))
+                        .placeholder(android.R.drawable.ic_menu_gallery)
+                        .error(android.R.drawable.ic_menu_gallery)
+                        .into(mImageView);
+            } else {
+                Picasso.get()
+                        .load(poster)
+                        .placeholder(android.R.drawable.ic_menu_gallery)
+                        .error(android.R.drawable.ic_menu_gallery)
+                        .into(mImageView);
+            }
+        } else { // no cover (or only the site's placeholder): the default one, as in the lists
+            Picasso.get().cancelRequest(mImageView);
+            mImageView.setImageDrawable(DefaultCover.gradient(mImageView.getContext(), coverKey(null)));
+        }
+    }
+
+    /** The user chose or removed the book's own cover (OwnCover): the cover shows anew. */
+    public void ownCoverChanged() {
+        if (mImageView != null && mSitePoster != null) {
+            showPoster();
+        }
+    }
+
     @Override
     public void showDescription(@NonNull DescriptionPOJO description) {
         if (mTitle == null) {
@@ -665,39 +723,8 @@ public class DescriptionBookFragment extends MvpAppCompatFragment
             mHeaderTitle = BookHeader.title(mHeaderAuthor, description.getTitle());
             bindFavorites();
 
-            String poster = description.getPoster();
-            String localCover = getLocalCoverFallback();
-            if (localCover != null && !localCover.isEmpty()) {
-                poster = localCover;
-            }
-            mDefaultCoverShown = poster != null && DefaultCover.replaces(poster);
-            if (poster != null && !poster.trim().isEmpty()) {
-                if (DefaultCover.replaces(poster)) {
-                    Picasso.get().cancelRequest(mImageView);
-                    mImageView.setImageDrawable(DefaultCover.drawable(mImageView.getContext(), coverKey(poster)));
-                } else if (poster.startsWith("content://")) {
-                    Picasso.get()
-                            .load(android.net.Uri.parse(poster))
-                            .placeholder(android.R.drawable.ic_menu_gallery)
-                            .error(android.R.drawable.ic_menu_gallery)
-                            .into(mImageView);
-                } else if (poster.startsWith("/") || poster.contains(":\\")) {
-                    Picasso.get()
-                            .load(new java.io.File(poster))
-                            .placeholder(android.R.drawable.ic_menu_gallery)
-                            .error(android.R.drawable.ic_menu_gallery)
-                            .into(mImageView);
-                } else {
-                    Picasso.get()
-                            .load(poster)
-                            .placeholder(android.R.drawable.ic_menu_gallery)
-                            .error(android.R.drawable.ic_menu_gallery)
-                            .into(mImageView);
-                }
-            } else {
-                Picasso.get().load(android.R.drawable.ic_menu_gallery)
-                        .into(mImageView);
-            }
+            mSitePoster = description.getPoster();
+            showPoster();
 
             BookActivity activity = (BookActivity) getActivity();
 

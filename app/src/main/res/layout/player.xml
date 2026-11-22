@@ -140,16 +140,20 @@
                 android:src="@drawable/ic_image_outline"
                 android:visibility="gone" />
 
+            <!-- the buttons take the row's full height: a tap above or below an icon plays, it does not open the
+                 sheet (mPlayer's click) -->
             <LinearLayout
                 android:id="@+id/topButtonsControls"
                 android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
+                android:layout_height="match_parent"
+                android:layout_marginTop="-2dp"
+                android:layout_marginBottom="-2dp"
                 android:orientation="horizontal">
 
                 <ImageButton
                     android:id="@+id/previousTop"
                     android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
+                    android:layout_height="match_parent"
                     android:background="?selectableItemBackgroundBorderless"
                     android:contentDescription="@string/previous"
                     android:paddingStart="@dimen/text_margin"
@@ -159,7 +163,7 @@
                 <ImageButton
                     android:id="@+id/playTop"
                     android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
+                    android:layout_height="match_parent"
                     android:background="?selectableItemBackgroundBorderless"
                     android:contentDescription="@string/play"
                     android:paddingStart="@dimen/text_margin"
@@ -169,7 +173,7 @@
                 <ImageButton
                     android:id="@+id/nextTop"
                     android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
+                    android:layout_height="match_parent"
                     android:background="?selectableItemBackgroundBorderless"
                     android:contentDescription="@string/next"
                     android:paddingStart="@dimen/text_margin"

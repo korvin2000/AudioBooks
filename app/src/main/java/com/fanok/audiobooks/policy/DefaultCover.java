@@ -12,6 +12,7 @@ import com.fanok.audiobooks.Url;
 import com.fanok.audiobooks.search.Provider;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.regex.Pattern;
 
 /**
  * Covers that never load and show a default cover instead: audioboo's Cloudflare answers every GET, its cover
@@ -45,6 +46,18 @@ public final class DefaultCover {
     private static int next;
 
     private DefaultCover() {
+    }
+
+    /**
+     * A site's own "no cover" image (izibuk's and otrub's poster.png, the DLE templates' no-img.png, noimage.jpg,
+     * nocover-audio.jpg…): the book has no cover, so its default cover shows instead.
+     */
+    private static final Pattern PLACEHOLDER = Pattern.compile("(?i)/(?:images/poster"
+            + "|no[-_]?(?:img|image|cover|poster|photo)\\d*|nocover[-\\w]*|placeholder)\\.(?:png|jpe?g|gif|webp|svg)(?:[?#].*)?$");
+
+    /** Whether {@code url} is a site's placeholder image rather than a cover. */
+    public static boolean placeholder(@Nullable String url) {
+        return url != null && PLACEHOLDER.matcher(url).find();
     }
 
     /** Whether the default cover shows instead of {@code photo}, without trying to load it. */

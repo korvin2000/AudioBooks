@@ -91,6 +91,8 @@ import com.fanok.audiobooks.pojo.OtherArtistPOJO;
 import com.fanok.audiobooks.pojo.StorageUtil;
 import com.fanok.audiobooks.policy.DefaultCover;
 import com.fanok.audiobooks.policy.EmbeddedCover;
+import com.fanok.audiobooks.fragment.DescriptionBookFragment;
+import com.fanok.audiobooks.policy.OwnCover;
 import com.fanok.audiobooks.policy.ParentalControl;
 import com.fanok.audiobooks.presenter.BookPresenter;
 import com.fanok.audiobooks.service.Checkpoint;
@@ -530,6 +532,7 @@ public class BookActivity extends MvpAppCompatActivity implements Activity {
         if (json == null) throw new NullPointerException();
         mBookPOJO = BookPOJO.parceJsonToBookPojo(json);
         mFavorites = new BookFavorites(this, mBookPOJO);
+        mFavorites.setOwnCoverAction(this::askOwnCover);
         mFavorites.addListener(mFavoritesListener);
 
         pref = PreferenceManager
@@ -1032,7 +1035,7 @@ public class BookActivity extends MvpAppCompatActivity implements Activity {
     /**
      * The block's cover, as the lists show it ({@link BooksListAddapter#loadCover}: the parental control's mask, the
      * default cover or the one read from the audio, the list's own image from its cache); a downloaded book's cover
-     * file first, as on the description page. A book without any has no image, the texts take its place.
+     * file first, as on the description page; a book without any shows its default cover, as in the lists.
      */
     private void bindPlayerCover() {
         if (mPlayerCover == null) {
@@ -1041,10 +1044,8 @@ public class BookActivity extends MvpAppCompatActivity implements Activity {
         mPlayerCoverBound = true;
         String local = DownloadStorageHelper.findLocalCoverForBook(this, mBookPOJO);
         String photo = local != null && !local.isEmpty() ? local : mBookPOJO.getPhoto();
-        boolean none = (photo == null || photo.trim().isEmpty()) && !DefaultCover.replaces(mBookPOJO.getUrl())
-                && ParentalControl.coverMask(this, mBookPOJO) == null;
-        show(mPlayerCover, !none);
-        mPlayerCoverWanted = none ? null : BooksListAddapter.loadCover(mPlayerCover, mBookPOJO, photo);
+        show(mPlayerCover, true);
+        mPlayerCoverWanted = BooksListAddapter.loadCover(mPlayerCover, mBookPOJO, photo);
     }
 
     /**
@@ -1524,6 +1525,52 @@ public class BookActivity extends MvpAppCompatActivity implements Activity {
     @Override
     public void refreshActivity() {
         BookActivity.refreshActivity(this, mBookPOJO, mNotificationClick);
+    }
+
+    /** «Своя обложка…»: the picked image becomes the book's cover here and in every list. */
+    private final androidx.activity.result.ActivityResultLauncher<String> mOwnCoverPick = registerForActivityResult(
+            new androidx.activity.result.contract.ActivityResultContracts.GetContent(), uri -> {
+                if (uri != null && mBookPOJO != null) {
+                    OwnCover.set(this, mBookPOJO.getUrl(), uri, saved -> {
+                        if (saved) {
+                            ownCoverChanged();
+                        } else {
+                            Toast.makeText(this, R.string.own_cover_failed, Toast.LENGTH_SHORT).show();
+                        }
+                    });
+                }
+            });
+
+    /** Picks the book's own cover; one already chosen can be replaced or removed. */
+    private void askOwnCover() {
+        if (OwnCover.of(this, mBookPOJO.getUrl()) == null) {
+            mOwnCoverPick.launch("image/*");
+            return;
+        }
+        new AlertDialog.Builder(this)
+                .setItems(new CharSequence[]{getString(R.string.own_cover_replace),
+                        getString(R.string.own_cover_remove)}, (dialog, which) -> {
+                    if (which == 0) {
+                        mOwnCoverPick.launch("image/*");
+                    } else {
+                        OwnCover.clear(this, mBookPOJO.getUrl());
+                        ownCoverChanged();
+                    }
+                })
+                .show();
+    }
+
+    /** The book's covers on this screen show the own cover chosen or removed. */
+    private void ownCoverChanged() {
+        mPlayerCoverBound = false;
+        if (mPlayerBookShown) {
+            bindPlayerCover();
+        }
+        for (androidx.fragment.app.Fragment fragment : getSupportFragmentManager().getFragments()) {
+            if (fragment instanceof DescriptionBookFragment) {
+                ((DescriptionBookFragment) fragment).ownCoverChanged();
+            }
+        }
     }
 
     /** The browser check of the book's site, which refused the app: passed, the book screen loads again. */
