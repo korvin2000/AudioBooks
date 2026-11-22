@@ -29,7 +29,7 @@ import java.util.concurrent.ConcurrentHashMap;
 /**
  * The one way to fetch a provider page: shared defaults (user agent, referrer, timeout, bounded body),
  * a per-host cookie jar, platform TLS validation, and classification of challenge/error pages.
- * Challenge pages (Cloudflare, DDoS-Guard) raise {@link CookesExeption}; 429 raises {@link RateLimitedException}, and a
+ * Challenge pages (Cloudflare, DDoS-Guard, a site's own human check) raise {@link CookesExeption}; 429 raises {@link RateLimitedException}, and a
  * host that said when to come back ({@code Retry-After}) is not asked again before then; other HTTP errors raise
  * {@link HttpStatusException}; parsers therefore never see an error page as content.
  */
@@ -39,6 +39,11 @@ public final class SiteHttp {
     static final int MAX_REDIRECTS = 5;
     public static final int MAX_BODY_BYTES = 4 * 1024 * 1024;
     private static final String REFERRER = "https://www.google.com/";
+    /**
+     * The page a site sends a visitor to for its own "are you human" check (slushat-knigi.com: a button to press once a
+     * day, answered with a cookie). Known by its path: it answers 200 and its title follows the language.
+     */
+    private static final String HUMAN_CHECK = "/__bgate";
     private static final Map<String, Map<String, String>> JAR = new ConcurrentHashMap<>();
     /** Hosts that answered 429 with a {@code Retry-After}: until when (epoch millis) they are not asked. */
     private static final Map<String, Long> LIMITED_UNTIL = new ConcurrentHashMap<>();
@@ -263,6 +268,10 @@ public final class SiteHttp {
                 AppProxy.reportTransportFailure(proxy, e); // a hint the finder confirms by control checks
             }
             throw e;
+        }
+        if (response.statusCode() == 200 && HUMAN_CHECK.equals(response.url().getPath())
+                && requestedHost.equals(Url.hostOf(response.url().toString()))) {
+            throw new CookesExeption(url); // the page asked for: the check is passed and verified on it
         }
         if (response.statusCode() == 403 || response.statusCode() == 429) {
             // the automatic proxy may be the one refused, by the host that answered (after redirects)

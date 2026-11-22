@@ -107,7 +107,11 @@ direct) are unchanged.
 ## 1. `SiteHttp` — site pages (jsoup)
 
 **File:** `net/SiteHttp.java`. **Transport:** `Jsoup.connect` → Android `HttpURLConnection` (platform OkHttp/Conscrypt
-under the hood, not the app's OkHttp).
+under the hood, not the app's OkHttp): HTTP/1.1. A site whose parser says `http2()` (slushat-knigi) is asked through
+the shared OkHttp client instead, over HTTP/2 as a browser asks: `org.jsoup.helper.OkHttpExecutor`, installed in
+`App.onCreate` in the place jsoup keeps its own JVM-only HTTP/2 transport. It sits in jsoup's package because that
+contract is package-private (jsoup 1.21.2; a jsoup update that changes it fails to compile there). Redirects, cookies,
+body limits and everything in `SiteHttp` stay as they are; unit tests never install it.
 
 **Used by:** every `source/*` parser (`SourceParser.fetch`, `loadListing`, `tracks`, `comments`, `series`, search),
 `model/*` (`AudioModel`, `BookDescriptionModel` through `model/BookPages`), `search/*` (source probes, ranking),
@@ -149,9 +153,15 @@ under the hood, not the app's OkHttp).
   (`net/RateLimitedException`, surfaced as `ProviderPage.Status.RATE_LIMITED`).
 - Challenges: `CookesExeption` → `ProviderPage.Status.BLOCKED` with `ProviderPage.challenge` → UI message
   `R.string.site_challenge`, or for sites whose check can be passed in a browser (`ActivityCookies.passes(provider)`:
-  audioboo, baza-knig) an offer «Пройти» (`BooksView.showSiteCheckOffer`, `Description.showSiteCheckOffer`). A plain
+  audioboo, baza-knig, slushat-knigi) an offer «Пройти» (`BooksView.showSiteCheckOffer`, `Description.showSiteCheckOffer`). A plain
   403/503 is `BLOCKED` without `challenge`: an outage or a refusal no browser can pass, so a list offers the other route
   or shows the message, never the check.
+- slushat-knigi's own human check (since 2026-11): a request without the cookie `bgate` is redirected to `/__bgate`
+  (200, a button to press once a day; the title follows the language). `SiteHttp.executeOnce` raises `CookesExeption`
+  with the URL that was asked, so a list no longer reads the check as an empty page. The site lets a request in without
+  the cookie only over HTTP/2 with a search engine's Referer (which `connect` sends), hence `SlushatKnigi.http2()`; if
+  the site closes that, the user passes the check in `ActivityCookies` and the pass (`SlushatKnigi.setCheck`, prefs
+  `cookies_slushat_knigi`) goes with the page requests. The app never presses the button or computes its key itself.
 - In auto-proxy mode a challenged/blocked page reports the route as suspect (`AppProxy.reportSuspect`), which may
   re-verify the proxy.
 - `model/BookPages.get(url, fetch)` coalesces identical book-page requests for 60 s (description, chapters and
@@ -250,6 +260,7 @@ bound to a different IP than the app's requests (the check screen says so).
 | Sites that need POST for pages | `SourceParser.postsPages()` → `SiteHttp.executePosted` |
 | Site cookies for pages | `SourceParser.cookies()` (own host only, jar wins) |
 | Site User-Agent for pages | `SourceParser.userAgent()` (own host only; null = `Consts.USER_AGENT`) |
+| Site pages over HTTP/2 | `SourceParser.http2()` (own host only) → `org.jsoup.helper.OkHttpExecutor` |
 | Site cookies/headers for media | `SourceParser.mediaCookies(bookUrl)`, `mediaHeaders(bookUrl)` → `DownloadUtil` |
 | Referer for images/media | `SourceParser.referer()`, `hosts()`, `refererHosts()` → `Provider.refererOf` (OkHttp interceptor) and `Covers.glide` |
 | Covers never requested from a site | `policy/DefaultCover.replaces(url)` (audioboo): call sites + OkHttp image guard; covers come from `policy/EmbeddedCover` (ID3 art of the first MP3) or the gradient default |

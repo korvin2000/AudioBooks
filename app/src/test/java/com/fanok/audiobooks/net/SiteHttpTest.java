@@ -21,6 +21,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
 import java.util.concurrent.CopyOnWriteArrayList;
+import com.fanok.audiobooks.CookesExeption;
 import org.jsoup.Connection;
 import org.jsoup.HttpStatusException;
 import org.jsoup.UnsupportedMimeTypeException;
@@ -94,6 +95,50 @@ public class SiteHttpTest {
             assertEquals("Книги", SiteHttp.parse(response).title());
             // page 1 is dropped before the request; the redirect is re-POSTed, never downgraded to GET
             assertEquals(Arrays.asList("POST /old/ xsort=1", "POST /new/ xsort=1"), site.log);
+        }
+    }
+
+    @Test
+    public void aRedirectToTheSitesHumanCheckIsAChallengeOfThePageAsked() throws IOException {
+        try (PostOnlySite site = new PostOnlySite()) {
+            String asked = site.base + "/gated/?story=1";
+            CookesExeption e = assertThrows(CookesExeption.class, () -> SiteHttp.get(asked));
+            assertEquals("the check is passed on the page asked, not on the check's own", asked, e.getMessage());
+            assertThrows("an endpoint behind the check: not \"not JSON\"", CookesExeption.class,
+                    () -> SiteHttp.getJson(asked));
+        }
+    }
+
+    /** slushat-knigi wants HTTP/2: OkHttp asks its pages; a redirect, the form and the body stay jsoup's. */
+    @Test
+    public void aSiteThatWantsHttp2IsAskedThroughOkHttpAndEveryOtherAsBefore() throws Exception {
+        java.lang.reflect.Field slot = Class.forName("org.jsoup.helper.RequestDispatch")
+                .getDeclaredField("clientConstructor");
+        slot.setAccessible(true);
+        Object jsoups = slot.get(null);
+        List<String> throughOkHttp = new CopyOnWriteArrayList<>();
+        try (PostOnlySite site = new PostOnlySite()) {
+            org.jsoup.helper.OkHttpExecutor.install(new okhttp3.OkHttpClient.Builder()
+                    .dns(host -> Arrays.asList(InetAddress.getLoopbackAddress()))
+                    .addInterceptor(chain -> {
+                        throughOkHttp.add(chain.request().method() + " " + chain.request().url().encodedPath());
+                        return chain.proceed(chain.request());
+                    }).build());
+            String wanting = "http://slushat-knigi.com:" + site.socket.getLocalPort();
+            Connection.Response page = SiteHttp.execute(SiteHttp.connect(wanting + "/new/")
+                    .method(Connection.Method.POST).data("xsort", "1"));
+            assertEquals("Книги", SiteHttp.parse(page).title());
+            assertThrows(CookesExeption.class, () -> SiteHttp.get(wanting + "/gated/"));
+            assertEquals(Arrays.asList("POST /new/", "GET /gated/", "GET /__bgate"), throughOkHttp);
+
+            Connection.Response other = SiteHttp.execute(SiteHttp.connect(site.base + "/new/")
+                    .method(Connection.Method.POST).data("xsort", "1"));
+            assertEquals("Книги", SiteHttp.parse(other).title());
+            assertEquals("another site: jsoup's own connection", 3, throughOkHttp.size());
+            assertEquals("POST /new/ xsort=1", site.log.get(0));
+            assertEquals("POST /new/ xsort=1", site.log.get(site.log.size() - 1));
+        } finally {
+            slot.set(null, jsoups);
         }
     }
 
@@ -183,6 +228,12 @@ public class SiteHttpTest {
                 location = "/loop/" + (Integer.parseInt(path.substring(6, path.length() - 1)) + 1) + "/";
             } else if (path.equals("/nowhere/")) {
                 status = "302 Found";
+            } else if (path.startsWith("/gated/")) { // slushat-knigi.com without the pass of its human check
+                status = "302 Found";
+                location = "/__bgate?r=/gated/";
+            } else if (path.startsWith("/__bgate")) {
+                status = "200 OK";
+                html = "<html><head><title>Check</title></head><body><button>I am not a robot</button></body></html>";
             } else if (method.equals("POST")) {
                 status = "200 OK";
                 html = "<html><head><title>Книги</title></head><body>listing</body></html>";
