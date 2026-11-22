@@ -18,8 +18,9 @@ import java.util.Set;
     SavedEntity.class,
     AudioEntity.class,
     BooksAudioEntity.class,
-    FavoritePersonEntity.class
-}, version = 20)
+    FavoritePersonEntity.class,
+    BookmarkEntity.class
+}, version = 21)
 public abstract class AppDatabase extends RoomDatabase {
     public abstract FavoriteDao favoriteDao();
     public abstract HistoryDao historyDao();
@@ -27,6 +28,7 @@ public abstract class AppDatabase extends RoomDatabase {
     public abstract AudioDao audioDao();
     public abstract BooksAudioDao booksAudioDao();
     public abstract FavoritePersonDao favoritePersonDao();
+    public abstract BookmarkDao bookmarkDao();
 
     private static volatile AppDatabase INSTANCE;
 
@@ -101,9 +103,18 @@ public abstract class AppDatabase extends RoomDatabase {
         }
     };
 
+    static final Migration MIGRATION_20_21 = new Migration(20, 21) {
+        @Override
+        public void migrate(@NonNull SupportSQLiteDatabase database) {
+            // places marked in a book: chapter, position and a note (model.BookmarkRules)
+            database.execSQL("CREATE TABLE IF NOT EXISTS `bookmark` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `url_book` TEXT NOT NULL, `chapter_index` INTEGER NOT NULL, `chapter_name` TEXT NOT NULL, `position_ms` INTEGER NOT NULL, `note` TEXT, `created_at` INTEGER NOT NULL)");
+            database.execSQL("CREATE INDEX IF NOT EXISTS `index_bookmark_url_book` ON `bookmark` (`url_book`)");
+        }
+    };
+
     /** Every upgrade path, chained; the builder and the migration tests use the same list. */
     static final Migration[] MIGRATIONS = {MIGRATION_15_16, MIGRATION_16_17, MIGRATION_17_18, MIGRATION_18_19,
-            MIGRATION_19_20};
+            MIGRATION_19_20, MIGRATION_20_21};
 
     /**
      * Recreates {@code table} with {@code columns}. The new table is filled under a temporary name and gets

@@ -17,6 +17,8 @@ public class Settings {
     public static int balance;
     /** Night sound (an even, quiet level), played regardless of {@link #isEqualizerEnabled} like the balance. */
     public static boolean nightSound;
+    /** Volume boost, 0 (100 %) to {@link BalanceAudioProcessor#BOOST_MAX} percent more; played like the balance. */
+    public static int boost;
     public static EqualizerModel equalizerModel;
     public static double ratio = 1.0;
     public static boolean isEditing = false;

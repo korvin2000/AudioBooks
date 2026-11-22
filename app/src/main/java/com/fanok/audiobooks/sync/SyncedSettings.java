@@ -42,7 +42,8 @@ final class SyncedSettings {
     /** Default preferences holding a flag; also the search checkbox of every source. */
     private static final List<String> FLAGS = new ArrayList<>(Arrays.asList("history_procent", "toolbar_title",
             "toolbar_favorite", "toolbar_favorite_author", "toolbar_favorite_reader", "toolbar_share",
-            "toolbar_speed", "toolbar_download", "toolbar_sleep_timer", "toolbar_car_mode", "toolbar_equalizer", "toolbar_settings",
+            "toolbar_speed", "toolbar_download", "toolbar_sleep_timer", "toolbar_car_mode", "toolbar_equalizer",
+            "toolbar_bookmarks", "toolbar_settings",
             "toolbar_open_site", "toolbar_main_screen", "toolbar_refresh", "autoPlayPref", "reproductionPref",
             "seekButtonsPref", "seekToPausePref", "rewind_back", "safeNavigationPref", "scrollToSelectedPref",
             "search_pref", "pref_play_last_book", "flip_pause", SkipSilenceProcessor.PREF));

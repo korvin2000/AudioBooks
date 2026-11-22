@@ -114,6 +114,42 @@
                 android:textSize="16sp" />
         </LinearLayout>
 
+        <!-- the volume boost for quiet recordings: 100 % (none) to 200 %, heard at once like the balance -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="44dp"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:paddingLeft="16dp"
+            android:paddingRight="16dp">
+
+            <TextView
+                android:id="@+id/equalizer_boost_label"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:importantForAccessibility="no"
+                android:text="@string/equalizer_boost"
+                android:textSize="16sp" />
+
+            <SeekBar
+                android:id="@+id/equalizer_boost"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:contentDescription="@string/equalizer_boost"
+                android:thumb="@drawable/custom_equalizer_thumb" />
+
+            <TextView
+                android:id="@+id/equalizer_boost_value"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:importantForAccessibility="no"
+                android:minEms="3"
+                android:gravity="end"
+                android:textSize="16sp"
+                tools:text="150%" />
+        </LinearLayout>
+
         <!-- night sound is the app's own, like the balance: independent of the switch above -->
         <androidx.appcompat.widget.SwitchCompat
             android:id="@+id/equalizer_night"

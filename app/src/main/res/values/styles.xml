@@ -1,4 +1,4 @@
-<resources>
+<resources xmlns:tools="http://schemas.android.com/tools">
 
     <!-- DARK application theme. -->
     <style name="AppTheme" parent="Theme.MaterialComponents.DayNight.DarkActionBar.Bridge">
@@ -24,6 +24,10 @@
         <item name="toolbarStyle">@style/Widget.App.Toolbar</item>
         <item name="toolbarNavigationButtonStyle">@style/Widget.App.Toolbar.Button.Navigation</item>
         <item name="actionButtonStyle">@style/Widget.App.ActionButton</item>
+        <item name="dialogCornerRadius">@dimen/dialog_corner_radius</item>
+        <item name="android:dialogCornerRadius" tools:targetApi="p">@dimen/dialog_corner_radius</item>
+        <item name="popupMenuStyle">@style/Widget.App.PopupMenu</item>
+        <item name="actionOverflowMenuStyle">@style/Widget.App.PopupMenu.Overflow</item>
     </style>
 
     <style name="AppTheme.NoActionBar">
@@ -110,6 +114,10 @@
         <item name="toolbarStyle">@style/Widget.App.Toolbar</item>
         <item name="toolbarNavigationButtonStyle">@style/Widget.App.Toolbar.Button.Navigation</item>
         <item name="actionButtonStyle">@style/Widget.App.ActionButton</item>
+        <item name="dialogCornerRadius">@dimen/dialog_corner_radius</item>
+        <item name="android:dialogCornerRadius" tools:targetApi="p">@dimen/dialog_corner_radius</item>
+        <item name="popupMenuStyle">@style/Widget.App.PopupMenu</item>
+        <item name="actionOverflowMenuStyle">@style/Widget.App.PopupMenu.Overflow</item>
     </style>
 
     <style name="AppThemeBlack.NoActionBar">
@@ -186,6 +194,10 @@
         <item name="toolbarStyle">@style/Widget.App.Toolbar</item>
         <item name="toolbarNavigationButtonStyle">@style/Widget.App.Toolbar.Button.Navigation</item>
         <item name="actionButtonStyle">@style/Widget.App.ActionButton</item>
+        <item name="dialogCornerRadius">@dimen/dialog_corner_radius</item>
+        <item name="android:dialogCornerRadius" tools:targetApi="p">@dimen/dialog_corner_radius</item>
+        <item name="popupMenuStyle">@style/Widget.App.PopupMenu</item>
+        <item name="actionOverflowMenuStyle">@style/Widget.App.PopupMenu.Overflow</item>
 
     </style>
 
@@ -371,6 +383,18 @@
          which is the toolbar color and too dark on a dark dialog. -->
     <style name="ThemeOverlay.App.DialogAccent" parent="">
         <item name="colorPrimary">?attr/colorAccent</item>
+    </style>
+
+    <!-- Popup and overflow menus on a rounded plate; dialogs take their corners from dialogCornerRadius: AppCompat's
+         by its own attribute, Material's (API 28+) by the platform's. -->
+    <style name="Widget.App.PopupMenu" parent="Widget.AppCompat.PopupMenu">
+        <item name="android:popupBackground">@drawable/popup_menu_background</item>
+        <item name="android:popupElevation">8dp</item>
+    </style>
+
+    <style name="Widget.App.PopupMenu.Overflow" parent="Widget.AppCompat.PopupMenu.Overflow">
+        <item name="android:popupBackground">@drawable/popup_menu_background</item>
+        <item name="android:popupElevation">8dp</item>
     </style>
 
     <style name="TvOptionsMenuItem" parent="Widget.AppCompat.Button.Borderless"><item name="android:layout_width">?attr/actionBarSize</item>

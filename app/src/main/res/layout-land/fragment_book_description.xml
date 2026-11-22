@@ -34,11 +34,13 @@
             android:visibility="invisible"
             tools:background="?attr/backgraundColor">
 
+            <!-- the bottom padding keeps the last card off the page's bottom edge -->
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginStart="@dimen/text_margin_book_description"
-                android:orientation="vertical">
+                android:orientation="vertical"
+                android:paddingBottom="@dimen/text_margin_book_description">
 
                 <!-- "Автор — Название": the author toggles the author, the title the book; a long press copies it -->
                 <TextView
@@ -50,14 +52,23 @@
                     tools:text="Роулинг Джоан — Гарри Поттер и Орден Феникса" />
 
 
+                <!-- an outlined pill, a little under the title: the smaller text makes room for its padding; a name
+                     too long for it ends in an ellipsis -->
                 <TextView
                     android:id="@+id/genre"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
+                    android:layout_marginTop="3dp"
+                    android:background="@drawable/bg_genre_pill"
+                    android:ellipsize="end"
                     android:maxLines="1"
+                    android:paddingStart="10dp"
+                    android:paddingTop="2dp"
+                    android:paddingEnd="10dp"
+                    android:paddingBottom="2dp"
                     android:singleLine="true"
                     android:textColor="?attr/hrefColor"
-                    android:textSize="@dimen/textSizeBookDescription"
+                    android:textSize="14sp"
                     tools:text="Фантастика" />
 
 
@@ -311,104 +322,124 @@
                     android:visibility="gone"
                     tools:text="Книга в ухе" />
 
-                <View
+                <!-- the description on a card (bg_book_card), its padding in place of the divider and the margins
+                     that were here; the end margin keeps it off the screen's edge, where the rows above may run to.
+                     The card has the divider's id: the code hides that one when the book has nothing to show here
+                     (showDescription), and so the whole card -->
+                <LinearLayout
                     android:id="@+id/descLine"
                     android:layout_width="match_parent"
-                    android:layout_height="1px"
-                    android:layout_marginTop="@dimen/text_margin_book_description"
-                    android:background="?attr/subTextColor" />
-
-                <TextView
-                    android:id="@+id/desc"
-                    android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="@dimen/text_margin_book_description"
-                    android:ellipsize="end"
-                    android:textColor="?attr/subTextColor"
-                    android:textSize="@dimen/textSizeBookDescription"
-                    tools:text="Гарри Поттер с нетерпением ждет окончания каникул и начала пятого учебного года в Хогвартсе. Юный волшебник как никогда страдает от одиночества, а насмешки и придирки Дурслей стали совсем невыносимы. К тому же он уверен, что Волан-де-Морт возродился и скоро начнет действовать. Вас снова ждут опасные и захватывающие приключения, жестокая борьба, верные друзья и волшебный мир Гарри Поттера." />
-
-                <!-- the site's collections the book is in, a link each, under the unfolded description (bindDescription) -->
-                <LinearLayout
-                    android:id="@+id/collections"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="@dimen/text_margin"
+                    android:layout_marginEnd="@dimen/text_margin_book_description"
+                    android:background="@drawable/bg_book_card"
                     android:orientation="vertical"
-                    android:visibility="gone">
+                    android:paddingStart="@dimen/book_card_padding"
+                    android:paddingTop="@dimen/margin_small"
+                    android:paddingEnd="@dimen/book_card_padding"
+                    android:paddingBottom="@dimen/margin_small">
 
                     <TextView
+                        android:id="@+id/desc"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:text="@string/book_collections"
-                        android:textColor="?attr/colorPrimaryText"
+                        android:ellipsize="end"
+                        android:textColor="?attr/subTextColor"
                         android:textSize="@dimen/textSizeBookDescription"
-                        android:textStyle="bold" />
-                </LinearLayout>
+                        tools:text="Гарри Поттер с нетерпением ждет окончания каникул и начала пятого учебного года в Хогвартсе. Юный волшебник как никогда страдает от одиночества, а насмешки и придирки Дурслей стали совсем невыносимы. К тому же он уверен, что Волан-де-Морт возродился и скоро начнет действовать. Вас снова ждут опасные и захватывающие приключения, жестокая борьба, верные друзья и волшебный мир Гарри Поттера." />
 
-                <!-- the site's notes under the collections: the book's other titles, the date it was added (bindNotes) -->
-                <TextView
-                    android:id="@+id/descNotes"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="@dimen/text_margin"
-                    android:textColor="?attr/subTextColor"
-                    android:textSize="@dimen/textSizeBookDescription"
-                    android:visibility="gone" />
-
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:orientation="horizontal">
-
-                    <!-- beside "show less" only: copies the description -->
-                    <TextView
-                        android:id="@+id/copyDesc"
-                        android:layout_width="wrap_content"
+                    <!-- the site's collections the book is in, a link each, under the unfolded description (bindDescription) -->
+                    <LinearLayout
+                        android:id="@+id/collections"
+                        android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:maxLines="1"
-                        android:singleLine="true"
-                        android:text="@string/copy"
-                        android:textColor="?attr/hrefColor"
+                        android:layout_marginTop="@dimen/text_margin"
+                        android:orientation="vertical"
+                        android:visibility="gone">
+
+                        <TextView
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:text="@string/book_collections"
+                            android:textColor="?attr/colorPrimaryText"
+                            android:textSize="@dimen/textSizeBookDescription"
+                            android:textStyle="bold" />
+                    </LinearLayout>
+
+                    <!-- the site's notes under the collections: the book's other titles, the date it was added (bindNotes) -->
+                    <TextView
+                        android:id="@+id/descNotes"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="@dimen/text_margin"
+                        android:textColor="?attr/subTextColor"
                         android:textSize="@dimen/textSizeBookDescription"
                         android:visibility="gone" />
 
-                    <TextView
-                        android:id="@+id/showMore"
-                        android:layout_width="0dp"
+                    <LinearLayout
+                        android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:maxLines="1"
-                        android:singleLine="true"
-                        android:text="@string/show_more"
-                        android:textAlignment="center"
-                        android:textColor="?attr/hrefColor"
-                        android:textSize="@dimen/textSizeBookDescription" />
+                        android:orientation="horizontal">
+
+                        <!-- beside "show less" only: copies the description -->
+                        <TextView
+                            android:id="@+id/copyDesc"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:maxLines="1"
+                            android:singleLine="true"
+                            android:text="@string/copy"
+                            android:textColor="?attr/hrefColor"
+                            android:textSize="@dimen/textSizeBookDescription"
+                            android:visibility="gone" />
+
+                        <TextView
+                            android:id="@+id/showMore"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:maxLines="1"
+                            android:singleLine="true"
+                            android:text="@string/show_more"
+                            android:textAlignment="center"
+                            android:textColor="?attr/hrefColor"
+                            android:textSize="@dimen/textSizeBookDescription" />
+                    </LinearLayout>
                 </LinearLayout>
 
-                <View
+                <!-- the recommended books on a card of their own, under their divider's id: the code shows and hides
+                     it with them (showOtherBooksLine), so no empty card waits for them or stays when there are none -->
+                <LinearLayout
                     android:id="@+id/otherBookLine"
                     android:layout_width="match_parent"
-                    android:layout_height="1px"
-                    android:layout_marginTop="@dimen/text_margin_book_description"
-                    android:background="?attr/subTextColor" />
-
-                <TextView
-                    android:id="@+id/recommendedBooksTitle"
-                    android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="@dimen/text_margin_book_description"
-                    android:text="@string/other_recomended_books"
-                    android:textColor="?attr/colorPrimaryText"
-                    android:textSize="@dimen/textSizeBookDescription"
-                    android:visibility="gone" />
+                    android:layout_marginEnd="@dimen/text_margin_book_description"
+                    android:background="@drawable/bg_book_card"
+                    android:orientation="vertical"
+                    android:paddingStart="@dimen/book_card_padding"
+                    android:paddingTop="@dimen/margin_small"
+                    android:paddingEnd="@dimen/book_card_padding"
+                    android:paddingBottom="@dimen/margin_small"
+                    android:visibility="gone">
 
-                <androidx.recyclerview.widget.RecyclerView
-                    android:id="@+id/recommendedBooks"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:orientation="horizontal"
-                    android:visibility="gone" />
+                    <TextView
+                        android:id="@+id/recommendedBooksTitle"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="@string/other_recomended_books"
+                        android:textColor="?attr/colorPrimaryText"
+                        android:textSize="@dimen/textSizeBookDescription"
+                        android:textStyle="bold"
+                        android:visibility="gone" />
+
+                    <androidx.recyclerview.widget.RecyclerView
+                        android:id="@+id/recommendedBooks"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal"
+                        android:visibility="gone" />
+                </LinearLayout>
 
             </LinearLayout>
         </ScrollView>

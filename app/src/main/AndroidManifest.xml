@@ -16,6 +16,8 @@
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <!-- ExoPlayer holds wake/Wi-Fi locks while streaming (WAKE_MODE_NETWORK). -->
     <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <!-- The equalizer's 3D room is a reverb on the output mix (audio session 0), which the player sends to. -->
+    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
     <!-- Downloads live in app-specific storage; shared folders are reached through SAF. File-path access to a
          user folder needs these only up to API 29 (legacy storage) / 32 (reads before READ_MEDIA_*). -->
     <uses-permission
@@ -166,6 +168,9 @@
                 <category android:name="android.intent.category.LAUNCHER" />
                 <category android:name="android.intent.category.LEANBACK_LAUNCHER" />
             </intent-filter>
+            <meta-data
+                android:name="android.app.shortcuts"
+                android:resource="@xml/shortcuts" />
         </activity>
         <activity
             android:name=".activity.SearchableActivity"

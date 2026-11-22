@@ -62,7 +62,7 @@ public class MigrationTest {
         AppDatabase room = openWithRoom();
         try {
             SupportSQLiteDatabase db = room.getOpenHelper().getWritableDatabase();
-            assertEquals(20, db.getVersion());
+            assertEquals(21, db.getVersion());
             assertEquals(2, count(db, "favorite"));
             assertEquals(1, count(db, "history"));
             assertEquals(1, count(db, "saved"));
@@ -166,6 +166,23 @@ public class MigrationTest {
             assertTrue(c.moveToFirst());
             assertEquals(0, c.getLong(0));
         }
+    }
+
+    @Test
+    public void migrate20To21AddsBookmarksAndKeepsTheRest() throws Exception {
+        try (SupportSQLiteDatabase db = helper.createDatabase(DB, 20)) {
+            db.execSQL("INSERT INTO history (name, url_book, coments, opened_at) VALUES ('H', 'https://example.com/h1', 0, 5)");
+            db.execSQL("INSERT INTO audio (url_book, name, time) VALUES ('https://example.com/h1', 'Chapter 3', 120)");
+        }
+
+        SupportSQLiteDatabase db = helper.runMigrationsAndValidate(DB, 21, true, AppDatabase.MIGRATION_20_21);
+        assertEquals(1, count(db, "history"));
+        assertEquals(1, count(db, "audio"));
+        assertEquals(0, count(db, "bookmark"));
+        assertEquals(Boolean.FALSE, indexes(db, "bookmark").get("index_bookmark_url_book"));
+        db.execSQL("INSERT INTO bookmark (url_book, chapter_index, chapter_name, position_ms, note, created_at)"
+                + " VALUES ('https://example.com/h1', 2, 'Chapter 3', 90000, NULL, 7)");
+        assertEquals(1, count(db, "bookmark"));
     }
 
     private SQLiteDatabase createVersion16() {

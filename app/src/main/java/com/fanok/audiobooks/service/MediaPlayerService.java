@@ -3,6 +3,7 @@ package com.fanok.audiobooks.service;
 import static android.support.v4.media.MediaBrowserCompat.MediaItem.FLAG_PLAYABLE;
 import static com.fanok.audiobooks.activity.BookActivity.Broadcast_SET_IMAGE;
 import static com.fanok.audiobooks.activity.BookActivity.Broadcast_SET_PROGRESS;
+import static com.fanok.audiobooks.activity.BookActivity.Broadcast_SEEK_UNDO_OFFER;
 import static com.fanok.audiobooks.activity.BookActivity.Broadcast_SET_SELECTION;
 import static com.fanok.audiobooks.activity.BookActivity.Broadcast_SET_TITLE;
 import static com.fanok.audiobooks.activity.BookActivity.Broadcast_SHOW_EQUALIZER;
@@ -11,6 +12,7 @@ import static com.fanok.audiobooks.activity.SleepTimerActivity.Broadcast_UPDATE_
 import static com.fanok.audiobooks.activity.SleepTimerActivity.bradcast_FinishTimer;
 import static com.fanok.audiobooks.activity.SleepTimerActivity.bradcast_UpdateTimer;
 import static com.fanok.audiobooks.android_equalizer.EqualizerFragment.Broadcast_EqualizerEnabled;
+import static com.fanok.audiobooks.android_equalizer.EqualizerFragment.Broadcast_ReverbChanged;
 import static com.fanok.audiobooks.presenter.BookPresenter.Broadcast_Equalizer;
 import static com.fanok.audiobooks.presenter.BookPresenter.Broadcast_PAUSE;
 import static com.fanok.audiobooks.presenter.BookPresenter.Broadcast_PLAY;
@@ -20,6 +22,7 @@ import static com.fanok.audiobooks.presenter.BookPresenter.Broadcast_RESUME;
 import static com.fanok.audiobooks.presenter.BookPresenter.Broadcast_SEEK_NEXT_30;
 import static com.fanok.audiobooks.presenter.BookPresenter.Broadcast_SEEK_PREVIOUS_10;
 import static com.fanok.audiobooks.presenter.BookPresenter.Broadcast_SEEK_TO;
+import static com.fanok.audiobooks.presenter.BookPresenter.Broadcast_SEEK_UNDO;
 import static com.fanok.audiobooks.presenter.BookPresenter.Broadcast_SET_SPEED;
 import static com.fanok.audiobooks.presenter.BookPresenter.Broadcast_SHOW_TITLE;
 import static com.fanok.audiobooks.presenter.SleepTimerPresenter.Broadcast_SleepTimer;
@@ -34,6 +37,8 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.SharedPreferences;
+import android.content.pm.ApplicationInfo;
+import android.content.pm.PackageManager;
 import android.content.pm.ServiceInfo;
 import android.graphics.Bitmap;
 import android.graphics.drawable.Drawable;
@@ -44,6 +49,7 @@ import android.hardware.SensorManager;
 import android.media.AudioManager;
 import android.media.ToneGenerator;
 import android.media.audiofx.Equalizer;
+import android.media.audiofx.AudioEffect;
 import android.media.audiofx.PresetReverb;
 import android.net.ConnectivityManager;
 import android.net.Network;
@@ -57,6 +63,7 @@ import android.os.Handler;
 import android.os.IBinder;
 import android.os.Looper;
 import android.os.PowerManager;
+import android.os.Process;
 import android.os.SystemClock;
 import android.support.v4.media.MediaBrowserCompat;
 import android.support.v4.media.MediaBrowserCompat.MediaItem;
@@ -77,8 +84,10 @@ import androidx.core.app.ServiceCompat;
 import androidx.core.content.ContextCompat;
 import androidx.core.content.IntentCompat;
 import androidx.media.MediaBrowserServiceCompat;
+import androidx.media.MediaSessionManager;
 import androidx.media.session.MediaButtonReceiver;
 import androidx.media3.common.AudioAttributes;
+import androidx.media3.common.AuxEffectInfo;
 import androidx.media3.common.C;
 import androidx.media3.common.MediaItem.ClippingConfiguration;
 import androidx.media3.common.PlaybackException;
@@ -107,6 +116,7 @@ import com.fanok.audiobooks.broadcasts.OnCancelBroadcastReceiver;
 import com.fanok.audiobooks.model.AudioDBModel;
 import com.fanok.audiobooks.model.AudioListDBModel;
 import com.fanok.audiobooks.model.AudioModel;
+import com.fanok.audiobooks.model.BookmarkRules;
 import com.fanok.audiobooks.model.BooksDBModel;
 import com.fanok.audiobooks.pojo.AudioPOJO;
 import com.fanok.audiobooks.pojo.BookPOJO;
@@ -116,10 +126,14 @@ import com.fanok.audiobooks.policy.EmbeddedCover;
 import com.fanok.audiobooks.policy.ParentalControl;
 import com.fanok.audiobooks.presenter.BookPresenter;
 import com.fanok.audiobooks.presenter.SleepTimerPresenter;
+import com.fanok.audiobooks.room.AppDatabase;
+import com.fanok.audiobooks.room.BookmarkDao;
+import com.fanok.audiobooks.room.BookmarkEntity;
 import com.fanok.audiobooks.room.BooksAudioEntity;
 import com.fanok.audiobooks.util.DeletionPlanner;
 import com.fanok.audiobooks.util.DownloadStorageHelper;
 import com.fanok.audiobooks.util.DownloadUtil;
+import com.fanok.audiobooks.util.SeekUndo;
 import com.squareup.picasso.Picasso;
 import com.squareup.picasso.Target;
 import io.reactivex.android.schedulers.AndroidSchedulers;
@@ -127,6 +141,7 @@ import io.reactivex.disposables.Disposable;
 import io.reactivex.schedulers.Schedulers;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
@@ -290,6 +305,8 @@ public class MediaPlayerService extends MediaBrowserServiceCompat {
         final int index;
         final long positionMs;
         final boolean play;
+        /** The place was chosen by the listener (a bookmark), not left there: played from it exactly. */
+        final boolean exact;
 
         /**
          * @param ordinals each chapter's index in the book's full chapter list when {@code chapters} is a subset
@@ -297,6 +314,12 @@ public class MediaPlayerService extends MediaBrowserServiceCompat {
          */
         public Request(@Nullable BookPOJO book, @NonNull String bookUrl, @NonNull List<AudioPOJO> chapters,
                 @Nullable int[] ordinals, int index, long positionMs, boolean play) {
+            this(book, bookUrl, chapters, ordinals, index, positionMs, play, false);
+        }
+
+        public Request(@Nullable BookPOJO book, @NonNull String bookUrl, @NonNull List<AudioPOJO> chapters,
+                @Nullable int[] ordinals, int index, long positionMs, boolean play, boolean exact) {
+            this.exact = exact;
             this.book = book;
             this.bookUrl = bookUrl;
             this.chapters = new ArrayList<>(chapters);
@@ -631,6 +654,7 @@ public class MediaPlayerService extends MediaBrowserServiceCompat {
             }
             player = null;
         }
+        releaseReverb();
         if (mediaSession != null) {
             try {
                 mediaSession.setActive(false);
@@ -684,17 +708,103 @@ public class MediaPlayerService extends MediaBrowserServiceCompat {
         return new MediaBrowserServiceCompat.BrowserRoot(MY_MEDIA_ROOT_ID, null);
     }
 
-    /** The current book's chapters, unless parental control hides the book; the policy is read off this thread. */
+    /**
+     * A car ({@link #isCarClient}) browses the library, {@link BrowseTree}; any other client sees what it always saw:
+     * the current book's chapters at the root and nothing else.
+     */
     @Override
     public void onLoadChildren(@NonNull final String parentId, @NonNull final Result<List<MediaItem>> result) {
-        if (!MY_MEDIA_ROOT_ID.equals(parentId) || !hasBook()) {
+        if (!isCarClient()) {
+            if (MY_MEDIA_ROOT_ID.equals(parentId)) {
+                loadChapters(result, false);
+            } else {
+                result.sendResult(new ArrayList<>());
+            }
+            return;
+        }
+        switch (parentId) {
+            case MY_MEDIA_ROOT_ID:
+                result.sendResult(rootItems());
+                break;
+            case BrowseTree.NODE_CURRENT:
+                loadChapters(result, true);
+                break;
+            case BrowseTree.NODE_HISTORY:
+            case BrowseTree.NODE_FAVORITE:
+            case BrowseTree.NODE_SAVED:
+                loadBooks(parentId, result);
+                break;
+            default:
+                result.sendResult(new ArrayList<>());
+        }
+    }
+
+    /**
+     * The library is the user's: only Android Auto, a car's own preinstalled media apps and this app read it. The
+     * framework checks a browser's package against its uid; a browser the compat library cannot name (a framework
+     * one before Android 9) is none of them.
+     */
+    private boolean isCarClient() {
+        MediaSessionManager.RemoteUserInfo client;
+        try {
+            client = getCurrentBrowserInfo();
+        } catch (IllegalStateException e) {
+            return false;
+        }
+        if (client.getUid() == Process.myUid()) {
+            return true;
+        }
+        PackageManager packages = getPackageManager();
+        //a compat browser names its package itself: only a package of the calling uid is believed
+        String[] owned = packages.getPackagesForUid(client.getUid());
+        if (owned == null || !Arrays.asList(owned).contains(client.getPackageName())) {
+            return false;
+        }
+        if (BrowseTree.ANDROID_AUTO.equals(client.getPackageName())) {
+            return true;
+        }
+        if (!packages.hasSystemFeature(PackageManager.FEATURE_AUTOMOTIVE)) {
+            return false;
+        }
+        try {
+            return (packages.getApplicationInfo(client.getPackageName(), 0).flags & ApplicationInfo.FLAG_SYSTEM) != 0;
+        } catch (PackageManager.NameNotFoundException e) {
+            return false;
+        }
+    }
+
+    /** The library's lists, each under the app's own name for it. */
+    @NonNull
+    private List<MediaItem> rootItems() {
+        List<MediaItem> items = new ArrayList<>();
+        for (String node : BrowseTree.rootNodes(hasBook())) {
+            int title = BrowseTree.NODE_CURRENT.equals(node) ? R.string.auto_current_book
+                    : BrowseTree.NODE_HISTORY.equals(node) ? R.string.menu_history
+                    : BrowseTree.NODE_FAVORITE.equals(node) ? R.string.menu_favorite : R.string.menu_saved;
+            MediaDescriptionCompat description = new MediaDescriptionCompat.Builder()
+                    .setMediaId(node)
+                    .setTitle(getString(title))
+                    .build();
+            items.add(new MediaItem(description, MediaItem.FLAG_BROWSABLE));
+        }
+        return items;
+    }
+
+    /**
+     * The current book's chapters, unless parental control hides the book; the policy is read off this thread.
+     * {@code bounded}: a car's list, the {@link BrowseTree#firstListedChapter} window of them.
+     */
+    private void loadChapters(@NonNull final Result<List<MediaItem>> result, boolean bounded) {
+        if (!hasBook()) {
             result.sendResult(new ArrayList<>());
             return;
         }
         final String url = bookUrl;
         final String subtitle = bookName();
         final List<MediaBrowserCompat.MediaItem> mediaItems = new ArrayList<>();
-        for (int i = 0; i < chapters.size(); i++) {
+        int from = bounded ? BrowseTree.firstListedChapter(chapters.size(), chapterIndex) : 0;
+        int to = bounded ? Math.min(chapters.size(), from + BrowseTree.MAX_ITEMS) : chapters.size();
+        for (int i = from; i < to; i++) {
             MediaDescriptionCompat description = new MediaDescriptionCompat.Builder()
                     .setMediaId(Integer.toString(i))
                     .setTitle(chapters.get(i).getName())
@@ -718,6 +828,60 @@ public class MediaPlayerService extends MediaBrowserServiceCompat {
         if (!queued) {
             result.sendResult(new ArrayList<>());
         }
+    }
+
+    /** A list of the library ({@link BrowseTree#NODE_HISTORY} and the like), read off the main thread. */
+    private void loadBooks(@NonNull final String node, @NonNull final Result<List<MediaItem>> result) {
+        final Context app = getApplicationContext();
+        result.detach();
+        boolean queued = execDb(() -> {
+            List<MediaItem> items = new ArrayList<>();
+            try {
+                items = bookItems(app, node);
+            } catch (RuntimeException e) {
+                Log.w(TAG, "onLoadChildren: cannot read " + node, e);
+            }
+            final List<MediaItem> children = items;
+            handler.post(() -> result.sendResult(children));
+        });
+        if (!queued) {
+            result.sendResult(new ArrayList<>());
+        }
+    }
+
+    /**
+     * The first {@link BrowseTree#MAX_ITEMS} books of a list, newest first, that start from a car: allowed by
+     * parental control and with their chapters stored, which {@link #restoreBook} plays without the book's page. Any
+     * other book (a collection, a book only looked at) would need its site, which only the book's screen loads.
+     */
+    @NonNull
+    private static List<MediaItem> bookItems(@NonNull Context app, @NonNull String node) {
+        BooksDBModel books = new BooksDBModel(app);
+        List<BookPOJO> source = BrowseTree.NODE_HISTORY.equals(node) ? books.getAllHistory()
+                : BrowseTree.NODE_FAVORITE.equals(node) ? books.getAllFavorite() : books.getAllSaved();
+        AudioListDBModel stored = new AudioListDBModel(app);
+        ParentalControl.Store parental = ParentalControl.store(app);
+        List<MediaItem> items = new ArrayList<>();
+        for (BookPOJO book : source) {
+            if (items.size() >= BrowseTree.MAX_ITEMS) {
+                break;
+            }
+            String url = book.getUrl();
+            if (!BrowseTree.isBook(url) || !stored.isset(url)) {
+                continue;
+            }
+            BookPOJO known = books.getSomewhere(url); //the row restoreBook judges the book by
+            if (!ParentalControl.isAllowed(parental, known != null ? known : book)) {
+                continue;
+            }
+            MediaDescriptionCompat description = new MediaDescriptionCompat.Builder()
+                    .setMediaId(url)
+                    .setTitle(book.getName())
+                    .setSubtitle(BrowseTree.subtitle(book.getAutor(), book.getArtist()))
+                    .build();
+            items.add(new MediaItem(description, FLAG_PLAYABLE));
+        }
+        return items;
     }
 
     @Override
@@ -920,6 +1084,7 @@ public class MediaPlayerService extends MediaBrowserServiceCompat {
         if (player != null && hasBook() && chapterIndex < chapters.size() - 1) {
             untouched = false;
             resumeAfterGiveUp();
+            offerSeekUndo(chapterIndex + 1, 0);
             loadChapter(chapterIndex + 1, 0, true);
         }
     }
@@ -939,6 +1104,7 @@ public class MediaPlayerService extends MediaBrowserServiceCompat {
             return;
         }
         untouched = false;
+        offerSeekUndo(Math.max(0, chapterIndex - 1), 0);
         if (chapterIndex > 0) {
             resumeAfterGiveUp();
             loadChapter(chapterIndex - 1, 0, true);
@@ -956,6 +1122,7 @@ public class MediaPlayerService extends MediaBrowserServiceCompat {
         wantPlaying = play;
         untouched = false;
         pausedAt = play ? -1 : 0;
+        offerSeekUndo(index, 0);
         loadChapter(index, 0, true);
     }
 
@@ -1002,6 +1169,7 @@ public class MediaPlayerService extends MediaBrowserServiceCompat {
         publishState();
         removeNotification();
         notifyChildrenChanged(MY_MEDIA_ROOT_ID);
+        notifyChildrenChanged(BrowseTree.NODE_CURRENT);
         stopSelf();
     }
 
@@ -1041,6 +1209,13 @@ public class MediaPlayerService extends MediaBrowserServiceCompat {
         }
         //the outgoing book keeps where it was left
         checkpointNow(false);
+        //a chapter chosen on the book's screen is a jump; another book, or another list of its chapters (the
+        //downloaded ones only), ends the offer: its place is an index in the list that goes
+        if (hasBook() && Objects.equals(bookUrl, request.bookUrl) && sameChapters(chapters, request.chapters)) {
+            offerSeekUndo(Math.max(0, Math.min(request.index, chapters.size() - 1)), request.positionMs);
+        } else if (seekUndo.take() != null) {
+            sendInternal(new Intent(Broadcast_SEEK_UNDO_OFFER));
+        }
         if (!Objects.equals(bookUrl, request.bookUrl)) {
             //a wake window belongs to the book the timer paused: a shake must not start another one
             closeWakeWindow();
@@ -1062,9 +1237,11 @@ public class MediaPlayerService extends MediaBrowserServiceCompat {
         }
         resumeOnSkip = false;
         wantPlaying = request.play;
-        untouched = !request.play;
+        untouched = !request.play && !request.exact;
         long position = request.positionMs;
-        if (request.play) {
+        if (request.exact) {
+            pausedAt = -1; //as after a seek: not rewound, now or at a later Play
+        } else if (request.play) {
             position = rewoundAfterPause(position, 0);
             pausedAt = -1;
         } else {
@@ -1085,6 +1262,20 @@ public class MediaPlayerService extends MediaBrowserServiceCompat {
         }
         loadChapter(index, position, true);
         notifyChildrenChanged(MY_MEDIA_ROOT_ID);
+        notifyChildrenChanged(BrowseTree.NODE_CURRENT);
+    }
+
+    /** Whether two lists name the same chapters in the same order: an index in one is that chapter in the other. */
+    private static boolean sameChapters(@NonNull List<AudioPOJO> a, @NonNull List<AudioPOJO> b) {
+        if (a.size() != b.size()) {
+            return false;
+        }
+        for (int i = 0; i < a.size(); i++) {
+            if (!Objects.equals(a.get(i).getName(), b.get(i).getName())) {
+                return false;
+            }
+        }
+        return true;
     }
 
     /**
@@ -1102,6 +1293,9 @@ public class MediaPlayerService extends MediaBrowserServiceCompat {
         }
         finishedEarly = false;
         failedKind = null;
+        if (index != chapterIndex && chapters.size() > BrowseTree.MAX_ITEMS) {
+            notifyChildrenChanged(BrowseTree.NODE_CURRENT); //a car lists a window of chapters around this one
+        }
         chapterIndex = index;
         startPositionMs = Math.max(0, positionMs);
         final AudioPOJO audio = chapters.get(index);
@@ -1302,8 +1496,9 @@ public class MediaPlayerService extends MediaBrowserServiceCompat {
         int index = parseMediaIndex(mediaId);
         if (index >= 0) {
             select(index, true);
-        } else if (mediaId != null && (mediaId.startsWith("https://") || mediaId.startsWith("http://"))) {
-            //a book this app knows: restoreBook ignores URLs without chapters in the database
+        } else if (BrowseTree.isBook(mediaId)) {
+            //a book this app knows (a car's list holds only such): restoreBook ignores URLs without chapters in the
+            //database
             if (mediaId.equals(bookUrl)) {
                 play();
             } else {
@@ -2479,9 +2674,10 @@ public class MediaPlayerService extends MediaBrowserServiceCompat {
         IntentFilter filter = new IntentFilter();
         for (String action : new String[]{Broadcast_PLAY, Broadcast_RESUME, Broadcast_PAUSE, Broadcast_PLAY_NEXT,
                 Broadcast_PLAY_PREVIOUS,
-                Broadcast_SEEK_TO, Broadcast_SEEK_NEXT_30, Broadcast_SEEK_PREVIOUS_10, Broadcast_SET_SPEED,
+                Broadcast_SEEK_TO, Broadcast_SEEK_UNDO, Broadcast_SEEK_NEXT_30, Broadcast_SEEK_PREVIOUS_10,
+                BookPresenter.Broadcast_ADD_BOOKMARK, Broadcast_SET_SPEED,
                 Broadcast_SHOW_TITLE, Broadcast_SleepTimer, Broadcast_UPDATE_TIMER_START, Broadcast_Equalizer,
-                Broadcast_EqualizerEnabled}) {
+                Broadcast_EqualizerEnabled, Broadcast_ReverbChanged}) {
             filter.addAction(action);
         }
         ContextCompat.registerReceiver(this, commandReceiver, filter, ContextCompat.RECEIVER_NOT_EXPORTED);
@@ -2512,6 +2708,12 @@ public class MediaPlayerService extends MediaBrowserServiceCompat {
                 break;
             case Broadcast_SEEK_TO:
                 seekFromApp(intent.getIntExtra("postion", 0));
+                break;
+            case Broadcast_SEEK_UNDO:
+                undoSeek();
+                break;
+            case BookPresenter.Broadcast_ADD_BOOKMARK:
+                addBookmark(intent.getStringExtra("url"));
                 break;
             case Broadcast_SEEK_NEXT_30:
                 if (player != null && hasBook()) {
@@ -2554,6 +2756,10 @@ public class MediaPlayerService extends MediaBrowserServiceCompat {
                     storage.loadEqualizerSettings();
                     startEqualizer();
                 }
+                applyReverb();
+                break;
+            case Broadcast_ReverbChanged:
+                applyReverb();
                 break;
             default:
         }
@@ -2561,11 +2767,75 @@ public class MediaPlayerService extends MediaBrowserServiceCompat {
 
     /** The app's seek adapters: {@link #seekAndPlay(long)} while "resume after seeking" is on, else a plain seek. */
     private void seekFromApp(long positionMs) {
+        long duration = player == null ? C.TIME_UNSET : player.getDuration();
+        long target = Math.max(0, positionMs);
+        offerSeekUndo(chapterIndex, duration == C.TIME_UNSET ? target : Math.min(target, duration)); //as seekTo clamps
         if (mPreferences.getBoolean("seekToPausePref", true)) {
             seekAndPlay(positionMs);
         } else {
             seekTo(positionMs);
         }
+    }
+
+    /** Takes back a jump made by mistake; kept here, where the place before the jump is known exactly. */
+    private final SeekUndo seekUndo = new SeekUndo();
+
+    /**
+     * The listener is about to move the place to {@code toChapter}, {@code toMs} (the app's seek bar, a chapter
+     * chosen, previous or next): when that is a jump, the book's screen offers the way back to where the player
+     * stands now. The player's own moves (the end of a chapter, a recovery, an undo) do not come here.
+     */
+    private void offerSeekUndo(int toChapter, long toMs) {
+        if (player == null || !hasBook()) {
+            return;
+        }
+        SeekUndo.Place back = seekUndo.move(SystemClock.elapsedRealtime(), chapterIndex, currentPositionMs(),
+                toChapter, toMs);
+        if (back != null) {
+            sendInternal(new Intent(Broadcast_SEEK_UNDO_OFFER).putExtra("position", back.positionMs)
+                    .putExtra("name", chapters.get(back.chapter).getName()));
+        } else if (!seekUndo.pending()) {
+            sendInternal(new Intent(Broadcast_SEEK_UNDO_OFFER)); //back where the jumps began: nothing to take back
+        }
+    }
+
+    /** Back to where the last jump started, playing or paused as it is; offers no undo of its own. */
+    private void undoSeek() {
+        SeekUndo.Place back = seekUndo.take();
+        if (back == null || player == null || !hasBook() || back.chapter >= chapters.size()) {
+            return;
+        }
+        untouched = false;
+        if (back.chapter == chapterIndex) {
+            seekTo(back.positionMs);
+        } else {
+            loadChapter(back.chapter, back.positionMs, true);
+        }
+    }
+
+    /**
+     * Marks the place now in book {@code url}, when it is the one loaded: kept here, where the place is known exactly.
+     * The chapter is stored by its index in the full list (the loaded one may be the downloaded chapters only) and by
+     * name; a place marked a moment ago is that mark. The book's screen hears Broadcast_BOOKMARK_ADDED once stored.
+     */
+    private void addBookmark(@Nullable String url) {
+        if (player == null || !hasBook() || !Objects.equals(bookUrl, url)) {
+            return; //another book came into the player since the tap: nothing of the one asked for to mark
+        }
+        final BookmarkEntity mark = BookmarkRules.create(bookUrl, ordinalOf(chapterIndex),
+                chapters.get(chapterIndex).getName(), currentPositionMs(), System.currentTimeMillis());
+        final Context app = getApplicationContext();
+        execDb(() -> {
+            try {
+                BookmarkDao dao = AppDatabase.getDatabase(app).bookmarkDao();
+                BookmarkEntity same = BookmarkRules.findSame(dao.getByBook(mark.urlBook), mark);
+                int id = same != null ? same.id : (int) dao.insert(mark);
+                sendInternal(new Intent(BookActivity.Broadcast_BOOKMARK_ADDED).putExtra("id", id)
+                        .putExtra("url", mark.urlBook).putExtra("added", same == null));
+            } catch (RuntimeException e) {
+                Log.e(TAG, "cannot store the bookmark", e);
+            }
+        });
     }
 
     // ---------------------------------------------------------------------------------------------------------
@@ -3246,6 +3516,7 @@ public class MediaPlayerService extends MediaBrowserServiceCompat {
         } else {
             stopEqualizer();
         }
+        applyReverb();
     }
 
     private void startEqualizer() {
@@ -3261,11 +3532,6 @@ public class MediaPlayerService extends MediaBrowserServiceCompat {
 
             try {
                 mEqualizer = new Equalizer(0, audioSesionId);
-
-                presetReverb = new PresetReverb(0, audioSesionId);
-                presetReverb.setPreset(Settings.equalizerModel.getReverbPreset());
-                presetReverb.setEnabled(Settings.isReverbOn(Settings.equalizerModel.getReverbPreset()));
-
                 mEqualizer.setEnabled(Settings.isEqualizerEnabled);
                 //the same mapping as the dialog: the sound heard while editing is the one kept after closing it
                 Settings.applyTo(mEqualizer);
@@ -3280,7 +3546,37 @@ public class MediaPlayerService extends MediaBrowserServiceCompat {
             mEqualizer.release();
             mEqualizer = null;
         }
+    }
 
+    /**
+     * The 3D room, played as an auxiliary send of the player: a PresetReverb on the player's own session is an insert
+     * effect and passes only the reverb's wet sound, which on some devices is silence. The send keeps the dry sound.
+     * No room chosen, the equalizer off or a reverb the device refuses takes the send away.
+     */
+    private void applyReverb() {
+        short preset = Settings.equalizerModel == null ? PresetReverb.PRESET_NONE
+                : Settings.equalizerModel.getReverbPreset();
+        if (player != null && Settings.isReverbOn(preset)) {
+            try {
+                if (presetReverb == null) {
+                    presetReverb = new PresetReverb(0, 0); //session 0: the output mix, where a send effect lives
+                }
+                presetReverb.setPreset(preset);
+                if (presetReverb.setEnabled(true) == AudioEffect.SUCCESS) {
+                    player.setAuxEffectInfo(new AuxEffectInfo(presetReverb.getId(), 1f));
+                    return;
+                }
+            } catch (RuntimeException e) {
+                Log.w(TAG, "No reverb", e);
+            }
+        }
+        releaseReverb();
+    }
+
+    private void releaseReverb() {
+        if (player != null) {
+            player.clearAuxEffectInfo();
+        }
         if (presetReverb != null) {
             presetReverb.release();
             presetReverb = null;

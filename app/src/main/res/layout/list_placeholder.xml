@@ -24,5 +24,6 @@
         android:layout_height="wrap_content"
         android:layout_marginTop="@dimen/text_margin"
         android:text="@string/retry"
+        android:textColor="?attr/hrefColor"
         android:visibility="gone" />
 </LinearLayout>

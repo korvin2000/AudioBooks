@@ -141,6 +141,7 @@ public class StorageUtil {
             settings.equalizerEnabled = Settings.isEqualizerEnabled;
             settings.balance = Settings.balance;
             settings.nightSound = Settings.nightSound;
+            settings.boost = Settings.boost;
 
             Gson gson = new Gson();
             preferences.edit()
@@ -172,9 +173,11 @@ public class StorageUtil {
         Settings.seekbarpos = settings.seekbarpos;
         Settings.balance = settings.balance;
         Settings.nightSound = settings.nightSound;
+        Settings.boost = Math.max(0, Math.min(BalanceAudioProcessor.BOOST_MAX, settings.boost));
         Settings.equalizerModel = model;
         //the sink's own sound plays what was loaded at once, with the equalizer off too: what the dialog shows is heard
         BalanceAudioProcessor.setBalance(settings.balance);
+        BalanceAudioProcessor.setBoost(Settings.boost);
         BalanceAudioProcessor.setNightSound(settings.nightSound);
         Settings.applyBass(settings.bassStrength);
     }

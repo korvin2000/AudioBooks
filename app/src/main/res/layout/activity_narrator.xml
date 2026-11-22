@@ -57,7 +57,7 @@
                 android:layout_height="wrap_content"
                 android:layout_gravity="center_horizontal"
                 android:adjustViewBounds="true"
-                android:contentDescription="@null"
+                android:contentDescription="@string/a11y_narrator_photo"
                 android:maxHeight="280dp"
                 android:visibility="gone" />
 

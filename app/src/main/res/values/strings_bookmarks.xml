@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- «Закладки» of the book screen (BookmarkSheet): places marked in a book. Not the catalog's marks on books. -->
+<resources>
+    <!-- the book screen's menu item, its toolbar setting and the sheet's title -->
+    <string name="bookmarks">Закладки</string>
+    <string name="bookmark_add">Добавить закладку</string>
+    <string name="bookmark_add_hint">Включите эту книгу в плеере, чтобы отметить место</string>
+    <string name="bookmark_empty">Закладок пока нет. «Добавить закладку» запомнит место, где сейчас плеер.</string>
+    <string name="bookmark_chapter_number">Глава %1$s</string>
+    <!-- a mark's second line: the position in the chapter, then the day it was made -->
+    <string name="bookmark_place">%1$s · %2$s</string>
+    <string name="bookmark_actions">Действия с закладкой</string>
+
+    <string name="bookmark_added">Закладка добавлена</string>
+    <string name="bookmark_exists">Это место уже в закладках</string>
+    <string name="bookmark_deleted">Закладка удалена</string>
+
+    <!-- the note: the snackbar's action, the mark's menu item, its dialog -->
+    <string name="bookmark_note">Заметка</string>
+    <string name="bookmark_note_edit">Заметка…</string>
+    <string name="bookmark_note_title">Заметка к закладке</string>
+    <string name="bookmark_note_hint">Что здесь, чтобы вспомнить</string>
+    <string name="bookmark_note_save">Сохранить</string>
+
+    <!-- a mark that cannot be gone to -->
+    <string name="bookmark_not_loaded">Список глав ещё загружается</string>
+    <string name="bookmark_not_downloaded">Глава этой закладки не скачана</string>
+    <string name="bookmark_chapter_gone">Этой главы больше нет в списке книги</string>
+</resources>

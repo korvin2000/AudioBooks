@@ -4,6 +4,7 @@ import static android.view.KeyEvent.KEYCODE_MEDIA_PLAY;
 import static android.view.KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE;
 import static com.fanok.audiobooks.Consts.handleUserInput;
 import static com.fanok.audiobooks.Consts.isServiceRunning;
+import static com.fanok.audiobooks.presenter.BookPresenter.Broadcast_SEEK_UNDO;
 import static com.fanok.audiobooks.presenter.BookPresenter.Broadcast_SHOW_TITLE;
 import static com.fanok.audiobooks.service.MediaPlayerService.countAudioWereShowingRatingPopUp;
 
@@ -28,6 +29,7 @@ import android.os.Build;
 import android.os.Bundle;
 import android.os.SystemClock;
 import android.text.Editable;
+import android.text.TextUtils;
 import android.text.TextWatcher;
 import android.util.AttributeSet;
 import android.util.Log;
@@ -100,8 +102,10 @@ import com.fanok.audiobooks.service.MediaPlayerService;
 import com.fanok.audiobooks.service.SeekStep;
 import com.fanok.audiobooks.util.BookProgress;
 import com.fanok.audiobooks.util.ChapterText;
+import com.fanok.audiobooks.util.CoverCorners;
 import com.fanok.audiobooks.util.DownloadStorageHelper;
 import com.fanok.audiobooks.util.RemainingTime;
+import com.fanok.audiobooks.util.SeekUndo;
 import com.fanok.audiobooks.android_equalizer.DialogEqualizerFragment;
 import com.google.android.gms.tasks.Task;
 import com.google.android.material.bottomsheet.BottomSheetBehavior;
@@ -139,6 +143,10 @@ public class BookActivity extends MvpAppCompatActivity implements Activity {
     public static final String Broadcast_SET_SELECTION = "SetSelection";
     public static final String Broadcast_SET_TITLE = "SetTitle";
     public static final String Broadcast_SHOW_RATING = "ShowRating";
+    /** The player offers the way back from a jump: "position" and the chapter's "name"; neither ends the offer. */
+    public static final String Broadcast_SEEK_UNDO_OFFER = "SeekUndoOffer";
+    /** The player stored a mark (BookmarkSheet): its "id", its book's "url", "added" false when the place had one. */
+    public static final String Broadcast_BOOKMARK_ADDED = "BookmarkAdded";
     public static final String Broadcast_UPDATE_ADAPTER = "UpdateAdapter";
 
     public static final String Broadcast_SHOW_EQUALIZER = "ShowEqualizer";
@@ -237,12 +245,12 @@ public class BookActivity extends MvpAppCompatActivity implements Activity {
     private static final int SEEK_COMMIT_TOLERANCE_MS = 1500;
     /** Menu items that can be toolbar icons, in toolbar order, and the setting of each; the favourite pair shares one. */
     private static final int[] TOOLBAR_ITEMS = {R.id.addFavorite, R.id.favoriteAuthor, R.id.favoriteReader, R.id.share,
-            R.id.playbackSpeed, R.id.download_delete, R.id.sleep_timer, R.id.car_mode, R.id.equalizer, R.id.settings,
-            R.id.openSite, R.id.addMainScreen, R.id.refresh};
+            R.id.playbackSpeed, R.id.download_delete, R.id.sleep_timer, R.id.car_mode, R.id.equalizer, R.id.bookmarks,
+            R.id.settings, R.id.openSite, R.id.addMainScreen, R.id.refresh};
     private static final String[] TOOLBAR_KEYS = {"toolbar_favorite", "toolbar_favorite_author",
             "toolbar_favorite_reader", "toolbar_share", "toolbar_speed", "toolbar_download", "toolbar_sleep_timer",
-            "toolbar_car_mode", "toolbar_equalizer", "toolbar_settings", "toolbar_open_site", "toolbar_main_screen",
-            "toolbar_refresh"};
+            "toolbar_car_mode", "toolbar_equalizer", "toolbar_bookmarks", "toolbar_settings", "toolbar_open_site",
+            "toolbar_main_screen", "toolbar_refresh"};
     /** The toolbar icons by default, as preferences.xml has them; the other actions stay in the overflow menu. */
     private static final List<String> TOOLBAR_DEFAULT = Arrays.asList("toolbar_favorite", "toolbar_speed",
             "toolbar_download", "toolbar_sleep_timer", "toolbar_car_mode", "toolbar_equalizer", "toolbar_main_screen");
@@ -322,6 +330,20 @@ public class BookActivity extends MvpAppCompatActivity implements Activity {
             mPresenter.setImageDrawable(id);
         }
     };
+
+    private final BroadcastReceiver seekUndoOffer = new BroadcastReceiver() {
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            showSeekUndo(intent.getLongExtra("position", 0), intent.getStringExtra("name"));
+        }
+    };
+
+    /** The offer to take a jump back, while it is on screen. */
+    private Snackbar mSeekUndoBar;
+
+    /** «Закладки», made when first opened. */
+    @Nullable
+    private BookmarkSheet mBookmarks;
 
     private final BroadcastReceiver showRating = new BroadcastReceiver() {
         @Override
@@ -644,6 +666,7 @@ public class BookActivity extends MvpAppCompatActivity implements Activity {
                     new BottomSheetBehavior.BottomSheetCallback() {
                         @Override
                         public void onStateChanged(@NonNull View bottomSheet, int newState) {
+                            hideSeekUndo(); // it is placed for the sheet as it was
                             if (actionBar != null) {
                                 if (BottomSheetBehavior.STATE_COLLAPSED == newState) {
                                     mPresenter.stateCollapsed();
@@ -952,6 +975,9 @@ public class BookActivity extends MvpAppCompatActivity implements Activity {
         mNameSubFits = heightOf(mNameCurent) + heightOf(mNameSub) <= room;
 
         mPlayerCover = findViewById(R.id.playerCover);
+        if (mPlayerCover != null) {
+            CoverCorners.round(mPlayerCover);
+        }
         mPlayerBookProgress = findViewById(R.id.playerBookProgress);
         mPlayerBookProgressText = findViewById(R.id.playerBookProgressText);
         float scale = getResources().getConfiguration().fontScale;
@@ -1185,6 +1211,47 @@ public class BookActivity extends MvpAppCompatActivity implements Activity {
         bar.show();
     }
 
+    private void hideSeekUndo() {
+        if (mSeekUndoBar != null) {
+            mSeekUndoBar.dismiss();
+            mSeekUndoBar = null;
+        }
+    }
+
+    /**
+     * A jump of the place in this screen's book: «Вернуться на 12:40 · Глава 3» for a few seconds; its action asks
+     * the player to go back there. No chapter name: the offer is over.
+     */
+    private void showSeekUndo(long positionMs, @Nullable String chapterName) {
+        hideSeekUndo();
+        if (chapterName == null || mBookPOJO == null
+                || !TextUtils.equals(mBookPOJO.getUrl(), MediaPlayerService.currentBookUrl())) {
+            return;
+        }
+        String name = ChapterText.shown(chapterName);
+        if (!name.isEmpty() && TextUtils.isDigitsOnly(name)) {
+            name = getString(R.string.seek_undo_chapter, name);
+        }
+        //a layout without the sheet (tablet, TV) has the player always open beside the pages
+        int state = bottomSheetBehavior == null ? BottomSheetBehavior.STATE_EXPANDED : bottomSheetBehavior.getState();
+        boolean open = state != BottomSheetBehavior.STATE_COLLAPSED && state != BottomSheetBehavior.STATE_HIDDEN;
+        //the open sheet is drawn in its own layer over the screen: a bar made on the screen would be under it
+        View host = open && bottomSheetBehavior != null ? mPlayer : findViewById(R.id.view_pager);
+        Snackbar bar = Snackbar.make(host,
+                getString(R.string.seek_undo, ChapterText.duration((int) (positionMs / 1000)), name),
+                (int) SeekUndo.WINDOW_MS)
+                .setAction(R.string.seek_undo_action, v -> broadcastSend(new Intent(Broadcast_SEEK_UNDO)));
+        if (open) {
+            //above the open player's seek bar and buttons, which stay free to use meanwhile
+            bar.setAnchorView((View) mSeekBar.getParent());
+        } else if (state == BottomSheetBehavior.STATE_COLLAPSED) {
+            //above the collapsed player, which is drawn over the screen's bottom
+            bar.setAnchorView(mPlayer);
+        }
+        mSeekUndoBar = bar;
+        bar.show();
+    }
+
     /** The speed item: "Скорость · 1,5×" in the overflow, the text "1,5×" on the toolbar; opens the speed dialog. */
     private void bindSpeedItem(@NonNull Menu menu) {
         MenuItem item = menu.findItem(R.id.playbackSpeed);
@@ -1260,6 +1327,14 @@ public class BookActivity extends MvpAppCompatActivity implements Activity {
             //the player's own speed button is the dialog's anchor: a view of this screen's theme, not the toolbar's
             mPresenter.buttonSpeedClick(mSpeed);
             return true;
+        } else if (id == R.id.bookmarks) {
+            if (mBookmarks == null && mBookPOJO.getUrl() != null) {
+                mBookmarks = new BookmarkSheet(mBookPOJO.getUrl(), mBookPOJO.getName(), mPresenter::goToBookmark);
+            }
+            if (mBookmarks != null) {
+                mBookmarks.show(this);
+            }
+            return true;
         }
         if (id == android.R.id.home) {
             if (mNotificationClick && isTaskRoot()) {
@@ -1291,6 +1366,7 @@ public class BookActivity extends MvpAppCompatActivity implements Activity {
         registerInternalReceiver(setSelectionBroadcast, Broadcast_SET_SELECTION);
         registerInternalReceiver(setTitleBroadcast, Broadcast_SET_TITLE);
         registerInternalReceiver(showRating, Broadcast_SHOW_RATING);
+        registerInternalReceiver(seekUndoOffer, Broadcast_SEEK_UNDO_OFFER);
         registerInternalReceiver(updateAdapter, Broadcast_UPDATE_ADAPTER);
         registerInternalReceiver(showEqualizer, Broadcast_SHOW_EQUALIZER);
         broadcastSend(new Intent(Broadcast_SHOW_TITLE));
@@ -1316,6 +1392,8 @@ public class BookActivity extends MvpAppCompatActivity implements Activity {
         unregisterReceiver(setSelectionBroadcast);
         unregisterReceiver(setTitleBroadcast);
         unregisterReceiver(showRating);
+        unregisterReceiver(seekUndoOffer);
+        hideSeekUndo();
         unregisterReceiver(updateAdapter);
         unregisterReceiver(showEqualizer);
         mPresenter.dismissSpeedDialog();
@@ -1339,6 +1417,9 @@ public class BookActivity extends MvpAppCompatActivity implements Activity {
             sShowingOwner = null;
         }
         mFavorites.release();
+        if (mBookmarks != null) {
+            mBookmarks.release();
+        }
         comentsCount.dispose();
         if (isFinishing() && !replaced) {
             com.fanok.audiobooks.model.ComentsModel.cancel(mBookPOJO.getUrl());

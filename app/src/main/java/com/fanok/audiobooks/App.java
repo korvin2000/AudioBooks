@@ -186,7 +186,7 @@ public class App extends Application {
      * The client of downloads: the shared one (connection pool, cookies, headers, proxy) restricted to HTTP/1.1.
      * akniga's CDN limits every connection to about 300 KB/s, and HTTP/2 puts all parallel segment requests of a
      * download on one connection; one connection per request makes a book download about three times faster.
-     * Playback, pages and covers keep the shared client.
+     * Playback takes it too ({@code DownloadUtil.upstreamFor}); pages and covers keep the shared client.
      */
     public static okhttp3.OkHttpClient getDownloadHttpClient() {
         okhttp3.OkHttpClient client = downloadHttpClient;

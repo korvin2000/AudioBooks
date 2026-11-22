@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- A card on the book page (the description, the recommended books): the list items' surface, a shade apart from
+     the page in each of the three themes, with soft corners. -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <solid android:color="?attr/backgroundItem" />
+    <corners android:radius="@dimen/book_card_radius" />
+</shape>

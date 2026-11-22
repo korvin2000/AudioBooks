@@ -17,6 +17,7 @@ import android.media.audiofx.PresetReverb;
 import android.os.Bundle;
 import android.text.TextUtils;
 import android.util.Log;
+import android.view.KeyEvent;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -39,6 +40,7 @@ import com.db.chart.view.AxisController;
 import com.db.chart.view.ChartView;
 import com.db.chart.view.LineChartView;
 import com.fanok.audiobooks.R;
+import com.fanok.audiobooks.adapter.ListFocus;
 import com.fanok.audiobooks.pojo.StorageUtil;
 import com.fanok.audiobooks.service.BalanceAudioProcessor;
 import java.util.ArrayList;
@@ -67,7 +69,6 @@ public class DialogEqualizerFragment extends DialogFragment {
     private Equalizer mEqualizer;
 
 
-    private PresetReverb presetReverb;
 
     private LineSet dataset;
 
@@ -127,6 +128,12 @@ public class DialogEqualizerFragment extends DialogFragment {
         ctx = context;
     }
 
+    /** The room is the player's (an auxiliary send, see {@code MediaPlayerService.applyReverb}), not the dialog's. */
+    private void sendReverbChanged() {
+        requireContext().sendBroadcast(new Intent(EqualizerFragment.Broadcast_ReverbChanged)
+                .setPackage(requireContext().getPackageName()));
+    }
+
     private void sendEqualizerEnabled(boolean enabled) {
         Intent intent = new Intent(Broadcast_EqualizerEnabled);
         intent.putExtra("enabled", enabled);
@@ -158,14 +165,6 @@ public class DialogEqualizerFragment extends DialogFragment {
         } catch (RuntimeException e) {
             Log.w(TAG, "No equalizer for session " + audioSesionId, e);
             return; // onViewCreated closes the dialog with a message
-        }
-        try {
-            presetReverb = new PresetReverb(0, audioSesionId);
-            presetReverb.setPreset(Settings.equalizerModel.getReverbPreset());
-            presetReverb.setEnabled(Settings.isReverbOn(Settings.equalizerModel.getReverbPreset()));
-        } catch (RuntimeException e) {
-            Log.w(TAG, "No reverb", e);
-            presetReverb = null;
         }
 
         mEqualizer.setEnabled(Settings.isEqualizerEnabled);
@@ -228,14 +227,13 @@ public class DialogEqualizerFragment extends DialogFragment {
             mEqualizer.setEnabled(isChecked);
             Settings.isEqualizerEnabled = isChecked;
             Settings.applyBass(Settings.equalizerModel.getBassStrength());
-            if (presetReverb != null) {
-                presetReverb.setEnabled(Settings.isReverbOn(Settings.equalizerModel.getReverbPreset()));
-            }
+            sendReverbChanged();
         });
 
         presetSpinner = view.findViewById(R.id.equalizer_preset_spinner);
         presetSpinner.getBackground().setColorFilter(textColor, PorterDuff.Mode.SRC_ATOP);
         bindBalance(view);
+        bindBoost(view);
         // night sound, like the balance, is the sink's: heard at once, with the equalizer switch off too
         SwitchCompat nightSwitch = view.findViewById(R.id.equalizer_night);
         nightSwitch.setTextColor(textColor);
@@ -254,7 +252,6 @@ public class DialogEqualizerFragment extends DialogFragment {
         reverbController.setMax(PresetReverb.PRESET_PLATE); // one step per room, 0 being none
         bassController.setLabel(getString(R.string.equalizer_bass));
         reverbController.setLabel(getString(R.string.equalizer_3d));
-        reverbController.setEnabled(presetReverb != null);
 
 
         bassController.circlePaint2.setColor(themeColor);
@@ -268,13 +265,7 @@ public class DialogEqualizerFragment extends DialogFragment {
         if (!Settings.isEqualizerReloaded) {
             x = Settings.bassStep(Settings.equalizerModel.getBassStrength());
 
-            if (presetReverb != null) {
-                try {
-                    y = presetReverb.getPreset();
-                } catch (Exception e) {
-                    Log.e(TAG, "onViewCreated: " + e.getLocalizedMessage());
-                }
-            }
+            y = Settings.equalizerModel.getReverbPreset();
         } else {
             x = Settings.bassStep(Settings.bassStrength);
             y = Settings.reverbPreset;
@@ -297,11 +288,8 @@ public class DialogEqualizerFragment extends DialogFragment {
                 progress -> {
                     Settings.reverbPreset = (short) progress;
                     try {
-                        if (presetReverb != null) {
-                            presetReverb.setPreset(Settings.reverbPreset);
-                            presetReverb.setEnabled(Settings.isReverbOn(Settings.reverbPreset));
-                        }
                         Settings.equalizerModel.setReverbPreset(Settings.reverbPreset);
+                        sendReverbChanged();
                     } catch (Exception e) {
                         Log.e(TAG, "onViewCreated: " + e.getLocalizedMessage());
                     }
@@ -408,6 +396,7 @@ public class DialogEqualizerFragment extends DialogFragment {
 
         chart.addData(dataset);
         chart.show();
+        bindRemote(view);
     }
 
     /**
@@ -453,6 +442,82 @@ public class DialogEqualizerFragment extends DialogFragment {
             public void onStopTrackingTouch(SeekBar seekBar) {
 
             }
+        });
+    }
+
+    /** The volume boost, 100 % to 200 %: heard at once, saved with the other settings, like the balance. */
+    private void bindBoost(@NonNull View view) {
+        SeekBar bar = view.findViewById(R.id.equalizer_boost);
+        TextView label = view.findViewById(R.id.equalizer_boost_label);
+        TextView value = view.findViewById(R.id.equalizer_boost_value);
+        if (bar == null || label == null || value == null) {
+            return; // a layout without the row (the fork's landscape crash) leaves the boost as it is
+        }
+        label.setTextColor(textColor);
+        value.setTextColor(textColor);
+        bar.getProgressDrawable().setColorFilter(new PorterDuffColorFilter(Color.DKGRAY, PorterDuff.Mode.SRC_IN));
+        bar.getThumb().setColorFilter(new PorterDuffColorFilter(themeColor, PorterDuff.Mode.SRC_IN));
+        bar.setMax(BalanceAudioProcessor.BOOST_MAX);
+        bar.setKeyProgressIncrement(10); // a remote steps by 10 %
+        bar.setProgress(Settings.boost);
+        value.setText(getString(R.string.equalizer_boost_value, 100 + Settings.boost));
+        bar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+            @Override
+            public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
+                Settings.boost = progress;
+                BalanceAudioProcessor.setBoost(progress);
+                value.setText(getString(R.string.equalizer_boost_value, 100 + progress));
+            }
+
+            @Override
+            public void onStartTrackingTouch(SeekBar seekBar) {
+
+            }
+
+            @Override
+            public void onStopTrackingTouch(SeekBar seekBar) {
+
+            }
+        });
+    }
+
+    /**
+     * A TV remote: the bands keep Up and Down (they change the level), so Right from the last band goes on to the
+     * knobs and Left from the first one back to the preset list above them; the top row is walked by links, and the
+     * remote starts on the balance, the first thing it can change. Off a TV nothing changes.
+     */
+    private void bindRemote(@NonNull View view) {
+        if (getDialog() == null || !ListFocus.isTv(requireContext())) {
+            return;
+        }
+        View back = view.findViewById(R.id.equalizer_back_btn);
+        back.setNextFocusRightId(R.id.equalizer_switch);
+        back.setNextFocusDownId(R.id.equalizer_balance);
+        view.findViewById(R.id.equalizer_switch).setNextFocusLeftId(R.id.equalizer_back_btn);
+        View balance = view.findViewById(R.id.equalizer_balance);
+        balance.setNextFocusUpId(R.id.equalizer_back_btn);
+        view.post(balance::requestFocus);
+        ViewGroup bands = view.findViewById(R.id.equalizerContainer);
+        getDialog().setOnKeyListener((dialog, keyCode, event) -> {
+            View focused = getDialog() == null ? null : getDialog().getCurrentFocus();
+            if (event.getAction() != KeyEvent.ACTION_DOWN || focused == null) {
+                return false;
+            }
+            View column = focused;
+            while (column != null && column.getParent() != bands) {
+                column = column.getParent() instanceof View ? (View) column.getParent() : null;
+            }
+            if (column == null) {
+                return false;
+            }
+            int index = bands.indexOfChild(column);
+            if (keyCode == KeyEvent.KEYCODE_DPAD_RIGHT && index == bands.getChildCount() - 1) {
+                return bassController.requestFocus();
+            }
+            if (keyCode == KeyEvent.KEYCODE_DPAD_LEFT && index == 0) {
+                return presetSpinner.requestFocus();
+            }
+            return false;
         });
     }
 
@@ -548,10 +613,6 @@ public class DialogEqualizerFragment extends DialogFragment {
 
         if (mEqualizer != null) {
             mEqualizer.release();
-        }
-
-        if (presetReverb != null) {
-            presetReverb.release();
         }
 
         Settings.isEditing = false;
