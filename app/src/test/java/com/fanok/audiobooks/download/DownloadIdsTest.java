@@ -164,4 +164,72 @@ public class DownloadIdsTest {
         List<String> rows = Arrays.asList("a", "s", "s", "b");
         assertArrayEquals(new int[]{1, 3, 2, -1}, DownloadIds.align(rows, Arrays.asList("s", "b", "s", "c")));
     }
+
+    private static String signed(String file, String signature) {
+        return "https://r4.audioknigi.xyz/a3f1/audio/" + file + ".mp3?md5=" + signature + "&expires=1793670303";
+    }
+
+    /** An expired signature: the chapter at the download's place in the list read again, same file, new query. */
+    @Test
+    public void aRefusedChapterIsRenewedWithItsFreshSignature() {
+        List<String> fresh = Arrays.asList(signed("c001", "new"), signed("c002", "new"), signed("c003", "new"));
+        List<DownloadIds.Entry> entries = DownloadIds.forBook(BOOK, fresh, null);
+        String id = DownloadIds.chapterId(BOOK, 1);
+
+        assertEquals(fresh.get(1), DownloadIds.renewedUrl(id, signed("c002", "old"), fresh, entries));
+        // the address did not change: renewing cannot help
+        assertNull(DownloadIds.renewedUrl(id, fresh.get(1), fresh, entries));
+        // the list no longer has that chapter
+        assertNull(DownloadIds.renewedUrl(DownloadIds.chapterId(BOOK, 3), signed("c004", "old"), fresh, entries));
+    }
+
+    /** A chapter inserted before it: its id now names another file, which must not continue its cached bytes. */
+    @Test
+    public void aChangedListLeavesTheDownloadAsItWas() {
+        List<String> fresh = Arrays.asList(signed("c000", "new"), signed("c001", "new"), signed("c002", "new"));
+        List<DownloadIds.Entry> entries = DownloadIds.forBook(BOOK, fresh, null);
+
+        assertNull(DownloadIds.renewedUrl(DownloadIds.chapterId(BOOK, 1), signed("c002", "old"), fresh, entries));
+        // another host is another file too
+        assertNull(DownloadIds.renewedUrl(DownloadIds.chapterId(BOOK, 2),
+                signed("c002", "old").replace("r4.", "r5."), fresh, entries));
+    }
+
+    /** Query-addressed files share one path: it does not tell which file the chapter now is. */
+    @Test
+    public void aPathSharedByOtherChaptersIsNoProof() {
+        List<String> fresh = Arrays.asList("https://baza-knig.top/get.php?file=3&sign=new",
+                "https://baza-knig.top/get.php?file=4&sign=new");
+        List<DownloadIds.Entry> entries = DownloadIds.forBook(BOOK, fresh, null);
+
+        assertNull(DownloadIds.renewedUrl(DownloadIds.chapterId(BOOK, 0),
+                "https://baza-knig.top/get.php?file=3&sign=old", fresh, entries));
+    }
+
+    /** One stream for many chapters, or a shared file where the site says so: its id names the file itself. */
+    @Test
+    public void aStreamIsRenewedByItsOwnHostAndPath() {
+        String hls = "https://media.4read.org/b/77/pl.m3u8?expires=2&md5=new";
+        List<String> fresh = Arrays.asList(hls, hls, hls);
+        List<DownloadIds.Entry> entries = DownloadIds.forBook(BOOK, fresh, null);
+        String id = DownloadIds.streamId(BOOK, hls);
+
+        assertEquals(hls, DownloadIds.renewedUrl(id, "https://media.4read.org/b/77/pl.m3u8?expires=1&md5=old",
+                fresh, entries));
+
+        String book = "https://golosknig.com/yacheyka-21-hellstrem-roslund";
+        String mp3 = "https://r1.akniga.club/s/b/92055/yacheyka-21.mp3?res=a&expires=2051222400";
+        List<String> chapters = Arrays.asList(mp3, mp3.replace("res=a", "res=b"));
+        List<DownloadIds.Entry> shared = DownloadIds.forBook(book, chapters, null);
+        assertEquals(mp3, DownloadIds.renewedUrl(shared.get(1).id, mp3.replace("2051222400", "1"), chapters, shared));
+    }
+
+    /** A legacy download is keyed by its full address: a new one would lose its bytes. */
+    @Test
+    public void aLegacyDownloadIsNotRenewed() {
+        List<String> fresh = Collections.singletonList(signed("c001", "new"));
+        List<DownloadIds.Entry> entries = DownloadIds.forBook(BOOK, fresh, null);
+
+        assertNull(DownloadIds.renewedUrl(entries.get(0).legacyId, signed("c001", "old"), fresh, entries));
+    }
 }

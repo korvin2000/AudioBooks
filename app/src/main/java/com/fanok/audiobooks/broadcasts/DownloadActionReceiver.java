@@ -17,6 +17,7 @@ import androidx.media3.exoplayer.offline.DownloadIndex;
 import androidx.media3.exoplayer.offline.DownloadService;
 import com.fanok.audiobooks.R;
 import com.fanok.audiobooks.download.DownloadMonitor;
+import com.fanok.audiobooks.download.DownloadRenewal;
 import com.fanok.audiobooks.service.ExoDownloadService;
 import com.fanok.audiobooks.util.DownloadUtil;
 import java.io.IOException;
@@ -69,6 +70,7 @@ public class DownloadActionReceiver extends BroadcastReceiver {
                     c, ExoDownloadService.class, /* contentId= */ null, APP_STOP_REASON, /* foreground= */ false);
 
         } else if ("RESUME_ALL".equals(a)) {
+            DownloadRenewal.forget(null);
             DownloadService.sendSetStopReason(
                     c, ExoDownloadService.class, /* contentId= */ null, Download.STOP_REASON_NONE, /* foreground= */ true);
         } else if ("CANCEL_ALL".equals(a)) {
@@ -87,6 +89,7 @@ public class DownloadActionReceiver extends BroadcastReceiver {
             }
         } else if ("RESUME".equals(a)) {
             for (String one : ids) {
+                DownloadRenewal.forget(one);
                 DownloadService.sendSetStopReason(c, ExoDownloadService.class, one, Download.STOP_REASON_NONE, true);
             }
         } else if ("CANCEL".equals(a)) {
@@ -97,10 +100,12 @@ public class DownloadActionReceiver extends BroadcastReceiver {
                 DownloadService.sendRemoveDownload(c, ExoDownloadService.class, one, false);
             }
         } else if ("RESTART".equals(a)) {
-            // Re-adding a failed download queues it again and keeps the bytes already in the cache.
+            // Re-adding a failed download queues it again and keeps the bytes already in the cache; an address the site
+            // refuses then is renewed from the book page (DownloadRenewal).
             for (String one : ids) {
                 Download download = idx.getDownload(one);
                 if (download != null && download.state == Download.STATE_FAILED) {
+                    DownloadRenewal.forget(one);
                     DownloadService.sendAddDownload(c, ExoDownloadService.class, download.request, false);
                 }
             }

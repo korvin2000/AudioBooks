@@ -123,6 +123,26 @@ public final class DownloadIds {
         return owned;
     }
 
+    /**
+     * The address download {@code id}, requested at {@code requestUrl}, is renewed with after the site refused it (an
+     * expired signature): the URL of its chapter in {@code urls}, the book's chapter list read again (with its
+     * {@code entries}, aligned), when that is the same file — the same host and path, which no other chapter of the
+     * book shares unless the id names the file itself (a stream) — under a new query. Null when the list no longer
+     * holds the download there, the file moved, the address did not change, or the id is a legacy one (keyed by its
+     * full address, a new address would lose its bytes): renewing cannot help.
+     */
+    public static String renewedUrl(String id, String requestUrl, List<String> urls, List<Entry> entries) {
+        if (bookKeyOfId(id) == null) return null;
+        for (int i = 0; i < urls.size(); i++) {
+            Entry entry = entries.get(i);
+            if (!entry.id.equals(id)) continue;
+            String url = urls.get(i);
+            boolean sameFile = (isStreamId(id) || !entry.legacyShared) && streamKey(url).equals(streamKey(requestUrl));
+            return sameFile && !url.equals(requestUrl) ? url : null;
+        }
+        return null;
+    }
+
     /** True for ids made by {@link #chapterId}/{@link #streamId} of this book. */
     public static boolean belongsTo(String downloadId, String bookUrl) {
         return downloadId != null && downloadId.startsWith(VERSION + "/" + bookKey(bookUrl) + "/");
