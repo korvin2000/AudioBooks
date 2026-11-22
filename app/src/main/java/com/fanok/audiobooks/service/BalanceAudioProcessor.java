@@ -149,6 +149,9 @@ public final class BalanceAudioProcessor extends BaseAudioProcessor {
         if (frames == 0) {
             return;
         }
+        if (SpectrumMeter.on) { // the cover's meter is shown: it reads the sound as it comes, the buffer untouched
+            SpectrumMeter.feed(inputBuffer, position, frames, frameSize, inputAudioFormat.sampleRate);
+        }
         ByteBuffer buffer = replaceOutputBuffer(frames * outputAudioFormat.bytesPerFrame);
         float[] target = channelGains;
         boolean night = nightSound;
@@ -276,6 +279,7 @@ public final class BalanceAudioProcessor extends BaseAudioProcessor {
             mix = new float[2 * block];
         }
         Arrays.fill(state, 0);
+        SpectrumMeter.flush(); // what the meter has from before a seek is not played
         //RBJ's band-pass of peak gain 1 at this stream's rate, computed once in double
         double w = 2 * Math.PI * BASS_HZ / Math.max(1, inputAudioFormat.sampleRate);
         double alpha = Math.sin(w) / (2 * BASS_Q);

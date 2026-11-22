@@ -1,4 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <integer name="isTablet">1</integer>
+    <!-- the cover with the player, larger on a tablet -->
+    <dimen name="cover_chapter_size">28sp</dimen>
+    <dimen name="cover_line_size">16sp</dimen>
+    <dimen name="cover_meter_width">144dp</dimen>
+    <dimen name="cover_meter_height">72dp</dimen>
+    <dimen name="cover_controls_height">128dp</dimen>
+    <dimen name="cover_glyph_pad">40dp</dimen>
+    <dimen name="cover_play_plate">88dp</dimen>
+    <dimen name="cover_play_pad">22dp</dimen>
 </resources>

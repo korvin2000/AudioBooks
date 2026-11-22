@@ -81,4 +81,15 @@
     <!-- the play button's round plate: in the folded player's row and, larger, in the open player's -->
     <dimen name="player_play_plate">44dp</dimen>
     <dimen name="player_play_plate_open">56dp</dimen>
+
+    <!-- the cover with the player (dialog_cover_player): the chapter and the line under it, the spectrum meter, the
+         buttons' row, the padding that leaves a side button its glyph, the play plate and its glyph's padding -->
+    <dimen name="cover_chapter_size">22sp</dimen>
+    <dimen name="cover_line_size">14sp</dimen>
+    <dimen name="cover_meter_width">96dp</dimen>
+    <dimen name="cover_meter_height">48dp</dimen>
+    <dimen name="cover_controls_height">96dp</dimen>
+    <dimen name="cover_glyph_pad">28dp</dimen>
+    <dimen name="cover_play_plate">72dp</dimen>
+    <dimen name="cover_play_pad">18dp</dimen>
 </resources>

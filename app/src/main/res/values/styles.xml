@@ -224,22 +224,12 @@
     </style>
 
 
-    <style name="ImageFullScreen" parent="Theme.MaterialComponents.NoActionBar.Bridge">
-        <item name="android:windowActivityTransitions">true</item>
-        <item name="windowActionBarOverlay">true</item>
-        <item name="android:statusBarColor">@color/actionBarTrac</item>
-
-        <!-- specify enter and exit transitions -->
-        <!--<item name="android:windowEnterTransition">@transition/explode</item>
-        <item name="android:windowExitTransition">@transition/explode</item>
--->
-        <!-- specify shared element transitions -->
-        <item name="android:windowSharedElementEnterTransition">
-            @transition/change_image_transform
-        </item>
-        <item name="android:windowSharedElementExitTransition">
-            @transition/change_image_transform
-        </item>
+    <!-- The cover with the player (CoverPlayer): a dialog over the whole screen, laid over the book screen's theme -->
+    <style name="CoverPlayer">
+        <item name="android:windowIsFloating">false</item>
+        <item name="android:windowNoTitle">true</item>
+        <item name="android:windowBackground">?attr/backgraundColor</item>
+        <item name="android:windowAnimationStyle">@android:style/Animation.Dialog</item>
     </style>
 
     <style name="LightAppTheme.Popup" parent="LightAppTheme.NoActionBar">

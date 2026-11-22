@@ -323,6 +323,16 @@ public class BookActivity extends MvpAppCompatActivity implements Activity {
 
     @SuppressLint("UnsafeOptInUsageError")
     private AudioAdapter mAudioAdapter;
+
+    /** The cover with the player, while it is open ({@link #showCoverPlayer}); and the poster it was opened with. */
+    @Nullable
+    private CoverPlayer mCoverPlayer;
+    @Nullable
+    private String mCoverPoster;
+    private static final String STATE_COVER_PLAYER = "coverPlayer";
+    private static final String STATE_COVER_POSTER = "coverPoster";
+    /** The play buttons' icon as the player last set it: the cover's player opens with it. */
+    private int mPlayIcon = R.drawable.ic_play;
     private final BroadcastReceiver setImage = new BroadcastReceiver() {
         @Override
         public void onReceive(Context context, Intent intent) {
@@ -851,14 +861,7 @@ public class BookActivity extends MvpAppCompatActivity implements Activity {
             });
             new SeekHold(mNextTop, true, true);
         }
-        mPlayBottom.setOnClickListener(view -> mPresenter.buttomPlayClick(view));
-        new SwitchBookHold().attach(mPlayBottom);
-        mPreviousBottom.setOnClickListener(view -> jumpChapter(view, false));
-        mNextBottom.setOnClickListener(view -> jumpChapter(view, true));
-        mRewind.setOnClickListener(view -> mPresenter.buttomRewindClick(view));
-        mForward.setOnClickListener(view -> mPresenter.buttomForwardClick(view));
-        new SeekHold(mRewind, false, false);
-        new SeekHold(mForward, true, false);
+        bindControls(mRewind, mPreviousBottom, mPlayBottom, mNextBottom, mForward);
         mSpeed.setOnClickListener(v -> mPresenter.buttonSpeedClick(v));
         getSystemService(AUDIO_SERVICE);
 
@@ -892,8 +895,64 @@ public class BookActivity extends MvpAppCompatActivity implements Activity {
             }
         });
 
+        if (savedInstanceState != null && savedInstanceState.getBoolean(STATE_COVER_PLAYER)) {
+            showCoverPlayer(savedInstanceState.getString(STATE_COVER_POSTER)); // open before the rotation
+        }
+    }
 
+    /** The open player's five buttons: the sheet's bottom row, or the cover's ({@link #showCoverPlayer}). */
+    private void bindControls(@NonNull View rewind, @NonNull View previous, @NonNull View play, @NonNull View next,
+            @NonNull View forward) {
+        play.setOnClickListener(view -> mPresenter.buttomPlayClick(view));
+        new SwitchBookHold().attach(play);
+        previous.setOnClickListener(view -> jumpChapter(view, false));
+        next.setOnClickListener(view -> jumpChapter(view, true));
+        rewind.setOnClickListener(view -> mPresenter.buttomRewindClick(view));
+        forward.setOnClickListener(view -> mPresenter.buttomForwardClick(view));
+        new SeekHold(rewind, false, false);
+        new SeekHold(forward, true, false);
+    }
 
+    /**
+     * The description's cover was tapped: the cover over the whole screen with the player ({@link CoverPlayer}). It
+     * shows the book's own or downloaded cover, else {@code poster} (the description's, larger than the list's), else
+     * the list's; its buttons have the sheet's handlers, and what it shows follows the player as the sheet does.
+     */
+    public void showCoverPlayer(@Nullable String poster) {
+        if (mCoverPlayer != null || isFinishing()) {
+            return;
+        }
+        mCoverPoster = poster;
+        String local = DownloadStorageHelper.findLocalCoverForBook(this, mBookPOJO);
+        String photo = local != null && !local.isEmpty() ? local
+                : poster != null && !poster.trim().isEmpty() ? poster : mBookPOJO.getPhoto();
+        CoverPlayer cover = new CoverPlayer(this, mBookPOJO, photo);
+        bindControls(cover.rewind, cover.previous, cover.play, cover.next, cover.forward);
+        cover.setOnKeyListener((dialog, keyCode, event) -> handleUserInput(this, event)); // a remote's media keys
+        cover.setOnDismissListener(dialog -> {
+            if (mActiveSeekHold != null) {
+                mActiveSeekHold.finish(true); // held as it closed: its window took the release with it
+            }
+            mCoverPlayer = null;
+            hideSeekUndo(); // it was shown over the cover
+        });
+        mCoverPlayer = cover;
+        cover.showPlaying(mPlayIcon, getString(mPlayIcon == R.drawable.ic_pause ? R.string.pause : R.string.play));
+        if (!mShowingCount) {
+            cover.showChapter(mNameCurent.getText());
+        }
+        bindProgress();
+        cover.show();
+        broadcastSend(new Intent(Broadcast_SHOW_TITLE)); // the player answers with its chapter, icon and progress
+    }
+
+    @Override
+    protected void onSaveInstanceState(@NonNull Bundle outState) {
+        super.onSaveInstanceState(outState);
+        if (mCoverPlayer != null) {
+            outState.putBoolean(STATE_COVER_PLAYER, true);
+            outState.putString(STATE_COVER_POSTER, mCoverPoster);
+        }
     }
 
     @Override
@@ -1076,12 +1135,13 @@ public class BookActivity extends MvpAppCompatActivity implements Activity {
 
     /**
      * Where the book stands, reckoned as the description's time line is ({@link RemainingTime}): the line under the
-     * playing chapter's name and the block's progress. It follows the progress this screen already receives while
-     * the book plays, else its saved place; the views change only when their text does, about once a minute.
+     * playing chapter's name (the cover player's too) and the block's progress. It follows the progress this screen
+     * already receives while the book plays, else its saved place; the views change only when their text does, about
+     * once a minute.
      */
     private void bindProgress() {
         String url = mBookPOJO.getUrl();
-        if (mNameSub == null || url == null) {
+        if (url == null || mNameSub == null && mCoverPlayer == null) {
             return;
         }
         int[] seconds = BookProgress.seconds(url);
@@ -1099,7 +1159,10 @@ public class BookActivity extends MvpAppCompatActivity implements Activity {
         long position = live ? BookProgress.positionMs(url) : mCheckpoint != null ? mCheckpoint.positionMs : 0;
         RemainingTime.Line line = mRemaining.at(chapter, position, BookPresenter.getSpeed());
         String subtitle = other ? "" : ChapterText.subtitle(line, mRemaining.total());
-        if (!subtitle.contentEquals(mNameSub.getText())) {
+        if (mCoverPlayer != null) {
+            mCoverPlayer.showLine(subtitle);
+        }
+        if (mNameSub != null && !subtitle.contentEquals(mNameSub.getText())) {
             mNameSub.setText(subtitle);
             show(mNameSub, !mShowingCount && mNameSubFits && !subtitle.isEmpty());
         }
@@ -1236,12 +1299,15 @@ public class BookActivity extends MvpAppCompatActivity implements Activity {
         int state = bottomSheetBehavior == null ? BottomSheetBehavior.STATE_EXPANDED : bottomSheetBehavior.getState();
         boolean open = state != BottomSheetBehavior.STATE_COLLAPSED && state != BottomSheetBehavior.STATE_HIDDEN;
         //the open sheet is drawn in its own layer over the screen: a bar made on the screen would be under it
-        View host = open && bottomSheetBehavior != null ? mPlayer : findViewById(R.id.view_pager);
+        View host = mCoverPlayer != null ? mCoverPlayer.controls
+                : open && bottomSheetBehavior != null ? mPlayer : findViewById(R.id.view_pager);
         Snackbar bar = Snackbar.make(host,
                 getString(R.string.seek_undo, ChapterText.duration((int) (positionMs / 1000)), name),
                 (int) SeekUndo.WINDOW_MS)
                 .setAction(R.string.seek_undo_action, v -> broadcastSend(new Intent(Broadcast_SEEK_UNDO)));
-        if (open) {
+        if (mCoverPlayer != null) {
+            bar.setAnchorView(mCoverPlayer.controls); // over the cover with the player, above its buttons
+        } else if (open) {
             //above the open player's seek bar and buttons, which stay free to use meanwhile
             bar.setAnchorView((View) mSeekBar.getParent());
         } else if (state == BottomSheetBehavior.STATE_COLLAPSED) {
@@ -1371,7 +1437,7 @@ public class BookActivity extends MvpAppCompatActivity implements Activity {
         registerInternalReceiver(showEqualizer, Broadcast_SHOW_EQUALIZER);
         broadcastSend(new Intent(Broadcast_SHOW_TITLE));
         if (mAudioAdapter != null) mAudioAdapter.startLive();
-        if (mNameSub != null && mBookPOJO.getUrl() != null) {
+        if (mBookPOJO.getUrl() != null) { // the cover player shows it on every layout
             mCheckpoint = new StorageUtil(this).loadCheckpoint(mBookPOJO.getUrl());
             BookProgress.addListener(mBookProgress);
             bindProgress();
@@ -1421,6 +1487,9 @@ public class BookActivity extends MvpAppCompatActivity implements Activity {
             mBookmarks.release();
         }
         comentsCount.dispose();
+        if (mCoverPlayer != null) {
+            mCoverPlayer.dismiss(); // a rotation: onSaveInstanceState has it opened again
+        }
         if (isFinishing() && !replaced) {
             com.fanok.audiobooks.model.ComentsModel.cancel(mBookPOJO.getUrl());
         }
@@ -1873,8 +1942,12 @@ public class BookActivity extends MvpAppCompatActivity implements Activity {
 
     @Override
     public void showTitle(@NotNull @NonNull String name) {
+        CharSequence chapter = ChapterText.colored(name, mDigitColor, mSymbolColor);
         if (!mShowingCount) {
-            mNameCurent.setText(ChapterText.colored(name, mDigitColor, mSymbolColor));
+            mNameCurent.setText(chapter);
+        }
+        if (mCoverPlayer != null) {
+            mCoverPlayer.showChapter(chapter);
         }
     }
 
@@ -1962,6 +2035,9 @@ public class BookActivity extends MvpAppCompatActivity implements Activity {
     }
 
     private void showTime(int timeCurent, int timeEnd, int buffered) {
+        if (mCoverPlayer != null) {
+            mCoverPlayer.showTime(timeCurent, timeEnd);
+        }
         if (mProgressBar != null) {
             mProgressBar.setMax(timeEnd);
             mProgressBar.setProgress(timeCurent);
@@ -1994,6 +2070,10 @@ public class BookActivity extends MvpAppCompatActivity implements Activity {
     @Override
     public void setImageDrawable(int id) {
         String label = getString(id == R.drawable.ic_pause ? R.string.pause : R.string.play);
+        mPlayIcon = id;
+        if (mCoverPlayer != null) {
+            mCoverPlayer.showPlaying(id, label);
+        }
         if (mPlayTop != null) {
             mPlayTop.setImageResource(id);
             mPlayTop.setContentDescription(label);
