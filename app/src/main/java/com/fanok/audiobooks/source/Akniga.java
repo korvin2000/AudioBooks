@@ -11,10 +11,14 @@ import static com.fanok.audiobooks.source.Json.seconds;
 import static com.fanok.audiobooks.source.Json.string;
 import static com.fanok.audiobooks.source.Players.resolve;
 
+import android.content.SharedPreferences;
+import android.text.TextUtils;
 import android.util.Log;
 
 import androidx.annotation.Nullable;
+import androidx.preference.PreferenceManager;
 
+import com.fanok.audiobooks.App;
 import com.fanok.audiobooks.R;
 import com.fanok.audiobooks.Url;
 import com.fanok.audiobooks.model.BookPages;
@@ -38,6 +42,7 @@ import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParseException;
 import com.google.gson.JsonParser;
+import com.google.gson.JsonPrimitive;
 
 import io.reactivex.functions.BooleanSupplier;
 
@@ -66,7 +71,8 @@ import okhttp3.HttpUrl;
  * collections). The authors, readers and sections are one table shape. Search {@code /search/books/page<N>/?q=Q};
  * the author and reader searches are ajax endpoints POSTed with the page's security key ({@link #fetch}), one page
  * only. Book pages give a security key and a book id; the chapters come from {@code /ajax/player/token} and
- * {@code /ajax/b/<bid>} as one encrypted HLS URL clipped per chapter. The series is a block of the page or a
+ * {@code /ajax/b/<bid>} as one encrypted HLS URL clipped per chapter; when the site has changed the passphrase, its
+ * own player is asked ({@link #playerStream}). The series is a block of the page or a
  * {@code /series/} page; the comments are on the page, the rest in its RSS feed. Other narrations are found by
  * searching the title and author.
  */
@@ -74,8 +80,32 @@ public final class Akniga implements SourceParser {
 
     private static final String TAG = "ComentsModel";
 
-    /** Passphrase reverse-engineered from akniga's obfuscated player script. */
-    private static final String PASSPHRASE = "EKxtcg46V";
+    /**
+     * The passphrases akniga's obfuscated player script holds and tries one after another ({@code plh.getHres}); here
+     * they are {@code plh.assets3()}, {@code assets2()} and {@code assets()}, the one the site answers with today
+     * first. The site moves from one to another (23.11.2026: from the second to the first); a passphrase the script
+     * gains is added here, and until then learned from the player itself ({@link #playerStream}). Golosknig keeps
+     * its own.
+     */
+    static final String[] PASSPHRASES = {"5Z7EGM9MaLvAlAWi69U4fzW4", "EKxtcg46V", "ymXEKzvUkuo5G03.1C159BD535E9793"};
+    /** What the player accepts as a decrypted {@code hres}. */
+    private static final Pattern STREAM_URL = Pattern.compile("^(https?:)?//\\S+$");
+    /** Where the passphrases learned from the player are kept, one a line. */
+    private static final String PREF_PASSPHRASES = "akniga_passphrases";
+    /**
+     * Asked of the page's scripts with an {@code hres} as the argument: the stream the player makes of it
+     * ({@code plh.getHres}) and every passphrase it hands {@code CryptoJS.AES.decrypt} on the way; an empty
+     * {@code hres} first makes it try them all.
+     */
+    private static final String ASK_PLAYER = "(function(h){var keys=[],url=null;"
+            + "try{var aes=CryptoJS.AES,real=aes.decrypt;aes.decrypt=function(c,k){"
+            + "if(typeof k==='string'&&keys.indexOf(k)<0)keys.push(k);return real.apply(this,arguments)}}catch(e){}"
+            + "try{plh.getHres('')}catch(e){}try{url=plh.getHres(h)}catch(e){}"
+            + "return JSON.stringify({url:url,keys:keys})})";
+    /** Passphrases learned from the player beyond {@link #PASSPHRASES}; null until read from the preferences. */
+    private static List<String> learned;
+    /** The scripts (their addresses) of the page whose player had no answer: not asked again until they change. */
+    private static String unanswered = "";
     /** LiveStreet's answer to a key of another session (akniga's player token, golosknig's playlist). */
     static final String HACKING = "Hacking attemp";
     private static final Pattern SECURITY_KEY
@@ -287,6 +317,7 @@ public final class Akniga implements SourceParser {
             answer = tokenAnswer(doc, url);
         }
         String book = null;
+        String stream = "";
         if (answer != null) {
             String bid = bid(doc);
             book = SiteHttp.body(post(url, "/ajax/b/" + bid)
@@ -294,8 +325,9 @@ public final class Akniga implements SourceParser {
                     .data("bid", bid)
                     .data("token", string(object(answer), "token"))
                     .data("hls", "true"));
+            stream = playerStream(doc, url, hres(object(book)));
         }
-        return parseTracks(doc, book, url);
+        return parseTracks(doc, book, url, stream);
     }
 
     /** The player token's answer for the page's key and book; null when the page has neither. */
@@ -968,16 +1000,21 @@ public final class Akniga implements SourceParser {
      * URL shared by all chapters, each clipped by its start/finish time.
      */
     public static ArrayList<AudioPOJO> parseTracks(Document doc, String bookJson, String bookUrl) {
+        return parseTracks(doc, bookJson, bookUrl, "");
+    }
+
+    /** {@code stream}: the HLS URL the site's own player made of the answer's {@code hres}; "" to decrypt it here. */
+    static ArrayList<AudioPOJO> parseTracks(Document doc, String bookJson, String bookUrl, String stream) {
         String bookName = Html.text(doc.selectFirst(".caption__article-main"));
         Chapters chapters = new Chapters(bookName, bookUrl);
         String why = ""; // what the site answered instead, for the report; "" when the page had no player key
         if (bookJson != null) {
             JsonObject book = object(bookJson);
-            JsonElement hres = book.get("hres");
-            String hls = hres == null ? "" : decryptHres(hres.isJsonPrimitive() ? hres.getAsString() : hres.toString());
+            String hres = hres(book);
+            String hls = !stream.isEmpty() ? stream : hres.isEmpty() ? "" : decryptHres(hres);
             // {"error":true,"error_reason":"token"}: the player token refused, which the site's own player asks again
             why = book.has("error") ? ", refused: " + string(book, "error_reason")
-                    : hres != null && hls.isEmpty() ? ", hres not decryptable" : "";
+                    : !hres.isEmpty() && hls.isEmpty() ? ", hres not decryptable" : "";
             if (!hls.isEmpty()) {
                 JsonElement items = book.get("items");
                 if (items != null && items.isJsonPrimitive()) {
@@ -1072,28 +1109,149 @@ public final class Akniga implements SourceParser {
     }
 
     /**
-     * Decrypts akniga's {@code hres} (the HLS playlist URL), a {@link CryptoJs} JSON. Returns "" when it cannot be
-     * decrypted.
+     * Decrypts akniga's {@code hres} (the HLS playlist URL), a {@link CryptoJs} JSON, with the first of the
+     * {@link #passphrases} that leaves a URL, as the player does: a wrong passphrase mostly fails the padding, and now
+     * and then leaves garbage. Returns "" when none decrypts it.
      */
     public static String decryptHres(String hresJson) {
-        try {
-            String result = CryptoJs.decrypt(hresJson, PASSPHRASE).trim();
-            // a JSON string like "https:\/\/r1.akniga.club\/b\/111286\/pl.m3u8?…", a list of them or {url}
+        for (String passphrase : passphrases()) {
             try {
-                JsonElement value = JsonParser.parseString(result);
-                if (value.isJsonArray() && value.getAsJsonArray().size() > 0) {
-                    value = value.getAsJsonArray().get(0);
-                } else if (value.isJsonObject()) {
-                    value = value.getAsJsonObject().get("url");
+                String result = CryptoJs.decrypt(hresJson, passphrase).trim();
+                // a JSON string like "https:\/\/r1.akniga.club\/b\/111286\/pl.m3u8?…", a list of them or {url}
+                try {
+                    JsonElement value = JsonParser.parseString(result);
+                    if (value.isJsonArray() && value.getAsJsonArray().size() > 0) {
+                        value = value.getAsJsonArray().get(0);
+                    } else if (value.isJsonObject()) {
+                        value = value.getAsJsonObject().get("url");
+                    }
+                    result = string(value);
+                } catch (JsonParseException notJson) {
+                    result = result.replace("\\/", "/");
                 }
-                result = string(value);
-            } catch (JsonParseException notJson) {
-                result = result.replace("\\/", "/");
+                String url = streamUrl(result);
+                if (!url.isEmpty()) {
+                    return url;
+                }
+            } catch (RuntimeException wrongPassphrase) {
+                // the next one
             }
-            return resolve(Url.SERVER_AKNIGA + "/", result);
-        } catch (Exception e) {
+        }
+        return "";
+    }
+
+    /** The {@code hres} of a {@code /ajax/b/<bid>} answer as {@link #decryptHres} reads it; "" when it has none. */
+    private static String hres(JsonObject book) {
+        JsonElement hres = book.get("hres");
+        return hres == null ? "" : hres.isJsonPrimitive() ? hres.getAsString() : hres.toString();
+    }
+
+    /** {@code url} when it is what the player accepts as a stream, absolute; else "". */
+    private static String streamUrl(String url) {
+        return STREAM_URL.matcher(url).matches() ? resolve(Url.SERVER_AKNIGA + "/", url) : "";
+    }
+
+    // ---------------------------------------------------------------- the site's own player
+
+    /** The passphrases learned from the player, then {@link #PASSPHRASES}. */
+    private static synchronized List<String> passphrases() {
+        if (learned == null) {
+            learned = new ArrayList<>();
+            SharedPreferences pref = prefs();
+            for (String passphrase : (pref == null ? "" : pref.getString(PREF_PASSPHRASES, "")).split("\n")) {
+                if (!passphrase.isEmpty()) {
+                    learned.add(passphrase);
+                }
+            }
+        }
+        List<String> all = new ArrayList<>(learned);
+        all.addAll(Arrays.asList(PASSPHRASES));
+        return all;
+    }
+
+    @Nullable
+    private static SharedPreferences prefs() {
+        App app = App.getInstance();
+        return app == null ? null : PreferenceManager.getDefaultSharedPreferences(app);
+    }
+
+    /**
+     * The stream of an {@code hres} no passphrase here opens, asked of the site's own player: the page's scripts run
+     * off screen ({@link PageScripts}) and decrypt it themselves, which also shows the passphrases they use
+     * ({@link #learn}), so the books after this one are decrypted here again. One book at a time; "" when the player
+     * cannot be asked or does not know either, and then it is not asked again until the page's scripts change.
+     */
+    private static synchronized String playerStream(Document doc, String bookUrl, String hres) {
+        if (hres.isEmpty() || !decryptHres(hres).isEmpty()) {
+            return ""; // read here: nothing to ask, or the book before this one has just asked
+        }
+        String player = doc.select("script[src]").eachAttr("abs:src").toString();
+        if (player.equals(unanswered) || !PageScripts.canAsk()) {
             return "";
         }
+        try {
+            String answer = PageScripts.ask(bookUrl, scripts(doc, bookUrl),
+                    ASK_PLAYER + "(" + new JsonPrimitive(hres) + ")");
+            if (answer == null) {
+                return "";
+            }
+            String stream = learn(answer);
+            if (stream.isEmpty() && decryptHres(hres).isEmpty()) {
+                unanswered = player;
+            }
+            return stream;
+        } catch (IOException | RuntimeException e) {
+            Log.w(TAG, "akniga's player was not asked about " + bookUrl, e);
+            return "";
+        }
+    }
+
+    /** The page's scripts in its order: those in the page and the site's own files, not the third parties'. */
+    private static List<String> scripts(Document doc, String bookUrl) throws IOException {
+        List<String> scripts = new ArrayList<>();
+        for (Element script : doc.select("script")) {
+            String type = script.attr("type");
+            String src = script.absUrl("src");
+            if (!type.isEmpty() && !type.contains("javascript")) {
+                continue; // data, not a script (ld+json)
+            }
+            if (!script.hasAttr("src")) {
+                scripts.add(script.data());
+            } else if (Url.isHost(src, Url.SERVER_AKNIGA)) {
+                scripts.add(SiteHttp.body(SiteHttp.connect(src).referrer(bookUrl)));
+            }
+        }
+        return scripts;
+    }
+
+    /**
+     * What the player answered ({@link #ASK_PLAYER}, as {@code evaluateJavascript} hands it over): the passphrases it
+     * used that are not in {@link #PASSPHRASES} replace those learned before and are kept for the next start. Returns
+     * the stream it made of the {@code hres}, "" when it made none.
+     */
+    static synchronized String learn(String answer) {
+        JsonObject said = object(string(Json.parse(answer)));
+        List<String> used = new ArrayList<>();
+        JsonElement keys = said.get("keys");
+        if (keys != null && keys.isJsonArray()) {
+            for (JsonElement key : keys.getAsJsonArray()) {
+                String passphrase = string(key);
+                if (!passphrase.isEmpty() && passphrase.length() <= 256 && passphrase.indexOf('\n') < 0
+                        && used.size() < 16 && !used.contains(passphrase)
+                        && !Arrays.asList(PASSPHRASES).contains(passphrase)) {
+                    used.add(passphrase);
+                }
+            }
+        }
+        passphrases(); // those of the preferences first
+        if (!used.isEmpty() && !used.equals(learned)) {
+            learned = used;
+            SharedPreferences pref = prefs();
+            if (pref != null) {
+                pref.edit().putString(PREF_PASSPHRASES, TextUtils.join("\n", used)).apply();
+            }
+        }
+        return streamUrl(string(said, "url"));
     }
 
     // ---------------------------------------------------------------- series
